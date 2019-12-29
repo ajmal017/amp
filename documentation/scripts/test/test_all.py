@@ -430,3 +430,107 @@ $$"""
         act = dslt._process(txt, file_name)
         act = prnt.remove_empty_lines(act)
         self.assert_equal(act, exp)
+
+    @staticmethod
+    def _get_text_problematic_for_prettier1():
+        txt = r"""
+* Python formatting
+- Python has several built-in ways of formatting strings
+  1) `%` format operator
+  2) `format` and `str.format`
+
+
+* `%` format operator
+- Text template as a format string
+  - Values to insert are provided as a value or a `tuple`
+"""
+        return txt
+
+    def test_process_prettier_bug1(self):
+        """
+        For some reason prettier replaces - with * when there are 2 empty lines.
+        """
+        txt = self._get_text_problematic_for_prettier1()
+        exp = r"""- Python formatting
+
+* Python has several built-in ways of formatting strings
+  1. `%` format operator
+  2. `format` and `str.format`
+
+- `%` format operator
+
+* Text template as a format string
+  - Values to insert are provided as a value or a `tuple`
+"""
+        act = dslt._prettier(txt)
+        self.assert_equal(act, exp)
+
+    def test_process5(self):
+        """
+        Run the text linter on a txt file.
+        """
+        txt = self._get_text_problematic_for_prettier1()
+        exp = r"""* Python formatting
+- Python has several built-in ways of formatting strings
+
+  1. `%` format operator
+  2. `format` and `str.format`
+
+* `%` format operator
+- Text template as a format string
+  - Values to insert are provided as a value or a `tuple`
+"""
+        file_name = os.path.join(self.get_scratch_space(), "test.txt")
+        act = dslt._process(txt, file_name)
+        self.assert_equal(act, exp)
+
+    @pytest.mark.skip
+    def test_process6(self):
+        """
+        Run the text linter on a txt file.
+        """
+        txt = r"""
+* `str.format`
+- Python 3 allows to format multiple values, e.g.,
+   ```python
+   key = 'my_var'
+   value = 1.234
+   ```
+"""
+        exp = r"""
+* `str.format`
+- Python 3 allows to format multiple values, e.g.,
+  ```python
+  key = 'my_var'
+  value = 1.234
+  ```
+"""
+        file_name = os.path.join(self.get_scratch_space(), "test.txt")
+        act = dslt._process(txt, file_name)
+        self.assert_equal(act, exp)
+
+    @pytest.mark.skip
+    def test_process7(self):
+        """
+        Run the text linter on a txt file.
+        """
+        txt = r"""
+* `str`-`bytes` gotchas
+- You can't mix `str` and `bytes` even if they seem to be equivalent
+  ```python
+  b'one' + 'two'
+  >>>
+  TypeError: can't concat str to bytes
+  ```
+- Comparing `bytes` and `str` is always `False`
+  ```python
+  print(b'foo' == 'foo')
+  >>>
+  False
+  ```
+"""
+        exp = r"""
+"""
+        file_name = os.path.join(self.get_scratch_space(), "test.txt")
+        act = dslt._process(txt, file_name)
+        self.assert_equal(act, exp)

@@ -87,8 +87,8 @@ def _process_single_line_comment(line: str) -> bool:
     """
     do_continue = False
     if line.startswith(r"%%") or line.startswith(r"//"):
-        _LOG.debug("  -> skip")
         do_continue = True
+        _LOG.debug("  -> do_continue=True")
         return do_continue
     # Skip frame.
     if (
@@ -97,24 +97,27 @@ def _process_single_line_comment(line: str) -> bool:
         or re.match(r"\#+ =====", line)
         or re.match(r"\#+ \/\/\/\/\/", line)
     ):
-        _LOG.debug("  -> skip")
         do_continue = True
+        _LOG.debug("  -> do_continue=True")
         return do_continue
+    # Nothing to do.
     return do_continue
 
 
-def _process_abbreviations(line: str) -> str:
+def _process_abbreviations(in_line: str) -> str:
     r"""
     Transform
         - `->` into `$\rightarrow`
     """
-    # line = re.sub("([^\s])->(\s)", r"\1$\rightarrow\2", line)
+    line = in_line
     for x, y in [
             (r"=>", r"\implies"),
             (r"->", r"\rightarrow"),
             (r"-^", r"\uparrow"),
             (r"-v", r"\downarrow")]:
         line = re.sub(r"(\s)%s(\s)" % re.escape(x), r"\1$%s$\2" % re.escape(y), line)
+    if line != in_line:
+        _LOG.debug("    -> line=%s", line)
     return line
 
 

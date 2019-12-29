@@ -181,6 +181,10 @@
 - We keep the time series data (aka payload) and the KG data separated
 - The KG contains metadata and pointers to the payload for each time series
 
+## 
+
+# Implementation details
+
 ## DataSourceAdapters
 
 - `Adapters` are equivalent to `ETL1` "Fillers"
