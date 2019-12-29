@@ -80,7 +80,7 @@ def _preprocess(txt: str) -> str:
     txt_new_as_str = "\n".join(txt_new)
     # Replace multiple empty lines with one, to avoid prettier to start using
     # `*` instead of `-`.
-    txt_new_as_str = re.sub(r'\n\s*\n', '\n\n', txt_new_as_str)
+    txt_new_as_str = re.sub(r"\n\s*\n", "\n\n", txt_new_as_str)
     #
     _LOG.debug("txt_new_as_str=%s", txt_new_as_str)
     return txt_new_as_str
@@ -107,7 +107,7 @@ def _prettier(txt: str) -> str:
     cmd_opts.append("2>&1 >/dev/null")
     cmd_opts_as_str = " ".join(cmd_opts)
     cmd_as_str = " ".join([executable, cmd_opts_as_str])
-    rc, output_tmp = si.system_to_string(cmd_as_str, abort_on_error=True)
+    _, output_tmp = si.system_to_string(cmd_as_str, abort_on_error=True)
     _LOG.debug("output_tmp=%s", output_tmp)
     #
     txt = io_.from_file(tmp_file_name)
@@ -179,7 +179,9 @@ def _refresh_toc(txt: str) -> str:
     txt = io_.from_file(tmp_file_name)
     return txt
 
+
 # #############################################################################
+
 
 def _to_execute_action(action, actions):
     to_execute = actions is None or action in actions
@@ -188,8 +190,9 @@ def _to_execute_action(action, actions):
     return to_execute
 
 
-def _process(txt: str, in_file_name: str, actions: Optional[List[str]] = None)\
-        -> str:
+def _process(
+    txt: str, in_file_name: str, actions: Optional[List[str]] = None
+) -> str:
     # Pre-process text.
     action = "preprocess"
     if _to_execute_action(action, actions):
@@ -210,16 +213,14 @@ def _process(txt: str, in_file_name: str, actions: Optional[List[str]] = None)\
             txt = _refresh_toc(txt)
     return txt
 
-import helpers.parser as prsr
-
 
 # #############################################################################
 
 _VALID_ACTIONS = [
-"preprocess",
-"prettier",
-"postprocess",
-"refresh_toc",
+    "preprocess",
+    "prettier",
+    "postprocess",
+    "refresh_toc",
 ]
 
 

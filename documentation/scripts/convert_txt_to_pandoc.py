@@ -111,11 +111,14 @@ def _process_abbreviations(in_line: str) -> str:
     """
     line = in_line
     for x, y in [
-            (r"=>", r"\implies"),
-            (r"->", r"\rightarrow"),
-            (r"-^", r"\uparrow"),
-            (r"-v", r"\downarrow")]:
-        line = re.sub(r"(\s)%s(\s)" % re.escape(x), r"\1$%s$\2" % re.escape(y), line)
+        (r"=>", r"\implies"),
+        (r"->", r"\rightarrow"),
+        (r"-^", r"\uparrow"),
+        (r"-v", r"\downarrow"),
+    ]:
+        line = re.sub(
+            r"(\s)%s(\s)" % re.escape(x), r"\1$%s$\2" % re.escape(y), line
+        )
     if line != in_line:
         _LOG.debug("    -> line=%s", line)
     return line

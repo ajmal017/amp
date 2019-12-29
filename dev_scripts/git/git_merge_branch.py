@@ -172,6 +172,7 @@ _VALID_ACTIONS = [
     "merge",
 ]
 
+
 def _main(parser):
     args = parser.parse_args()
     dbg.init_logger(verbosity=args.log_level, use_exec_path=True)
