@@ -341,10 +341,18 @@ $$"""
 
     # #########################################################################
 
+    def _helper_process(self, txt, exp, file_name):
+        file_name = os.path.join(self.get_scratch_space(), file_name)
+        act = dslt._process(txt, file_name)
+        if exp:
+            self.assert_equal(act, exp)
+        return act
+
     def test_process1(self):
         txt = self._get_text1()
-        file_name = os.path.join(self.get_scratch_space(), "test.txt")
-        act = dslt._process(txt, file_name)
+        exp = None
+        file_name = "test.txt"
+        act = self._helper_process(txt, exp, file_name)
         self.check_string(act)
 
     def test_process2(self):
@@ -362,9 +370,8 @@ $$"""
 1. Choose the right tasks
    - Avoid non-essential tasks
 """
-        file_name = os.path.join(self.get_scratch_space(), "test.txt")
-        act = dslt._process(txt, file_name)
-        self.assert_equal(act, exp)
+        file_name = "test.txt"
+        self._helper_process(txt, exp, file_name)
 
     def test_process3(self):
         """
@@ -398,9 +405,8 @@ $$"""
 - Hello
   - World
 """
-        file_name = os.path.join(self.get_scratch_space(), "test.md")
-        act = dslt._process(txt, file_name)
-        self.assert_equal(act, exp)
+        file_name = "test.md"
+        self._helper_process(txt, exp, file_name)
 
     def test_process4(self):
         """
@@ -426,8 +432,8 @@ $$"""
 1) oh no!
 ```
 """
-        file_name = os.path.join(self.get_scratch_space(), "test.md")
-        act = dslt._process(txt, file_name)
+        file_name = "test.md"
+        act = self._helper_process(txt, None, file_name)
         act = prnt.remove_empty_lines(act)
         self.assert_equal(act, exp)
 
@@ -480,9 +486,8 @@ $$"""
 - Text template as a format string
   - Values to insert are provided as a value or a `tuple`
 """
-        file_name = os.path.join(self.get_scratch_space(), "test.txt")
-        act = dslt._process(txt, file_name)
-        self.assert_equal(act, exp)
+        file_name = "test.txt"
+        self._helper_process(txt, exp, file_name)
 
     @pytest.mark.skip
     def test_process6(self):
@@ -505,9 +510,8 @@ $$"""
   value = 1.234
   ```
 """
-        file_name = os.path.join(self.get_scratch_space(), "test.txt")
-        act = dslt._process(txt, file_name)
-        self.assert_equal(act, exp)
+        file_name = "test.txt"
+        self._helper_process(txt, exp, file_name)
 
     @pytest.mark.skip
     def test_process7(self):
@@ -531,6 +535,5 @@ $$"""
 """
         exp = r"""
 """
-        file_name = os.path.join(self.get_scratch_space(), "test.txt")
-        act = dslt._process(txt, file_name)
-        self.assert_equal(act, exp)
+        file_name = "test.txt"
+        self._helper_process(txt, exp, file_name)
