@@ -1,27 +1,91 @@
+# This creates problems with piping.
 # Make output white.
-echo -e '\033[0;0m\c'
-
-function execute() {
-  cmd=$*
-  echo "+ $cmd"
-  eval $cmd 
-  return $?
-}
-
-function frame() {
-  echo "####################################################################"
-  echo "$*"
-  echo "####################################################################"
-}
+#echo -e '\033[0;0m\c'
 
 ACK_OPTS="--smart-case --nogroup --nocolor"
 
 GIT_LOG_OPTS='%Creset%Cgreen%h %C(reset)%C(cyan)%<(8)%aN%Creset %Creset%C(bold white) %<(55)%s %C(bold black)(%>(14)%ar) %C(red)%ad %C(yellow)%<(10)%d%C(reset)'
 
+execute() {
+  cmd=$*
+  echo "+ $cmd"
+  eval $cmd
+  return $?
+}
+
+execute_with_verbose() {
+  cmd=$*
+  if [[ $verbose == 1 ]]; then
+      echo "+ $cmd"
+  fi;
+  eval $cmd
+  return $?
+}
+
+frame() {
+  echo "####################################################################"
+  echo "$*"
+  echo "####################################################################"
+}
+
+
+parse_jack_cmd_opts() {
+  # Initialize variables.
+  regex=""
+  dir="."
+  verbose=0
+
+  #echo "Options to parse: '$@'"
+  while getopts ":vhr:d:" opt; do
+      #echo "Parsing opt='$opt'"
+      case "$opt" in
+          h)
+              echo "Usage:"
+              echo "  -r 'regex to look for'"
+              echo "  [-d] directory to search in"
+              echo "  [-v] verbose"
+              exit 0
+              ;;
+          v)  verbose=1
+              ;;
+          r)  regex=$OPTARG
+              ;;
+          d)  dir=$OPTARG
+              ;;
+          \? )
+              echo "Error: invalid option '-$OPTARG'"
+              exit -1
+              ;;
+          :)
+              echo "Error: option '-$OPTARG' requires an argument"
+              exit -1
+              ;;
+      esac
+  done
+  #echo "OPTIND='$OPTIND'"
+  shift $((OPTIND-1))
+  #[ "${1:-}" = "--" ] && shift
+
+  if [[ -z $regex ]]; then
+      regex=$1
+      dir='.'
+      shift
+  fi;
+
+  #if [[ ! -z $@ ]]; then
+  #    echo "Error: too many params '$@'"
+  #    exit -1
+  #fi;
+
+  if [[ $verbose == 1 ]]; then
+      echo "regex='$regex'"
+      echo "dir='$dir'"
+  fi;
+}
 
 # ##############################################################################
 
-function get_python_version() {
+get_python_version() {
   python - <<END
 import sys
 pyv = sys.version_info[:]
@@ -35,7 +99,7 @@ END
 }
 
 
-function execute_setenv() {
+execute_setenv() {
   if [[ -z $1 ]]; then
     echo "ERROR($EXEC_NAME): Need to specify a parameter representing setenv"
     return 1

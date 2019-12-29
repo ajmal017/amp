@@ -4,20 +4,33 @@ Import as:
 import helpers.parser as prsr
 """
 
+import argparse
+import logging
+from typing import List, Optional
 
-def add_bool_arg(parser, name, default=False, help_=None):
+import helpers.dbg as dbg
+import helpers.printing as prnt
+
+_LOG = logging.getLogger(__name__)
+
+
+def add_bool_arg(
+    parser: argparse.ArgumentParser,
+    name,
+    default: bool = False,
+    help_: Optional[str] = None,
+) -> argparse.ArgumentParser:
     """
     Add options to a parser like --xyz and --no-xyz (e.g., for --incremental).
     """
     group = parser.add_mutually_exclusive_group(required=False)
     group.add_argument("--" + name, dest=name, action="store_true", help=help_)
-    group.add_argument("--no-" + name, dest=name, action="store_false")
+    group.add_argument("--no_" + name, dest=name, action="store_false")
     parser.set_defaults(**{name: default})
     return parser
 
 
-# TODO(gp): Use this everywhere.
-def add_verbosity_arg(parser):
+def add_verbosity_arg(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument(
         "-v",
         dest="log_level",
@@ -25,4 +38,74 @@ def add_verbosity_arg(parser):
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         help="Set the logging level",
     )
+    return parser
+
+
+# #############################################################################
+
+
+def actions_to_string(
+    actions: List[str], valid_actions: List[str], add_frame: bool
+) -> str:
+    space = max([len(a) for a in valid_actions]) + 2
+    format_ = "%" + str(space) + "s: %s"
+    actions = [
+        format_ % (a, "Yes" if a in actions else "-") for a in valid_actions
+    ]
+    actions_as_str = "\n".join(actions)
+    if add_frame:
+        ret = prnt.frame("# Action selected:") + "\n"
+        ret += prnt.space(actions_as_str)
+    return ret
+
+
+def select_actions(
+    args: argparse.Namespace, valid_actions: List[str]
+) -> List[str]:
+    # Select actions.
+    if not args.action or args.all:
+        actions = list(valid_actions)
+    else:
+        actions = args.action
+    actions = actions[:]
+    dbg.dassert_isinstance(actions, list)
+    dbg.dassert_no_duplicates(actions)
+    # Validate actions.
+    for action in set(actions):
+        if action not in valid_actions:
+            raise ValueError("Invalid action '%s'" % action)
+    # Reorder actions according to 'valid_actions'.
+    actions = [action for action in valid_actions if action in actions]
+    return actions
+
+
+def mark_action(action: str, actions: List[str]):
+    to_execute = action in actions
+    _LOG.debug("\n%s", prnt.frame("action=%s" % action))
+    if to_execute:
+        actions = [a for a in actions if a != action]
+    else:
+        _LOG.warning("Skip action='%s'", action)
+    return to_execute, actions
+
+
+def add_action_arg(
+    parser: argparse.ArgumentParser, valid_actions: List[str]
+) -> argparse.ArgumentParser:
+    group = parser.add_mutually_exclusive_group(required=False)
+    group.add_argument(
+        "--action",
+        dest="action",
+        action="append",
+        choices=valid_actions,
+        help="Actions to execute",
+    )
+    group.add_argument(
+        "--skip-action",
+        dest="skip_action",
+        action="append",
+        choices=valid_actions,
+        help="Actions to skip",
+    )
+    parser.add_argument("--all", action="store_true", help="Run all the actions")
     return parser

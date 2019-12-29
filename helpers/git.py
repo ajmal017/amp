@@ -7,9 +7,9 @@ import helpers.git as git
 import logging
 import os
 import re
-from typing import List, Optional
+from typing import Dict, List
 
-import helpers.datetime_ as datetime_
+import helpers.datetime_ as hdt
 import helpers.dbg as dbg
 import helpers.system_interaction as si
 
@@ -21,7 +21,7 @@ _LOG = logging.getLogger(__name__)
 #  to make reference to git again.
 
 
-def _system_to_one_string(cmd):
+def _system_to_one_string(cmd) -> str:
     _, output = si.system_to_string(cmd)
     res = si.get_first_line(output)
     return res
@@ -36,13 +36,14 @@ def get_git_name() -> str:
     return _system_to_one_string(cmd)
 
 
-def get_branch_name() -> str:
+def get_branch_name(git_dir=".") -> str:
     """
     Return the name of the Git branch we are in.
 
     E.g., `master` or `PartTask672_DEV_INFRA_Add_script_to_check_and_merge_PR`
     """
-    cmd = "git rev-parse --abbrev-ref HEAD"
+    dbg.dassert_exists(git_dir)
+    cmd = "cd %s && git rev-parse --abbrev-ref HEAD" % git_dir
     return _system_to_one_string(cmd)
 
 
@@ -139,28 +140,28 @@ def get_repo_symbolic_name(super_module: bool) -> str:
     return repo_name
 
 
-def _get_repo_map():
-    _REPO_MAP = {"alphamatic/amp": "Amp"}
+def _get_repo_map() -> Dict[str, str]:
+    repo_map = {"alphamatic/amp": "Amp"}
     # TODO(gp): The proper fix is #PartTask551.
     # Get info from the including repo, if possible.
     try:
         import repo_config as repc  # type: ignore
 
-        _REPO_MAP.update(repc.REPO_MAP)
+        repo_map.update(repc.REPO_MAP)
     except ImportError:
         _LOG.debug("No including repo")
-    dbg.dassert_no_duplicates(_REPO_MAP.keys())
-    dbg.dassert_no_duplicates(_REPO_MAP.values())
-    return _REPO_MAP.copy()
+    dbg.dassert_no_duplicates(repo_map.keys())
+    dbg.dassert_no_duplicates(repo_map.values())
+    return repo_map.copy()  # type: ignore
 
 
-def get_all_repo_symbolic_names():
+def get_all_repo_symbolic_names() -> List[str]:
     repo_map = _get_repo_map()
-    return repo_map.values()
+    return repo_map.values()  # type: ignore
 
 
 # TODO(gp): Found a better name.
-def get_repo_prefix(repo_github_name):
+def get_repo_prefix(repo_github_name) -> str:
     """
     Return the symbolic name of a git repo.
     E.g., for "alphamatic/amp", the function returns "Amp".
@@ -249,6 +250,7 @@ def get_hash_head(dir_name: str) -> str:
     # 4759b3685f903e6c669096e960b248ec31c63b69
     return output
 
+
 # #############################################################################
 
 
@@ -258,16 +260,36 @@ def _check_files(files: List[str]) -> List[str]:
         if os.path.exists(f):
             files_tmp.append(f)
         else:
-            _LOG.warning("'%s' doesn't exist", f)
+            _LOG.debug("File '%s' doesn't exist: skipping", f)
     return files_tmp
 
 
-def get_modified_files():
-    """
-    Return the list of files that are added and modified. In other words the
-    files that will be committed with a `git commit -am ...`.
+def _get_files(
+    dir_name: str, cmd: str, remove_files_non_present: bool
+) -> List[str]:
+    cd_cmd = "cd %s && " % dir_name
+    _, output = si.system_to_string(cd_cmd + cmd)
+    #
+    files = output.split()
+    files = [os.path.join(dir_name, f) for f in files]
+    if remove_files_non_present:
+        files = _check_files(files)
+    return files
 
-    Equivalent to dev_scripts/git_files.sh
+
+def get_modified_files(
+    dir_name: str = ".", remove_files_non_present: bool = True
+) -> List[str]:
+    """
+    Return the files that are added and modified in the Git client.
+
+    In other words the files that will be committed with a `git commit -am ...`.
+    Equivalent to `dev_scripts/git_files.sh`
+
+    :param dir_name: directory with Git client
+    :param remove_files_non_present: remove the files that are not
+        currently present in the client
+    :return: list of files
     """
     # If the client status is:
     #   > git status -s
@@ -283,29 +305,51 @@ def get_modified_files():
     #   dev_scripts/infra/ssh_tunnels.py
     #   helpers/git.py
     cmd = "(git diff --cached --name-only; git ls-files -m) | sort | uniq"
-    _, files = si.system_to_string(cmd)
-    files = files.split()
-    files = _check_files(files)
+    files = _get_files(dir_name, cmd, remove_files_non_present)
     return files
 
 
-def get_previous_committed_files(num_commits=1):
+# TODO(gp): -> ...previously...
+def get_previous_committed_files(
+    dir_name: str = ".",
+    num_commits: int = 1,
+    remove_files_non_present: bool = True,
+) -> List[str]:
     """
-    Return the list of files changed by the current git user in the last
-    `num_commits` commits.
+    Return files changed in the Git client in the last `num_commits` commits.
 
-    Equivalent to dev_scripts/git_previous_commit_files.sh
+    Equivalent to `dev_scripts/git_previous_commit_files.sh`
+
+    :param dir_name: directory with Git client
+    :param remove_files_non_present: remove the files that are not
+        currently present in the client
+    :return: list of files
     """
     cmd = []
     cmd.append('git show --pretty="" --name-only')
     cmd.append("$(git log --author $(git config user.name) -%d" % num_commits)
     cmd.append(r"""| \grep "^commit " | perl -pe 's/commit (.*)/$1/')""")
-    cmd = " ".join(cmd)
-    _, files = si.system_to_string(cmd)
-    #
-    files = files.split()
-    files = sorted(list(set(files)))
-    files = _check_files(files)
+    cmd_as_str = " ".join(cmd)
+    files = _get_files(dir_name, cmd_as_str, remove_files_non_present)
+    return files
+
+
+def get_modified_files_in_branch(
+    dir_name: str, dst_branch: str, remove_files_non_present: bool = True
+) -> List[str]:
+    """
+    Return files modified in the current branch with respect to `dst_branch`.
+
+    Equivalent to `git diff --name-only master...`
+
+    :param dir_name: directory with Git client
+    :param dst_branch: branch to compare to, e.g., master
+    :param remove_files_non_present: remove the files that are not
+        currently present in the client
+    :return: list of files
+    """
+    cmd = "git diff --name-only %s..." % dst_branch
+    files = _get_files(dir_name, cmd, remove_files_non_present)
     return files
 
 
@@ -339,7 +383,7 @@ def git_log(num_commits=5, my_commits=False):
 def git_stash_push(prefix, msg=None, log_level=logging.DEBUG):
     user_name = si.get_user_name()
     server_name = si.get_server_name()
-    timestamp = datetime_.get_timestamp()
+    timestamp = hdt.get_timestamp()
     tag = "%s-%s-%s" % (user_name, server_name, timestamp)
     tag = prefix + "." + tag
     _LOG.debug("tag='%s'", tag)

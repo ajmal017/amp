@@ -7,7 +7,7 @@ import core.statistics as stats
 import functools
 import logging
 import math
-from typing import Iterable, List, Optional, Tuple
+from typing import Iterable, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -37,7 +37,7 @@ ADJ_PVAL_COL = "adj_pvals"
 # Consider exposing `nan_policy`.
 def moments(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Calculates, mean, standard deviation, skew, and kurtosis.
+    Calculate, mean, standard deviation, skew, and kurtosis.
     """
     mean = df.mean()
     std = df.std()
@@ -48,6 +48,151 @@ def moments(df: pd.DataFrame) -> pd.DataFrame:
         index=df.columns,
     )
     return result
+
+
+def replace_infs_with_nans(
+    data: Union[pd.Series, pd.DataFrame],
+) -> Union[pd.Series, pd.DataFrame]:
+    """
+    Replace infs with nans in a copy of `data`.
+    """
+    return data.replace([np.inf, -np.inf], np.nan)
+
+
+def compute_frac_zero(
+    data: Union[pd.Series, pd.DataFrame],
+    atol: float = 0.0,
+    axis: Optional[int] = 0,
+) -> Union[float, pd.Series]:
+    """
+    Calculate fraction of zeros in a numerical series or dataframe.
+
+    :param data: numeric series or dataframe
+    :param atol: relative tolerance, as in `np.isclose`
+    :param axis: numpy axis for summation
+    """
+    # Create an ndarray of zeros of the same shape.
+    zeros = np.zeros(data.shape)
+    # Compare values of `df` to `zeros`.
+    is_close_to_zero = np.isclose(data.values, zeros, atol=atol)
+    num_zeros = is_close_to_zero.sum(axis=axis)
+    return _compute_denominator_and_package(num_zeros, data, axis)
+
+
+def compute_frac_nan(
+    data: Union[pd.Series, pd.DataFrame], axis: Optional[int] = 0
+) -> Union[float, pd.Series]:
+    """
+    Calculate fraction of nans in `data`.
+
+    :param data: numeric series or dataframe
+    :param axis: numpy axis for summation
+    """
+    num_nans = data.isna().values.sum(axis=axis)
+    return _compute_denominator_and_package(num_nans, data, axis)
+
+
+def compute_frac_inf(
+    data: Union[pd.Series, pd.DataFrame], axis: Optional[int] = 0
+) -> Union[float, pd.Series]:
+    """
+    Count fraction of infs in a numerical series or dataframe.
+
+    :param data: numeric series or dataframe
+    :param axis: numpy axis for summation
+    """
+    num_infs = np.isinf(data.values).sum(axis=axis)
+    return _compute_denominator_and_package(num_infs, data, axis)
+
+
+# TODO(Paul): Consider exposing `rtol`, `atol`.
+def compute_frac_constant(
+    data: Union[pd.Series, pd.DataFrame]
+) -> Union[float, pd.Series]:
+    """
+    Compute fraction of values in the series that changes at the next timestamp.
+
+    :param data: numeric series or dataframe
+    :param axis: numpy axis for summation
+    """
+    diffs = data.diff().iloc[1:]
+    constant_frac = compute_frac_zero(diffs, axis=0)
+    return constant_frac
+
+
+# TODO(Paul): Refactor to work with dataframes as well. Consider how to handle
+#     `axis`, which the pd.Series version of `copy()` does not take.
+def count_num_finite_samples(data: pd.Series) -> float:
+    """
+    Count number of finite data points in a given time series.
+
+    :param data: numeric series or dataframe
+    """
+    data = data.copy()
+    data = replace_infs_with_nans(data)
+    return data.count()
+
+
+# TODO(Paul): Extend to dataframes.
+def count_num_unique_values(data: pd.Series) -> int:
+    """
+    Count number of unique values in the series.
+    """
+    srs = pd.Series(data=data.unique())
+    return count_num_finite_samples(srs)
+
+
+def _compute_denominator_and_package(
+    reduction: Union[float, np.ndarray],
+    data: Union[pd.Series, pd.DataFrame],
+    axis: Optional[float] = None,
+):
+    """
+    Normalize and package `reduction` according to `axis` and `data` metadata.
+
+    This is a helper function used for several `compute_frac_*` functions:
+    - It determines the denominator to use in normalization (for the `frac`
+      part)
+    - It packages the output so that it has index/column information as
+      appropriate
+
+    :param reduction: contains a reduction of `data` along `axis`
+    :param data: numeric series or dataframe
+    :param axis: indicates row or column or else `None` for ignoring 2d
+        structure
+    """
+    if isinstance(data, pd.Series):
+        df = data.to_frame()
+    else:
+        df = data
+    nrows, ncols = df.shape
+    # Ensure that there is data available.
+    # TODO(Paul): Consider adding a check on the column data type.
+    if nrows == 0 or ncols == 0:
+        _LOG.warning("No data available!")
+        return np.nan
+    # Determine the correct denominator based on `axis`.
+    if axis is None:
+        denom = nrows * ncols
+    elif axis == 0:
+        denom = nrows
+    elif axis == 1:
+        denom = ncols
+    else:
+        raise ValueError("axis=%i", axis)
+    normalized = reduction / denom
+    # Return float or pd.Series as appropriate based on dimensions and axis.
+    if isinstance(normalized, float):
+        dbg.dassert(not axis)
+        return normalized
+    else:
+        dbg.dassert_isinstance(normalized, np.ndarray)
+        if axis == 0:
+            return pd.Series(data=normalized, index=df.columns)
+        elif axis == 1:
+            return pd.Series(data=normalized, index=df.index)
+        else:
+            raise ValueError("axis=`%s` but expected to be `0` or `1`!", axis)
 
 
 # #############################################################################
@@ -250,63 +395,3 @@ def multi_ttest(
     ttest = ttest_1samp(df, popmean=popmean, nan_policy=nan_policy)
     ttest[ADJ_PVAL_COL] = multipletests(ttest[PVAL_COL], method=method)
     return ttest
-
-
-# TODO(*): move to gen_utils.py as safe_div_nan?
-def safe_div(a, b):
-    div = a / b if b != 0 else np.nan
-    return div
-
-
-def count_num_zero(
-        series: pd.Series, zero_threshold: float = 1e-9
-) -> float:
-    """
-    Count number of zeroes in a given time series.
-
-    :param zero_threshold: floats smaller than this are treated as zeroes.
-    """
-    num_rows = series.shape[0]
-    num_zeros = (series.dropna().abs() < zero_threshold).sum()
-    return 100.0 * safe_div(num_zeros, num_rows)
-
-
-def count_num_nan(series: pd.Series) -> float:
-    """
-    Count number of nans in a given time series.
-    """
-    num_rows = series.shape[0]
-    num_nans = series.isna().sum()
-    return 100.0 * safe_div(num_nans, num_rows)
-
-
-def count_num_inf(series: pd.Series) -> float:
-    """
-    Count number of infs in a given time series.
-    """
-    num_rows = series.shape[0]
-    num_infs = series.dropna().apply(np.isinf).sum()
-    return 100.0 * safe_div(num_infs, num_rows)
-
-
-def count_num_samples(series: pd.Series) -> int:
-    """
-    Count number of data points in a given time series.
-    """
-    return series.shape[0]
-
-
-def count_num_unique_values(series: pd.Series) -> int:
-    """
-    Count number of unique values in the series.
-    """
-    return len(series.unique())
-
-
-def count_num_percentage_changes(series: pd.Series) -> float:
-    """
-    Compute percentage of values in the series that changes at the next timestamp.
-    """
-    changes = series.dropna().pct_change()
-    changes_count = changes[changes != 0].shape[0]
-    return safe_div(changes_count, series.shape[0])

@@ -10,6 +10,7 @@ system commands, env vars, ...
 import getpass
 import logging
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -17,7 +18,7 @@ import time
 from typing import Any, List, Optional, Tuple
 
 import helpers.dbg as dbg
-import helpers.printing as pri
+import helpers.printing as prnt
 
 _LOG = logging.getLogger(__name__)
 
@@ -193,9 +194,9 @@ def _system(
     if abort_on_error and rc != 0:
         msg = (
             "\n"
-            + pri.frame("cmd='%s' failed with rc='%s'" % (cmd, rc))
+            + prnt.frame("cmd='%s' failed with rc='%s'" % (cmd, rc))
             + "\nOutput of the failing command is:\n%s\n%s\n%s"
-            % (pri.line(">"), output, pri.line("<"))
+            % (prnt.line(">"), output, prnt.line("<"))
         )
         _LOG.error("%s", msg)
         raise RuntimeError("cmd='%s' failed with rc='%s'" % (cmd, rc))
@@ -276,13 +277,6 @@ def system_to_string(
     return rc, output
 
 
-def get_non_empty_lines(output: str) -> List[str]:
-    output_as_arr = output.split("\n")
-    output_as_arr = [l.rstrip().lstrip() for l in output_as_arr]
-    output_as_arr = [l for l in output_as_arr if l]
-    return output_as_arr
-
-
 def get_first_line(output: str) -> str:
     """
     Return the first (and only) line from a string.
@@ -290,12 +284,13 @@ def get_first_line(output: str) -> str:
     This is used when calling system_to_string() and expecting a single line
     output.
     """
-    output_as_arr = get_non_empty_lines(output)
+    output = prnt.remove_empty_lines(output)
+    output_as_arr = output.split("\n")
     dbg.dassert_eq(len(output_as_arr), 1, "output='%s'", output)
     return output_as_arr[0].rstrip().lstrip()
 
 
-def system_to_one_line_string(cmd, *args, **kwargs):
+def system_to_one_line_string(cmd, *args, **kwargs) -> Tuple[int, str]:
     """
     Execute a shell command and capture its output (expected to be a single line).
 
@@ -305,10 +300,11 @@ def system_to_one_line_string(cmd, *args, **kwargs):
     output = get_first_line(output)
     return rc, output
 
+
 # #############################################################################
 
 
-def get_process_pids(keep_line):
+def get_process_pids(keep_line) -> Tuple[List[int], List[str]]:
     """
     Find all the processes corresponding to `ps ax` filtered line by line with
     `keep_line()`.
@@ -318,8 +314,8 @@ def get_process_pids(keep_line):
     cmd = "ps ax"
     rc, txt = system_to_string(cmd, abort_on_error=False)
     _LOG.debug("txt=\n%s", txt)
-    pids = []
-    txt_out = []
+    pids: List[int] = []
+    txt_out: List[str] = []
     if rc == 0:
         for line in txt.split("\n"):
             _LOG.debug("line=%s", line)
@@ -379,7 +375,7 @@ def kill_process(get_pids, timeout_in_secs=5, polltime_in_secs=0.1):
 # #############################################################################
 
 
-def query_yes_no(question, abort_on_no):
+def query_yes_no(question: str, abort_on_no: bool):
     """
     Ask a yes/no question via raw_input() and return their answer.
 
@@ -410,3 +406,64 @@ def query_yes_no(question, abort_on_no):
             print("You answer no: exiting")
             sys.exit(-1)
     return ret
+
+
+# #############################################################################
+
+# TODO(gp): Move it helpers/tools_interaction.py ?
+
+
+def pytest_show_artifacts(dir_name: str, tag: Optional[str] = None) -> List[str]:
+    dbg.dassert_ne(dir_name, "")
+    dbg.dassert_dir_exists(dir_name)
+    cd_cmd = "cd %s && " % dir_name
+    # There might be no pytest artifacts.
+    abort_on_error = False
+    file_names: List[str] = []
+    # Find pytest artifacts.
+    cmd = 'find . -name ".pytest_cache" -type d'
+    _, output_tmp = system_to_string(cd_cmd + cmd, abort_on_error=abort_on_error)
+    file_names.extend(output_tmp.split())
+    #
+    cmd = 'find . -name "__pycache__" -type d'
+    _, output_tmp = system_to_string(cd_cmd + cmd, abort_on_error=abort_on_error)
+    file_names.extend(output_tmp.split())
+    # Find .pyc artifacts.
+    cmd = 'find . -name "*.pyc" -type f'
+    _, output_tmp = system_to_string(cd_cmd + cmd, abort_on_error=abort_on_error)
+    file_names.extend(output_tmp.split())
+    # Remove empty lines.
+    file_names = prnt.remove_empty_lines_from_string_list(file_names)
+    #
+    if tag is not None:
+        num_files = len(file_names)
+        _LOG.info("%s: %d", tag, num_files)
+        _LOG.debug("\n%s", prnt.space("\n".join(file_names)))
+    return file_names
+
+
+def pytest_clean_artifacts(dir_name: str, preview: bool = False):
+    _LOG.warning("Cleaning pytest artifacts")
+    dbg.dassert_ne(dir_name, "")
+    dbg.dassert_dir_exists(dir_name)
+    if preview:
+        _LOG.warning("Preview only: nothing will be deleted")
+    # Show before cleaning.
+    file_names = pytest_show_artifacts(dir_name, tag="Before cleaning")
+    # Clean.
+    for f in file_names:
+        exists = os.path.exists(f)
+        _LOG.debug("%s -> exists=%s", f, exists)
+        if exists:
+            if not preview:
+                if os.path.isdir(f):
+                    shutil.rmtree(f)
+                elif os.path.isfile(f):
+                    os.remove(f)
+                else:
+                    raise ValueError("Can't delete %s" % f)
+            else:
+                _LOG.debug("rm %s", f)
+    # Show after cleaning.
+    file_names = pytest_show_artifacts(dir_name, tag="After cleaning")
+    dbg.dassert_eq(len(file_names), 0)

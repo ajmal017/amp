@@ -21,6 +21,7 @@ E.g.,
 > linter.py --files event_study/*.py linter_v2.py --yapf --isort -v DEBUG
 
 # Lint the changes in the branch:
+> linter.py -b
 > linter.py -f $(git diff --name-only master...)
 
 # Lint all python files, but not the notebooks.
@@ -40,14 +41,14 @@ import os
 import py_compile
 import re
 import sys
-from typing import Any, List, Tuple
+from typing import Any, List, Tuple, Type
 
 import helpers.dbg as dbg
 import helpers.git as git
 import helpers.io_ as io_
 import helpers.list as hlist
 import helpers.parser as prsr
-import helpers.printing as pri
+import helpers.printing as prnt
 import helpers.system_interaction as si
 import helpers.unit_test as ut
 
@@ -62,6 +63,14 @@ _TMP_DIR = os.path.abspath(os.getcwd() + "/tmp.linter")
 # #############################################################################
 
 
+NO_PRINT = False
+
+
+def _print(*args, **kwargs):
+    if not NO_PRINT:
+        print(*args, **kwargs)
+
+
 # TODO(gp): This could become the default behavior of system().
 def _system(cmd: str, abort_on_error: bool = True) -> int:
     suppress_output = _LOG.getEffectiveLevel() > logging.DEBUG
@@ -74,11 +83,7 @@ def _system(cmd: str, abort_on_error: bool = True) -> int:
     return rc
 
 
-def _remove_empty_lines(output: List[str]) -> List[str]:
-    output = [l for l in output if l.strip("\n") != ""]
-    return output
-
-
+# TODO(gp): Move to helpers/printing.py
 def _dassert_list_of_strings(output: List[str], *args: Any) -> None:
     dbg.dassert_isinstance(output, list, *args)
     for line in output:
@@ -144,10 +149,11 @@ def _tee(cmd: str, executable: str, abort_on_error: bool) -> List[str]:
     _LOG.debug("cmd=%s executable=%s", cmd, executable)
     _, output = si.system_to_string(cmd, abort_on_error=abort_on_error)
     dbg.dassert_isinstance(output, str)
-    _LOG.debug("output1=\n'%s'", output)
+    output1 = output.split("\n")
+    _LOG.debug("output1= (%d)\n'%s'", len(output1), "\n".join(output1))
     #
-    output2 = _remove_empty_lines(output.split("\n"))
-    _LOG.debug("output2=\n'%s'", "\n".join(output2))
+    output2 = prnt.remove_empty_lines_from_string_list(output1)
+    _LOG.debug("output2= (%d)\n'%s'", len(output2), "\n".join(output2))
     _dassert_list_of_strings(output2)
     return output2
 
@@ -200,12 +206,19 @@ def _get_files(args) -> List[str]:
         # User has specified files.
         file_names = args.files
     else:
-        if args.previous_git_commit_files is not None:
+        if args.current_git_files:
+            # Get all the git modified files.
+            file_names = git.get_modified_files()
+        elif args.previous_git_committed_files is not None:
             _LOG.debug("Looking for files committed in previous Git commit")
             # Get all the git in user previous commit.
-            n_commits = args.previous_git_commit_files
+            n_commits = args.previous_git_committed_files
             _LOG.info("Using %s previous commits", n_commits)
             file_names = git.get_previous_committed_files(n_commits)
+        elif args.modified_files_in_branch:
+            dir_name = "."
+            dst_branch = "master"
+            file_names = git.get_modified_files_in_branch(dir_name, dst_branch)
         elif args.dir_name:
             if args.dir_name == "$GIT_ROOT":
                 dir_name = git.get_client_root(super_module=True)
@@ -217,9 +230,6 @@ def _get_files(args) -> List[str]:
             cmd = "find %s -name '*' -type f" % dir_name
             _, output = si.system_to_string(cmd)
             file_names = output.split("\n")
-        if not file_names or args.current_git_files:
-            # Get all the git modified files.
-            file_names = git.get_modified_files()
     # Remove text files used in unit tests.
     file_names = [f for f in file_names if not is_test_input_output_file(f)]
     # Make all paths absolute.
@@ -234,23 +244,39 @@ def _get_files(args) -> List[str]:
     return file_names_out
 
 
+def _list_to_str(list_: List[str]) -> str:
+    return "%d (%s)" % (len(list_), " ".join(list_))
+
+
 def _get_files_to_lint(args, file_names: List[str]) -> List[str]:
     """
     Get all the files that need to be linted.
 
     Typically files to lint are python and notebooks.
     """
-    _LOG.debug("file_names=(%s) %s", len(file_names), " ".join(file_names))
+    _LOG.debug("file_names=%s", _list_to_str(file_names))
     # Keep only actual .py and .ipynb files.
     file_names = _filter_target_files(file_names)
-    _LOG.debug("file_names=(%s) %s", len(file_names), " ".join(file_names))
+    _LOG.debug("file_names=%s", _list_to_str(file_names))
     # Remove files.
     if args.skip_py:
         file_names = [f for f in file_names if not is_py_file(f)]
     if args.skip_ipynb:
         file_names = [f for f in file_names if not is_ipynb_file(f)]
-    if args.skip_paired_jupytext:
-        file_names = [f for f in file_names if not is_paired_jupytext_file(f)]
+    if args.skip_files:
+        dbg.dassert_isinstance(args.skip_files, list)
+        # TODO(gp): Factor out this code and reuse it in this function.
+        _LOG.warning(
+            "Skipping %s files, as per user request",
+            _list_to_str(args.skip_files),
+        )
+        skip_files = args.skip_files
+        skip_files = [os.path.abspath(f) for f in skip_files]
+        skip_files = set(skip_files)
+        file_names_out = [f for f in file_names if f not in skip_files]
+        removed_file_names = list(set(file_names) - set(file_names_out))
+        _LOG.warning("Removing %s files", _list_to_str(removed_file_names))
+        file_names = file_names_out
     # Keep files.
     if args.only_py:
         file_names = [
@@ -437,7 +463,9 @@ class _BasicHygiene(_Action):
         _write_file_back(file_name, txt, txt_new)
         return output
 
+
 # #############################################################################
+
 
 class _CompilePython(_Action):
     """
@@ -463,7 +491,9 @@ class _CompilePython(_Action):
             output.append(str(e))
         return output
 
+
 # #############################################################################
+
 
 class _Autoflake(_Action):
     """
@@ -489,7 +519,9 @@ class _Autoflake(_Action):
         output = _tee(cmd, self._executable, abort_on_error=False)
         return output
 
+
 # #############################################################################
+
 
 class _Yapf(_Action):
     """
@@ -515,7 +547,9 @@ class _Yapf(_Action):
         output = _tee(cmd, self._executable, abort_on_error=False)
         return output
 
+
 # #############################################################################
+
 
 class _Black(_Action):
     """
@@ -548,7 +582,9 @@ class _Black(_Action):
         output = [l for l in output if all(w not in l for w in to_remove)]
         return output
 
+
 # #############################################################################
+
 
 class _Isort(_Action):
     """
@@ -573,7 +609,9 @@ class _Isort(_Action):
         output = _tee(cmd, self._executable, abort_on_error=False)
         return output
 
+
 # #############################################################################
+
 
 class _Flake8(_Action):
     """
@@ -649,7 +687,9 @@ class _Flake8(_Action):
             output = output_tmp
         return output
 
+
 # #############################################################################
+
 
 class _Pydocstyle(_Action):
     def __init__(self):
@@ -707,15 +747,20 @@ class _Pydocstyle(_Action):
                     "D107",
                 ]
             )
-        opts = ""
+        cmd_opts = ""
         if ignore:
-            opts += "--ignore " + ",".join(ignore)
-        # yapf: disable
-        cmd = self._executable + " %s %s" % (opts, file_name)
-        # yapf: enable
+            cmd_opts += "--ignore " + ",".join(ignore)
+        #
+        cmd = []
+        cmd.append(self._executable)
+        cmd.append(cmd_opts)
+        cmd.append(file_name)
+        cmd_as_str = " ".join(cmd)
         # We don't abort on error on pydocstyle, since it returns error if there
         # is # any violation.
-        _, file_lines_as_str = si.system_to_string(cmd, abort_on_error=False)
+        _, file_lines_as_str = si.system_to_string(
+            cmd_as_str, abort_on_error=False
+        )
         # Process lint_log transforming:
         #   linter_v2.py:1 at module level:
         #       D400: First line should end with a period (not ':')
@@ -743,7 +788,9 @@ class _Pydocstyle(_Action):
                 output.append(line)
         return output
 
+
 # #############################################################################
+
 
 class _Pyment(_Action):
     def __init__(self):
@@ -764,7 +811,9 @@ class _Pyment(_Action):
         output = _tee(cmd, self._executable, abort_on_error=False)
         return output
 
+
 # #############################################################################
+
 
 class _Pylint(_Action):
     def __init__(self):
@@ -905,7 +954,9 @@ class _Pylint(_Action):
         output = output_as_str.split("\n")
         return output
 
+
 # #############################################################################
+
 
 class _Mypy(_Action):
     def __init__(self):
@@ -921,14 +972,14 @@ class _Mypy(_Action):
         if not is_py_file(file_name) or is_paired_jupytext_file(file_name):
             _LOG.debug("Skipping file_name='%s'", file_name)
             return []
-        #
+        # TODO(gp): Convert all these idioms into arrays and joins.
         cmd = self._executable + " %s" % file_name
-        _system(
+        output = _tee(
             cmd,
+            self._executable,
             # mypy returns -1 if there are errors.
             abort_on_error=False,
         )
-        output = _tee(cmd, self._executable, abort_on_error=False)
         # Remove some errors.
         output_tmp: List[str] = []
         for line in output:
@@ -971,7 +1022,7 @@ class _IpynbFormat(_Action):
         return output
 
 
-# TODO(gp): Move in a more general file.
+# TODO(gp): Move in a more general file: probably system_interaction.
 def _is_under_dir(file_name: str, dir_name: str) -> bool:
     """
     Return whether a file is under the given directory.
@@ -1046,7 +1097,9 @@ def is_paired_jupytext_file(file_name: str) -> bool:
     )
     return is_paired
 
+
 # #############################################################################
+
 
 class _ProcessJupytext(_Action):
     def __init__(self, jupytext_action):
@@ -1245,14 +1298,14 @@ class _CustomPythonChecks(_Action):
             # Format separating lines.
             if _CustomPythonChecks.DEBUG:
                 _LOG.debug("* Format separating lines")
-            min_num_chars = 5
-            for char in "# = - < >".split():
-                regex = r"(\s*\#)\s*" + (("\\" + char) * min_num_chars)
-                if _CustomPythonChecks.DEBUG:
-                    _LOG.debug("regex=%s", regex)
-                m = re.match(regex, line)
-                if m:
-                    line = m.group(1) + " " + char * (78 - len(m.group(1)))
+            min_num_chars = 6
+            regex = r"(\s*\#)\s*([\#\=\-\<\>]){%d,}\s*$" % min_num_chars
+            if _CustomPythonChecks.DEBUG:
+                _LOG.debug("regex=%s", regex)
+            m = re.match(regex, line)
+            if m:
+                char = m.group(2)
+                line = m.group(1) + " " + char * (78 - len(m.group(1)))
             #
             if _CustomPythonChecks.DEBUG:
                 _LOG.debug("    -> %s", line)
@@ -1281,66 +1334,37 @@ class _LintMarkdown(_Action):
         if ext not in (".txt", ".md"):
             _LOG.debug("Skipping file_name='%s' because ext='%s'", file_name, ext)
             return output
+        # Run lint_txt.py.
+        executable = "lint_txt.py"
+        exec_path = git.find_file_in_git_tree(executable)
+        dbg.dassert_exists(exec_path)
         #
-        # Pre-process text.
-        #
-        txt = io_.from_file(file_name).split("\n")
-        txt_new: List[str] = []
-        for line in txt:
-            line = re.sub(r"^\* ", "- STAR", line)
-            txt_new.append(line)
-        # Write.
-        txt_new_as_str = "\n".join(txt_new)
-        io_.to_file(file_name, txt_new_as_str)
-        #
-        # Lint.
-        #
-        cmd_opts: List[str] = []
-        cmd_opts.append("--parser markdown")
-        cmd_opts.append("--prose-wrap always")
-        cmd_opts.append("--write")
-        cmd_opts.append("--tab-width 4")
-        cmd_opts_as_str = " ".join(cmd_opts)
-        cmd_as_str = " ".join([self._executable, cmd_opts_as_str, file_name])
-        output_tmp = _tee(cmd_as_str, self._executable, abort_on_error=True)
-        output.extend(output_tmp)
-        #
-        # Post-process text.
-        #
-        txt = io_.from_file(file_name).split("\n")
-        txt_new: List[str] = []  # type: ignore
-        for i, line in enumerate(txt):
-            # Check whether there is TOC otherwise add it.
-            if i == 0 and line != "<!--ts-->":
-                output.append(
-                    "No tags for table of content in md file: adding it"
-                )
-                txt_new.append("<!--ts-->\n<!--te-->")
-            line = re.sub(r"^\-   STAR", "*   ", line)
-            # Remove some artifacts when copying from gdoc.
-            line = re.sub(r"’", "'", line)
-            line = re.sub(r"“", '"', line)
-            line = re.sub(r"”", '"', line)
-            line = re.sub(r"…", "...", line)
-            # -   You say you'll do something
-            # line = re.sub("^(\s*)-   ", r"\1- ", line)
-            # line = re.sub("^(\s*)\*   ", r"\1* ", line)
-            txt_new.append(line)
-        # Write.
-        txt_new_as_str = "\n".join(txt_new)  # type: ignore
-        io_.to_file(file_name, txt_new_as_str)
-        #
-        # Refresh table of content.
-        #
-        amp_path = git.get_amp_abs_path()
-        cmd: List[str] = []  # type: ignore
-        gh_md_toc = os.path.join(amp_path, "documentation/scripts/gh-md-toc")
-        dbg.dassert_exists(gh_md_toc)
-        cmd.append(gh_md_toc)
-        cmd.append("--insert %s" % file_name)
+        cmd = []
+        cmd.append(exec_path)
+        cmd.append("-i %s" % file_name)
+        cmd.append("--in_place")
         cmd_as_str = " ".join(cmd)
-        _system(cmd_as_str, abort_on_error=False)
+        output = _tee(cmd_as_str, executable, abort_on_error=True)
+        # Remove cruft.
+        output = [l for l in output if "Saving log to file" not in l]
         return output
+
+
+# #############################################################################
+
+
+def _check_file_property(actions, all_file_names, pedantic):
+    output: List[str] = []
+    action = "check_file_property"
+    if action in actions:
+        for file_name in all_file_names:
+            class_ = _get_action_class(action)
+            output_tmp = class_.execute(file_name, pedantic)
+            _dassert_list_of_strings(output_tmp)
+            output.extend(output_tmp)
+    actions = [a for a in actions if a != action]
+    _LOG.debug("actions=%s", actions)
+    return output, actions
 
 
 # #############################################################################
@@ -1354,6 +1378,59 @@ class _LintMarkdown(_Action):
 # - it allows to have clear control over options
 
 
+# Actions and if they read / write files.
+# The order of this list implies the order in which they are executed.
+_VALID_ACTIONS_META: List[Tuple[str, str, str, Type[_Action]]] = [
+    (
+        "check_file_property",
+        "r",
+        "Check that generic files are valid",
+        _CheckFileProperty,
+    ),
+    (
+        "basic_hygiene",
+        "w",
+        "Clean up (e.g., tabs, trailing spaces)",
+        _BasicHygiene,
+    ),
+    ("compile_python", "r", "Check that python code is valid", _CompilePython),
+    ("autoflake", "w", "Removes unused imports and variables", _Autoflake),
+    ("isort", "w", "Sort Python import definitions alphabetically", _Isort),
+    # Superseded by black.
+    # ("yapf", "w", "Formatter for Python code", _Yapf),
+    ("black", "w", "The uncompromising code formatter", _Black),
+    ("flake8", "r", "Tool For Style Guide Enforcement", _Flake8),
+    ("pydocstyle", "r", "Docstring style checker", _Pydocstyle),
+    # TODO(gp): Fix this.
+    # Not installable through conda.
+    # ("pyment", "w", "Create, update or convert docstring", _Pyment),
+    ("pylint", "w", "Check that module(s) satisfy a coding standard", _Pylint),
+    ("mypy", "r", "Static code analyzer using the hint types", _Mypy),
+    ("sync_jupytext", "w", "Create / sync jupytext files", _SyncJupytext),
+    ("test_jupytext", "r", "Test jupytext files", _TestJupytext),
+    # Superseded by "sync_jupytext".
+    # ("ipynb_format", "w", "Format jupyter code using yapf", _IpynbFormat),
+    (
+        "custom_python_checks",
+        "w",
+        "Apply some custom python checks",
+        _CustomPythonChecks,
+    ),
+    ("lint_markdown", "w", "Lint txt/md markdown files", _LintMarkdown),
+]
+
+
+# joblib and caching with lru_cache don't get along, so we cache explicitly.
+_VALID_ACTIONS = None
+
+
+def _get_valid_actions() -> List[str]:
+    global _VALID_ACTIONS
+    if _VALID_ACTIONS is None:
+        _VALID_ACTIONS = list(zip(*_VALID_ACTIONS_META))[0]
+    return _VALID_ACTIONS  # type: ignore
+
+
 def _get_action_class(action: str) -> _Action:
     """
     Return the function corresponding to the passed string.
@@ -1365,12 +1442,10 @@ def _get_action_class(action: str) -> _Action:
         if name == action:
             dbg.dassert_is(res, None)
             res = class_
-    # Make mypy happy.
-    if res is None:
-        dbg.dassert_is_not(res, None)
-    else:
-        obj = res()
-    return obj
+    dbg.dassert_is_not(res, None)
+    # mypy gets confused since we are returning a class.
+    obj = res()  # type: ignore
+    return obj  # type: ignore
 
 
 def _remove_not_possible_actions(actions: List[str]) -> List[str]:
@@ -1391,33 +1466,16 @@ def _remove_not_possible_actions(actions: List[str]) -> List[str]:
     return actions_tmp
 
 
-def _actions_to_string(actions: List[str]) -> str:
-    space = max([len(a) for a in _ALL_ACTIONS]) + 2
-    format_ = "%" + str(space) + "s: %s"
-    actions_as_str = [
-        format_ % (a, "Yes" if a in actions else "-") for a in _ALL_ACTIONS
-    ]
-    return "\n".join(actions_as_str)
-
-
 def _select_actions(args: argparse.Namespace) -> List[str]:
-    # Select actions.
-    actions = args.action
-    if isinstance(actions, str) and " " in actions:
-        actions = actions.split(" ")
-    if not actions or args.all:
-        actions = _ALL_ACTIONS[:]
-    # Validate actions.
-    for action in set(actions):
-        if action not in _ALL_ACTIONS:
-            raise ValueError("Invalid action '%s'" % action)
-    # Reorder actions according to _ALL_ACTIONS.
-    actions = [action for action in _ALL_ACTIONS if action in actions]
+    actions = prsr.select_actions(args, _get_valid_actions())
     # Find the tools that are available.
     actions = _remove_not_possible_actions(actions)
     #
-    actions_as_str = _actions_to_string(actions)
-    _LOG.info("# Action selected:\n%s", pri.space(actions_as_str))
+    add_frame = True
+    actions_as_str = prsr.actions_to_string(
+        actions, _get_valid_actions(), add_frame
+    )
+    _LOG.info("\n%s", actions_as_str)
     return actions
 
 
@@ -1426,7 +1484,7 @@ def _test_actions():
     # Check all the actions.
     num_not_poss = 0
     possible_actions: List[str] = []
-    for action in _ALL_ACTIONS:
+    for action in _get_valid_actions():
         class_ = _get_action_class(action)
         is_possible = class_.check_if_possible()
         _LOG.debug("%s -> %s", action, is_possible)
@@ -1435,8 +1493,11 @@ def _test_actions():
         else:
             num_not_poss += 1
     # Report results.
-    actions_as_str = _actions_to_string(possible_actions)
-    _LOG.info("Possible actions:\n%s", pri.space(actions_as_str))
+    add_frame = True
+    actions_as_str = prsr.actions_to_string(
+        possible_actions, _get_valid_actions(), add_frame
+    )
+    _LOG.info("\n%s", actions_as_str)
     if num_not_poss > 0:
         _LOG.warning("There are %s actions that are not possible", num_not_poss)
     else:
@@ -1457,10 +1518,10 @@ def _lint(
     proper order.
     """
     output: List[str] = []
-    _LOG.info("\n%s", pri.frame(file_name, char1="="))
+    _LOG.info("\n%s", prnt.frame(file_name, char1="="))
     for action in actions:
-        _LOG.debug("\n%s", pri.frame(action, char1="-"))
-        print("## %-20s (%s)" % (action, file_name))
+        _LOG.debug("\n%s", prnt.frame(action, char1="-"))
+        _print("## %-20s (%s)" % (action, file_name))
         if debug:
             # Make a copy after each action.
             dst_file_name = file_name + "." + action
@@ -1501,11 +1562,10 @@ def _run_linter(
         _LOG.warning(
             "Using num_threads='%s' since there is a single file", num_threads
         )
+    output: List[str] = []
     if num_threads == "serial":
-        output: List[str] = []
         for file_name in file_names:
             output_tmp = _lint(file_name, actions, pedantic, args.debug)
-            output.extend(output_tmp)
     else:
         num_threads = int(num_threads)
         # -1 is interpreted by joblib like for all cores.
@@ -1518,60 +1578,25 @@ def _run_linter(
             joblib.delayed(_lint)(file_name, actions, pedantic, args.debug)
             for file_name in file_names
         )
-        output = list(itertools.chain.from_iterable(output_tmp))
-    output.insert(0, "cmd line='%s'" % dbg.get_command_line())
-    # TODO(gp): datetime_.get_timestamp().
-    # output.insert(1, "datetime='%s'" % datetime.datetime.now())
-    output = _remove_empty_lines(output)
+        output_tmp = list(itertools.chain.from_iterable(output_tmp))
+    output.extend(output_tmp)
+    output = prnt.remove_empty_lines_from_string_list(output)
     return output
+
+
+def _count_lints(lints: List[str]) -> int:
+    num_lints = 0
+    for line in lints:
+        # dev_scripts/linter.py:493: ... [pydocstyle]
+        if re.match(r"\S+:\d+.*\[\S+\]", line):
+            num_lints += 1
+    _LOG.info("num_lints=%d", num_lints)
+    return num_lints
 
 
 # #############################################################################
 # Main.
 # #############################################################################
-
-# Actions and if they read / write files.
-# The order of this list implies the order in which they are executed.
-_VALID_ACTIONS_META = [
-    (
-        "check_file_property",
-        "r",
-        "Check that generic files are valid",
-        _CheckFileProperty,
-    ),
-    (
-        "basic_hygiene",
-        "w",
-        "Clean up (e.g., tabs, trailing spaces)",
-        _BasicHygiene,
-    ),
-    ("compile_python", "r", "Check that python code is valid", _CompilePython),
-    ("autoflake", "w", "Removes unused imports and variables", _Autoflake),
-    ("isort", "w", "Sort Python import definitions alphabetically", _Isort),
-    # Superseded by black.
-    # ("yapf", "w", "Formatter for Python code", _Yapf),
-    ("black", "w", "The uncompromising code formatter", _Black),
-    ("flake8", "r", "Tool For Style Guide Enforcement", _Flake8),
-    ("pydocstyle", "r", "Docstring style checker", _Pydocstyle),
-    # TODO(gp): Fix this.
-    # Not installable through conda.
-    # ("pyment", "w", "Create, update or convert docstring", _Pyment),
-    ("pylint", "w", "Check that module(s) satisfy a coding standard", _Pylint),
-    ("mypy", "r", "Static code analyzer using the hint types", _Mypy),
-    ("sync_jupytext", "w", "Create / sync jupytext files", _SyncJupytext),
-    ("test_jupytext", "r", "Test jupytext files", _TestJupytext),
-    # Superseded by "sync_jupytext".
-    # ("ipynb_format", "w", "Format jupyter code using yapf", _IpynbFormat),
-    (
-        "custom_python_checks",
-        "w",
-        "Apply some custom python checks",
-        _CustomPythonChecks,
-    ),
-    ("lint_markdown", "w", "Lint txt/md markdown files", _LintMarkdown),
-]
-
-_ALL_ACTIONS = list(zip(*_VALID_ACTIONS_META))[0]
 
 
 def _main(args: argparse.Namespace) -> int:
@@ -1582,60 +1607,64 @@ def _main(args: argparse.Namespace) -> int:
         _test_actions()
         _LOG.warning("Exiting as requested")
         sys.exit(0)
-    output: List[str] = []
+    if args.no_print:
+        global NO_PRINT
+        NO_PRINT = True
     # Get all the files to process.
     all_file_names = _get_files(args)
-    _LOG.info("Found %s files to process", len(all_file_names))
+    _LOG.info("# Found %d files to process", len(all_file_names))
     # Select files.
     file_names = _get_files_to_lint(args, all_file_names)
     _LOG.info(
-        "# Found %d files to lint:\n%s",
-        len(file_names),
-        pri.space("\n".join(file_names)),
+        "\n%s\n%s",
+        prnt.frame("# Found %d files to lint:" % len(file_names)),
+        prnt.space("\n".join(file_names)),
     )
     if args.collect_only:
         _LOG.warning("Exiting as requested")
         sys.exit(0)
     # Select actions.
     actions = _select_actions(args)
+    all_actions = actions[:]
     _LOG.debug("actions=%s", actions)
     # Create tmp dir.
     io_.create_dir(_TMP_DIR, incremental=False)
     _LOG.info("tmp_dir='%s'", _TMP_DIR)
     # Check the files.
-    action = "check_file_property"
-    if action in actions:
-        for file_name in all_file_names:
-            pedantic = args.pedantic
-            class_ = _get_action_class(action)
-            output_tmp = class_.execute(file_name, pedantic)
-            _dassert_list_of_strings(output_tmp)
-            output.extend(output_tmp)
-    actions = [a for a in actions if a != action]
-    _LOG.debug("actions=%s", actions)
+    lints: List[str] = []
+    lints_tmp, actions = _check_file_property(
+        actions, all_file_names, args.pedantic
+    )
+    lints.extend(lints_tmp)
     # Run linter.
-    output_tmp = _run_linter(actions, args, file_names)
-    _dassert_list_of_strings(output_tmp)
-    output.extend(output_tmp)
+    lints_tmp = _run_linter(actions, args, file_names)
+    _dassert_list_of_strings(lints_tmp)
+    lints.extend(lints_tmp)
     # Sort the errors.
-    output = sorted(output)
-    output = hlist.remove_duplicates(output)
-    # Print linter output.
-    print(pri.frame(args.linter_log, char1="/").rstrip("\n"))
-    print("\n".join(output) + "\n")
-    print(pri.line(char="/").rstrip("\n"))
+    lints = sorted(lints)
+    lints = hlist.remove_duplicates(lints)
+    # Count number of lints.
+    num_lints = _count_lints(lints)
+    #
+    output: List[str] = []
+    output.append("cmd line='%s'" % dbg.get_command_line())
+    # TODO(gp): datetime_.get_timestamp().
+    # output.insert(1, "datetime='%s'" % datetime.datetime.now())
+    output.append("actions=%d %s" % (len(all_actions), all_actions))
+    output.append("file_names=%d %s" % (len(file_names), file_names))
+    output.extend(lints)
+    output.append("num_lints=%d" % num_lints)
     # Write the file.
     output_as_str = "\n".join(output)
     io_.to_file(args.linter_log, output_as_str)
-    # Count number of lints.
-    num_lints = 0
-    for line in output:
-        # dev_scripts/linter.py:493: ... [pydocstyle]
-        if re.match(r"\S+:\d+.*\[\S+\]", line):
-            num_lints += 1
-    _LOG.info("num_lints=%d", num_lints)
+    # Print linter output.
+    txt = io_.from_file(args.linter_log)
+    _print(prnt.frame(args.linter_log, char1="/").rstrip("\n"))
+    _print(txt + "\n")
+    _print(prnt.line(char="/").rstrip("\n"))
+    #
     if num_lints != 0:
-        _LOG.info(
+        _LOG.warning(
             "You can quickfix the issues with\n> vim -c 'cfile %s'",
             args.linter_log,
         )
@@ -1662,22 +1691,33 @@ def _parser() -> argparse.ArgumentParser:
         "-c",
         "--current_git_files",
         action="store_true",
-        help="Select all files modified in the current git client",
+        help="Select files modified in the current git client",
     )
     parser.add_argument(
         "-p",
-        "--previous_git_commit_files",
+        "--previous_git_committed_files",
         nargs="?",
         type=int,
         const=1,
         default=None,
-        help="Select all files modified in previous 'n' user git commit",
+        help="Select files modified in previous 'n' user git commit",
+    )
+    parser.add_argument(
+        "-b",
+        "--modified_files_in_branch",
+        action="store_true",
+        help="Select files modified in current branch with respect to master",
     )
     parser.add_argument(
         "-d",
         "--dir_name",
         action="store",
         help="Select all files in a dir. 'GIT_ROOT' to select git root",
+    )
+    parser.add_argument(
+        "--skip_files",
+        action="append",
+        help="Force skipping certain files, e.g., together with -d",
     )
     # Select files based on type.
     parser.add_argument(
@@ -1726,10 +1766,12 @@ def _parser() -> argparse.ArgumentParser:
         "--test_actions", action="store_true", help="Print the possible actions"
     )
     # Select actions.
+    # TODO(gp): use prsr.add_action_arg
     parser.add_argument("--action", action="append", help="Run a specific check")
     parser.add_argument(
         "--all", action="store_true", help="Run all recommended phases"
     )
+    #
     parser.add_argument(
         "--pedantic", action="store_true", help="Run some purely cosmetic lints"
     )
@@ -1746,6 +1788,7 @@ def _parser() -> argparse.ArgumentParser:
         default="./linter_warnings.txt",
         help="File storing the warnings",
     )
+    parser.add_argument("--no_print", action="store_true")
     prsr.add_verbosity_arg(parser)
     return parser
 
