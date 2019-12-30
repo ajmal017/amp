@@ -1,9 +1,8 @@
 ## Where to save files for general consumption
 
-In general we prefer to separate data that is:
-
--   used only by one person: you can keep it in your _wd dir or in /scratch
--   used by multiple people: you should move it to /data
+- In general we prefer to separate data that is:
+    -   used only by one person: you can keep it in your _wd dir or in /scratch
+    -   used by multiple people: you should move it to /data
 
 When you change shared data:
 
@@ -20,8 +19,6 @@ If you see that your code that used to work doesn’t work anymore, check the gi
 
 
 ### Guidelines for official datasets
-
-
 
 -   Datasets are versioned
     -   E.g.,` v0.3` (not` v 0.3`, not` v_0.3`, not `V0.3`)
@@ -52,7 +49,7 @@ If you see that your code that used to work doesn’t work anymore, check the gi
     -   Ideally we want something that is “fire-and-forget”, i.e., we start a script and the data generation, checks and so on, are run without any human intervention
 
 
-### 5.4.2. Patching a dataset {#5-4-2-patching-a-dataset}
+### Patching a dataset
 
 
 
@@ -63,7 +60,7 @@ If you see that your code that used to work doesn’t work anymore, check the gi
     -   Also we need to make sure that the change is also applied to the official release flow, kick off the process of generating the dataset from scratch, and make sure that the dataset matches the patched version
 
 
-### 5.4.3. Lifecycle of a dataset task {#5-4-3-lifecycle-of-a-dataset-task}
+### Lifecycle of a dataset task
 
 
 
@@ -78,7 +75,7 @@ If you see that your code that used to work doesn’t work anymore, check the gi
     -   We can use minor version e.g., v0.4.1 for bug fixes and minor improvements (e.g., fix the name of a column) and major revisions (v0.4 -> v0.5) for a new feature
 
 
-### 5.4.4. Expose a dataset reader {#5-4-4-expose-a-dataset-reader}
+### Expose a dataset reader
 
 Provide library functions for reading the data creating a nice interface for the data (e.g., ravenpack/project_helpers/rp_sql_pickle.py)
 
@@ -95,7 +92,7 @@ Add all the conversion functions that are needed so that we can add a level of i
 The reader also makes sure that the data is not broken.
 
 
-### 5.4.5. Reproducibility of any datasets {#5-4-5-reproducibility-of-any-datasets}
+### Reproducibility of any datasets
 
 We should be able to regenerate any dataset from scratch in a deterministic way.
 
@@ -114,7 +111,7 @@ Cons:
 -   when it’s time to put it in production, nobody remembers how the data was generated
 
 
-### 5.4.6. Creating datasets {#5-4-6-creating-datasets}
+### Creating datasets
 
 
 
@@ -161,7 +158,7 @@ else:
 
 
 
-### 5.4.7. Suggested data formats {#5-4-7-suggested-data-formats}
+### Suggested data formats
 
 Best formats to store tabular data are, in order:
 
@@ -195,7 +192,7 @@ For unstructured data:
 One can save the same data both as pickle and as json, using the same name and different suffixes (.pkl, .json), to allow for both computer and human consumption.
 
 
-### 5.4.8. Releasing a new dataset {#5-4-8-releasing-a-new-dataset}
+### Releasing a new dataset
 
 When you change the data reader interface, or you create a new version of the data set, do a quick grep looking for code that relies on that data set
 
@@ -206,7 +203,7 @@ When you change the data reader interface, or you create a new version of the da
 -   Try to do as much as possible to lower the burden for the team to transition to the new API
 
 
-### 5.4.9. Data encyclopedia guidelines {#5-4-9-data-encyclopedia-guidelines}
+### Data encyclopedia guidelines
 
 Each section should show:
 
@@ -221,10 +218,10 @@ Each section should show:
 
 Before each commit, do "Restart -> Restart & Run" to make sure nothing is broken (if so please file a bug)
 
-## 5.12. Architectural and design pattern {#5-12-architectural-and-design-pattern}
+## Architectural and design pattern
 
 
-### 5.12.1. Organize scripts as pipelines {#5-12-1-organize-scripts-as-pipelines}
+### Organize scripts as pipelines
 
 One can organize complex computations in stages of a pipeline
 
@@ -254,7 +251,7 @@ The code should be organized to allow these different modes of operations, but t
 -   E.g., I implement the various chunks of the pipeline in a library, separating functions that read / save data after a stage and then assemble the pieces into a throw-away script where I hardwire the file names and so on
 
 
-### 5.12.2. Incremental behavior {#5-12-2-incremental-behavior}
+### Incremental behavior
 
 
 
@@ -279,7 +276,7 @@ The code should be organized to allow these different modes of operations, but t
         -   if output file exists and param `--force`, then report a log.warn and rewrite output file
 
 
-### 5.12.3. Run end-to-end {#5-12-3-run-end-to-end}
+### Run end-to-end
 
 
 
@@ -288,7 +285,7 @@ The code should be organized to allow these different modes of operations, but t
     -   This also helps with scalability issues, since if takes 1 hr for 1 month of data and we have 10 years of data is going to take 120 hours (=5 days) to run on the entire data set
 
 
-### 5.12.4. Think about scalability {#5-12-4-think-about-scalability}
+### Think about scalability
 
 
 
@@ -298,7 +295,7 @@ The code should be organized to allow these different modes of operations, but t
 -   Remember that typically we need to run the same scripts multiple times (e.g., for debug and / or production)
 
 
-### 5.12.5. Use command line for reproducibility {#5-12-5-use-command-line-for-reproducibility}
+### Use command line for reproducibility
 
 
 
@@ -306,7 +303,7 @@ The code should be organized to allow these different modes of operations, but t
     -   In this way a command line contains all the set-up to run an experiment
 
 
-### 5.12.6. Structure the code in terms of filters {#5-12-6-structure-the-code-in-terms-of-filters}
+### Structure the code in terms of filters
 
 
 
@@ -320,13 +317,12 @@ The code should be organized to allow these different modes of operations, but t
 6. patch up SQL (e.g., inserting missing TR codes and reporting them to us so we can check with TR)
 
 
-## 5.13. Pipeline design pattern {#5-13-pipeline-design-pattern}
+## Pipeline design pattern
 
 Many of what said here applies also to notebooks, since a notebook is already structured as a pipeline
 
 
-###
-    5.13.1. Config contains everything {#5-13-1-config-contains-everything}
+### Config contains everything
 
 Centralize all the options into a config that is defined at the beginning of the notebook, instead of having parameters interspersed in the entire notebook.
 
@@ -342,8 +338,7 @@ E.g,, the SPY adjustment becomes a single function and the cell is:
 
 
 
-###
-    5.13.2. Make the pipeline think only in terms of config {#5-13-2-make-the-pipeline-think-only-in-terms-of-config}
+### Make the pipeline think only in terms of config
 
 Each function gets its params from the config. There is an adapter that adapts the config to the specific function allowing to keep the interfaces flexible
 
@@ -369,29 +364,24 @@ in this way the pipeline (i.e., notebooks) just passes the config to all the fun
 
 This can be controversial and I usually do it only for functions whose interface I expect to change
 
-
-###
-    5.13.3. Repeat the structure but not the implementation {#5-13-3-repeat-the-structure-but-not-the-implementation}
+### Repeat the structure but not the implementation
 
 In other words, the “structure”, i.e., the control flow, is difficult to factor out across different notebooks, so it’s ok to repeat the structure of the code (e.g., cut and paste the same invocation of functions in different notebooks) as long as the implementation of the pieces doing the actual work is factored out.
 
 
-###
-    5.13.4. Have a way to compare and pretty-print configs {#5-13-4-have-a-way-to-compare-and-pretty-print-configs}
+### Have a way to compare and pretty-print configs
 
 Self-explanatory.
 
 pprint() is awesome
 
 
-###
-    5.13.5. Save the config together with the results {#5-13-5-save-the-config-together-with-the-results}
+### Save the config together with the results
 
 In this way one can know exactly how the results were generated. Also saving info about, user, server, time, git version and conda env can help.
 
 
-###
-    5.13.6. Use functions to allow total flexibility {#5-13-6-use-functions-to-allow-total-flexibility}
+### Use functions to allow total flexibility
 
 Sometimes one piece of the pipeline becomes super complicated because one wants to do completely different things in different situations, so one ends up doing:
 
@@ -450,8 +440,7 @@ For instance one can compose masks / filtering in any possible way by creating f
 One can also pass a pointer to the function directly instead of the name to be evaluated at later stage.
 
 
-###
-    5.13.7. Each function validates its own params {#5-13-7-each-function-validates-its-own-params}
+### Each function validates its own params
 
 This is basic separation of responsibility, but sometimes one wants to do some checks at the beginning to avoid to get an assertion too late. Classical example: the name of the file to save the result is invalid and a long run crashes at the very end.
 
@@ -467,16 +456,14 @@ def f(...):
 and then call check_f_params() also at the beginning when validating the config.
 
 
-###
-    5.13.8. Bend but not break {#5-13-8-bend-but-not-break}
+### Bend but not break
 
 Always bend and try not to break.
 
 E.g., to save a file, create the enclosing dir if missing, instead of having the OS throw an error.
 
 
-###
-    5.13.9. Make configs hierarchical {#5-13-9-make-configs-hierarchical}
+### Make configs hierarchical
 
 As soon as stages of the pipeline become hierarchical also the config becomes hierarchical (instead of flat) so that
 
@@ -503,8 +490,7 @@ config = {
 
 
 
-###
-    5.13.10. Add verbose mode {#5-13-10-add-verbose-mode}
+### Add verbose mode
 
 One problem is that to keep the notebook simple, one ends up having very complex that in the notebook were originals many cells with a lot of debug, plots in the middle. One approach is to have a "verbose" mode:
 
@@ -525,8 +511,7 @@ Global and function-specific verbose mode can even become config params.
 Sometimes logging is better, although it’s not very notebook friendly.
 
 
-###
-    5.13.11. Multi-process + memoization > optimize one function {#5-13-11-multi-process-memoization->-optimize-one-function}
+### Multi-process + memoization > optimize one function
 
 IMO it is better to keep functions simple even if slow, and then get speed-up by avoiding to recompute the same result and use coarse grain parallelism. Maybe obvious, maybe not.
 
