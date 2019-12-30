@@ -20,7 +20,7 @@ _LOG = logging.getLogger(__name__)
 
 
 class Test_env1(ut.TestCase):
-    def test_get_system_signature1(self):
+    def test_get_system_signature1(self) -> None:
         txt = env.get_system_signature()
         _LOG.debug(txt)
 
@@ -40,60 +40,60 @@ class Test_git1(ut.TestCase):
     """
 
     @staticmethod
-    def _helper(func_call):
+    def _helper(func_call: str) -> None:
         act = eval(func_call)
         _LOG.debug("%s=%s", func_call, act)
 
-    def test_get_git_name1(self):
+    def test_get_git_name1(self) -> None:
         func_call = "git.get_repo_symbolic_name(super_module=True)"
         self._helper(func_call)
 
-    def test_is_inside_submodule1(self):
+    def test_is_inside_submodule1(self) -> None:
         func_call = "git.is_inside_submodule()"
         self._helper(func_call)
 
-    def test_get_client_root1(self):
+    def test_get_client_root1(self) -> None:
         func_call = "git.get_client_root(super_module=True)"
         self._helper(func_call)
 
-    def test_get_client_root2(self):
+    def test_get_client_root2(self) -> None:
         func_call = "git.get_client_root(super_module=False)"
         self._helper(func_call)
 
-    def test_get_path_from_git_root1(self):
+    def test_get_path_from_git_root1(self) -> None:
         file_name = "helpers/test/test_helpers.py"
         act = git.get_path_from_git_root(file_name, super_module=False)
         _LOG.debug("get_path_from_git_root()=%s", act)
 
-    def test_get_repo_symbolic_name1(self):
+    def test_get_repo_symbolic_name1(self) -> None:
         func_call = "git.get_repo_symbolic_name(super_module=True)"
         self._helper(func_call)
 
-    def test_get_repo_symbolic_name2(self):
+    def test_get_repo_symbolic_name2(self) -> None:
         func_call = "git.get_repo_symbolic_name(super_module=False)"
         self._helper(func_call)
 
-    def test_get_modified_files1(self):
+    def test_get_modified_files1(self) -> None:
         func_call = "git.get_modified_files()"
         self._helper(func_call)
 
-    def test_get_previous_committed_files1(self):
+    def test_get_previous_committed_files1(self) -> None:
         func_call = "git.get_previous_committed_files()"
         self._helper(func_call)
 
-    def test_git_log1(self):
+    def test_git_log1(self) -> None:
         func_call = "git.git_log()"
         self._helper(func_call)
 
-    def test_git_log2(self):
+    def test_git_log2(self) -> None:
         func_call = "git.git_log(my_commits=True)"
         self._helper(func_call)
 
-    def test_git_all_repo_symbolic_names1(self):
+    def test_git_all_repo_symbolic_names1(self) -> None:
         func_call = "git.get_all_repo_symbolic_names()"
         self._helper(func_call)
 
-    def test_git_all_repo_symbolic_names2(self):
+    def test_git_all_repo_symbolic_names2(self) -> None:
         all_repo_sym_names = git.get_all_repo_symbolic_names()
         for repo_sym_name in all_repo_sym_names:
             repo_github_name = git.get_repo_github_name(repo_sym_name)
@@ -109,7 +109,7 @@ class Test_git1(ut.TestCase):
                 + ut.to_string("repo_sym_name_tmpA")
             )
 
-    def test_get_amp_abs_path1(self):
+    def test_get_amp_abs_path1(self) -> None:
         amp_dir = git.get_amp_abs_path()
         # Check.
         self.assertTrue(os.path.exists(amp_dir))
@@ -118,18 +118,58 @@ class Test_git1(ut.TestCase):
             # e.g., amp.dev.build_clean_env.run_slow_coverage_tests.
             self.assert_equal(os.path.basename(amp_dir), "amp")
 
-    def test_get_branch_name(self):
+    def test_get_branch_name1(self) -> None:
         _ = git.get_branch_name()
 
     @pytest.mark.skipif('si.get_user_name() == "jenkins"', reason="#781")
     @pytest.mark.skipif(
         'git.get_repo_symbolic_name(super_module=False) == "alphamatic/amp"'
     )
-    def test_get_submodule_hash(self):
-        _ = git.get_submodule_hash("amp")
+    def test_get_submodule_hash1(self) -> None:
+        dir_name = "amp"
+        _ = git.get_submodule_hash(dir_name)
 
-    def test_get_head_hash(self):
-        _ = git.get_head_hash(".")
+    def test_get_head_hash1(self) -> None:
+        dir_name = "."
+        _ = git.get_head_hash(dir_name)
+
+    def test_get_remote_head_hash1(self) -> None:
+        dir_name = "."
+        _ = git.get_head_hash(dir_name)
+
+    def test_report_submodule_status1(self) -> None:
+        dir_name = "."
+        short_hash = True
+        _ = git.report_submodule_status(dir_name, short_hash)
+
+    def _helper_group_hashes(self, head_hash: str, remh_hash: str, subm_hash: str, exp) -> None:
+        act = git._group_hashes(head_hash, remh_hash, subm_hash)
+        self.assert_equal(act, exp)
+
+    def test_group_hashes1(self) -> None:
+        head_hash = "a2bfc704"
+        remh_hash = "a2bfc704"
+        subm_hash = None
+        exp = "head_hash = remh_hash = a2bfc704"
+        #
+        #
+        self._helper_group_hashes(head_hash, remh_hash, subm_hash, exp)
+
+    def test_group_hashes2(self) -> None:
+        head_hash = "22996772"
+        remh_hash = "92167662"
+        subm_hash = "92167662"
+        exp = "head_hash = remh_hash = a2bfc704"
+        #
+        self._helper_group_hashes(head_hash, remh_hash, subm_hash, exp)
+
+    def test_group_hashes3(self) -> None:
+        head_hash = "7ea03eb6"
+        remh_hash = "7ea03eb6"
+        subm_hash = "7ea03eb6"
+        exp = "head_hash = remh_hash = a2bfc704"
+        #
+        self._helper_group_hashes(head_hash, remh_hash, subm_hash, exp)
 
 
 # #############################################################################
@@ -138,27 +178,27 @@ class Test_git1(ut.TestCase):
 
 
 class Test_list_1(ut.TestCase):
-    def test_find_duplicates1(self):
+    def test_find_duplicates1(self) -> None:
         list_ = "a b c d".split()
         list_out = hlist.find_duplicates(list_)
         self.assertEqual(list_out, [])
 
-    def test_find_duplicates2(self):
+    def test_find_duplicates2(self) -> None:
         list_ = "a b c a d e f f".split()
         list_out = hlist.find_duplicates(list_)
         self.assertEqual(set(list_out), set("a f".split()))
 
-    def test_remove_duplicates1(self):
+    def test_remove_duplicates1(self) -> None:
         list_ = "a b c d".split()
         list_out = hlist.remove_duplicates(list_)
         self.assertEqual(list_out, "a b c d".split())
 
-    def test_remove_duplicates2(self):
+    def test_remove_duplicates2(self) -> None:
         list_ = "a b c a d e f f".split()
         list_out = hlist.remove_duplicates(list_)
         self.assertEqual(list_out, "a b c d e f".split())
 
-    def test_remove_duplicates3(self):
+    def test_remove_duplicates3(self) -> None:
         list_ = "a b c a d e f f".split()
         list_ = list(reversed(list_))
         list_out = hlist.remove_duplicates(list_)
@@ -171,18 +211,18 @@ class Test_list_1(ut.TestCase):
 
 
 class Test_numba_1(ut.TestCase):
-    def test1(self):
+    def test1(self) -> None:
         # TODO(gp): Implement this.
         pass
 
 
 # #############################################################################
-# numba.py
+# printing.py
 # #############################################################################
 
 
 class Test_printing1(ut.TestCase):
-    def test_color_highlight1(self):
+    def test_color_highlight1(self) -> None:
         for c in prnt.COLOR_MAP:
             _LOG.debug(prnt.color_highlight(c, c))
 
@@ -193,7 +233,7 @@ class Test_printing1(ut.TestCase):
 
 
 class Test_s3_1(ut.TestCase):
-    def test_get_path1(self):
+    def test_get_path1(self) -> None:
         file_path = (
             "s3://default00-bucket/kibot/All_Futures_Continuous_Contracts_daily"
         )
@@ -204,7 +244,7 @@ class Test_s3_1(ut.TestCase):
         )
 
     @pytest.mark.slow
-    def test_ls1(self):
+    def test_ls1(self) -> None:
         file_path = os.path.join(
             hs3.get_path(), "kibot/All_Futures_Continuous_Contracts_daily"
         )
@@ -219,7 +259,7 @@ class Test_s3_1(ut.TestCase):
 
 class Test_unit_test1(ut.TestCase):
     @pytest.mark.amp
-    def test_purify_txt_from_client1(self):
+    def test_purify_txt_from_client1(self) -> None:
         super_module_path = git.get_client_root(super_module=True)
         # TODO(gp): We should remove the current path.
         txt = r"""
@@ -253,6 +293,6 @@ dev_scripts/test/Test_linter_py1.test_linter1/tmp.scratch/input.py:3: error: Nam
 
 
 class Test_user_credentials1(ut.TestCase):
-    def test_get_credentials1(self):
+    def test_get_credentials1(self) -> None:
         data = usc.get_credentials()
         _LOG.debug("data=%s", data)
