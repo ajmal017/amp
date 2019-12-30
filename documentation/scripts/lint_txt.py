@@ -250,7 +250,7 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _main(args):
+def _main(args: argparse.Namespace) -> None:
     in_file_name = args.infile.name
     from_stdin = in_file_name == "<stdin>"
     dbg.init_logger(
