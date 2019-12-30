@@ -251,11 +251,14 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def _main(args):
-    dbg.init_logger(verbosity=args.log_level, use_exec_path=False)
-    # Read input.
     in_file_name = args.infile.name
+    from_stdin = in_file_name == "<stdin>"
+    dbg.init_logger(
+        verbosity=args.log_level, use_exec_path=False, force_white=from_stdin
+    )
+    # Read input.
     _LOG.debug("in_file_name=%s", in_file_name)
-    if in_file_name != "<stdin>":
+    if not from_stdin:
         dbg.dassert(
             in_file_name.endswith(".txt") or in_file_name.endswith(".md"),
             "Invalid extension for file name '%s'",
