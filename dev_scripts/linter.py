@@ -91,7 +91,7 @@ def _dassert_list_of_strings(output: List[str], *args: Any) -> None:
 
 
 # TODO(gp): Horrible: to remove / rewrite.
-def _clean_file(file_name, write_back):
+def _clean_file(file_name, write_back) -> Tuple[str, str]:
     """
     Remove empty spaces, tabs, windows end-of-lines.
     :param write_back: if True the file is overwritten in place.
@@ -1679,7 +1679,7 @@ def _main(args: argparse.Namespace) -> int:
     return num_lints
 
 
-def _parser() -> argparse.ArgumentParser:
+def _parse() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
@@ -1794,7 +1794,7 @@ def _parser() -> argparse.ArgumentParser:
 
 
 if __name__ == "__main__":
-    parser_ = _parser()
+    parser_ = _parse()
     args_ = parser_.parse_args()
     rc_ = _main(args_)
     sys.exit(rc_)

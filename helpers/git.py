@@ -4,6 +4,7 @@ Import as:
 import helpers.git as git
 """
 
+import collections
 import logging
 import os
 import re
@@ -294,9 +295,8 @@ def get_hash(git_hash: str, short_hash: bool, num_digits: int = 8) -> str:
         ret = git_hash
     return ret
 
-import collections
 
-def _group_hashes(head_hash: str , remh_hash: str , subm_hash: str):
+def _group_hashes(head_hash: str, remh_hash: str, subm_hash: str):
     """
     head_hash: a
     remh_hash: b
@@ -305,7 +305,7 @@ def _group_hashes(head_hash: str , remh_hash: str , subm_hash: str):
     map_ = collections.OrderedDict()
     map_["head_hash"] = head_hash
     map_["remh_hash"] = remh_hash
-    if subm_hash is not None:
+    if subm_hash:
         map_["subm_hash"] = subm_hash
     #
     inv_map = collections.OrderedDict()

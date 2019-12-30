@@ -19,18 +19,15 @@ import helpers.system_interaction as si
 _LOG = logging.getLogger(__name__)
 
 
-
 def _pull(dir_names: List[str], short_hash: bool) -> None:
-    _LOG.info("status=\n%s", git.report_submodule_status(dir_names,
-                                                         short_hash))
+    _LOG.info("status=\n%s", git.report_submodule_status(dir_names, short_hash))
     for dir_name in dir_names:
         cmd = f"cd {dir_name} && git pull --autostash"
         si.system(cmd)
-    _LOG.info("status=\n%s", git.report_submodule_status(dir_names,
-                                                         short_hash))
+    _LOG.info("status=\n%s", git.report_submodule_status(dir_names, short_hash))
 
 
-def _show(dir_names: List[str], short_hash : bool) -> None:
+def _show(dir_names: List[str], short_hash: bool) -> None:
     print(git.report_submodule_status(dir_names, short_hash))
 
 
@@ -42,7 +39,7 @@ def _clean(dir_names: List[str]) -> None:
 
 def _roll_fwd(dir_names: List[str], auto_commit: bool, short_hash: bool) -> None:
     # Pull.
-    _pull(dir_names)
+    _pull(dir_names, short_hash)
     # Add changes.
     for dir_name in dir_names:
         cmd = f"git add {dir_name}"

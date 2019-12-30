@@ -138,11 +138,13 @@ class Test_git1(ut.TestCase):
         _ = git.get_head_hash(dir_name)
 
     def test_report_submodule_status1(self) -> None:
-        dir_name = "."
+        dir_names = ["."]
         short_hash = True
-        _ = git.report_submodule_status(dir_name, short_hash)
+        _ = git.report_submodule_status(dir_names, short_hash)
 
-    def _helper_group_hashes(self, head_hash: str, remh_hash: str, subm_hash: str, exp) -> None:
+    def _helper_group_hashes(
+        self, head_hash: str, remh_hash: str, subm_hash: str, exp
+    ) -> None:
         act = git._group_hashes(head_hash, remh_hash, subm_hash)
         self.assert_equal(act, exp)
 
