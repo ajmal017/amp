@@ -489,7 +489,6 @@ $$"""
         file_name = "test.txt"
         self._helper_process(txt, exp, file_name)
 
-    @pytest.mark.skip
     def test_process6(self):
         """
         Run the text linter on a txt file.
@@ -502,38 +501,12 @@ $$"""
    value = 1.234
    ```
 """
-        exp = r"""
-* `str.format`
+        exp = r"""* `str.format`
 - Python 3 allows to format multiple values, e.g.,
   ```python
   key = 'my_var'
   value = 1.234
   ```
-"""
-        file_name = "test.txt"
-        self._helper_process(txt, exp, file_name)
-
-    @pytest.mark.skip
-    def test_process7(self):
-        """
-        Run the text linter on a txt file.
-        """
-        txt = r"""
-* `str`-`bytes` gotchas
-- You can't mix `str` and `bytes` even if they seem to be equivalent
-  ```python
-  b'one' + 'two'
-  >>>
-  TypeError: can't concat str to bytes
-  ```
-- Comparing `bytes` and `str` is always `False`
-  ```python
-  print(b'foo' == 'foo')
-  >>>
-  False
-  ```
-"""
-        exp = r"""
 """
         file_name = "test.txt"
         self._helper_process(txt, exp, file_name)
