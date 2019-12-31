@@ -26,7 +26,7 @@ import helpers.parser as prsr
 
 _LOG = logging.getLogger(__name__)
 
-_NUM_SPACES = 4
+_NUM_SPACES = 2
 
 
 def _process_comment_block(line: str, in_skip_block: bool) -> Tuple[bool, bool]:
@@ -229,6 +229,7 @@ def _parse() -> argparse.ArgumentParser:
 def _main(parser: argparse.ArgumentParser) -> None:
     args = parser.parse_args()
     dbg.init_logger(verbosity=args.log_level, use_exec_path=True)
+    _LOG.info("cmd line=%s", dbg.get_command_line())
     # Slurp file.
     lines = io_.from_file(args.input).split("\n")
     lines = [l.rstrip("\n") for l in lines]
