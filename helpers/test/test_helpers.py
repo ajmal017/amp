@@ -154,14 +154,14 @@ class Test_git1(ut.TestCase):
         subm_hash = None
         exp = "head_hash = remh_hash = a2bfc704"
         #
-        #
         self._helper_group_hashes(head_hash, remh_hash, subm_hash, exp)
 
     def test_group_hashes2(self) -> None:
         head_hash = "22996772"
         remh_hash = "92167662"
         subm_hash = "92167662"
-        exp = "head_hash = remh_hash = a2bfc704"
+        exp = """head_hash = 22996772
+remh_hash = subm_hash = 92167662"""
         #
         self._helper_group_hashes(head_hash, remh_hash, subm_hash, exp)
 
@@ -169,7 +169,7 @@ class Test_git1(ut.TestCase):
         head_hash = "7ea03eb6"
         remh_hash = "7ea03eb6"
         subm_hash = "7ea03eb6"
-        exp = "head_hash = remh_hash = a2bfc704"
+        exp = "head_hash = remh_hash = subm_hash = 7ea03eb6"
         #
         self._helper_group_hashes(head_hash, remh_hash, subm_hash, exp)
 

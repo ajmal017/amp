@@ -221,8 +221,8 @@ class Test_preprocess2(ut.TestCase):
 """
         exp = """
 # Python: nested functions
-    - Functions can be declared in the body of another function
-    - E.g., to hide utility functions in the scope of the function that uses them
+  - Functions can be declared in the body of another function
+  - E.g., to hide utility functions in the scope of the function that uses them
 
         ```python
         def print_integers(values):
