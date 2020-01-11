@@ -234,3 +234,38 @@
 - Comments that are marked as "pending" in GitHub are not published yet and
   visible only to the author
 - Once you publish the review then an email is sent and comments become visible
+
+# Conventions
+
+## Tags
+
+- AUTOML
+- BREAKS
+- BUG: 
+- CLEANUP: Tasks related to improving, refactoring, reorg (not bugs) general
+  shared code (e.g., for `helpers`)
+- DATA:
+- DATAFLOW
+- DEV_INFRA:
+- DWNLD:
+- ETL:
+- INFRA
+- INFRA:
+- INVESTIGATE
+- INVESTIGATE
+- JENKINS
+- KG
+- NLP:
+- ORG: 
+- POPPP
+- PRICE: Tasks related to price data
+- READ:
+- RESEARCH
+- RP
+- ST:
+- TWITTER:
+- WIND
+
+- Tags that should be cleaned up
+  - JODI -> ETL2
+  - ETL -> ETL2

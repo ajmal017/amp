@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-Lint md files.
+Lint txt files.
 > lint_txt.py -i foo.md -o bar.md
 
 It can be used in vim to prettify a part of the text using stdin / stdout.
@@ -156,6 +156,13 @@ def _postprocess(txt: str, in_file_name: str) -> str:
     return txt_new_as_str
 
 
+def _get_executable(executable: str) -> str:
+    amp_path = git.get_amp_abs_path()
+    executable_path = os.path.join(amp_path, executable)
+    dbg.dassert_exists(executable_path)
+    return executable_path
+
+
 def _refresh_toc(txt: str) -> str:
     _LOG.debug("txt=%s", txt)
     # Check whether there is a TOC otherwise add it.
@@ -167,12 +174,29 @@ def _refresh_toc(txt: str) -> str:
     tmp_file_name = tempfile.NamedTemporaryFile().name
     io_.to_file(tmp_file_name, txt)
     # Process TOC.
-    amp_path = git.get_amp_abs_path()
+    executable = _get_executable("documentation/scripts/gh-md-toc")
+    #
     cmd: List[str] = []
-    gh_md_toc = os.path.join(amp_path, "documentation/scripts/gh-md-toc")
-    dbg.dassert_exists(gh_md_toc)
-    cmd.append(gh_md_toc)
+    cmd.append(executable)
     cmd.append("--insert %s" % tmp_file_name)
+    cmd_as_str = " ".join(cmd)
+    si.system(cmd_as_str, abort_on_error=False, suppress_output=True)
+    # Read file.
+    txt = io_.from_file(tmp_file_name)
+    return txt
+
+
+def _format_headers(txt: str) -> str:
+    # Write file.
+    tmp_file_name = tempfile.NamedTemporaryFile().name
+    io_.to_file(tmp_file_name, txt)
+    #
+    executable = _get_executable("documentation/scripts/transform_txt.py")
+    #
+    cmd: List[str] = []
+    cmd.append(executable)
+    cmd.append("--action format")
+    cmd.append(f"-i {tmp_file_name}")
     cmd_as_str = " ".join(cmd)
     si.system(cmd_as_str, abort_on_error=False, suppress_output=True)
     # Read file.
@@ -183,8 +207,9 @@ def _refresh_toc(txt: str) -> str:
 # #############################################################################
 
 
-def _to_execute_action(action, actions):
-    to_execute = actions is None or action in actions
+def _to_execute_action(action: str, actions: List[str]) -> bool:
+    dbg.dassert_isinstance(actions, list)
+    to_execute = action in actions
     if not to_execute:
         _LOG.debug("Skipping %s", action)
     return to_execute
@@ -206,11 +231,16 @@ def _process(
     if _to_execute_action(action, actions):
         txt = _postprocess(txt, in_file_name)
     # Refresh table of content.
+    is_md_file = in_file_name.endswith(".md")
     action = "refresh_toc"
     if _to_execute_action(action, actions):
-        is_md_file = in_file_name.endswith(".md")
         if is_md_file:
             txt = _refresh_toc(txt)
+    # Format headers.
+    action = "format_headers"
+    if _to_execute_action(action, actions):
+        if not is_md_file:
+            txt = _format_headers(txt)
     return txt
 
 
@@ -221,6 +251,7 @@ _VALID_ACTIONS = [
     "prettier",
     "postprocess",
     "refresh_toc",
+    #"format_headers",
 ]
 
 
@@ -266,7 +297,10 @@ def _main(args: argparse.Namespace) -> None:
         )
     txt = args.infile.read()
     # Process.
-    txt = _process(txt, in_file_name, actions=args.action)
+    actions = args.action
+    if actions is None:
+        actions = _VALID_ACTIONS[:]
+    txt = _process(txt, in_file_name, actions=actions)
     # Write output.
     if args.in_place:
         dbg.dassert_ne(in_file_name, "<stdin>")

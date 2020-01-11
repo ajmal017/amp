@@ -406,7 +406,13 @@ if __name__ == "main":
         # Check.
         self.check_string(output)
 
-    # #########################################################################
+
+# #########################################################################
+
+
+# pylint: disable=too-many-public-methods
+@pytest.mark.amp
+class Test_linter_py2(ut.TestCase):
 
     def _helper_check_shebang(
         self, file_name: str, txt: str, is_executable: bool, exp: str,
@@ -705,3 +711,127 @@ from typing import List
         file_name = "hello/world/tests/test_all.ipynb"
         exp = ""
         self._helper_check_test_file_dir(file_name, exp)
+
+    # #########################################################################
+
+    '''
+ """
+ 
+ :param data:
+ :return:
+ """
+    '''
+
+    '''
+"""
+Add to the bash script `txt` diagnostic informations.
+
+:return:
+    - client_root_path: the directory that includes the executable as
+      `dev_scripts/_setenv_*.py` (i.e., the dir that is ../exec_path)
+    - user_name
+""" 
+    
+    '''
+"""
+When running a conda command we need to execute a script to configure conda.
+This script is typically executed in .bashrc but here we create a new bash
+shell every time to execute a command, so we need to re-initialize the shell
+before any conda command.
+
+:param cmd:
+:param args:
+:param kwargs:
+:return:
+    '''
+
+# #############################################################################
+
+"""
+* Skills to show in an interview
+- You want to demonstrate that you have the following skills:
+    - rigorously formulate real-world problems
+    - solve problems
+    - design algorithms
+    - transform algorithms in a tested program
+    - analytical skills to determine computational complexity of solution
+"""
+
+
+"""
+* Skills to show in an interview
+- You want to demonstrate that you have the following skills:
+    1. Rigorously formulate real-world problems
+    2. Solve problems
+    3. Design algorithms
+    4. Transform algorithms in a tested program
+    5. Analytical skills to determine computational complexity of solution
+"""
+
+
+"""___Set-up___"""
+# stays the same instead of **_ML problem_**
+
+
+====================
+
+"""
+* Geometric mean
+        $$GM = \sqrt[n]{\prod_i x_i}$$
+"""
+
+became
+
+"""
+* Geometric mean $$
+        GM = \sqrt[n]{\prod_i x_i}
+        $$
+"""
+
+instead of
+
+"""
+* Geometric mean
+  $$
+  GM = \sqrt[n]{\prod_i x_i}
+  $$
+"""
+
+=====================
+
+if a math equation fits in one line
+
+$$
+Y_t = c + \phi Y_{t-1} + \varepsilon_t
+$$
+
+leave it in one line
+$$Y_t = c + \phi Y_{t-1} + \varepsilon_t$$
+
+=====================
+
+* AR(1) process: def
+- Aka "auto-regressive of order 1"
+- AR(1) model is defined as:
+    $$Y_t = c + \phi Y_{t-1} + \varepsilon_t$$
+  where the noise is IID Gaussian:
+  $\varepsilon_t \sim \GWN(0, \sigma_{\varepsilon}^2)$
+
+
+not
+
+
+* AR(1) process: def
+- Aka "auto-regressive of order 1"
+- AR(1) model is defined as:
+
+  $$
+  Y_t = c + \phi Y_{t-1} + \varepsilon_t
+  $$
+
+  where the noise is IID Gaussian:
+
+===================
+
+$\rightarrow$ -> =>
+

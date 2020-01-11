@@ -677,14 +677,14 @@ class _Pydocstyle(_Action):
             "D202",
             # D212: Multi-line docstring summary should start at the first line
             "D212",
-            # D203: 1 blank line required before class docstring (found 0)
+            # D203: 1 blank line required before class docstring
             "D203",
             # D205: 1 blank line required between summary line and description
             "D205",
-            # D400: First line should end with a period (not ':')
-            "D400",
+            ## D400: First line should end with a period (not ':')
+            #"D400",
             # D402: First line should not be the function's "signature"
-            "D402",
+            #"D402",
             # D407: Missing dashed underline after section
             "D407",
             # D413: Missing dashed underline after section
@@ -705,6 +705,7 @@ class _Pydocstyle(_Action):
                     # D103: Missing docstring in public function
                     "D103",
                     # D104: Missing docstring in public package
+                    # (i.e., in __init__.py)
                     "D104",
                     # D107: Missing docstring in __init__
                     "D107",
@@ -1364,7 +1365,19 @@ _VALID_ACTIONS_META: List[Tuple[str, str, str, Type[_Action]]] = [
     # Superseded by black.
     # ("yapf", "w", "Formatter for Python code", _Yapf),
     ("black", "w", "The uncompromising code formatter", _Black),
-    ("flake8", "r", "Tool For Style Guide Enforcement", _Flake8),
+    ("flake8", "r", "Tool for style guide enforcement", _Flake8),
+    # (flake8-bugbear: 19.8.0, mccabe: 0.6.1, naming: 0.9.1, pycodestyle: 2.5.0, pyflakes: 2.1.1)
+    # --max-complexity=10
+    # Stand-alone
+    #
+    # flake8 plugins
+    # https://github.com/PyCQA/pep8-naming
+    #   Check your code against PEP 8 naming conventions.
+    # https://github.com/PyCQA/flake8-docstrings
+    #   Run pydocstyle inside flake8 (not needed)
+    # https://github.com/PyCQA/flake8-bugbear
+    # pyflake, like pylint, pychecker
+    # https://realpython.com/python-code-quality/
     ("pydocstyle", "r", "Docstring style checker", _Pydocstyle),
     # TODO(gp): Fix this.
     # Not installable through conda.
