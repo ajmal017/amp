@@ -14,11 +14,9 @@
 
 - Time series may be univariate or multivariate
 
-- We can use some fields in each time series (e.g., download status, highest frequency) in the data set, which are filled manually, before the data is automatically populated from the download step
-
 - This is a running documentation of the fields we are interested in capturing
   about the data
-- Paul suggests to keep in the KG static or slowly changing data 
+- Paul suggests to keep in the KG static or slowly changing data
   - I don't disagree with it, but we need to decide where to put the rest of the
     information we want to capture
 
@@ -39,7 +37,7 @@
 
 ## 2. Data sets collection
 - It is informed by a modeling idea or just pre-emptively (e.g., "this data makes
-  us come up with a modeling ideas)
+  us come up with a modeling ideas")
   - E.g., see GitHub tasks under the `Datasets` milestone
 
 - Currently, the result of this activity is in the Monster Spreadsheet
@@ -59,8 +57,7 @@
   - Cost
   - ...
 
-- Currently we track this in the Monster Spreadsheet and filing issues against
-  ETL2
+- Currently we track this in the Monster Spreadsheet and file issues against ETL2
 
 ## 5. Data download
 - Download data and put it into a suitable form inside ETL2
@@ -137,7 +134,7 @@
     from 2000 to today) and then have automatic processes populate this data
     automatically
 
-- We could have 
+- We could have
 
 ### Access control
 
@@ -154,6 +151,24 @@
   - Customer
 
 # Fields
+
+## Conventions
+
+- We explicitly qualify if something is an estimate (e.g., ~$1000) or not
+- Every information should be traceable (especially cut-and-paste data)
+  - Where did it come from?
+    - Website, paper, book
+  - Who added that information and when
+    - Note that relying on the Git commit history might not be enough, since
+      maybe an analyst does some work, and somebody else adds it to the KB
+    - Context about data should be available (e.g., GitHub task might be the best
+      way)
+- How much do we believe in this information?
+  - Is it a wild guess? Is it an informed guess? Is it what we were told?
+- All metadata should be described in this document
+  - The field names
+    - should have underscores and not spaces
+    - should be as long as needed to be clear, although concise
 
 ## Data source metadata
 
@@ -201,7 +216,8 @@
   - E..g, P0
 
 - COST
-  - Is it free, is by subscription with annual cost
+  - Is it free or is by subscription?
+  - What is the annual cost?
 
 - STATUS
   - Download status
@@ -209,14 +225,39 @@
 
 - API_ACCESS
   - How to retrieve the data from ETL2?
-  - E.g., pointer to code, a 
+  - E.g., pointer to code, a
 
 - NOTES
-  - Why and how relevant is this data to our work?
-  - Is there an API? Do we need to scrape? Do we need to parse HTML, PDFs? How
-    complex do we believe it is to download?
+  - This is a free-form field which also incubates data that can become a field
+    in the future
+    - Why and how is this data relevant to our work?
+    - Is there an API? Do we need to scrape?
+    - Do we need to parse HTML, PDFs?
+    - How complex do we believe it is to download?
 
+## Time series metadata
 
 Task 921 - KG: Generate spreadsheet with time series info
 
-This spreadsheet came in part from Data source analysis template
+- ID (internal)
+- name
+- aliases
+- url
+- short description
+- long description
+- sampling frequency
+- release frequency
+- release delay
+- start date
+- end date
+- units of measure
+- target commodities
+- supply / demand / inventory
+- geo
+- related papers
+- internal data pointer
+
+## Knowledge base
+
+- There is an ontology for economic phenomena
+- Each time series relates to nodes in the ontology
