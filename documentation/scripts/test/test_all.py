@@ -437,6 +437,9 @@ $$"""
         act = prnt.remove_empty_lines(act)
         self.assert_equal(act, exp)
 
+
+    # #############################################################################
+
     @staticmethod
     def _get_text_problematic_for_prettier1():
         txt = r"""
@@ -507,6 +510,29 @@ $$"""
   key = 'my_var'
   value = 1.234
   ```
+"""
+        file_name = "test.txt"
+        self._helper_process(txt, exp, file_name)
+
+    def test_process7(self):
+        """
+        Run the text linter on a txt file.
+        """
+        txt = r"""* Marginalization
+- Aka summing out
+- Summing out probability over certain variables to remove them
+
+  $$
+  \Pr(Y) = \sum_z \Pr(Y, Z)
+  $$
+
+* Conditioning
+"""
+        exp = r"""* Marginalization
+- Aka summing out
+- Summing out probability over certain variables to remove them
+  $$\Pr(Y) = \sum_z \Pr(Y, Z)$$
+* Conditioning
 """
         file_name = "test.txt"
         self._helper_process(txt, exp, file_name)

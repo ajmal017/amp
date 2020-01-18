@@ -230,6 +230,30 @@
   - Use in cases where we have a large number of time series known to have
     meaningful correlations
 
+
+## 2014, The topology of macro financial flow using stochastic flow diagrams
+- Paper authors: Calkin, De Prado
+- [Link](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2379319)
+- Review author / date: GP, 2020-01-17
+- Score: 1 / 5
+- Summary:
+- Praises:
+  - PCA on futures sectors
+  - Interesting graphical representation
+    - Width of the arc represents strength of relationship (in terms of $R^2$)
+    - Color (green / red) and intensity represent sign and magnitude
+    - Lags are delays
+    - Geometric topology represents relationships better than tables
+    - Connectivity of a vertex represents importance
+  - Agreed that econometrics as it is, is close to a pseudo-science
+    that more complex techniques are needed than inverting a matrix
+- Critiques:
+  - Various inflammatory remarks and very little content
+- Next steps:
+  - None
+
+# Computer engineering
+
 ## 2015, Hidden technical debt in machine learning systems
 
 - Paper authors: Sculler et al.

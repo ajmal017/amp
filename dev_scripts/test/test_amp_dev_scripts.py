@@ -744,6 +744,7 @@ before any conda command.
 :param kwargs:
 :return:
     '''
+"""
 
 # #############################################################################
 
@@ -773,32 +774,29 @@ before any conda command.
 # stays the same instead of **_ML problem_**
 
 
-====================
+# ====================
 
 """
 * Geometric mean
         $$GM = \sqrt[n]{\prod_i x_i}$$
-"""
 
 became
 
-"""
 * Geometric mean $$
         GM = \sqrt[n]{\prod_i x_i}
         $$
-"""
 
 instead of
 
-"""
 * Geometric mean
   $$
   GM = \sqrt[n]{\prod_i x_i}
   $$
 """
 
-=====================
+# =====================
 
+"""
 if a math equation fits in one line
 
 $$
@@ -807,9 +805,11 @@ $$
 
 leave it in one line
 $$Y_t = c + \phi Y_{t-1} + \varepsilon_t$$
+"""
 
-=====================
+# =====================
 
+"""
 * AR(1) process: def
 - Aka "auto-regressive of order 1"
 - AR(1) model is defined as:
@@ -817,9 +817,7 @@ $$Y_t = c + \phi Y_{t-1} + \varepsilon_t$$
   where the noise is IID Gaussian:
   $\varepsilon_t \sim \GWN(0, \sigma_{\varepsilon}^2)$
 
-
 not
-
 
 * AR(1) process: def
 - Aka "auto-regressive of order 1"
@@ -834,4 +832,5 @@ not
 ===================
 
 $\rightarrow$ -> =>
+"""
 

@@ -121,14 +121,19 @@ def _postprocess(txt: str, in_file_name: str) -> str:
     txt = re.sub(r"^\s*\n(\s*```)$", r"\1", txt, 0, flags=re.MULTILINE)
     # Remove empty lines before higher level bullets, but not chapters.
     txt = re.sub(r"^\s*\n(\s+-\s+.*)$", r"\1", txt, 0, flags=re.MULTILINE)
+    # **_Thesis_** -> ___Thesis___
+    txt = re.sub(r"\*\*_(.*)_\*\*", r"___\1___", txt, 0)
     # True if one is in inside a ``` .... ``` block.
     in_triple_tick_block: bool = False
     txt_new: List[str] = []
+    # Remove empty lines before / after lines with only $$.
+    txt = re.sub(r"^\s*\n(\s*\$\$)", r"\1", txt, 0, flags=re.MULTILINE)
+    txt = re.sub(r"^(\s*\$\$)\n\n+(\s*[a-z])", r"\1\n\2", txt, 0, flags=re.MULTILINE)
+    # Inline single line math equation $$ ... $$.
+    txt = re.sub(r"^(\s*)\$\$\n\1(.{,75})\n\s*\$\$\s*$", r"\1$$\2$$", txt, 0, flags=re.MULTILINE)
     for i, line in enumerate(txt.split("\n")):
         # Undo the transformation `* -> STAR`.
         line = re.sub(r"^\-(\s*)STAR", r"*\1", line, 0)
-        # Remove empty lines.
-        line = re.sub(r"^\s*\n(\s*\$\$)", r"\1", line, 0, flags=re.MULTILINE)
         # Handle ``` block.
         m = re.match(r"^\s*```(.*)\s*$", line)
         if m:
@@ -207,16 +212,15 @@ def _format_headers(txt: str) -> str:
 # #############################################################################
 
 
-def _to_execute_action(action: str, actions: List[str]) -> bool:
-    dbg.dassert_isinstance(actions, list)
-    to_execute = action in actions
+def _to_execute_action(action: str, actions: Optional[List[str]]) -> bool:
+    to_execute = actions is None or action in actions
     if not to_execute:
         _LOG.debug("Skipping %s", action)
     return to_execute
 
 
 def _process(
-    txt: str, in_file_name: str, actions: Optional[List[str]] = None
+    txt: str, in_file_name: str, actions: Optional[List[str]] = None,
 ) -> str:
     # Pre-process text.
     action = "preprocess"
@@ -285,7 +289,7 @@ def _main(args: argparse.Namespace) -> None:
     in_file_name = args.infile.name
     from_stdin = in_file_name == "<stdin>"
     dbg.init_logger(
-        verbosity=args.log_level, use_exec_path=False, force_white=from_stdin
+        verbosity=args.log_level, use_exec_path=False, force_white=not from_stdin
     )
     # Read input.
     _LOG.debug("in_file_name=%s", in_file_name)
@@ -300,7 +304,7 @@ def _main(args: argparse.Namespace) -> None:
     actions = args.action
     if actions is None:
         actions = _VALID_ACTIONS[:]
-    txt = _process(txt, in_file_name, actions=actions)
+    txt = _process(txt, in_file_name, actions)
     # Write output.
     if args.in_place:
         dbg.dassert_ne(in_file_name, "<stdin>")
