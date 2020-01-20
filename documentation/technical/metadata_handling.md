@@ -1,25 +1,31 @@
 # Definitions and principles
 
 ## `DataSource`
+
 - A `DataSource` is a collection of datasets from a specific origin (e.g., a
   website like `eia.org`, the WIND terminal)
 
 ## Data in a `DataSource`
-- Each `DataSource` typically contains:
-  1. Metadata (i.e., information about the data, e.g., a description of each time
-     series)
-     - Some `DataSource` might not have metadata and contain just payload data
-  2. Payload data (e.g., time series, point in time data, tables, PDFs with text)
 
-- This data comes in "raw form" (e.g., the schema for both 1. and 2. is typically
-  different among different data sources)
+- Each `DataSource` typically contains:
+
+  1. Metadata (i.e., information about the data, e.g., a description of each
+     time series)
+     - Some `DataSource` might not have metadata and contain just payload data
+  2. Payload data (e.g., time series, point in time data, tables, PDFs with
+     text)
+
+- This data comes in "raw form" (e.g., the schema for both 1. and 2. is
+  typically different among different data sources)
 - We want to convert the raw data into our internal data representation
 
 ## Time series
+
 - Each `DataSource` typically is composed of many time series
   - Time series may be univariate or multivariate
 
 ## Raw metadata and payload
+
 - We define "raw" any data (both metadata and payload) in the form it originally
   existed in the data source, e.g.,
   - Raw metadata in case there was a file with a directory of the data
@@ -29,8 +35,9 @@
   - The ETL2 layer stores both the raw data and the P1 data
 
 ## P1 metadata and payload
-- This is 
-- Data that has been transformed and 
+
+- This is
+- Data that has been transformed and
 
 - This is an example of raw metadata:
   ```
@@ -44,20 +51,20 @@
   - Where did it come from?
     - E.g., website, paper, book
   - Who added that information and when?
-    - Note that who made the modification to a data structure (e.g., Max) might be
-      different from whom made the change in the db (e.g., Paul committed the
+    - Note that who made the modification to a data structure (e.g., Max) might
+      be different from whom made the change in the db (e.g., Paul committed the
       change)
     - Git is tracking the second part, but we want to track the first part
-    - Context about data should be available (e.g., GitHub task might be the best
-      way)
+    - Context about data should be available (e.g., GitHub task might be the
+      best way)
 - How much do we believe in this information?
   - Is it a wild guess?
   - Is it an informed guess?
   - Is it what we were told by somebody on the street?
 - All metadata should be described in this document
   - The field names
-    - should have underscores and not spaces
-    - should be as long as needed to be clear, although concise
+    - Should have underscores and not spaces
+    - Should be as long as needed to be clear, although concise
 - We should qualify if something is an estimate (e.g., ~\$1000) or not (e.g.,
   \$725 / month)
 
@@ -65,7 +72,8 @@
 
 ## MonsterDataSource
 
-- Tracked [PartTask583](https://github.com/ParticleDev/commodity_research/issues/578)
+- Tracked
+  [PartTask583](https://github.com/ParticleDev/commodity_research/issues/578)
 
 - The MonsterDataSource stores all the data sources we are aware of
   - In practice it is a machine readable form of the Monster Spreadsheet
@@ -85,8 +93,8 @@
 
 - Probably this will evolve into a full blown database table at some point
   - For now we want to keep it as a CSV so we can:
-    - version control
-    - review the changes before commit
+    - Version control
+    - Review the changes before commit
 
 ### P1 fields
 
@@ -98,8 +106,8 @@
   - E.g., "USDA"
 - `DATASET`
   - Optional
-  - Represents the fact that one data set can be organized in multiple data sets,
-    each with many time series
+  - Represents the fact that one data set can be organized in multiple data
+    sets, each with many time series
   - E.g., For USDA there are several data sets "Agricultural Transportation Open
     Data Platform", "U.S. Agricultural Trade Data"
 - `SUMMARY`
@@ -109,8 +117,8 @@
       understand what the data set is about
   - E.g., "The U.S. Energy Information Administration (EIA) collects, analyzes,
     and disseminates independent and impartial energy information to promote
-    sound policymaking, efficient markets, and public understanding of energy and
-    its interaction with the economy and the environment."
+    sound policymaking, efficient markets, and public understanding of energy
+    and its interaction with the economy and the environment."
 - `SUMMARY_SOURCE`
   - Where did we know about this data source
   - E.g., it can be an URL, a paper, a book
@@ -125,8 +133,8 @@
   - What is the predominant source of the data
     - Survey: data that is collected by 'survey' methodology
     - First-hand: closest source of the data
-    - Aggregation: the source just present the information which comes from other
-      party
+    - Aggregation: the source just present the information which comes from
+      other party
     - Search engine
 - `DOWNLOAD_STATUS`
   - Represents whether we have:
@@ -137,11 +145,11 @@
       ETL2
     - ...
 - `SUBSCRIPTION_TYPE`
-    - free
-    - subscription
-    - both: source has open data and paid services simultaneously
+  - Free
+  - Subscription
+  - Both: source has open data and paid services simultaneously
 - `COST`
-    - indicative cost, if subscription
+  - Indicative cost, if subscription
 - `HIGHEST_FREQUENCY`
   - Highest frequency available from a exploratory inspection, e.g.,
     - Annual
@@ -161,7 +169,8 @@
     - Agriculture
     - Climate
     - Coal
-    - Commodity: contains info about agricultural, metal, energy commodities as a whole
+    - Commodity: contains info about agricultural, metal, energy commodities as
+      a whole
     - Copper
     - Corn
     - Energy: contains oil + gas or other oil products
@@ -191,13 +200,13 @@
   - Number (or link) for the GitHub issue tracking the downloading of this
     specific data sets
 - `TAGS`
-  - wind: WIND terminal data sources
-  - chinagov: Chinese government sources of data
-  - baidu: data sources found using Baidu
-  - shf: sources from data vendors of Shanghai Futures Exchange
+  - Wind: WIND terminal data sources
+  - Chinagov: Chinese government sources of data
+  - Baidu: data sources found using Baidu
+  - Shf: sources from data vendors of Shanghai Futures Exchange
   - Papers that referred to this
-  - edgar: EDGAR equivalents in a given country
-  - wind+: sources from WIND Commodity DB
+  - Edgar: EDGAR equivalents in a given country
+  - Wind+: sources from WIND Commodity DB
   - 600: sources from Task 600 from Github issues
   - TODO(gp): To reorg
 - `NOTES`
@@ -208,8 +217,8 @@
     - Do we need to parse HTML, PDFs?
     - How complex do we believe it is to download?
 - `PRIORITY`
-  - Our subjective belief on how important a data source is. This information can
-    help us prioritize data source properly
+  - Our subjective belief on how important a data source is. This information
+    can help us prioritize data source properly
   - E..g, P0
 
 ## `MonsterMetaData`
@@ -227,33 +236,35 @@
 Task 921 - KG: Generate spreadsheet with time series info
 
 - ID (internal)
-- name
-- aliases
-- url
-- short description
-- long description
-- sampling frequency
-- release frequency
-- release delay
-- start date
-- end date
-- units of measure
-- target commodities
-- supply / demand / inventory
-- geo
-- related papers
-- internal data pointer
+- Name
+- Aliases
+- Url
+- Short description
+- Long description
+- Sampling frequency
+- Release frequency
+- Release delay
+- Start date
+- End date
+- Units of measure
+- Target commodities
+- Supply / demand / inventory
+- Geo
+- Related papers
+- Internal data pointer
 
 ## `MonsterPayloadData`
 
-- Tracked in [PartTask951: ETL2: Uniform access to ETL2
-  data](https://github.com/ParticleDev/commodity_research/issues/951)
+- Tracked in
+  [PartTask951: ETL2: Uniform access to ETL2 data](https://github.com/ParticleDev/commodity_research/issues/951)
 
-- ETL2 has interfaces to access data from each data source that we have downloaded
-- We want to have a single interface sitting on top of the data source specific API
+- ETL2 has interfaces to access data from each data source that we have
+  downloaded
+- We want to have a single interface sitting on top of the data source specific
+  API
 - This Uniform API should be able to return a timeseries given a unique ID
-  - The format of this data is fixed, e.g., it is a `pd.DataFrame` or `pd.Series`
-    indexed by datet imes with one or multiple columns
+  - The format of this data is fixed, e.g., it is a `pd.DataFrame` or
+    `pd.Series` indexed by datet imes with one or multiple columns
 
 ## `KnowledgeGraph`
 
@@ -278,7 +289,7 @@ Task 921 - KG: Generate spreadsheet with time series info
     - Convert the values into Python types
   - E.g., extract raw payload data and convert it into P1 data, if needed
     - Note that if the data is in a suitable format (e.g., CSV form) we might be
-      able to convert it on the flight to our internal `pandas` representation 
+      able to convert it on the flight to our internal `pandas` representation
     - If it's in a PDF or other unstructured data format we want to extract the
       data and save it
 
@@ -310,6 +321,7 @@ Import all the metadata about the time series into the MonsterTimeSeriesDb
 - The process we have been following is:
 
 ## 1. Idea generation
+
 - We come up with ideas from papers, books, ...
 
 - Currently this is done informally in GitHub tasks
@@ -317,19 +329,23 @@ Import all the metadata about the time series into the MonsterTimeSeriesDb
     sensitive IP
 
 ## 2. Data sets collection
-- It is informed by a modeling idea or just pre-emptively (e.g., "this data makes
-  us come up with a modeling ideas")
+
+- It is informed by a modeling idea or just pre-emptively (e.g., "this data
+  makes us come up with a modeling ideas")
   - E.g., see GitHub tasks under the `Datasets` milestone
 
 - Currently, the result of this activity is in the Monster Spreadsheet
 
 ## 3. Exploratory analysis of data sets
+
 - We look for data needed by a model; or
 - We browse data and come up with modeling ideas
 
-- Currently the result of this activity is in the GitHub tasks / Monster Spreadsheet
+- Currently the result of this activity is in the GitHub tasks / Monster
+  Spreadsheet
 
 ## 4. Prioritize data sources downloading
+
 - We decide which data set to download:
   - Based on business objective (e.g., a source for oil vs one for ags)
     - Amount of models that can be built out of the data
@@ -339,10 +355,11 @@ Import all the metadata about the time series into the MonsterTimeSeriesDb
   - ...
 
 - Currently we:
-  - track these activities in the Monster Spreadsheet and
-  - file issues against ETL2
+  - Track these activities in the Monster Spreadsheet and
+  - File issues against ETL2
 
 ## 5. Data download
+
 - Download raw data and put it into a suitable form inside ETL2
 
 - Ideally we would like to have each data source to be available both
@@ -359,10 +376,12 @@ Import all the metadata about the time series into the MonsterTimeSeriesDb
   - We use the Data Encyclopedia to track data sources available and APIs
 
 ## 6. Sanity check of the data
+
 - We want to check that the download data is sane, e.g.,
   - Did we miss anything we wanted to download?
   - Does the data look good?
-  - Compute statistics of the time series (e.g., using our timeseries stats flow)
+  - Compute statistics of the time series (e.g., using our timeseries stats
+    flow)
 
 - This task is inevitably subjective?
 
@@ -379,21 +398,21 @@ Import all the metadata about the time series into the MonsterTimeSeriesDb
 ### How to handle data already in relational form?
 
 - Some data is already in a relational form, e.g.,
-  - information about from which data source a time series come from
-    - we don't want to replicate information about a data source (e.g., its
+  - Information about from which data source a time series come from
+    - We don't want to replicate information about a data source (e.g., its
       `url`,)
-  - the source that informed a certain data source or relationship, e.g.,
-    - certain data sources are suggested by a paper, others from a book (e.g.,
+  - The source that informed a certain data source or relationship, e.g.,
+    - Certain data sources are suggested by a paper, others from a book (e.g.,
       The secrets of economic indicators), others are our own theory
     - We don't want to repeat information about a paper (e.g., its url)
       everywhere, but rather we would like to normalize this information
 
 - We want to store information about our internal process, e.g.,
-  - what is the priority of having a certain data source / time series
-    available internally
-  - what is the status of a data source (e.g., "downloaded", "only-historical
+  - What is the priority of having a certain data source / time series available
+    internally
+  - What is the status of a data source (e.g., "downloaded", "only-historical
     data downloaded", "real-time")
-  - what is the source of a data source (e.g., "WIND", ..., scraping website)
+  - What is the source of a data source (e.g., "WIND", ..., scraping website)
 
 - It can be argued that information about the infra should not be mixed with
   research ones
@@ -406,8 +425,8 @@ Import all the metadata about the time series into the MonsterTimeSeriesDb
       - "what are the models built in production from a data source?"
   - Thus inevitably we will need to "join multiple tables" from research and
     infra
-      - At this point let's just make it simpler to do instead of maintaining
-        different data structures
+    - At this point let's just make it simpler to do instead of maintaining
+      different data structures
 
 ### Successive approximations of data
 
@@ -423,8 +442,8 @@ Import all the metadata about the time series into the MonsterTimeSeriesDb
 
 #### Problem
 
-- We need to have policies to expose some of the data only internally; or
-  to certain customers
+- We need to have policies to expose some of the data only internally; or to
+  certain customers
 
 #### Solution
 
@@ -432,7 +451,6 @@ Import all the metadata about the time series into the MonsterTimeSeriesDb
   - Shared: fields
   - Internal
   - Customer
-
 
 ## Knowledge base
 
