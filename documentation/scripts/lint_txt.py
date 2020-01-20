@@ -157,7 +157,23 @@ def _postprocess(txt: str, in_file_name: str) -> str:
         txt_new.append(line)
     if in_triple_tick_block:
         print("%s:%s: A ``` block was not ending" % (in_file_name, 1))
+    #
     txt_new_as_str = "\n".join(txt_new).rstrip("\n")
+    # Ensure that there is exactly one empty line before each paragraph, assuming that it
+    regex = (
+            # Unless it is the first line.
+            r"(\S)" +
+            # Find a paragraph with as many \n before it.
+            r"\n*(\* .*)")
+    txt_new_as_str = re.sub(regex, r"\1\n\n\2", txt_new_as_str, 0, flags=re.MULTILINE)
+    #
+    regex = (
+            # Unless it is the first line.
+            #r"([\S|^#])" +
+            # Find a paragraph with as many \n before it.
+            r"\n*(#+ .*)")
+    #txt_new_as_str = re.sub(regex, r"\1\n\n\2", txt_new_as_str, 0, flags=re.MULTILINE)
+    txt_new_as_str = re.sub(regex, r"\n\n\1", txt_new_as_str, 0, flags=re.MULTILINE)
     return txt_new_as_str
 
 

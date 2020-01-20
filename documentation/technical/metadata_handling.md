@@ -1,28 +1,309 @@
-# Why is it useful?
-
-- Allow to judge news events and macroeconomic time series based on our
-  understanding of the world
-  - The usual approach is to consider events in an isolated fashion
-
-- Allow to build models automatically based on the relationship between
-  quantities existing in the real world
-
 # Definitions and principles
 
-## Data source and time series
-- Each data source is typically comprised of many time series
+## `DataSource`
+- A `DataSource` is a collection of datasets from a specific origin (e.g., a
+  website like `eia.org`, the WIND terminal)
 
-- Time series may be univariate or multivariate
+## Data in a `DataSource`
+- Each `DataSource` typically contains:
+  1. Metadata (i.e., information about the data, e.g., a description of each time
+     series)
+     - Some `DataSource` might not have metadata and contain just payload data
+  2. Payload data (e.g., time series, point in time data, tables, PDFs with text)
 
-- This is a running documentation of the fields we are interested in capturing
-  about the data
-- Paul suggests to keep in the KG static or slowly changing data
-  - I don't disagree with it, but we need to decide where to put the rest of the
-    information we want to capture
+- This data comes in "raw form" (e.g., the schema for both 1. and 2. is typically
+  different among different data sources)
+- We want to convert the raw data into our internal data representation
 
-## Everything should be tracked
+## Time series
+- Each `DataSource` typically is composed of many time series
+  - Time series may be univariate or multivariate
 
-- Self-evident
+## Raw metadata and payload
+- We define "raw" any data (both metadata and payload) in the form it originally
+  existed in the data source, e.g.,
+  - Raw metadata in case there was a file with a directory of the data
+  - Zipped CSV files containing timeseries data
+
+- The raw data is stored in the ETL2 layer
+  - The ETL2 layer stores both the raw data and the P1 data
+
+## P1 metadata and payload
+- This is 
+- Data that has been transformed and 
+
+- This is an example of raw metadata:
+  ```
+  ;updates;pub_date;document_type;organisation;part_of_a_collection;short_desc;title;updated;page_url;name;doc_url;doc_type;size;frequency
+  0;['2020-01-14T15:33:56.000+00:00', '2019-10-10T09:30:00.000+01:00'];Published 10 October 2019;National Statistics;Department for Business, Energy & Industrial Strategy;Business Population Estimates;Annual business population estimates for the UK and regions in 2019.;Business population estimates 2019;14 January 2020;/government/statistics/business-population-estimates-2019;Business population estimates for the UK and regions 2019: Statistical Release (PDF);https://assets.publishing.service.gov.uk/government/uploads/system/uploads/attachment_data/file/852919/Business_Population_Estimates_for_the_UK_and_regions_-_2019_Statistical_Release.pdf;PDF;636KB;[]
+  ```
+
+## Conventions
+
+- Every piece of information downloaded or inserted manually should be traceable
+  - Where did it come from?
+    - E.g., website, paper, book
+  - Who added that information and when?
+    - Note that who made the modification to a data structure (e.g., Max) might be
+      different from whom made the change in the db (e.g., Paul committed the
+      change)
+    - Git is tracking the second part, but we want to track the first part
+    - Context about data should be available (e.g., GitHub task might be the best
+      way)
+- How much do we believe in this information?
+  - Is it a wild guess?
+  - Is it an informed guess?
+  - Is it what we were told by somebody on the street?
+- All metadata should be described in this document
+  - The field names
+    - should have underscores and not spaces
+    - should be as long as needed to be clear, although concise
+- We should qualify if something is an estimate (e.g., ~\$1000) or not (e.g.,
+  \$725 / month)
+
+# Internal representations
+
+## MonsterDataSource
+
+- Tracked [PartTask583](https://github.com/ParticleDev/commodity_research/issues/578)
+
+- The MonsterDataSource stores all the data sources we are aware of
+  - In practice it is a machine readable form of the Monster Spreadsheet
+  - It is represented by a single CSV file
+  - It is checked in the repo under the `//p1/metadata`
+- There is a notebook that loads the CSV as pandas dataframe
+- There is a library that allows to query and manipulate this data structure,
+  e.g.,
+  - What data sources are available already?
+  - How many data sources do we know?
+  - How many data sources are available in ETL2?
+  - There are sanity checks to make sure the representation is consistent (e.g.,
+    make sure that the values in special columns have the right type and values)
+
+- This is the result of "Data sets collection" step
+  - Typically analysts are in charge of manipulating it
+
+- Probably this will evolve into a full blown database table at some point
+  - For now we want to keep it as a CSV so we can:
+    - version control
+    - review the changes before commit
+
+### P1 fields
+
+- `ID`
+  - P1 data source internal name
+  - E.g., `EIA_001`
+- `DATA_SOURCE`
+  - The symbolic name of the data source
+  - E.g., "USDA"
+- `DATASET`
+  - Optional
+  - Represents the fact that one data set can be organized in multiple data sets,
+    each with many time series
+  - E.g., For USDA there are several data sets "Agricultural Transportation Open
+    Data Platform", "U.S. Agricultural Trade Data"
+- `SUMMARY`
+  - Human readable summary
+    - What does this dataset contain?
+    - This is a free form description with links to make easier for a human to
+      understand what the data set is about
+  - E.g., "The U.S. Energy Information Administration (EIA) collects, analyzes,
+    and disseminates independent and impartial energy information to promote
+    sound policymaking, efficient markets, and public understanding of energy and
+    its interaction with the economy and the environment."
+- `SUMMARY_SOURCE`
+  - Where did we know about this data source
+  - E.g., it can be an URL, a paper, a book
+- `DATASOURCE_URL`
+  - E.g., `www.eia.gov`
+- `DATASET_URL`
+  - Links to the webpage about the specific dataset
+- `DESCRIPTION_URL`
+  - Links to the webpage with some description of the data
+  - E.g., `https://agtransport.usda.gov/`
+- `COLLECTION_TYPE`
+  - What is the predominant source of the data
+    - Survey: data that is collected by 'survey' methodology
+    - First-hand: closest source of the data
+    - Aggregation: the source just present the information which comes from other
+      party
+    - Search engine
+- `DOWNLOAD_STATUS`
+  - Represents whether we have:
+    - Historical downloaded: the raw historical data is in ETL2
+    - Historical metadata processed: the metadata has been processed and it's
+      available
+    - Historical payload data processed: the payload data is available through
+      ETL2
+    - ...
+- `SUBSCRIPTION_TYPE`
+    - free
+    - subscription
+    - both: source has open data and paid services simultaneously
+- `COST`
+    - indicative cost, if subscription
+- `HIGHEST_FREQUENCY`
+  - Highest frequency available from a exploratory inspection, e.g.,
+    - Annual
+    - Daily
+    - Hourly
+    - Monthly
+    - Quarterly
+    - Unspecified
+- `RELEASE`
+  - When the data is released, e.g.,
+    - Different releases
+    - End of month
+    - Third Friday of the month
+    - Unspecified
+- `COMMODITY_TARGETS`
+  - What target commodity it can be used for (from exploratory analysis), e.g.,
+    - Agriculture
+    - Climate
+    - Coal
+    - Commodity: contains info about agricultural, metal, energy commodities as a whole
+    - Copper
+    - Corn
+    - Energy: contains oil + gas or other oil products
+    - Gold
+    - Macroeconomic data
+    - Market: contains data about market indicators
+    - Metals
+    - Natural gas
+    - Oil
+    - Other
+    - Palladium
+    - Platinum
+    - Silver
+    - Soybean
+    - Steel
+    - Sugar
+    - Trade: trade data, freight data etc.
+- `GEO`
+  - Geographical location that this data is mainly about, e.g.,
+    - Global
+    - US
+    - China
+    - Europe
+- `GITHUB_ISSUE`
+  - Number (or link) for the GitHub issue tracking this specific data set
+- `GITHUB_ETL2_ISSUE`
+  - Number (or link) for the GitHub issue tracking the downloading of this
+    specific data sets
+- `TAGS`
+  - wind: WIND terminal data sources
+  - chinagov: Chinese government sources of data
+  - baidu: data sources found using Baidu
+  - shf: sources from data vendors of Shanghai Futures Exchange
+  - Papers that referred to this
+  - edgar: EDGAR equivalents in a given country
+  - wind+: sources from WIND Commodity DB
+  - 600: sources from Task 600 from Github issues
+  - TODO(gp): To reorg
+- `NOTES`
+  - This is a free-form field which also incubates data that can become a field
+    in the future
+    - Why and how is this data relevant to our work?
+    - Is there an API? Do we need to scrape?
+    - Do we need to parse HTML, PDFs?
+    - How complex do we believe it is to download?
+- `PRIORITY`
+  - Our subjective belief on how important a data source is. This information can
+    help us prioritize data source properly
+  - E..g, P0
+
+## `MonsterMetaData`
+
+- For each data source in the `MonsterDataSource` there is a dataframe
+  representing all the data contained in the data source
+
+- Each metadata for a timeseries contains a unique P1 ID that can be used to
+  retrieve the data from ETL2
+
+- The KnowledgeGraph contains pointers to metadata of timeseries
+
+### Fields
+
+Task 921 - KG: Generate spreadsheet with time series info
+
+- ID (internal)
+- name
+- aliases
+- url
+- short description
+- long description
+- sampling frequency
+- release frequency
+- release delay
+- start date
+- end date
+- units of measure
+- target commodities
+- supply / demand / inventory
+- geo
+- related papers
+- internal data pointer
+
+## `MonsterPayloadData`
+
+- Tracked in [PartTask951: ETL2: Uniform access to ETL2
+  data](https://github.com/ParticleDev/commodity_research/issues/951)
+
+- ETL2 has interfaces to access data from each data source that we have downloaded
+- We want to have a single interface sitting on top of the data source specific API
+- This Uniform API should be able to return a timeseries given a unique ID
+  - The format of this data is fixed, e.g., it is a `pd.DataFrame` or `pd.Series`
+    indexed by datet imes with one or multiple columns
+
+## `KnowledgeGraph`
+
+- This graph represents relationships between economic entities and data in ETL2
+  - E.g., what predicts crude oil demand, which timeseries are related to crude
+    oil demand
+
+- This is described in detail in the document `knowledge_graph_example.md`
+
+# Flow of data among representations
+
+- Download raw historical ETL2 data
+  - Data is added to ETL2
+
+- Download raw real-time ETL2 data
+  - Same as above but for the real-time loop
+
+- Transform raw data into our internal representation
+  - E.g., extract raw metadata and convert it into P1 metadata
+    - This consists in mapping fields from the raw metadata into our P1 internal
+      representation
+    - Convert the values into Python types
+  - E.g., extract raw payload data and convert it into P1 data, if needed
+    - Note that if the data is in a suitable format (e.g., CSV form) we might be
+      able to convert it on the flight to our internal `pandas` representation 
+    - If it's in a PDF or other unstructured data format we want to extract the
+      data and save it
+
+# Principles
+
+## P1 data and raw data
+- P1 data
+
+It's ok if we decide not to process the data, if we don't think it's high priority. So it's ok to stop here, but we can use it to implement the rest of the KG / ETL2 flow.
+Taking a look the CSV file in the zip file is compatible to our metadata statistics flow, which we started but not finished. We should complete it at some point.
+I would still import the metadata in our system (#578, #921) even if we don't have the payload data available in accessible form through the Uniform access (#951)
+Let's start using some standard names
+#578 -> MonsterDataSourceDb
+#921 -> MonsterTimeSeriesDb
+#951 -> UniformETL
+I propose as next immediate steps to use this data source as running example to implement the entire system
+Save the csv file with the metadata in ETL2 as "raw" data
+We should be able to access this in the same way we can access "raw" data
+Map the columns of this specific metadata csv file to our general metadata flow
+Finish the metadata statistics flow
+Run the statistics flow on this data
+Import the metadata about this data source into the MonsterDataSourceDb
+We should have an entry about this data source reporting the state as "raw data downloaded, metadata processed, data not exposed through UniformETL"
+Import all the metadata about the time series into the MonsterTimeSeriesDb
+
 
 # Our flow for ingesting data
 
@@ -49,7 +330,7 @@
 - Currently the result of this activity is in the GitHub tasks / Monster Spreadsheet
 
 ## 4. Prioritize data sources downloading
-- We decide which data to download:
+- We decide which data set to download:
   - Based on business objective (e.g., a source for oil vs one for ags)
     - Amount of models that can be built out of the data
   - Complexity of downloading
@@ -57,10 +338,12 @@
   - Cost
   - ...
 
-- Currently we track this in the Monster Spreadsheet and file issues against ETL2
+- Currently we:
+  - track these activities in the Monster Spreadsheet and
+  - file issues against ETL2
 
 ## 5. Data download
-- Download data and put it into a suitable form inside ETL2
+- Download raw data and put it into a suitable form inside ETL2
 
 - Ideally we would like to have each data source to be available both
   historically and in real-time
@@ -150,112 +433,6 @@
   - Internal
   - Customer
 
-# Fields
-
-## Conventions
-
-- We explicitly qualify if something is an estimate (e.g., ~$1000) or not
-- Every information should be traceable (especially cut-and-paste data)
-  - Where did it come from?
-    - Website, paper, book
-  - Who added that information and when
-    - Note that relying on the Git commit history might not be enough, since
-      maybe an analyst does some work, and somebody else adds it to the KB
-    - Context about data should be available (e.g., GitHub task might be the best
-      way)
-- How much do we believe in this information?
-  - Is it a wild guess? Is it an informed guess? Is it what we were told?
-- All metadata should be described in this document
-  - The field names
-    - should have underscores and not spaces
-    - should be as long as needed to be clear, although concise
-
-## Data source metadata
-
-- This represents a machine readable, revision controlled version of the Monster
-  Spreadsheet
-  - It's not clear how to represent it
-
-- This is the result of "Data sets collection" step
-  - Typically analysts are in charge of manipulating it
-
-- For each data source we are interested in the following information
-
-- ID
-  - P1 data source internal name
-  - E.g., `EIA_001`
-
-- SOURCE
-  - Data set source description
-  - E.g., `US Energy Information Administration`
-
-- URL
-  - Main url
-  - E.g., `www.eia.gov`
-
-- SUMMARY
-  - Human readable summary
-    - What does it contain?
-    - This is a free form description with links to make easier for a human to
-      understand what the data set is about
-  - E.g., "The U.S. Energy Information Administration (EIA) collects, analyzes,
-    and disseminates independent and impartial energy information to promote
-    sound policymaking, efficient markets, and public understanding of energy and
-    its interaction with the economy and the environment."
-
-- SUMMARY_SOURCE
-  - Where was the summary taken from
-  - E.g., it can be an url, a paper, a book
-
-- GITHUB_TASK
-  - Is there a GitHub task related to this?
-
-- PRIORITY
-  - Our subjective belief on how important a data source is. This information can
-    help us prioritize data source properly
-  - E..g, P0
-
-- COST
-  - Is it free or is by subscription?
-  - What is the annual cost?
-
-- STATUS
-  - Download status
-  - E.g., completed, in progress
-
-- API_ACCESS
-  - How to retrieve the data from ETL2?
-  - E.g., pointer to code, a
-
-- NOTES
-  - This is a free-form field which also incubates data that can become a field
-    in the future
-    - Why and how is this data relevant to our work?
-    - Is there an API? Do we need to scrape?
-    - Do we need to parse HTML, PDFs?
-    - How complex do we believe it is to download?
-
-## Time series metadata
-
-Task 921 - KG: Generate spreadsheet with time series info
-
-- ID (internal)
-- name
-- aliases
-- url
-- short description
-- long description
-- sampling frequency
-- release frequency
-- release delay
-- start date
-- end date
-- units of measure
-- target commodities
-- supply / demand / inventory
-- geo
-- related papers
-- internal data pointer
 
 ## Knowledge base
 
