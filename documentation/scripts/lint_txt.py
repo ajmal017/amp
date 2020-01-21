@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-Lint txt files.
+Lint md files.
 > lint_txt.py -i foo.md -o bar.md
 
 It can be used in vim to prettify a part of the text using stdin / stdout.
@@ -223,6 +223,7 @@ def _format_headers(txt: str) -> str:
     # Read file.
     txt = io_.from_file(tmp_file_name)
     return txt
+    return txt  # type: ignore
 
 
 # #############################################################################
@@ -236,7 +237,7 @@ def _to_execute_action(action: str, actions: Optional[List[str]]) -> bool:
 
 
 def _process(
-    txt: str, in_file_name: str, actions: Optional[List[str]] = None,
+    txt: str, in_file_name: str, actions: Optional[List[str]] = None
 ) -> str:
     # Pre-process text.
     action = "preprocess"
@@ -275,6 +276,9 @@ _VALID_ACTIONS = [
 ]
 
 
+_DEFAULT_ACTIONS = _VALID_ACTIONS[:]
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -296,7 +300,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--in_place", action="store_true",
     )
-    prsr.add_action_arg(parser, _VALID_ACTIONS)
+    prsr.add_action_arg(parser, _VALID_ACTIONS, _DEFAULT_ACTIONS)
     prsr.add_verbosity_arg(parser)
     return parser
 
