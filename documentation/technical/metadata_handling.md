@@ -9,20 +9,20 @@
 
 - Each `DataSource` typically contains:
 
-  1. Metadata (i.e., information about the data, e.g., a description of each
-     time series)
-     - Some `DataSource` might not have metadata and contain just payload data
+  1. Metadata, i.e., information about the data (e.g., a description of each time
+     series)
   2. Payload data (e.g., time series, point in time data, tables, PDFs with
      text)
 
-- This data comes in "raw form"
+- Some `DataSource` might not have metadata and contain just payload data
+- Both metadata and payload data comes in "raw form"
   - E.g., the schema for both 1. and 2. is typically different among different
     data sources, irregular, and incomplete
 - We want to convert any raw data into our internal data representation
 
 ## Time series
 
-- Each `DataSource` typically is composed of many time series
+- The payload data in each `DataSource` typically is composed of many time series
   - Time series may be univariate or multivariate
 
 ## Raw metadata and payload
@@ -33,11 +33,7 @@
   - Zipped CSV files containing timeseries data
 
 - The raw data is stored in the ETL2 layer
-  - The ETL2 layer stores both the raw data and the P1 data
-
-## P1 metadata and payload
-
-- This is data that has been transformed in our internal format
+  - We transformed raw data into P1 data and we save it back in the ETL2 layer
 
 - This is an example of raw metadata:
   ```
@@ -45,24 +41,30 @@
   0;['2020-01-14T15:33:56.000+00:00', '2019-10-10T09:30:00.000+01:00'];Published 10 October 2019;National Statistics;Department for Business, Energy & Industrial Strategy;Business Population Estimates;Annual business population estimates for the UK and regions in 2019.;Business population estimates 2019;14 January 2020;/government/statistics/business-population-estimates-2019;Business population estimates for the UK and regions 2019: Statistical Release (PDF);https://assets.publishing.service.gov.uk/government/uploads/system/uploads/attachment_data/file/852919/Business_Population_Estimates_for_the_UK_and_regions_-_2019_Statistical_Release.pdf;PDF;636KB;[]
   ```
 
+## P1 metadata and payload
+
+- P1 data is both metadata and payload data that has been transformed in our
+  internal format
+
 ## Conventions
 
-- Every piece of information downloaded or inserted manually should be traceable
+- Every piece of data downloaded or inserted manually should be traceable
   - Where did it come from?
     - E.g., `xyz.org` website, a paper, a book
   - Who added that information and when?
-    - Note that who made the modification to a data structure (e.g., Max) might
-      be different from whom made the change in the db (e.g., Paul committed the
+    - Who made the modification to a data structure (e.g., Max) might be
+      different from whom made the change in the db (e.g., Paul committed the
       change)
-    - Git is tracking the second part, but we want to track the first part
-    - Context about data should be available (e.g., GitHub task might be the
-      best way)
-- All metadata should be described in this document
-  - The field names should
+    - Git is tracking the second part, but we want to track the first part, as
+      well
+    - Context about the data change should be available (e.g., GitHub task might
+      be the best way): why was the data changed?
+- All metadata and payload data should be described in this document
+  - The field names should:
     - have a name as long as needed to be clear, although concise
-    - have underscores and not spaces
     - be capitalized
-    - have a type associated
+    - use underscores and not spaces
+    - have a type associated to it (e.g., string, float)
     - a description
 - We should qualify if something is an estimate (e.g., ~\$1000) or not (e.g.,
   \$725 / month)
@@ -71,71 +73,68 @@
   - Is it an informed guess?
   - Is it what we were told by somebody on the street?
 
-# Our flow for ingesting data
+# Our flow for on-boarding data
 
-- The process we follow is:
+- The process we follow has multiple stages
 
-## 1. Idea generation
+## Idea generation
 
-- We come up with ideas from papers, books, ...
+- We come up with ideas from papers, books, etc. about interesting datasets and
+  models
 - Currently this is done informally in GitHub tasks
 
-## 2. Data sets collection
+## Datasets collection
 
-- It is informed by a modeling idea or just pre-emptively (e.g., "this data
-  makes us come up with a modeling ideas")
-  - E.g., see GitHub tasks under the `Datasets` milestone
+- Dataset collection is informed by a modeling idea or just "this data makes us
+  come up with a modeling ideas"
 
-- Currently, the result of this activity should go in the `MonsterDataSource`
-  (see below), and currently is in the Monster Spreadsheet
+- E.g., see GitHub tasks under the `Datasets` milestone
+- The result of this activity should go in the `MonsterDataSource` (see below)
+  - Currently is in the Monster Spreadsheet
 
-## 3. Exploratory analysis of data sets
+## Prioritize data sources downloading
 
-- We:
-  - look for data needed by a model; or
-  - browse data and come up with modeling ideas
-
-- Currently the result of this activity is in the GitHub tasks / Monster
-  Spreadsheet
-
-## 4. Prioritize data sources downloading
-
-- We decide which data set to download:
-  - Based on business objective (e.g., a source for oil vs one for ags)
-    - Amount of models that can be built out of the data
-  - Complexity of downloading
+- We decide which dataset to download based on several competing criteria:
+  - Business objective, e.g.,
+    - a source for oil is more interesting than one for ags
+    - the amount of models that can be built out of the data
+  - Complexity of downloading (e.g., data in PDF vs data in CSV format)
   - Uniqueness
   - Cost
   - ...
 
 - Currently we:
-  - Track these activities in the Monster Spreadsheet and
+  - Track these activities in the Monster Spreadsheet; and
   - File issues against ETL2
 
-## 5. Data download
+## Data download
 
 - Download the raw data (both metadata and payload) and put it into a suitable
   form inside ETL2
 
 - Ideally we would like to have each data source to be available both
   historically and in real-time
-  - On the one side, only the real-time data can inform us on publication delay,
-    reliability of the downloading process, delay to acquire the data on our
-    side, throttling, ...
+  - On the one side, only the real-time data can inform us about:
+    - publication delay,
+    - reliability of the downloading process
+    - delay to acquire the data on our side
+    - throttling, ...
   - On the other side, we would prefer to do the additional work of putting data
     in production (with all the on-going maintenance effort) only when we know
     this data is useful for our models or can be sold
   - We need to strike a balance between these two needs
 
-- Currently we track these activities into GH tasks
-  - We use the `DataEncyclopedia` and `etl_guides` to track data sources
-    available and APIs
+- Currently we track these activities into GitHub tasks
+  - We use the `DataEncyclopedia` and `etl_guides` to track data source available
+    and APIs
 
-## 6. Transform data into our internal P1 representation
+## Transform data into P1 representation
 
+- We want to transform all metadata and payload data into a standard P1
+  representation
 - See below
 
-## 7. Sanity check of the data
+## Sanity check of the data
 
 - We want to check that the downloaded data is sane, e.g.,
   - Did we miss anything we wanted to download?
@@ -143,73 +142,30 @@
   - Compute statistics of the time series (e.g., using our timeseries stats
     flow)
 
-## 8. Expose data to researchers
+## Expose data to researchers
 
-- Researchers access the data from ETL2
+- Researchers can access the data from ETL2
 
 - Ideally we would like to share the access mechanisms with customers as much as
   possible (of course with the proper access control)
   - E.g., we could build REST APIs that call into our internal APIs
 
-# Complexities in the design
-
-### How to handle data already in relational form?
-
-- Some data is already in a relational form, e.g.,
-  - Information about from which data source a time series come from
-    - We don't want to replicate information about a data source (e.g., its
-      `URL`)
-  - The source that informed a certain data source or relationship
-
-- We want to store information about our internal process, e.g.,
-  - What is the priority of having a certain data source / time series available
-    internally
-  - What is the status of a data source (e.g., "downloaded", "only-historical
-    data downloaded", "real-time")
-  - What is the source of a data source (e.g., "WIND", ..., scraping website)
-
-- It can be argued that information about the infra should not be mixed with
-  research ones
-  - The issue is that the process of discovering data sources and on-boarding
-    data sources moves at different speed
-    - E.g., one researcher (or potentially even a customer!) might want to know:
-      - "what are the sources about oil that are available?"
-      - "what are the next sources to download?"
-      - "do we have only historical data or real-time of a data source?"
-      - "what are the models built in production from a data source?"
-  - Thus inevitably we will need to "join multiple tables" from research and
-    infra
-    - At this point let's just make it simpler to do instead of maintaining
-      different data structures
-
-### Successive approximations of data
-
-- It can happen that for a data source some of the fields are filled manually
-  initially and then automatically updated
-  - E.g., we can have an analyst fill out the duration of the data (e.g., "from
-    2000 to today") and then have automatic processes populate this data
-    automatically
-
-### Access control
-
-- We need to have policies to expose some of the data only internally; or to
-  certain customers
-
-- We can group fields into different "tables"
-  - Shared: fields
-  - Internal
-  - Customer
-
 # Internal representations
 
-## `MonsterDataSource`
+- We collect data into 4 data structures with a fixed schema:
+  - `MonsterDataSource`: collects information about all data sources we are aware
+    of
+  - `MonsterMetaData`: collects all the metadata about all the timeseries we
+    store
+  - `MonsterPayloadData`: collects all the payload data about timeseries
+  - `KnowledgeGraph`: collects all the relationships between economic entities
+    and timeseries
 
 - TODO(*): Ok to come up with better names, but we might need to have names for
   these data structures so it's easier to understand what we are referring to
   (e.g., the Monster Spreadsheet)
 
-- Tracked
-  [PartTask583](https://github.com/ParticleDev/commodity_research/issues/578)
+## `MonsterDataSource`
 
 - The `MonsterDataSource` stores all the data sources we are aware of
   - In practice it is a machine readable form of the Monster Spreadsheet
@@ -231,6 +187,10 @@
   - For now we want to keep it as a CSV so we can:
     - Version control
     - Review the changes before commit
+
+### Refs
+- [PartTask578 KG: Data source metadata (formerly known as Monster
+  Spreadsheet)](https://github.com/ParticleDev/commodity_research/issues/578)
 
 ### P1 fields
 
@@ -294,13 +254,13 @@
     - Monthly
     - Quarterly
     - Unspecified
-- `RELEASE`
+- `RELEASE_FREQUENCY`
   - When the data is released, e.g.,
     - Different releases
     - End of month
     - Third Friday of the month
     - Unspecified
-- `COMMODITY_TARGETS`
+- `TARGET_COMMODITIES`
   - What target commodity it can be used for (from exploratory analysis), e.g.,
     - Agriculture
     - Climate
@@ -324,6 +284,7 @@
     - Steel
     - Sugar
     - Trade: trade data, freight data etc.
+  - We want to have our own internal representation (in terms of "PCA sectors")
 - `GEO`
   - Geographical location that this data is mainly about, e.g.,
     - Global
@@ -356,6 +317,9 @@
   - Our subjective belief on how important a data source is. This information
     can help us prioritize data source properly
   - E..g, P0
+- `RELATED_MATERIAL`
+  - Pointers to papers, articles, books, blogs that contain information related
+    to this specific time series
 
 ## `MonsterMetaData`
 
@@ -367,34 +331,95 @@
 
 - The KnowledgeGraph contains pointers to metadata of timeseries
 
-### Fields
+### Refs
+- [PartTask921 KG: Generate spreadsheet with time series
+  info](https://github.com/ParticleDev/commodity_research/issues/921)
 
-Task 921 - KG: Generate spreadsheet with time series info
+### P1 fields
 
 - `ID`
   - Internal P1 ID
+  - E.g., "EIA_NGASDS_001"
 - `NAME`
-  - 
-- `ALIASES`
-- `URL`
-- `SHORT DESCRIPTION`
-- `LONG DESCRIPTION`
-- `SAMPLING FREQUENCY`
-- `RELEASE FREQUENCY`
-- `RELEASE DELAY`
-- `START DATE`
-- `END DATE`
-- `UNITS OF MEASURE`
-- `TARGET COMMODITIES`
+  - A brief name that we can use to refer to it, if possible
+- `SHORT_DESCRIPTION`
+  - One line description
+- `LONG_DESCRIPTION`
+  - Long description
+- `DATA_SOURCE`
+  - Pointer to the corresponding entry in `MonsterDataSource`
+- `DATA_URL`
+  - The url where this timeseries was downloaded from
+  - E.g., this is a link that will initiate a download (e.g., in case we want to
+    go back to the source and re-download for any reason)
+- `INFO_URL`
+  - Url with information relevant for this specific timeseries, e.g., description
+    of the fields
+- `SAMPLING_FREQUENCY`
+  - What is the frequency (e.g., daily, weekly, monthly) of the timeseries
+  - This should be computed automatically
+- `RELEASE_FREQUENCY`
+  - How often is released (e.g., every month, every quarter)
+- `RELEASE_DELAY`
+  - This is an estimate of how long it takes for the data to be published
+- `START_DATE`
+  - Timestamp when the time series starts
+- `END_DATE`
+  - Timestamp when the time series ends
+- Fields we recompute internally from the historical / real-time data
+  - `P1_SAMPLING_FREQUENCY`
+  - `P1_RELEASE_FREQUENCY`
+  - `P1_RELEASE_DELAY`
+  - `P1_START_DATE`
+  - `P1_END_DATE`
+  - `P1_RELEASE_DELAY`
+- `UNITS_OF_MEASURE`
+  - Unit of measure of each column
+- `COLUMN_DESCRIPTION`
+  - A description of each column in the data in case of dataframe
 - `SUPPLY / DEMAND / INVENTORY`
-- `GEO`
-- `RELATED PAPERS`
-- `INTERNAL DATA POINTER`
+  - Manual annotation of what we think this data applies to
+  - This information might be redundant with the KG, and to be removed
+- `INTERNAL_DATA_POINTER`
+  - Pointer to ETL2 data
+- `IMPORTANCE`
+  - How important / market moving this time series is
+    - E.g., 0 - 10 as a magnitude coefficient
+  - This is a field we can estimate manually and / or automatically (e.g., look
+    at market volatility)
+
+- `IS_HISTORICAL_OR_RT`
+  - If the data was downloaded as historical data or real-time
+  - We can keep multiple copies of the same time series, some downloaded
+    historically and other real-time
+  - For production we stitch together historical and real-time to get a single
+    view of the data (like we used to do with Tardis)
+- `DOWNLOAD_TS`
+  - When it was downloaded
+  - It can be a list of timestamps
+
+- Same metadata as `MonsterDataSource` but for specific timeseries since they
+  might have different values than the including data source
+  - `TARGET_COMMODITIES`
+  - `COLLECTION_TYPE`
+  - `DOWNLOAD_STATUS`
+  - `GEO`
+  - `RELATED_MATERIAL`
+  - `GITHUB_ISSUE`
+  - `GITHUB_ETL2_ISSUE`
+
+### Price / volume data
+
+- Note that price / volume timeseries (e.g., for commodities, equities, ETFs)
+  have enough structure to warrant being in the database
+  - Some additional data can be:
+    - Informal name
+    - Symbols and exchanges (with dates)
+    - Pointers to price / volume data
+    - Options / futures and contract specs
+    - Class (e.g., energy / metals / aggs)
 
 ## `MonsterPayloadData`
-
-- Tracked in
-  [PartTask951: ETL2: Uniform access to ETL2 data](https://github.com/ParticleDev/commodity_research/issues/951)
 
 - ETL2 has interfaces to access data from each data source that we have
   downloaded
@@ -403,6 +428,10 @@ Task 921 - KG: Generate spreadsheet with time series info
 - This Uniform API should be able to return a timeseries given a unique ID
   - The format of this data is fixed, e.g., it is a `pd.DataFrame` or
     `pd.Series` indexed by datet imes with one or multiple columns
+
+### Refs
+- [PartTask951: ETL2: Uniform access to ETL2
+  data](https://github.com/ParticleDev/commodity_research/issues/951)
 
 ## `KnowledgeGraph`
 
@@ -414,22 +443,43 @@ Task 921 - KG: Generate spreadsheet with time series info
 
 # Flow of data among representations
 
+- We need to transform data among different datasets
+  - Some transformations are automatic, other requires human annotation
+
 - Download raw historical ETL2 data
-  - Data is added to ETL2
+  - `DataSource` -> `ETL2`, `MonsterDataSource`
+  - Data is added to ETL2 and we update the `MonsterDataSource`
 
 - Download raw real-time ETL2 data
+  - `DataSource` -> `ETL2`, `MonsterDataSource`
   - Same as above but for the real-time loop
 
-- Transform raw data into our internal representation
-  - E.g., extract raw metadata and convert it into P1 metadata
-    - This consists in mapping fields from the raw metadata into our P1 internal
-      representation
-    - Convert the values into Python types
-  - E.g., extract raw payload data and convert it into P1 data, if needed
-    - Note that if the data is in a suitable format (e.g., CSV form) we might be
-      able to convert it on the flight to our internal `pandas` representation
-    - If it's in a PDF or other unstructured data format we want to extract the
-      data and save it
+- Transform raw metadata into our internal representation
+  - `ETL2` -> `MonsterMetaData`
+    - This consists in
+      - mapping fields from the raw metadata into our P1 internal representation
+      - convert the values into Python types
+
+- Transform raw payload data into our internal representation
+  - `ETL2` -> `MonsterPayloadData`
+  - Note that if the data is in a suitable format (e.g., CSV form) we might be
+    able to convert it on the flight to our internal `pandas` representation
+  - If it's in a PDF or other unstructured data format we can:
+    - decide not to process it for now
+    - pre-process the data and save it into a structured format
+
+- Update P1 metadata after a download
+  - `MonsterPayloadData` -> `MonsterMetaData`, `MonsterDataSource`
+  - E.g., we want to compute some statistics about the data (e.g.,
+    `P1_SAMPLING_FREQUENCY`, `P1_START_DATE`)
+
+- Compute statistics from `MonsterMetaData`, `MonsterDataSource`
+  - Given data from `MonsterDataSource`, `MonsterMetaData`, `MonsterPayloadData`
+    we want to compute statistics / sanity checks, e.g.,
+    - How many data sources to we have?
+    - How many data sources have downloaded completely?
+    - How many time series we have or have downloaded?
+    - How many nans there are in a subset of timeseries?
 
 # Principles
 
@@ -453,8 +503,57 @@ Import the metadata about this data source into the MonsterDataSourceDb
 We should have an entry about this data source reporting the state as "raw data downloaded, metadata processed, data not exposed through UniformETL"
 Import all the metadata about the time series into the MonsterTimeSeriesDb
 
-
 ## Knowledge base
 
 - There is an ontology for economic phenomena
 - Each time series relates to nodes in the ontology
+
+# Complexities in the design
+
+### How to handle data already in relational form?
+
+- Some data is already in a relational form, e.g.,
+  - Information about the data source a time series comes from
+    - We don't want to replicate information about a data source (e.g., its
+      `URL`)
+  - The source that informed a certain data source or relationship (e.g., a
+    paper)
+
+- We want to store information about our internal process, e.g.,
+  - What is the priority of having a certain data source / time series available
+    internally
+  - What is the status of a data source (e.g., "downloaded", "only-historical
+    data downloaded", "real-time")
+  - What is the source of a data source (e.g., "WIND", ..., scraping website)
+
+- It can be argued that information about infra should not be mixed with research
+  ones
+  - The issue is that the process of discovering data sources and on-boarding
+    data sources moves at different speed
+    - E.g., one researcher (or potentially even a customer!) might want to know:
+      - "what are the sources about oil that are available?"
+      - "what are the next sources to download?"
+      - "do we have only historical data or real-time of a data source?"
+      - "what are the models built in production from a data source?"
+  - Thus inevitably we will need to "join multiple tables" from research and
+    infra
+    - At this point let's just make it simpler to do instead of maintaining
+      different data structures
+
+### Successive approximations of data
+
+- It can happen that for a data source some of the fields are filled manually
+  initially and then automatically updated
+  - E.g., we can have an analyst fill out the duration of the data (e.g., "from
+    2000 to today") and then have automatic processes populate this data
+    automatically
+
+### Access control
+
+- We need to have policies to expose some of the data only internally; or to
+  certain customers
+
+- We can group fields into different "tables"
+  - Shared: fields
+  - Internal
+  - Customer
