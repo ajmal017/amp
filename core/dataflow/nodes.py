@@ -6,8 +6,12 @@ import io
 import logging
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
+import gluonts.model.deepar as gmd
+import gluonts.trainer as gt
+import numpy as np
 import pandas as pd
 
+import core.data_adapters as adpt
 import core.finance as fin
 import core.statistics as stats
 import helpers.dbg as dbg
@@ -488,6 +492,175 @@ class Resample(Transformer):
 # #############################################################################
 
 
+class ContinuousSkLearnModel(FitPredictNode):
+    """
+    Fit and predict an sklearn model.
+    """
+
+    def __init__(
+        self,
+        nid: str,
+        model_func: Callable[..., Any],
+        x_vars: Union[List[str], Callable[[], List[str]]],
+        y_vars: Union[List[str], Callable[[], List[str]]],
+        steps_ahead: int,
+        model_kwargs: Optional[Any] = None,
+    ) -> None:
+        """
+    Specify the data and sklearn modeling parameters.
+
+    Assumptions:
+        :param nid: unique node id
+        :param model_func: an sklearn model
+        :param x_vars: indexed by knowledge datetimes
+            - `x_vars` may contain lags of `y_vars`
+        :param y_vars: indexed by knowledge datetimes
+            - e.g., in the case of returns, this would correspond to `ret_0`
+        :param steps_ahead: number of steps ahead for which a prediction is to
+            be generated. E.g.,
+                - if `steps_ahead == 0`, then the predictions are
+                  are contemporaneous with the observed response (and hence
+                  inactionable)
+                - if `steps_ahead == 1`, then the model attempts to predict
+                  `y_vars` for the next time step
+                - The model is only trained to predict the target `steps_ahead`
+                  steps ahead (and not all intermediate steps)
+        :param model_kwargs: parameters to forward to the sklearn model (e.g.,
+            regularization constants)
+        """
+        super().__init__(nid)
+        self._model_func = model_func
+        self._model_kwargs = model_kwargs or {}
+        self._x_vars = x_vars
+        self._y_vars = y_vars
+        self._model = None
+        self._steps_ahead = steps_ahead
+        dbg.dassert_lte(
+            0, self._steps_ahead, "Non-causal prediction attempted! Aborting..."
+        )
+
+    def fit(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+        self._validate_input_df(df_in)
+        df = df_in.copy()
+        # Obtain index slice for which forward targets exist.
+        dbg.dassert_lt(self._steps_ahead, df.index.size)
+        idx = df.index[: -self._steps_ahead]
+        # Prepare x_vars in sklearn format.
+        x_vars = self._to_list(self._x_vars)
+        x_fit = adpt.transform_to_sklearn(df.loc[idx], x_vars)
+        # Prepare forward y_vars in sklearn format.
+        fwd_y_df = self._get_fwd_y_df(df).loc[idx]
+        fwd_y_fit = adpt.transform_to_sklearn(fwd_y_df, fwd_y_df.columns.tolist())
+        # Define and fit model.
+        self._model = self._model_func(**self._model_kwargs)
+        self._model = self._model.fit(x_fit, fwd_y_fit)
+        # Generate insample predictions and put in dataflow dataframe format.
+        fwd_y_hat = self._model.predict(x_fit)
+        #
+        fwd_y_hat_vars = [y + "_hat" for y in fwd_y_df.columns]
+        fwd_y_hat = adpt.transform_from_sklearn(idx, fwd_y_hat_vars, fwd_y_hat)
+        # TODO(Paul): Summarize model perf or make configurable.
+        # TODO(Paul): Consider separating model eval from fit/predict.
+        info = collections.OrderedDict()
+        info["model_x_vars"] = x_vars
+        info["insample_perf"] = self._model_perf(fwd_y_df, fwd_y_hat)
+        self._set_info("fit", info)
+        # Return targets and predictions.
+        return {
+            "df_out": fwd_y_df.merge(fwd_y_hat, left_index=True, right_index=True)
+        }
+
+    def predict(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+        self._validate_input_df(df_in)
+        df = df_in.copy()
+        idx = df.index
+        # Transform x_vars to sklearn format.
+        x_vars = self._to_list(self._x_vars)
+        x_predict = adpt.transform_to_sklearn(df, x_vars)
+        # Use trained model to generate predictions.
+        dbg.dassert_is_not(
+            self._model, None, "Model not found! Check if `fit` has been run."
+        )
+        fwd_y_hat = self._model.predict(x_predict)
+        # Put predictions in dataflow dataframe format.
+        fwd_y_df = self._get_fwd_y_df(df)
+        fwd_y_hat_vars = [y + "_hat" for y in fwd_y_df.columns.tolist()]
+        fwd_y_hat = adpt.transform_from_sklearn(idx, fwd_y_hat_vars, fwd_y_hat)
+        # Generate basic perf stats.
+        info = collections.OrderedDict()
+        info["model_perf"] = self._model_perf(fwd_y_df, fwd_y_hat)
+        self._set_info("predict", info)
+        # Return targets and predictions.
+        return {
+            "df_out": fwd_y_df.merge(fwd_y_hat, left_index=True, right_index=True)
+        }
+
+    @staticmethod
+    def _validate_input_df(df: pd.DataFrame) -> None:
+        """
+        Assert if df violates constraints, otherwise return `None`.
+        """
+        dbg.dassert_isinstance(df, pd.DataFrame)
+        dbg.dassert(df.index.freq)
+        return None
+
+    def _get_fwd_y_df(self, df):
+        """
+        Return dataframe of `steps_ahead` forward y values.
+        """
+        y_vars = self._to_list(self._y_vars)
+        mapper = lambda y: y + "_%i" % self._steps_ahead
+        [mapper(y) for y in y_vars]
+        # TODO(Paul): Ensure that `fwd_y_vars` and `y_vars` do not overlap.
+        fwd_y_df = df[y_vars].shift(-self._steps_ahead).rename(columns=mapper)
+        return fwd_y_df
+
+    # TODO(Paul): Add type hints.
+    # TODO(Paul): Consider omitting this (and relying on downstream
+    #     processing to e.g., adjust for number of hypotheses tested).
+    @staticmethod
+    def _model_perf(
+        y: pd.DataFrame, y_hat: pd.DataFrame
+    ) -> collections.OrderedDict:
+        info = collections.OrderedDict()
+        # info["hitrate"] = pip._compute_model_hitrate(self.model, x, y)
+        pnl_rets = y.multiply(y_hat.rename(columns=lambda x: x.strip("_hat")))
+        info["pnl_rets"] = pnl_rets
+        info["sr"] = fin.compute_sharpe_ratio(
+            pnl_rets.resample("1B").sum(), time_scaling=252
+        )
+        return info
+
+    # TODO(Paul): Make this a mixin to use with all modeling nodes.
+    @staticmethod
+    def _to_list(to_list: Union[List[str], Callable[[], List[str]]]) -> List[str]:
+        """
+        Return a list given its input.
+
+        - If the input is a list, the output is the same list.
+        - If the input is a function that returns a list, then the output of
+          the function is returned.
+
+        How this might arise in practice:
+          - A ColumnTransformer returns a number of x variables, with the
+            number dependent upon a hyperparameter expressed in config
+          - The column names of the x variables may be derived from the input
+            dataframe column names, not necessarily known until graph execution
+            (and not at construction)
+          - The ColumnTransformer output columns are merged with its input
+            columns (e.g., x vars and y vars are in the same DataFrame)
+        Post-merge, we need a way to distinguish the x vars and y vars.
+        Allowing a callable here allows us to pass in the ColumnTransformer's
+        method `transformed_col_names` and defer the call until graph
+        execution.
+        """
+        if callable(to_list):
+            to_list = to_list()
+        if isinstance(to_list, list):
+            return to_list
+        raise TypeError("Data type=`%s`" % type(to_list))
+
+
 class SkLearnModel(FitPredictNode):
     def __init__(
         self,
@@ -512,7 +685,8 @@ class SkLearnModel(FitPredictNode):
             str(df_in[df_in.isna().any(axis=1)].head().index),
         )
         df = df_in.copy()
-        idx, x_vars, x_fit, y_vars, y_fit = self._to_sklearn_format(df)
+        idx = df.index
+        x_vars, x_fit, y_vars, y_fit = self._to_sklearn_format(df)
         self._model = self._model_func(**self._model_kwargs)
         self._model = self._model.fit(x_fit, y_fit)
         y_hat = self._model.predict(x_fit)
@@ -530,7 +704,8 @@ class SkLearnModel(FitPredictNode):
     def predict(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
         dbg.dassert_isinstance(df_in, pd.DataFrame)
         df = df_in.copy()
-        idx, x_vars, x_predict, y_vars, y_predict = self._to_sklearn_format(df)
+        idx = df.index
+        x_vars, x_predict, y_vars, y_predict = self._to_sklearn_format(df)
         dbg.dassert_is_not(
             self._model, None, "Model not found! Check if `fit` has been run."
         )
@@ -558,32 +733,28 @@ class SkLearnModel(FitPredictNode):
         )
         return info
 
-    # TODO(Paul): Add type hints.
     def _to_sklearn_format(
         self, df: pd.DataFrame
-    ) -> Tuple[pd.Index, List[str], pd.DataFrame, List[str], pd.DataFrame]:
-        idx = df.index
-        df = df.reset_index()
-        # TODO(Paul): replace with class name
+    ) -> Tuple[List[str], np.array, List[str], np.array]:
         x_vars = self._to_list(self._x_vars)
         y_vars = self._to_list(self._y_vars)
-        x_vals = df[x_vars]
-        y_vals = df[y_vars]
-        return idx, x_vars, x_vals, y_vars, y_vals
+        x_vals, y_vals = adpt.transform_to_sklearn_old(df, x_vars, y_vars)
+        return x_vars, x_vals, y_vars, y_vals
 
-    # TODO(Paul): Add type hints.
     @staticmethod
     def _from_sklearn_format(
         idx: pd.Index,
         x_vars: List[str],
-        x_vals: pd.DataFrame,
+        x_vals: np.array,
         y_vars: List[str],
-        y_vals: pd.DataFrame,
-        y_hat: pd.DataFrame,
+        y_vals: np.array,
+        y_hat: np.array,
     ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-        x = pd.DataFrame(x_vals.values, index=idx, columns=x_vars)
-        y = pd.DataFrame(y_vals.values, index=idx, columns=y_vars)
-        y_h = pd.DataFrame(y_hat, index=idx, columns=[y + "_hat" for y in y_vars])
+        x = adpt.transform_from_sklearn(idx, x_vars, x_vals)
+        y = adpt.transform_from_sklearn(idx, y_vars, y_vals)
+        y_h = adpt.transform_from_sklearn(
+            idx, [y + "_hat" for y in y_vars], y_hat
+        )
         return x, y, y_h
 
     @staticmethod
@@ -607,6 +778,139 @@ class SkLearnModel(FitPredictNode):
         Allowing a callable here allows us to pass in the ColumnTransformer's
         method `transformed_col_names` and defer the call until graph
         execution.
+        """
+        if callable(to_list):
+            to_list = to_list()
+        if isinstance(to_list, list):
+            return to_list
+        raise TypeError("Data type=`%s`" % type(to_list))
+
+
+class DeepARGlobalModel(FitPredictNode):
+    """
+    A dataflow node for a DeepAR model.
+
+    See https://arxiv.org/abs/1704.04110 for a description of the DeepAR model.
+
+    For additional context and best-practices, see
+    https://github.com/ParticleDev/commodity_research/issues/966
+    """
+
+    def __init__(
+        self,
+        nid: str,
+        trainer_kwargs: Optional[Any] = None,
+        estimator_kwargs: Optional[Any] = None,
+        x_vars=Union[List[str], Callable[[], List[str]]],
+        y_vars=Union[List[str], Callable[[], List[str]]],
+    ) -> None:
+        """
+        Initialize dataflow node for gluon-ts DeepAR model.
+
+        :param nid: unique node id
+        :param trainer_kwargs: See
+          - https://gluon-ts.mxnet.io/api/gluonts/gluonts.trainer.html#gluonts.trainer.Trainer
+          - https://github.com/awslabs/gluon-ts/blob/master/src/gluonts/trainer/_base.py
+        :param estimator_kwargs: See
+          - https://gluon-ts.mxnet.io/api/gluonts/gluonts.model.deepar.html
+          - https://github.com/awslabs/gluon-ts/blob/master/src/gluonts/model/deepar/_estimator.py
+        :param x_vars: Covariates. Could be, e.g., features associated with a
+            point-in-time event. Must be known throughout the prediction
+            window at the time the prediction is made.
+        :param y_vars: Used in autoregression
+        """
+        super().__init__(nid)
+        self._estimator_kwargs = estimator_kwargs
+        # To avoid passing a class through config, handle `Trainer()`
+        # parameters separately from `estimator_kwargs`.
+        self._trainer_kwargs = trainer_kwargs
+        self._trainer = gt.Trainer(**self._trainer_kwargs)
+        dbg.dassert_not_in("trainer", self._estimator_kwargs)
+        #
+        self._estimator_func = gmd.DeepAREstimator
+        # NOTE: Covariates (x_vars) are not required by DeepAR.
+        # TODO(Paul): Allow this model to accept y_vars only.
+        #   - This could be useful for, e.g., predicting future values of
+        #     what would normally be predictors
+        self._x_vars = x_vars
+        self._y_vars = y_vars
+        self._estimator = None
+        self._predictor = None
+        # We determine `prediction_length` automatically and therefore do not
+        # allow it to be set by the user.
+        dbg.dassert_not_in("prediction_length", self._estimator_kwargs)
+        #
+        dbg.dassert_in("freq", self._estimator_kwargs)
+        self._freq = self._estimator_kwargs["freq"]
+
+    def fit(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+        dbg.dassert_isinstance(df_in, pd.DataFrame)
+        x_vars = self._to_list(self._x_vars)
+        y_vars = self._to_list(self._y_vars)
+        df = df_in.copy()
+        # Transform dataflow local timeseries dataframe into gluon-ts format.
+        gluon_train = adpt.transform_to_gluon(df, x_vars, y_vars, self._freq)
+        # Set the prediction length to the length of the local timeseries - 1.
+        #   - To predict for time t_j at time t_i, t_j > t_i, we need to know
+        #     x_vars up to and including time t_j
+        #   - For this model, multi-step predictions are equivalent to
+        #     iterated single-step predictions
+        pred_len = df.index.get_level_values(0).unique().size - 1
+        # Instantiate the (DeepAR) estimator and train the model.
+        self._estimator = self._estimator_func(
+            prediction_length=pred_len,
+            trainer=self._trainer,
+            **self._estimator_kwargs,
+        )
+        self._predictor = self._estimator.train(gluon_train)
+        # Apply model predictions to the training set (so that we can evaluate
+        # in-sample performance).
+        idx0 = df.index[0][0]
+        gluon_test = adpt.transform_to_gluon(
+            df.loc[idx0:idx0], x_vars, y_vars, self._freq
+        )
+        fit_predictions = list(self._predictor.predict(gluon_test))
+        # Transform gluon-ts predictions into a dataflow local timeseries
+        # dataframe.
+        # TODO(Paul): Gluon has built-in functionality to take the mean of
+        #     traces, and we might consider using it instead.
+        y_hat_traces = adpt.transform_from_gluon_forecasts(fit_predictions)
+        # TODO(Paul): Store the traces / dispersion estimates.
+        # Average over all available samples.
+        y_hat = y_hat_traces.mean(level=[0, 1])
+        # Map multiindices to align our prediction indices with those used
+        # by the passed-in local timeseries dataframe.
+        # TODO(Paul): Do this mapping earlier before removing the traces.
+        offsets = df.index.get_level_values(0).unique().to_list()
+        aligned_idx = y_hat.index.map(
+            lambda x: (
+                offsets[offsets.index(x[0]) + 1],
+                x[1] - pd.Timedelta(f"1{self._freq}"),
+            )
+        )
+        y_hat.index = aligned_idx
+        y_hat.name = y_vars[0] + "_hat"
+        y_hat.index.rename(df.index.names, inplace=True)
+        # Store info.
+        info = collections.OrderedDict()
+        info["model_x_vars"] = x_vars
+        # TODO(Paul): Consider storing only the head of each list in `info`
+        #     for debugging purposes.
+        # info["gluon_train"] = list(gluon_train)
+        # info["gluon_test"] = list(gluon_test)
+        # info["fit_predictions"] = fit_predictions
+        self._set_info("fit", info)
+        return {"df_out": y_hat.to_frame()}
+
+    def predict(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+        raise NotImplementedError()
+
+    @staticmethod
+    def _to_list(to_list: Union[List[str], Callable[[], List[str]]]) -> List[str]:
+        """
+        As in `SkLearnNode` version.
+
+        TODO(Paul): Think about factoring this method out into a parent/mixin.
         """
         if callable(to_list):
             to_list = to_list()
