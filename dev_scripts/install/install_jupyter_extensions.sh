@@ -9,7 +9,7 @@ if [[ ! -d $DIR_NAME ]]; then
 fi;
 ls $DIR_NAME
 
-if [[ 0 == 1 ]]; then
+if [[ 1 == 1 ]]; then
   # Sometimes the vim extension gives problems. This procedure typically solves
   # the problem.
   # Note on installation:
