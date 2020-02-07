@@ -205,7 +205,7 @@ class Cached:
             _LOG.log(_LOG_LEVEL, "%s: executed from '%s'", self._func.__name__, self.get_last_cache_accessed())
             # TODO(gp): We make a copy, but we should do something better
             # (PartTask1071).
-            obj = obj.copy(deep=True)
+            obj = copy.deepcopy(obj)
         return obj
 
     def get_last_cache_accessed(self) -> str:
