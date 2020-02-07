@@ -6,6 +6,7 @@ import helpers.cache as hcac
 """
 
 import argparse
+import copy
 import functools
 import logging
 import os
@@ -202,6 +203,9 @@ class Cached:
             self._reset_cache_tracing()
             obj = self._execute_func(*args, **kwargs)
             _LOG.log(_LOG_LEVEL, "%s: executed from '%s'", self._func.__name__, self.get_last_cache_accessed())
+            # TODO(gp): We make a copy, but we should do something better
+            # (PartTask1071).
+            obj = obj.copy(deep=True)
         return obj
 
     def get_last_cache_accessed(self) -> str:
