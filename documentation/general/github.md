@@ -237,30 +237,35 @@
 
 # Conventions
 
-## Tags
-
-- AUTOML
-- BREAKS
+## Labels
 - BUG: 
 - CLEANUP: Tasks related to improving, refactoring, reorg (not bugs) general
   shared code (e.g., for `helpers`)
+- ENHANCEMENT
+- P0:
+- P1:
+- P2:
+
+## Projects
+
+- AUTOML
+- BREAKS
 - DATA:
 - DATAFLOW
-- DEV_INFRA:
+- DEV_TOOLS: -> Maybe just tools
 - DWNLD:
 - ETL:
 - INFRA
-- INFRA:
-- INVESTIGATE
-- INVESTIGATE
+- INVESTIGATE:
 - JENKINS
 - KG
 - NLP:
 - ORG: 
 - POPPP
 - PRICE: Tasks related to price data
-- READ:
-- RESEARCH
+- READ: Reading
+- RESEARCH: Theoretical issues related to research, not necessarily about writing
+  code
 - RP
 - ST:
 - TWITTER:
