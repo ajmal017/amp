@@ -241,12 +241,21 @@
 - BUG: 
 - CLEANUP: Tasks related to improving, refactoring, reorg (not bugs) general
   shared code (e.g., for `helpers`)
-- ENHANCEMENT
-- P0:
-- P1:
-- P2:
+- ENHANCEMENT: An improvement to an existing features
+- PAUSED: An Issue that was started, made some progress, and then we stopped
+  without getting to completion
+- P0: High priority (it should be picked up as soon as there is time)
+- P1: Medium priority (icebox)
+- P2: Low priority (freezer)
+- FEATURE: Implement a new feature
+- DESIGN: Design a new or an old software component
+- 1HR: Something that can be fixed quickly, if you have 1 hr of spare time
+
+- TODO(gp): Does the priority still makes sense?
 
 ## Projects
+
+- TODO(gp): Add the description to ZenHub and remove it from here.
 
 - AUTOML
 - BREAKS
@@ -269,8 +278,13 @@
 - RP
 - ST:
 - TWITTER:
-- WIND
-
+- WIND:
 - Tags that should be cleaned up
   - JODI -> ETL2
   - ETL -> ETL2
+- Hypotheses
+- Research
+- Twitter
+- Build
+- Helpers
+- Core

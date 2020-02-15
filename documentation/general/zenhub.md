@@ -165,3 +165,8 @@
         - "Approximation of RP ESS"
   - This is also equivalent to our purpose milestones (they become Epics)
 
+- Remove the project tags (at least moving forward)
+  - A quick tool to clean up the tags from the bugs
+
+- Give priority to the project
+  - E.g., AutoML doc -> Add doc
