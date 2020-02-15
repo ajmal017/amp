@@ -243,3 +243,12 @@
     - You need to know the previous portfolio in order to compute the next
       positions
   - Any other cross-sectional dependencies also pose synchronization barriers
+
+# Building a processing pipeline
+
+## Simple approach
+- While the pipeline is still linear and simple we can just use functions taking
+  a `Config` object
+- The next step is use our `DataFlow` framework to build complex graph
+  computations that can easily put in production
+

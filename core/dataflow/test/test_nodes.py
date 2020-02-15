@@ -1,14 +1,14 @@
 import logging
 import pprint
 
+import mxnet
 import numpy as np
 import pandas as pd
-import pytest
 import sklearn.linear_model as slm
 
+import core.artificial_signal_generators as sig_gen
 import core.config as cfg
 import core.dataflow as dtf
-import core.signal_processing as sigp
 import helpers.printing as prnt
 import helpers.unit_test as hut
 
@@ -111,14 +111,14 @@ class TestContinuousSkLearnModel(hut.TestCase):
         config_kwargs["alpha"] = 0.5
         return config
 
-    def _get_data(self, lag: int) -> None:
+    def _get_data(self, lag: int) -> pd.DataFrame:
         """
         Generate "random returns". Use lag + noise as predictor.
         """
         num_periods = 50
         total_steps = num_periods + lag + 1
-        rets = sigp.get_gaussian_walk(0, 0.2, total_steps, seed=10).diff()
-        noise = sigp.get_gaussian_walk(0, 0.02, total_steps, seed=1).diff()
+        rets = sig_gen.get_gaussian_walk(0, 0.2, total_steps, seed=10).diff()
+        noise = sig_gen.get_gaussian_walk(0, 0.02, total_steps, seed=1).diff()
         pred = rets.shift(-lag).loc[1:num_periods] + noise.loc[1:num_periods]
         resp = rets.loc[1:num_periods]
         idx = pd.date_range("2010-01-01", periods=num_periods, freq="T")
@@ -126,11 +126,48 @@ class TestContinuousSkLearnModel(hut.TestCase):
         return df
 
 
+class TestContinuousDeepArModel(hut.TestCase):
+    def test_fit_dag1(self) -> None:
+        dag = self._get_dag()
+        #
+        output_df = dag.run_leq_node("deepar", "fit")["df_out"]
+        self.check_string(output_df.to_string())
+
+    def test_predict_dag1(self) -> None:
+        dag = self._get_dag()
+        #
+        dag.run_leq_node("deepar", "fit")
+        output_df = dag.run_leq_node("deepar", "predict")["df_out"]
+        self.check_string(output_df.to_string())
+
+    def _get_dag(self) -> dtf.DAG:
+        mxnet.random.seed(0)
+        data, _ = sig_gen.get_gluon_dataset(
+            dataset_name="m4_hourly", train_length=100, test_length=1,
+        )
+        fit_idxs = data.iloc[:70].index
+        predict_idxs = data.iloc[70:].index
+        data_source_node = dtf.ReadDataFromDf("data", data)
+        data_source_node.set_fit_idxs(fit_idxs)
+        data_source_node.set_predict_idxs(predict_idxs)
+        # Create DAG and test data node.
+        dag = dtf.DAG(mode="strict")
+        dag.add_node(data_source_node)
+        # Load deepar config and create modeling node.
+        config = cfg.Config()
+        config["x_vars"] = None
+        config["y_vars"] = ["y"]
+        config["trainer_kwargs"] = {"epochs": 1}
+        config["estimator_kwargs"] = {"prediction_length": 2}
+        node = dtf.ContinuousDeepArModel("deepar", **config.to_dict(),)
+        dag.add_node(node)
+        dag.connect("data", "deepar")
+        return dag
+
+
 class TestDeepARGlobalModel(hut.TestCase):
-    @pytest.mark.skip(
-        reason="test showing instability and node may be deprecated anyway"
-    )
     def test_fit1(self) -> None:
+        mxnet.random.seed(0)
         local_ts = self._get_local_ts()
         num_entries = 100
         config = self._get_config()
@@ -152,10 +189,8 @@ class TestDeepARGlobalModel(hut.TestCase):
         )
         self.check_string(config_info_output)
 
-    @pytest.mark.skip(
-        reason="test showing instability and node may be deprecated anyway"
-    )
     def test_fit_dag1(self) -> None:
+        mxnet.random.seed(0)
         dag = dtf.DAG(mode="strict")
         local_ts = self._get_local_ts()
         data_source_node = dtf.ReadDataFromDf("local_ts", local_ts)

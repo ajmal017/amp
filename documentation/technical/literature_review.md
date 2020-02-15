@@ -230,7 +230,6 @@
   - Use in cases where we have a large number of time series known to have
     meaningful correlations
 
-
 ## 2014, The topology of macro financial flow using stochastic flow diagrams
 - Paper authors: Calkin, De Prado
 - [Link](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2379319)
