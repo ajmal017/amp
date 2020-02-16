@@ -238,53 +238,19 @@
 # Conventions
 
 ## Labels
-- BUG: 
-- CLEANUP: Tasks related to improving, refactoring, reorg (not bugs) general
-  shared code (e.g., for `helpers`)
-- ENHANCEMENT: An improvement to an existing features
-- PAUSED: An Issue that was started, made some progress, and then we stopped
-  without getting to completion
-- P0: High priority (it should be picked up as soon as there is time)
-- P1: Medium priority (icebox)
-- P2: Low priority (freezer)
-- FEATURE: Implement a new feature
-- DESIGN: Design a new or an old software component
-- 1HR: Something that can be fixed quickly, if you have 1 hr of spare time
-
-- TODO(gp): Does the priority still makes sense?
-
-## Projects
-
-- TODO(gp): Add the description to ZenHub and remove it from here.
-
-- AUTOML
-- BREAKS
-- DATA:
-- DATAFLOW
-- DEV_TOOLS: -> Maybe just tools
-- DWNLD:
-- ETL:
-- INFRA
-- INVESTIGATE:
-- JENKINS
-- KG
-- NLP:
-- ORG: 
-- POPPP
-- PRICE: Tasks related to price data
-- READ: Reading
-- RESEARCH: Theoretical issues related to research, not necessarily about writing
-  code
-- RP
-- ST:
-- TWITTER:
-- WIND:
-- Tags that should be cleaned up
-  - JODI -> ETL2
-  - ETL -> ETL2
-- Hypotheses
-- Research
-- Twitter
-- Build
-- Helpers
-- Core
+- `1HR`: Something that can be fixed quickly, if you have 1 hr of spare time
+- `Bug`: Report a bug with a proper repro case
+- `Cleanup`: Tasks related to improving, refactoring, reorganizing code
+- `Design`: Design a new or re-design an old software component
+- `Enhancement`: Request an improvement to an existing features
+- `Feature`: Implement a new feature
+- `Blocking`
+- `Blocked`
+- `P0`: High priority (it should be picked up as soon as there is time)
+- `P1`: Medium priority (icebox)
+- `P2`: Low priority (freezer)
+- `Paused`: An Issue that was started, we made some progress on it, and then we
+  stopped without getting to completion
+- `Duplicate`:
+- `Discussion`:
+- `Question`: How to do XYZ

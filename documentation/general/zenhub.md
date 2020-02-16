@@ -54,8 +54,6 @@
 
 * Sprint backlog
 - = the work that the team is committed to tackle in a given Milestone
-  - estimates
-  - requirements
 
 ## Mapping Agile concept onto GH
 
@@ -170,3 +168,34 @@
 
 - Give priority to the project
   - E.g., AutoML doc -> Add doc
+
+# Our conventions
+
+## Pipelines
+
+## Sprint
+- Sprints are numbered and have a commodity name
+  - E.g., "Sprint1 - Gold", "Sprint2 - Natural gas"
+
+- We create a Sprint for each "Team" (Dev, Tools, NLP, AutoML) with the standard
+  process (prioritization, estimate, ...)
+  - We merge the Sprint for each Team into a single Sprint for the entire DevTeam
+  - We don't want to say "one Team is ahead or behind": we win or lose together
+
+## Workflow
+- Decide a reference Issue to which we assign 2 story points
+  - It should be small, something that can be done in around a single day
+
+- The bugs that are candidates for the next Sprint go in `SprintCandidate`
+  pipeline
+  - TODO(GP, Paul): Is `SprintCandidate` a Pipeline or a Milestone?
+  - Each Issue needs to have a clear goal, a definition of "done", and "small"
+  - Issues are ranked in terms of business value
+
+- Each Team estimates each of their Issues in `SprintCandidate` in terms of story
+  points
+- Then we select for each Team the Sprint in terms of a number of story points
+  that is doable in 2 weeks
+  - Initially we assume 2 story points = 1 day, so for the sprint is 20 points
+    per Team member
+  - We will then refine the estimates using Velocity charts
