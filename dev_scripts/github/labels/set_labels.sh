@@ -7,6 +7,8 @@
 EXEC="/Users/saggese/src/github/github-label-maker/github-label-maker.py"
 
 SRC_DIR="./dev_scripts/github/labels"
+SRC_NAME="$SRC_DIR/gh_tech_labels.json"
+#SRC_NAME="$SRC_DIR/gh_org_labels.json"
 DST_DIR="$SRC_DIR/backup"
 
 
@@ -26,8 +28,7 @@ function backup_and_update() {
     label
 
     # Update.
-    FILE_NAME="$SRC_DIR/gh_tech_labels.json"
-    OPTS="-m $FILE_NAME"
+    OPTS="-m $SRC_NAME"
     label
 }
 
