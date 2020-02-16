@@ -19,10 +19,7 @@ function label() {
 }
 
 
-# ParticleDev/commodity_research
-OWNER="ParticleDev"
-REPO="commodity_research"
-if [[ 1 == 1 ]]; then
+function backup_and_update() {
     # Backup.
     FILE_NAME="$DST_DIR/labels.$OWNER.$REPO.json"
     OPTS="-d $FILE_NAME"
@@ -32,34 +29,26 @@ if [[ 1 == 1 ]]; then
     FILE_NAME="$SRC_DIR/gh_tech_labels.json"
     OPTS="-m $FILE_NAME"
     label
+}
+
+
+# ParticleDev/commodity_research
+OWNER="ParticleDev"
+REPO="commodity_research"
+if [[ 1 == 1 ]]; then
+    backup_and_update
 fi;
 
 # ParticleDev/infra
 OWNER="ParticleDev"
 REPO="infra"
 if [[ 1 == 1 ]]; then
-    # Backup.
-    FILE_NAME="$DST_DIR/labels.$OWNER.$REPO.json"
-    OPTS="-d $FILE_NAME"
-    label
-
-    # Update.
-    FILE_NAME="$SRC_DIR/gh_tech_labels.json"
-    OPTS="-m $FILE_NAME"
-    label
+    backup_and_update
 fi;
 
 # alphamatic/amp
 OWNER="alphamatic"
 REPO="amp"
 if [[ 1 == 1 ]]; then
-    # Backup.
-    FILE_NAME="$DST_DIR/labels.$OWNER.$REPO.json"
-    OPTS="-d $FILE_NAME"
-    label
-
-    # Update.
-    FILE_NAME="$SRC_DIR/gh_tech_labels.json"
-    OPTS="-m $FILE_NAME"
-    label
+    backup_and_update
 fi;
