@@ -1,10 +1,13 @@
 #!/bin/bash -e
 
+# """
+# Backup and then update labels of several GitHub repos.
+# """
+
 EXEC="/Users/saggese/src/github/github-label-maker/github-label-maker.py"
 
 SRC_DIR="./dev_scripts/github/labels"
 DST_DIR="$SRC_DIR/backup"
-#gh_tech_labels.json
 
 
 function label() {
@@ -16,25 +19,47 @@ function label() {
 }
 
 
-# Backup.
-if [[ 0 == 1 ]]; then
+# ParticleDev/commodity_research
 OWNER="ParticleDev"
 REPO="commodity_research"
-FILE_NAME="$DST_DIR/labels.$OWNER.$REPO.json"
-OPTS="-d $FILE_NAME"
-label
+if [[ 1 == 1 ]]; then
+    # Backup.
+    FILE_NAME="$DST_DIR/labels.$OWNER.$REPO.json"
+    OPTS="-d $FILE_NAME"
+    label
 
-FILE_NAME="$SRC_DIR/gh_tech_labels.json"
-OPTS="-m $FILE_NAME"
-label
+    # Update.
+    FILE_NAME="$SRC_DIR/gh_tech_labels.json"
+    OPTS="-m $FILE_NAME"
+    label
 fi;
 
+# ParticleDev/infra
+OWNER="ParticleDev"
+REPO="infra"
+if [[ 1 == 1 ]]; then
+    # Backup.
+    FILE_NAME="$DST_DIR/labels.$OWNER.$REPO.json"
+    OPTS="-d $FILE_NAME"
+    label
+
+    # Update.
+    FILE_NAME="$SRC_DIR/gh_tech_labels.json"
+    OPTS="-m $FILE_NAME"
+    label
+fi;
+
+# alphamatic/amp
 OWNER="alphamatic"
 REPO="amp"
-FILE_NAME="$DST_DIR/labels.$OWNER.$REPO.json"
-OPTS="-d $FILE_NAME"
-label
+if [[ 1 == 1 ]]; then
+    # Backup.
+    FILE_NAME="$DST_DIR/labels.$OWNER.$REPO.json"
+    OPTS="-d $FILE_NAME"
+    label
 
-FILE_NAME="$SRC_DIR/gh_tech_labels.json"
-OPTS="-m $FILE_NAME"
-label
+    # Update.
+    FILE_NAME="$SRC_DIR/gh_tech_labels.json"
+    OPTS="-m $FILE_NAME"
+    label
+fi;

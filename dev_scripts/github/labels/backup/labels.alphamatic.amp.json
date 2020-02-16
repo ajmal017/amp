@@ -5,17 +5,17 @@
     "description": "Something that can be fixed quickly, if you have 1 hr of spare time"
   },
   {
-    "name": "BLOCKED",
+    "name": "Blocked",
     "color": "#5319e7",
     "description": "Blocked"
   },
   {
-    "name": "BLOCKING",
+    "name": "Blocking",
     "color": "#000000",
     "description": "Blocking"
   },
   {
-    "name": "BUG",
+    "name": "Bug",
     "color": "#ee0701",
     "description": "Bug that needs to be fixed"
   },
@@ -26,7 +26,7 @@
   },
   {
     "name": "Design",
-    "color": "#385cc9",
+    "color": "#fef2c0",
     "description": "Design a new or re-design an old software component"
   },
   {
@@ -55,7 +55,7 @@
     "description": "Implement a new feature"
   },
   {
-    "name": "IN_PROGRESS",
+    "name": "In progress",
     "color": "#00BB00",
     "description": "TODO(gp): To remove at some point"
   },
@@ -75,13 +75,13 @@
     "description": "Low priority"
   },
   {
-    "name": "PAUSED",
+    "name": "Paused",
     "color": "#fbca04",
     "description": "After some work was done on this bug, it was paused"
   },
   {
-    "name": "PERMANENT",
-    "color": "#385cc9",
+    "name": "Permanent",
+    "color": "#b7330b",
     "description": "Routine ongoing tasks, which cannot be closed"
   },
   {
@@ -90,17 +90,17 @@
     "description": "Question"
   },
   {
-    "name": "TO_CLOSE",
+    "name": "To close",
     "color": "#5319e7",
     "description": "Issue is ready to be closed"
   },
   {
-    "name": "TO_REVIEW",
+    "name": "To review",
     "color": "#cc317c",
     "description": "Issue is ready to be reviewed"
   },
   {
-    "name": "UMBRELLA",
+    "name": "Umbrella",
     "color": "#b7330b",
     "description": "TODO(gp): To remove at some point"
   },
