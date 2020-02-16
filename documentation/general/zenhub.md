@@ -171,8 +171,6 @@
 
 # Our conventions
 
-## Pipelines
-
 ## Sprint
 - Sprints are numbered and have a commodity name
   - E.g., "Sprint1 - Gold", "Sprint2 - Natural gas"

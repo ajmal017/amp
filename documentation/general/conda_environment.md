@@ -74,10 +74,11 @@
 - Typically GP takes care of getting all this fun stuff to work, but you are
   welcome to try locally to minimize surprises.
 
-# Conda maintenance
+# Conda maintenance (only for admins)
 
 ## Updating conda itself
 
+- To update conda itself you can run:
 ```bash
 > conda activate base
 
@@ -90,6 +91,13 @@
 3.8.0
 ```
 
-##
+## Cleaning conda packages
+- One can clean up the entire cache of packages with:
+```bash
+> conda clean --yes --all
+```
 
-conda clean --yes --all
+- This operation:
+  - affects the conda system for all the users
+  - is just about deleting cached artifacts so it should not have destructive
+    effects
