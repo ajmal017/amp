@@ -1,0 +1,62 @@
+[
+  {
+    "name": "Blocked",
+    "color": "#d16851",
+    "description": ""
+  },
+  {
+    "name": "Blocking",
+    "color": "#000000",
+    "description": ""
+  },
+  {
+    "name": "Bug",
+    "color": "#f09af4",
+    "description": ""
+  },
+  {
+    "name": "Epic",
+    "color": "#3E4B9E",
+    "description": null
+  },
+  {
+    "name": "In progress",
+    "color": "#009901",
+    "description": ""
+  },
+  {
+    "name": "P0",
+    "color": "#FF0000",
+    "description": "High priority"
+  },
+  {
+    "name": "P1",
+    "color": "#FF8800",
+    "description": "Medium priority"
+  },
+  {
+    "name": "P2",
+    "color": "#880088",
+    "description": "Low priority"
+  },
+  {
+    "name": "Paused",
+    "color": "#FBD204",
+    "description": ""
+  },
+  {
+    "name": "To close",
+    "color": "#AAAAAA",
+    "description": ""
+  },
+  {
+    "name": "To review",
+    "color": "#4383cc",
+    "description": ""
+  },
+  {
+    "name": "Umbrella",
+    "color": "#b7330b",
+    "description": ""
+  }
+]
