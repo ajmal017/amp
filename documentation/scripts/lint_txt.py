@@ -47,6 +47,7 @@ def _preprocess(txt: str) -> str:
         if re.match(r"#+ [#\/\-\=]{6,}$", line):
             continue
         line = re.sub(r"^\s*\*\s+", "- STAR", line)
+        line = re.sub(r"^\s*\*\*\s+", "- DOUBLE_STAR", line)
         # Transform:
         # $$E_{in} = \frac{1}{N} \sum_i e(h(\vx_i), y_i)$$
         #
@@ -86,7 +87,7 @@ def _preprocess(txt: str) -> str:
     return txt_new_as_str
 
 
-def _prettier(txt: str) -> str:
+def _prettier(txt: str, print_width: Optional[int]) -> str:
     _LOG.debug("txt=\n%s", txt)
     #
     debug = False
@@ -103,6 +104,10 @@ def _prettier(txt: str) -> str:
     cmd_opts.append("--write")
     tab_width = 2
     cmd_opts.append("--tab-width %s" % tab_width)
+    if print_width is not None:
+        dbg.dassert_lte(1, print_width)
+        cmd_opts.append("--print-width %s" % print_width)
+        #assert 0, print_width
     cmd_opts.append(tmp_file_name)
     #cmd_opts.append("2>&1 >/dev/null")
     cmd_opts_as_str = " ".join(cmd_opts)
@@ -115,8 +120,10 @@ def _prettier(txt: str) -> str:
     return txt
 
 
-def _postprocess(txt: str, in_file_name: str) -> str:
+def _postprocess(txt: str, in_file_name: Optional[str]) -> str:
     _LOG.debug("txt=%s", txt)
+    if in_file_name is None:
+        in_file_name = "None"
     # Remove empty lines before ```.
     txt = re.sub(r"^\s*\n(\s*```)$", r"\1", txt, 0, flags=re.MULTILINE)
     # Remove empty lines before higher level bullets, but not chapters.
@@ -134,6 +141,7 @@ def _postprocess(txt: str, in_file_name: str) -> str:
     for i, line in enumerate(txt.split("\n")):
         # Undo the transformation `* -> STAR`.
         line = re.sub(r"^\-(\s*)STAR", r"*\1", line, 0)
+        line = re.sub(r"^\-(\s*)DOUBLE_STAR", r"**\1", line, 0)
         # Handle ``` block.
         m = re.match(r"^\s*```(.*)\s*$", line)
         if m:
@@ -159,12 +167,12 @@ def _postprocess(txt: str, in_file_name: str) -> str:
         print("%s:%s: A ``` block was not ending" % (in_file_name, 1))
     #
     txt_new_as_str = "\n".join(txt_new).rstrip("\n")
-    # Ensure that there is exactly one empty line before each paragraph, assuming that it
+    # Ensure that there is exactly one empty line before each paragraph.
     regex = (
             # Unless it is the first line.
             r"(\S)" +
             # Find a paragraph with as many \n before it.
-            r"\n*(\* .*)")
+            r"\n*(\*+ .*)")
     txt_new_as_str = re.sub(regex, r"\1\n\n\2", txt_new_as_str, 0, flags=re.MULTILINE)
     #
     regex = (
@@ -172,7 +180,6 @@ def _postprocess(txt: str, in_file_name: str) -> str:
             #r"([\S|^#])" +
             # Find a paragraph with as many \n before it.
             r"\n*(#+ .*)")
-    #txt_new_as_str = re.sub(regex, r"\1\n\n\2", txt_new_as_str, 0, flags=re.MULTILINE)
     txt_new_as_str = re.sub(regex, r"\n\n\1", txt_new_as_str, 0, flags=re.MULTILINE)
     return txt_new_as_str
 
@@ -236,8 +243,10 @@ def _to_execute_action(action: str, actions: Optional[List[str]]) -> bool:
     return to_execute
 
 
-def _process(
-    txt: str, in_file_name: str, actions: Optional[List[str]] = None
+def process_txt(
+    txt: str, is_md_file: bool, in_file_name: Optional[str],
+    print_width: Optional[int] = None,
+    actions: Optional[List[str]] = None,
 ) -> str:
     # Pre-process text.
     action = "preprocess"
@@ -246,13 +255,12 @@ def _process(
     # Prettify.
     action = "prettier"
     if _to_execute_action(action, actions):
-        txt = _prettier(txt)
+        txt = _prettier(txt, print_width=print_width)
     # Post-process text.
     action = "postprocess"
     if _to_execute_action(action, actions):
         txt = _postprocess(txt, in_file_name)
     # Refresh table of content.
-    is_md_file = in_file_name.endswith(".md")
     action = "refresh_toc"
     if _to_execute_action(action, actions):
         if is_md_file:
@@ -324,7 +332,8 @@ def _main(args: argparse.Namespace) -> None:
     actions = args.action
     if actions is None:
         actions = _VALID_ACTIONS[:]
-    txt = _process(txt, in_file_name, actions)
+    is_md_file = in_file_name.endswith(".md")
+    txt = process_txt(txt, is_md_file, in_file_name, actions=actions)
     # Write output.
     if args.in_place:
         dbg.dassert_ne(in_file_name, "<stdin>")
