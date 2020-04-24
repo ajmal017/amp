@@ -1261,7 +1261,10 @@ def display_df(
     df,
     index=True,
     inline_index=False,
-    max_lines=5,
+    max_columns : int = 20,
+    max_colwidth :int = 50,
+    max_rows : int = 60,
+    width : int = 80,
     as_txt=False,
     tag=None,
     mode=None,
@@ -1282,23 +1285,10 @@ def display_df(
         - "all_rows": print all the rows
         - "all_cols": print all the columns
         - "all": print the entire df (it could be huge)
+
     """
     if isinstance(df, pd.Series):
         df = pd.DataFrame(df)
-    elif isinstance(df, pd.Panel):
-        for c in list(df.keys()):
-            print("# %s" % c)
-            df_tmp = df[c]
-            display_df(
-                df_tmp,
-                index=index,
-                inline_index=inline_index,
-                max_lines=max_lines,
-                as_txt=as_txt,
-                mode=mode,
-            )
-        return
-    #
     dbg.dassert_type_is(df, pd.DataFrame)
     dbg.dassert_eq(
         hlist.find_duplicates(df.columns.tolist()),
@@ -1307,22 +1297,24 @@ def display_df(
     )
     if tag is not None:
         print(tag)
-    if max_lines is not None:
-        dbg.dassert_lte(1, max_lines)
-        if df.shape[0] > max_lines:
-            # log.error("Printing only top / bottom %s out of %s rows",
-            #        max_lines, df.shape[0])
-            ellipses = pd.DataFrame(
-                [["..."] * len(df.columns)], columns=df.columns, index=["..."]
-            )
-            df = pd.concat(
-                [
-                    df.head(int(max_lines / 2)),
-                    ellipses,
-                    df.tail(int(max_lines / 2)),
-                ],
-                axis=0,
-            )
+    # # Limit the max amount of lines to print.
+    # if max_lines is not None:
+    #     dbg.dassert_lte(1, max_lines)
+    #     if df.shape[0] > max_lines:
+    #         # log.error("Printing only top / bottom %s out of %s rows",
+    #         #        max_lines, df.shape[0])
+    #         ellipses = pd.DataFrame(
+    #             [["..."] * len(df.columns)], columns=df.columns, index=["..."]
+    #         )
+    #         df = pd.concat(
+    #             [
+    #                 df.head(int(max_lines / 2)),
+    #                 ellipses,
+    #                 df.tail(int(max_lines / 2)),
+    #             ],
+    #             axis=0,
+    #         )
+    # Handle the index.
     if inline_index:
         df = df.copy()
         # Copy the index to a column and don't print the index.
@@ -1341,15 +1333,25 @@ def display_df(
         else:
             import IPython.core.display
 
-            IPython.core.display.display(
-                IPython.core.display.HTML(df.to_html(index=index))
-            )
+            IPython.core.display.display(df)
+                #IPython.core.display.HTML(df.to_html(index=index))
+                    #index=index
+            #)
 
+    # https://pandas.pydata.org/pandas-docs/stable/user_guide/options.html#available-options
     if mode is None:
-        _print_display()
+        with pd.option_context(
+                "display.max_columns", max_columns,
+                "display.max_colwidth", max_colwidth,
+                "display.max_rows", max_rows,
+                "display.width", width
+        ):
+            #_print_display()
+            display(df)
+            assert 0
     elif mode == "all_rows":
         with pd.option_context(
-            "display.max_rows", None, "display.max_columns", 3
+            "display.max_rows", None, "display.max_columns", max_columns,
         ):
             _print_display()
     elif mode == "all_cols":
@@ -1362,7 +1364,7 @@ def display_df(
             "display.max_rows",
             int(1e6),
             "display.max_columns",
-            3,
+            max_columns,
             "display.max_colwidth",
             int(1e6),
             "display.max_columns",
