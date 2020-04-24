@@ -128,11 +128,17 @@ class Test_jack1(ut.TestCase):
 
     # TODO(gp): Not clear why it's broken.
     @pytest.mark.skipif('si.get_user_name() == "jenkins"')
+    @pytest.mark.skipif(
+        'si.get_server_name() == "docker-instance"', reason="Issue #1522, #1831"
+    )
     def test_jack(self) -> None:
         cmd = 'jack -r "def dassert"'
         si.system(cmd)
 
     @pytest.mark.skipif('si.get_user_name() == "jenkins"')
+    @pytest.mark.skipif(
+        'si.get_server_name() == "docker-instance"', reason="Issue #1522, #1831"
+    )
     def test_jackpy(self) -> None:
         cmd = 'jackpy -r "def dassert"'
         si.system(cmd)
@@ -359,6 +365,9 @@ if __name__ == "main":
         """
         return txt
 
+    @pytest.mark.skipif(
+        'si.get_server_name() == "docker-instance"', reason="Issue #1522, #1831"
+    )
     def test_linter1(self) -> None:
         """
         Run linter.py as executable on some text.
@@ -371,6 +380,9 @@ if __name__ == "main":
         # Check.
         self.check_string(output)
 
+    @pytest.mark.skipif(
+        'si.get_server_name() == "docker-instance"', reason="Issue #1522, #1831"
+    )
     def test_linter2(self) -> None:
         """
         Run linter.py as library on some text.

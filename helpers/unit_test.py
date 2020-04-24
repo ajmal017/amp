@@ -13,7 +13,7 @@ import pprint
 import random
 import re
 import unittest
-from typing import Any, List, NoReturn, Optional
+from typing import Any, List, NoReturn, Optional, Iterable, Mapping, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -24,6 +24,7 @@ import helpers.git as git
 import helpers.io_ as io_
 import helpers.printing as prnt
 import helpers.system_interaction as si
+import collections
 
 _LOG = logging.getLogger(__name__)
 
@@ -75,6 +76,107 @@ def in_unit_test_mode() -> bool:
 
 
 # #############################################################################
+
+
+def convert_df_to_string(
+    df: Union[pd.DataFrame, pd.Series],
+    n_rows: Optional[int] = None,
+    title: Optional[str] = None,
+    index: bool = False,
+) -> str:
+    """
+    Convert DataFrame or Series to string for verifying test results.
+
+    :param df: DataFrame to be verified
+    :param n_rows: number of rows in expected output
+    :param title: title for test output
+    :return: string representation of input
+    """
+    n_rows = n_rows or len(df)
+    output = []
+    # Add title in the beginning if provided.
+    if title is not None:
+        output.append(prnt.frame(title))
+    # Provide context for full representation of data.
+    with pd.option_context(
+                "display.max_colwidth", int(1e6), "display.max_columns", None, "display.max_rows", None
+        ):
+        # Add top N rows.
+        output.append(df.head(n_rows).to_string(index=index))
+        output_str = "\n".join(output)
+    return output_str
+
+
+def convert_info_to_string(info: Mapping):
+    """
+    Convert info to string for verifying test results.
+
+    Info often contains pd.Series, so pandas context is provided
+    to print all rows and all contents.
+
+    :param info: info to convert to string
+    :return: string representation of info
+    """
+    output = []
+    # Provide context for full representation of pd.Series in info.
+    with pd.option_context(
+                "display.max_colwidth", int(1e6), "display.max_columns", None, "display.max_rows", None
+        ):
+        output.append(prnt.frame("info"))
+        output.append(pprint.pformat(info))
+        output_str = "\n".join(output)
+    return output_str
+
+
+def get_ordered_value_counts(column: pd.Series) -> pd.Series:
+    """
+    Get column value counts and sort.
+
+    Value counts are sorted alphabetically by index, and then counts in
+    descending order. The order of indices with the same count is
+    alphabetical, which makes the string representation of the same series
+    predictable.
+
+    The output of `value_counts` without sort arranges indices with same
+    counts randomly, which makes tests dependent on string comparison
+    impossible.
+
+    :param column: column for value counts
+    :return: counts ordered by index and values
+    """
+    value_counts = column.value_counts()
+    value_counts = value_counts.sort_index()
+    value_counts = value_counts.sort_values(ascending=False)
+    return value_counts
+
+
+def get_value_counts_for_columns(
+        df: pd.DataFrame, columns: Optional[Iterable] = None
+) -> Mapping[str, pd.Series]:
+    """
+    Get value counts for multiple columns.
+
+    The function creates a dict of value counts for each passed column. The
+    values in each resulting series are sorted first by value, then alphabetically
+    by index to keep the order predictable.
+
+    Counts are included in info for filtering and mapping functions to keep
+    track of changes in values.
+
+    :param df: dataframe with value counts going to info
+    :param columns: names of columns for counting values
+    :return: value counts for provided columns
+    """
+    columns = columns or df.columns.to_list()
+    dbg.dassert_is_subset(
+        columns,
+        df.columns.to_list(),
+        msg="The requested columns could not be found in the dataframe",
+    )
+    value_counts_by_column = collections.OrderedDict()
+    for col in columns:
+        value_counts_by_column[col] = get_ordered_value_counts(df[col])
+    return value_counts_by_column
 
 
 def to_string(var: str) -> str:
@@ -376,12 +478,16 @@ class TestCase(unittest.TestCase):
         test_name = self._get_test_name()
         _assert_equal(actual, expected, test_name, dir_name)
 
-    def check_string(self, actual: str, fuzzy_match: bool = False) -> None:
+    def check_string(
+        self, actual: str, fuzzy_match: bool = False, purify_text: bool = True
+    ) -> None:
         """
         Check the actual outcome of a test against the expected outcomes
         contained in the file and/or updates the golden reference file with the
         actual outcome.
 
+        :param: purify_text: remove some artifacts (e.g., user names,
+            directories, reference to Git client)
         Raises if there is an error.
         """
         dbg.dassert_in(type(actual), (bytes, str))
@@ -394,7 +500,8 @@ class TestCase(unittest.TestCase):
         file_name = self.get_output_dir() + "/test.txt"
         _LOG.debug("file_name=%s", file_name)
         # Remove reference from the current purify.
-        actual = purify_txt_from_client(actual)
+        if purify_text:
+            actual = purify_txt_from_client(actual)
         #
         if get_update_tests():
             # Update the test result.

@@ -1,6 +1,7 @@
 import io
 import json
 import logging
+import pprint
 from typing import Any, Callable, Dict, Tuple
 
 import matplotlib.pyplot as plt
@@ -266,6 +267,98 @@ class Test_config1(ut.TestCase):
         #
         config1.update(config2)
         self.check_string(str(config1))
+
+    def test_hierarchical_update_empty_nested_config1(self) -> None:
+        """
+        Generate a config of `{"key1": {"key0": }}` structure.
+        """
+        subconfig = cfg.Config()
+        subconfig.add_subconfig("key0")
+        #
+        config = cfg.Config()
+        config_tmp = config.add_subconfig("key1")
+        config_tmp.update(subconfig)
+        #
+        expected_result = cfg.Config()
+        config_tmp = expected_result.add_subconfig("key1")
+        config_tmp.add_subconfig("key0")
+        self.assertEqual(str(config), str(expected_result))
+
+    def test_config_with_function(self) -> None:
+        config = cfg.Config()
+        config[
+            "filters"
+        ] = "[(<function _filter_relevance at 0x7fe4e35b1a70>, {'thr': 90})]"
+        expected_result = "filters: [(<function _filter_relevance>, {'thr': 90})]"
+        actual_result = str(config)
+        self.assertEqual(actual_result, expected_result)
+
+    def test_flatten1(self) -> None:
+        config = cfg.Config()
+        #
+        config_tmp = config.add_subconfig("read_data")
+        config_tmp["file_name"] = "foo_bar.txt"
+        config_tmp["nrows"] = 999
+        #
+        config["single_val"] = "hello"
+        #
+        config_tmp = config.add_subconfig("zscore")
+        config_tmp["style"] = "gaz"
+        config_tmp["com"] = 28
+        #
+        flattened = config.flatten()
+        # TODO(*): `sort_dicts` param new in 3.8.
+        # string = pprint.pformat(flattened, sort_dicts=False)
+        string = pprint.pformat(flattened)
+        self.check_string(string)
+
+    def test_flatten2(self) -> None:
+        config = cfg.Config()
+        #
+        config_tmp = config.add_subconfig("read_data")
+        config_tmp["file_name"] = "foo_bar.txt"
+        config_tmp["nrows"] = 999
+        #
+        config["single_val"] = "hello"
+        #
+        config.add_subconfig("zscore")
+        #
+        flattened = config.flatten()
+        # TODO(*): `sort_dicts` param new in 3.8.
+        # string = pprint.pformat(flattened, sort_dicts=False)
+        string = pprint.pformat(flattened)
+        self.check_string(string)
+
+
+class Test_subtract_config1(ut.TestCase):
+    def test_test1(self) -> None:
+        config1 = cfg.Config()
+        config1[("l0",)] = "1st_floor"
+        config1[["l1", "l2"]] = "2nd_floor"
+        config1[["r1", "r2", "r3"]] = [1, 2]
+        #
+        config2 = cfg.Config()
+        config2["l0"] = "Euro_1nd_floor"
+        config2[["l1", "l2"]] = "2nd_floor"
+        config2[["r1", "r2", "r3"]] = [1, 2]
+        #
+        diff = cfg.subtract_config(config1, config2)
+        self.check_string(str(diff))
+
+    def test_test2(self) -> None:
+        config1 = cfg.Config()
+        config1[("l0",)] = "1st_floor"
+        config1[["l1", "l2"]] = "2nd_floor"
+        config1[["r1", "r2", "r3"]] = [1, 2, 3]
+        #
+        config2 = cfg.Config()
+        config2["l0"] = "Euro_1nd_floor"
+        config2[["l1", "l2"]] = "2nd_floor"
+        config2[["r1", "r2", "r3"]] = [1, 2]
+        config2["empty"] = cfg.Config()
+        #
+        diff = cfg.subtract_config(config1, config2)
+        self.check_string(str(diff))
 
 
 # #############################################################################

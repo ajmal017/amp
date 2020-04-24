@@ -4,8 +4,7 @@ Run a notebook given a config or a list of configs.
 
 Use example:
 > run_notebook.py --dst_dir nlp/test_results \
- --no_incremental \
- --notebook nlp/notebooks/PartTask1102_RP_Pipeline.ipynb \
+ --notebook nlp/notebooks/NLP_RP_pipeline.ipynb \
  --function "nlp.build_configs.build_PartTask1088_configs()" \
   --num_threads 2
 """
@@ -27,7 +26,6 @@ import helpers.parser as prsr
 import helpers.pickle_ as hpickle
 import helpers.printing as printing
 import helpers.system_interaction as si
-import nlp.build_configs as ncfgbld  # noqa: F401 # pylint: disable=unused-import
 
 _LOG = logging.getLogger(__name__)
 
@@ -80,6 +78,7 @@ def _run_notebook(
     dst_dir: str,
     config: cfg.Config,
     config_builder: str,
+    publish: bool,
 ) -> None:
     """
     Run a notebook for the particular config from a list.
@@ -92,6 +91,7 @@ def _run_notebook(
     :param dst_dir: Path to directory with results
     :param config: Config for the experiment
     :param config_builder: Function used to generate all configs
+    :param publish: publish notebook iff `True`
     :return:
     """
     dbg.dassert_exists(notebook_file)
@@ -105,6 +105,11 @@ def _run_notebook(
     config = ccfgbld.set_experiment_result_dir(experiment_result_dir, config)
     _LOG.info("experiment_result_dir=%s", experiment_result_dir)
     io_.create_dir(experiment_result_dir, incremental=True)
+    # If there is already a success file in the dir, skip the experiment.
+    file_name = os.path.join(experiment_result_dir, "success.txt")
+    if os.path.exists(file_name):
+        _LOG.warning("Found file '%s': skipping simulation run", file_name)
+        return
     # Generate book-keeping files.
     file_name = os.path.join(experiment_result_dir, "config.pkl")
     _LOG.info("file_name=%s", file_name)
@@ -149,15 +154,20 @@ def _run_notebook(
     )
     si.system(cmd, output_file=log_file)
     # Convert to html and publish.
-    _LOG.info("Converting notebook %s", i)
-    log_file = log_file.replace(".log", ".html.log")
-    cmd = (
-        "python amp/dev_scripts/notebooks/publish_notebook.py"
-        + f" --file {dst_file}"
-        + f" --subdir {html_subdir_name}"
-        + " --action publish"
-    )
-    si.system(cmd, output_file=log_file)
+    if publish:
+        _LOG.info("Converting notebook %s", i)
+        log_file = log_file.replace(".log", ".html.log")
+        cmd = (
+            "python amp/dev_scripts/notebooks/publish_notebook.py"
+            + f" --file {dst_file}"
+            + f" --subdir {html_subdir_name}"
+            + " --action publish"
+        )
+        si.system(cmd, output_file=log_file)
+    # Publish an empty file to indicate a successful finish.
+    file_name = os.path.join(experiment_result_dir, "success.txt")
+    _LOG.info("file_name=%s", file_name)
+    io_.to_file(file_name, "")
 
 
 def _main(parser: argparse.ArgumentParser) -> None:
@@ -174,7 +184,27 @@ def _main(parser: argparse.ArgumentParser) -> None:
     ccfgbld.assert_on_duplicated_configs(configs)
     configs = ccfgbld.add_result_dir(dst_dir, configs)
     configs = ccfgbld.add_config_idx(configs)
-    _LOG.info("Created %s configs", len(configs))
+    #
+    if args.index:
+        ind = int(args.index)
+        dbg.dassert_lte(0, ind)
+        dbg.dassert_lt(ind, len(configs))
+        _LOG.warning(
+            "Only config %s will be executed due to passing --index", ind
+        )
+        configs = [x for x in configs if int(x[("meta", "id")]) == ind]
+    elif args.start_from_index:
+        start_from_index = int(args.start_from_index)
+        dbg.dassert_lte(0, start_from_index)
+        dbg.dassert_lt(start_from_index, len(configs))
+        _LOG.warning(
+            "Only configs %s and higher will be executed due to passing --start_from_index",
+            start_from_index,
+        )
+        configs = [
+            x for x in configs if int(x[("meta", "id")]) >= start_from_index
+        ]
+    _LOG.info("Created %s config(s)", len(configs))
     if args.dry_run:
         _LOG.warning(
             "The following configs will not be executed due to passing --dry_run:"
@@ -187,21 +217,31 @@ def _main(parser: argparse.ArgumentParser) -> None:
     notebook_file = os.path.abspath(notebook_file)
     dbg.dassert_exists(notebook_file)
     #
+    publish = args.publish_notebook
+    #
     num_threads = args.num_threads
     if num_threads == "serial":
-        for i, config in tqdm.tqdm(enumerate(configs)):
+        for config in tqdm.tqdm(configs):
+            i = int(config[("meta", "id")])
             _LOG.debug("\n%s", printing.frame("Config %s" % i))
             #
-            _run_notebook(i, notebook_file, dst_dir, config, config_builder)
+            _run_notebook(
+                i, notebook_file, dst_dir, config, config_builder, publish
+            )
     else:
         num_threads = int(num_threads)
         # -1 is interpreted by joblib like for all cores.
         _LOG.info("Using %d threads", num_threads)
         joblib.Parallel(n_jobs=num_threads, verbose=50)(
             joblib.delayed(_run_notebook)(
-                i, notebook_file, dst_dir, config, config_builder
+                int(config[("meta", "id")]),
+                notebook_file,
+                dst_dir,
+                config,
+                config_builder,
+                publish
             )
-            for i, config in enumerate(configs)
+            for config in configs
         )
 
 
@@ -235,6 +275,14 @@ def _parse() -> argparse.ArgumentParser:
         "random_seed_variants=[911,2,42,0])",
     )
     parser.add_argument(
+        "--index", action="store", help="Run a single experiment",
+    )
+    parser.add_argument(
+        "--start_from_index",
+        action="store",
+        help="Run experiments starting from a specified index",
+    )
+    parser.add_argument(
         "--dry_run",
         action="store_true",
         help="Run a short sim to sanity check the flow",
@@ -244,6 +292,11 @@ def _parse() -> argparse.ArgumentParser:
         action="store",
         help="Number of threads to use (-1 to use all CPUs)",
         required=True,
+    )
+    parser.add_argument(
+        "--publish_notebook",
+        action="store_true",
+        help="Publish each notebook after it executes",
     )
     prsr.add_verbosity_arg(parser)
     return parser

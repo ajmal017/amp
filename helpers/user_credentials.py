@@ -90,6 +90,8 @@ def get_credentials() -> Dict[str, Any]:
     #
     user_name = si.get_user_name()
     server_name = si.get_server_name()
+    _LOG.debug("user_name='%s'", user_name)
+    _LOG.debug("server_name='%s'", server_name)
     git_repo_name = git.get_repo_symbolic_name(super_module=True)
     # Values to assign.
     git_user_name = ""
@@ -117,9 +119,9 @@ def get_credentials() -> Dict[str, Any]:
         # GP.
         git_user_name = "saggese"
         git_user_email = "saggese@gmail.com"
-        if server_name in ("gpmac.local", "gpmac.lan"):
+        if server_name in ("gpmac.local", "gpmac.lan", "giacintos-mbp.lan"):
             # Laptop.
-            conda_sh_path = "/anaconda3/etc/profile.d/conda.sh"
+            conda_sh_path = "/Users/saggese/opt/anaconda3/etc/profile.d/conda.sh"
             conda_env_path = "/Users/saggese/.conda/envs"
             if git_repo_name == "ParticleDev/commodity_research":
                 # Forward port 10003 to the notebook server that is started by
@@ -128,12 +130,6 @@ def get_credentials() -> Dict[str, Any]:
                 # tunnel_info.append(service)
                 # jupyter_port = 10001
                 pass
-            elif git_repo_name == "alphamatic/lemonade":
-                # TODO(gp): This should be factored out in the including
-                #  superproject.
-                jupyter_port = 9999
-                notebook_html_path = "/Users/saggese/src/notebooks"
-                notebook_backup_path = "/Users/saggese/src/notebooks/backup"
         elif server_name == "twitter-data":
             # P1 old server.
             if git_repo_name == "ParticleDev/commodity_research":
@@ -224,6 +220,15 @@ def get_credentials() -> Dict[str, Any]:
         # MaxParticle.
         git_user_name = "MaxParticle"
         git_user_email = "max@particle.one"
+    elif user_name == "asya":
+        # Asya.
+        git_user_name = "ultrasya"
+        git_user_email = "asya@particle.one"
+        jupyter_port = 9698
+        if server_name == "MacBook-Pro-Asa.local":
+            # Home laptop.
+            conda_sh_path = "/Users/asya/opt/anaconda3/etc/profile.d/conda.sh"
+            conda_env_path = "/Users/asya/.conda/envs"
     elif user_name == "jenkins":
         # Jenkins.
         # Jenkins should not commit so it doesn't neet Git credentials.
@@ -231,6 +236,13 @@ def get_credentials() -> Dict[str, Any]:
         git_user_email = ""
         conda_sh_path = "/anaconda3/etc/profile.d/conda.sh"
         conda_env_path = "/var/lib/jenkins/.conda/envs"
+    # We use this for #1522, #1831.
+    elif server_name == "docker-instance" or user_name == 'root':
+        # Docker user.
+        git_user_name = "infraparticleone"
+        git_user_email = "infra@particle.one"
+        conda_sh_path = "/opt/conda/etc/profile.d/conda.sh"
+        conda_env_path = "~/.conda/envs/"
     # Check.
     for var_name, val_name in [
         ("git_user_name", git_user_name),
@@ -277,6 +289,7 @@ def get_credentials() -> Dict[str, Any]:
         "notebook_html_path": notebook_html_path,
         "notebook_backup_path": notebook_backup_path,
     }
+    _LOG.debug("Credentials: %s", ret)
     return ret
 
 
