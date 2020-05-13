@@ -1297,6 +1297,7 @@ def display_df(
     """
     if isinstance(df, pd.Series):
         df = pd.DataFrame(df)
+    #
     dbg.dassert_type_is(df, pd.DataFrame)
     dbg.dassert_eq(
         hlist.find_duplicates(df.columns.tolist()),

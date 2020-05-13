@@ -32,61 +32,7 @@ _LOG = logging.getLogger(__name__)
 #   - etc.
 
 
-def plot_autocorrelation(
-    signal: Union[pd.DataFrame, pd.Series],
-    lags: int = 40,
-    scale_mode: str = "auto",
-) -> None:
-    """
-    Plot autocorrelation and partial autocorrelation of series.
-    """
-    dbg.dassert_lte(1, lags)
-    fig = plt.figure(figsize=(12, 8))
-    if scale_mode == "auto":
-        pass
-    elif scale_mode == "fixed":
-        plt.ylim(-1, 1)
-    else:
-        raise ValueError("scale_mode='%s' is not supported" % scale_mode)
-    ax1 = fig.add_subplot(211)
-    # Exclude lag zero so that the y-axis does not get squashed.
-    fig = sm.graphics.tsa.plot_acf(signal, lags=lags, ax=ax1, zero=False)
-    ax2 = fig.add_subplot(212)
-    fig = sm.graphics.tsa.plot_pacf(signal, lags=lags, ax=ax2, zero=False)
-
-
-def plot_power_spectral_density(signal: Union[pd.DataFrame, pd.Series]) -> None:
-    """
-    Estimate the power spectral density using Welch's method.
-
-    Related to autocorrelation via the Fourier transform (Wiener-Khinchin).
-    """
-    freqs, psd = sp.signal.welch(signal)
-    plt.figure(figsize=(5, 4))
-    plt.semilogx(freqs, psd)
-    plt.title("PSD: power spectral density")
-    plt.xlabel("Frequency")
-    plt.ylabel("Power")
-    plt.tight_layout()
-
-
-def plot_spectrogram(signal: Union[pd.DataFrame, pd.Series]) -> None:
-    """
-    Plot spectrogram of signal.
-
-    From the scipy documentation of spectrogram:
-        "Spectrograms can be used as a way of visualizing the change of a
-         nonstationary signal's frequency content over time."
-    """
-    _, _, spectrogram = sp.signal.spectrogram(signal)
-    plt.figure(figsize=(5, 4))
-    plt.imshow(spectrogram, aspect="auto", cmap="hot_r", origin="lower")
-    plt.title("Spectrogram")
-    plt.ylabel("Frequency band")
-    plt.xlabel("Time window")
-    plt.tight_layout()
-
-
+# TODO(*): Deprecate. Keep for now as a nice way to arrange subplots.
 def plot_wavelet_levels(
     signal: Union[pd.DataFrame, pd.Series], wavelet_name: str, levels: int
 ) -> None:
@@ -146,23 +92,6 @@ def filter_low_pass(
         rec = rec[1:]
     reconstructed_signal = pd.Series(rec, index=signal.index)
     return reconstructed_signal
-
-
-def plot_low_pass(
-    signal: Union[pd.DataFrame, pd.Series], wavelet_name: str, threshold: float
-) -> None:
-    """
-    Overlay signal with result of filter_low_pass().
-    """
-    _, ax = plt.subplots(figsize=(12, 8))
-    ax.plot(signal, color="b", alpha=0.5, label="original signal")
-    rec = filter_low_pass(signal, wavelet_name, threshold)
-    ax.plot(rec, "k", label="DWT smoothing}", linewidth=2)
-    ax.legend()
-    ax.set_title("Removing High Frequency Noise with DWT", fontsize=18)
-    ax.set_ylabel("Signal Amplitude", fontsize=16)
-    ax.set_xlabel("Sample", fontsize=16)
-    plt.show()
 
 
 def plot_scaleogram(
@@ -293,6 +222,44 @@ def plot_crosscorrelation(
 # #############################################################################
 
 
+def compute_jensen_ratio(signal: pd.Series, p_norm: float = 2) -> float:
+    """
+    Calculate a ratio >= 1 with equality only when Jensen's inequality holds.
+
+    Definition and derivation:
+      - The result is the p-th root of the expectation of the p-th power of
+        abs(f), divided by the expectation of abs(f). If we apply Jensen's
+        inequality to (abs(signal)**p)**(1/p), renormalizing the lower bound to
+        1, then the upper bound is the valued calculated by this function.
+      - An alternative derivation is to apply Holder's inequality to `signal`,
+        using the constant function `1` on the support of the `signal` as the
+        2nd function.
+
+    Interpretation:
+      - If we apply this function to returns in the case where the expected
+        value of returns is 0 and we take p_norm = 2, then the result of this
+        function can be interpreted as a renormalized realized volatility.
+      - For a Gaussian signal, the expected value is np.sqrt(np.pi / 2), which
+        is approximately 1.25. This holds regardless of the volatility of the
+        Gaussian (so the measure is scale invariant).
+      - For a stationary function, the expected value does not change with
+        sampled series length.
+      - For a signal that is t-distributed with 4 dof, the expected value is
+        approximately 1.41.
+    """
+    # Require that we evaluate a norm.
+    dbg.dassert_lte(1, p_norm)
+    # TODO(*): Maybe add l-infinity support. For many stochastic signals, we
+    # should not expect a finite value.
+    dbg.dassert(np.isfinite(p_norm))
+    data = signal.dropna()
+    lp = sp.linalg.norm(data, ord=p_norm)
+    l1 = sp.linalg.norm(data, ord=1)
+    # Ignore support where `signal` has NaNs.
+    const = data.size ** (1 - 1 / p_norm)
+    return const * lp / l1
+
+
 def compute_forecastability(signal: pd.Series, mode: str = "welch") -> float:
     r"""
     Compute frequency-domain-based "forecastability" of signal.
@@ -314,6 +281,7 @@ def compute_forecastability(signal: pd.Series, mode: str = "welch") -> float:
     """
     dbg.dassert_isinstance(signal, pd.Series)
     dbg.dassert_isinstance(mode, str)
+    signal = signal.ffill(0).dropna()
     if mode == "welch":
         _, psd = sp.signal.welch(signal)
     elif mode == "periodogram":
@@ -933,18 +901,24 @@ def compute_rolling_zcorr(
 
 def process_outliers(
     srs: pd.Series,
-    window: int,
     mode: str,
     lower_quantile: float,
     upper_quantile: Optional[float] = None,
+    window: Optional[int] = None,
     min_periods: Optional[int] = None,
     info: Optional[dict] = None,
 ) -> pd.Series:
     """
     Process outliers in different ways given lower / upper quantiles.
 
+    Default behavior:
+    - if `min_periods` is `None` and `window` is `None`, set `min_periods` to
+      `0`
+    - if `min_periods` is `None` and `window` is not `None`, set `min_periods`
+       to `window`
+    - if `window` is `None`, set `window` to series length
+
     :param srs: pd.Series to process
-    :param window: rolling window size
     :param lower_quantile: lower quantile (in range [0, 1]) of the values to keep
         The interval of data kept without any changes is [lower, upper]. In other
         terms the outliers with quantiles strictly smaller and larger than the
@@ -953,6 +927,7 @@ def process_outliers(
         lower_quantile. If `None`, the quantile symmetric of the lower quantile
         with respect to 0.5 is taken. E.g., an upper quantile equal to 0.7 is
         taken for a lower_quantile = 0.3
+    :param window: rolling window size
     :param min_periods: minimum number of observations in window required to
         calculate the quantiles. The first `min_periods` values will not be
         processed. If `None`, defaults to `window`.
@@ -970,11 +945,17 @@ def process_outliers(
         upper_quantile = 1.0 - lower_quantile
     dbg.dassert_lte(lower_quantile, upper_quantile)
     dbg.dassert_lte(upper_quantile, 1.0)
+    # Process default `min_periods` and `window` parameters.
+    if min_periods is None:
+        if window is None:
+            min_periods = 0
+        else:
+            min_periods = window
+    if window is None:
+        window = srs.shape[0]
     if window < 30:
         _LOG.warning("`window`=`%s` < `30`", window)
-    if min_periods is None:
-        _LOG.warning("No `min_periods` specified, using default `None`.")
-    if min_periods is not None and min_periods > window:
+    if min_periods > window:
         _LOG.warning("`min_periods`=`%s` > `window`=`%s`", min_periods, window)
     # Compute bounds.
     l_bound = srs.rolling(window, min_periods=min_periods, center=False).quantile(
@@ -1037,10 +1018,10 @@ def process_outliers(
 
 def process_outlier_df(
     df: pd.DataFrame,
-    window: int,
     mode: str,
     lower_quantile: float,
     upper_quantile: Optional[float] = None,
+    window: Optional[int] = None,
     min_periods: Optional[int] = None,
     info: Optional[dict] = None,
 ) -> pd.DataFrame:
@@ -1062,10 +1043,10 @@ def process_outlier_df(
             maybe_stats = None
         srs = process_outliers(
             df[col],
-            window,
             mode,
             lower_quantile,
             upper_quantile=upper_quantile,
+            window=window,
             min_periods=min_periods,
             info=maybe_stats,
         )
@@ -1212,4 +1193,205 @@ def compute_eigenvector_diffs(eigenvecs: List[pd.DataFrame]) -> pd.DataFrame:
         srs.name = i
         ang_chg.append(srs)
     df = pd.concat(ang_chg, axis=1)
+    return df
+
+
+# #############################################################################
+# Trend + Residual decomposition
+# #############################################################################
+
+
+def get_trend_residual_decomp(
+    signal: pd.Series,
+    tau: float,
+    min_periods: int = 0,
+    min_depth: int = 1,
+    max_depth: int = 1,
+    nan_mode: Optional[str] = None,
+) -> pd.DataFrame:
+    """
+    Decompose a signal into trend + residual.
+
+    - The `trend` warm-up period is set by `min_periods`
+    - If `min_periods` is positive, then leading values of `trend` are NaN
+      - If `nan_mode = "propagate"`, then `residual` and `trend` are Nan
+        whenever at least one is
+      - If `nan_mode = "restore_to_residual", then `residual` is always non-NaN
+        whenever `residual` is
+        - E.g., so, in particular, during any `trend` warm-up period,
+          `signal = residual` and `signal = trend + residual` always holds
+        - However, when the warm-up phase ends, `residual` may experience a
+          large jump
+
+    :return: dataframe with columns "trend" and "residual", indexed like
+        "signal"
+    """
+    if nan_mode is None:
+        nan_mode = "propagate"
+    signal_ma = compute_smooth_moving_average(
+        signal, tau, min_periods, min_depth, max_depth
+    )
+    df = pd.DataFrame(index=signal.index)
+    df["trend"] = signal_ma
+    detrended = signal - signal_ma
+    if nan_mode == "restore_to_residual":
+        # Restore `signal` values if `detrended` is NaN due to detrending artifacts
+        # (e.g., from setting `min_periods`).
+        detrended.loc[detrended.isna()] = signal
+    elif nan_mode == "propagate":
+        pass
+    else:
+        raise ValueError(f"Unrecognized nan_mode `{nan_mode}`")
+    df["residual"] = detrended
+    return df
+
+
+# #############################################################################
+# Discrete wavelet transform
+# #############################################################################
+
+
+def get_swt(
+    sig: pd.Series, wavelet: str, mode: Optional[str] = None
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Get stationary wt details and smooths for all available scales.
+
+    If sig.index.freq == "B", then there is the following rough correspondence
+    between wavelet levels and time scales:
+      weekly ~ 2-3
+      monthly ~ 4-5
+      quarterly ~ 6
+      annual ~ 8
+      business cycle ~ 11
+
+    If sig.index.freq == "T", then the approximate scales are:
+      5 min ~ 2-3
+      quarter hourly ~ 4
+      hourly ~ 6
+      daily ~ 10-11
+
+    :param sig: input signal
+    :param wavelet: pywt wavelet name, e.g., "db8"
+    :param mode: supported modes are
+        - "knowledge_time":
+            - reindex transform according to knowledge times
+            - remove warm-up artifacts
+        - "zero_phase":
+            - no reindexing (e.g., no phase lag in output, but transform
+              timestamps are not necessarily knowledge times)
+            - remove warm-up artifacts
+        - "raw": `pywt.swt` as-is
+    :return: (smooth_df, detail_df)
+    """
+    # Choice of wavelet may significantly impact results.
+    _LOG.debug("wavelet=`%s`", wavelet)
+    # Convert to numpy and pad, since the pywt swt implementation
+    # requires that the input be a power of 2 in length.
+    sig_len = sig.size
+    padded = _pad_to_pow_of_2(sig.values)
+    # Perform the wavelet decomposition.
+    decomp = pywt.swt(padded, wavelet=wavelet, norm=True)
+    # Ensure we have at least one level.
+    levels = len(decomp)
+    _LOG.debug("levels=%d", levels)
+    dbg.dassert_lt(0, levels)
+    # Reorganize wavelet coefficients. `pywt.swt` output is of the form
+    #     [(cAn, cDn), ..., (cA2, cD2), (cA1, cD1)]
+    smooth, detail = zip(*reversed(decomp))
+    # Reorganize `swt` output into a dataframe
+    # - columns indexed by `int` wavelet level (1 up to `level`)
+    # - index identical to `sig.index` (padded portion deleted)
+    detail_dict = {}
+    smooth_dict = {}
+    for level in range(1, levels + 1):
+        detail_dict[level] = detail[level - 1][:sig_len]
+        smooth_dict[level] = smooth[level - 1][:sig_len]
+    detail_df = pd.DataFrame.from_dict(data=detail_dict)
+    detail_df.index = sig.index
+    smooth_df = pd.DataFrame.from_dict(data=smooth_dict)
+    smooth_df.index = sig.index
+    # Record wavelet width (required for removing warm-up artifacts).
+    width = len(pywt.Wavelet(wavelet).filter_bank[0])
+    _LOG.debug("wavelet width=%s", width)
+    if mode is None:
+        mode = "knowledge_time"
+    _LOG.debug("mode=`%s`", mode)
+    if mode == "knowledge_time":
+        for j in range(1, levels + 1):
+            # Remove "warm-up" artifacts.
+            _set_warmup_region_to_nan(detail_df[j], width, j)
+            _set_warmup_region_to_nan(smooth_df[j], width, j)
+            # Index by knowledge time.
+            detail_df[j] = _reindex_by_knowledge_time(detail_df[j], width, j)
+            smooth_df[j] = _reindex_by_knowledge_time(smooth_df[j], width, j)
+    elif mode == "zero_phase":
+        for j in range(1, levels + 1):
+            # Delete "warm-up" artifacts.
+            _set_warmup_region_to_nan(detail_df[j], width, j)
+            _set_warmup_region_to_nan(smooth_df[j], width, j)
+    elif mode == "raw":
+        return smooth_df, detail_df
+    else:
+        raise ValueError(f"Unsupported mode `{mode}`")
+    # Drop columns that are all-NaNs (e.g., artifacts of padding).
+    smooth_df.dropna(how="all", axis=1, inplace=True)
+    detail_df.dropna(how="all", axis=1, inplace=True)
+    return smooth_df, detail_df
+
+
+def _pad_to_pow_of_2(arr: np.array) -> np.array:
+    """
+    Minimally extend `arr` with zeros so that len is a power of 2.
+    """
+    sig_len = arr.shape[0]
+    _LOG.debug("signal length=%d", sig_len)
+    pow2_ceil = int(2 ** np.ceil(np.log2(sig_len)))
+    padded = np.pad(arr, (0, pow2_ceil - sig_len))
+    _LOG.debug("padded length=%d", len(padded))
+    return padded
+
+
+def _set_warmup_region_to_nan(srs: pd.Series, width: int, level: int) -> None:
+    """
+    Remove warm-up artifacts by setting to `NaN`.
+
+    NOTE: Modifies `srs` in-place.
+
+    :srs: swt
+    :width: width (length of support of mother wavelet)
+    :level: wavelet level
+    """
+    srs[: width * 2 ** (level - 1) - width // 2] = np.nan
+
+
+def _reindex_by_knowledge_time(
+    srs: pd.Series, width: int, level: int
+) -> pd.Series:
+    """
+    Shift series so that indexing is according to knowledge time.
+
+    :srs: swt
+    :width: width (length of support of mother wavelet)
+    :level: wavelet level
+    """
+    return srs.shift(width * 2 ** (level - 1) - width // 2)
+
+
+def get_dyadic_zscored(
+    sig: pd.Series, demean: bool = False, **kwargs: Any
+) -> pd.DataFrame:
+    """
+    Z-score `sig` with successive powers of 2.
+
+    :return: dataframe with cols named according to the exponent of 2. Number
+        of cols is determined based on signal length.
+    """
+    pow2_ceil = int(np.ceil(np.log2(sig.size)))
+    zscored = {}
+    for tau_pow in range(1, pow2_ceil):
+        zscored[tau_pow] = compute_rolling_zscore(
+            sig, tau=2 ** tau_pow, demean=demean, **kwargs
+        )
+    df = pd.DataFrame.from_dict(zscored)
     return df
