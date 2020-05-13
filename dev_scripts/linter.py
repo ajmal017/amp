@@ -261,7 +261,9 @@ def _get_files_to_lint(
     #
     _LOG.debug("file_names=(%s) %s", len(file_names), " ".join(file_names))
     if len(file_names) < 1:
-        _LOG.warning("No files that can be linted are specified")
+        msg = "No files that can be linted are specified"
+        _LOG.error(msg)
+        raise ValueError(msg)
     return file_names
 
 
@@ -734,7 +736,6 @@ class _Pydocstyle(_Action):
                     # D103: Missing docstring in public function
                     "D103",
                     # D104: Missing docstring in public package
-                    # (i.e., in __init__.py)
                     "D104",
                     # D107: Missing docstring in __init__
                     "D107",
@@ -1446,19 +1447,7 @@ _VALID_ACTIONS_META: List[Tuple[str, str, str, Type[_Action]]] = [
     # Superseded by black.
     # ("yapf", "w", "Formatter for Python code", _Yapf),
     ("black", "w", "The uncompromising code formatter", _Black),
-    ("flake8", "r", "Tool for style guide enforcement", _Flake8),
-    # (flake8-bugbear: 19.8.0, mccabe: 0.6.1, naming: 0.9.1, pycodestyle: 2.5.0, pyflakes: 2.1.1)
-    # --max-complexity=10
-    # Stand-alone
-    #
-    # flake8 plugins
-    # https://github.com/PyCQA/pep8-naming
-    #   Check your code against PEP 8 naming conventions.
-    # https://github.com/PyCQA/flake8-docstrings
-    #   Run pydocstyle inside flake8 (not needed)
-    # https://github.com/PyCQA/flake8-bugbear
-    # pyflake, like pylint, pychecker
-    # https://realpython.com/python-code-quality/
+    ("flake8", "r", "Tool For Style Guide Enforcement", _Flake8),
     ("pydocstyle", "r", "Docstring style checker", _Pydocstyle),
     # TODO(gp): Fix this.
     # Not installable through conda.
@@ -1881,6 +1870,4 @@ if __name__ == "__main__":
                 "Detected that some files were changed so returning -1 as per "
                 "the option `--post_check`"
             )
-        else:
-            rc_ = 0
     sys.exit(rc_)
