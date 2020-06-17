@@ -15,6 +15,7 @@ import pywt
 import scipy as sp
 import statsmodels.api as sm
 
+import helpers.dataframe as hdf
 import helpers.dbg as dbg
 
 _LOG = logging.getLogger(__name__)
@@ -215,136 +216,6 @@ def plot_crosscorrelation(
 
 
 # TODO(Paul): Add coherence plotting function.
-
-
-# #############################################################################
-# Metrics
-# #############################################################################
-
-
-def compute_jensen_ratio(
-    signal: pd.Series,
-    p_norm: float = 2,
-    inf_mode: Optional[str] = None,
-    nan_mode: Optional[str] = None,
-) -> float:
-    """
-    Calculate a ratio >= 1 with equality only when Jensen's inequality holds.
-
-    Definition and derivation:
-      - The result is the p-th root of the expectation of the p-th power of
-        abs(f), divided by the expectation of abs(f). If we apply Jensen's
-        inequality to (abs(signal)**p)**(1/p), renormalizing the lower bound to
-        1, then the upper bound is the valued calculated by this function.
-      - An alternative derivation is to apply Holder's inequality to `signal`,
-        using the constant function `1` on the support of the `signal` as the
-        2nd function.
-
-    Interpretation:
-      - If we apply this function to returns in the case where the expected
-        value of returns is 0 and we take p_norm = 2, then the result of this
-        function can be interpreted as a renormalized realized volatility.
-      - For a Gaussian signal, the expected value is np.sqrt(np.pi / 2), which
-        is approximately 1.25. This holds regardless of the volatility of the
-        Gaussian (so the measure is scale invariant).
-      - For a stationary function, the expected value does not change with
-        sampled series length.
-      - For a signal that is t-distributed with 4 dof, the expected value is
-        approximately 1.41.
-    """
-    dbg.dassert_isinstance(signal, pd.Series)
-    # Require that we evaluate a norm.
-    dbg.dassert_lte(1, p_norm)
-    # TODO(*): Maybe add l-infinity support. For many stochastic signals, we
-    # should not expect a finite value in the continuous limit.
-    dbg.dassert(np.isfinite(p_norm))
-    # Set reasonable defaults for inf and nan modes.
-    if inf_mode is None:
-        inf_mode = "return_nan"
-    if nan_mode is None:
-        nan_mode = "ignore"
-    # Handle NaNs.
-    if nan_mode == "ignore":
-        data = signal.dropna()
-    elif nan_mode == "ffill":
-        data = signal.ffill().dropna()
-    elif nan_mode == "strict":
-        if signal.isna().any():
-            raise ValueError(f"NaNs detected in nan_mode `{nan_mode}`")
-    else:
-        raise ValueError(f"Unrecognized nan_mode `{nan_mode}`")
-    dbg.dassert(not data.isna().any())
-    # Handle infs.
-    has_infs = (~data.apply(np.isfinite)).any()
-    if has_infs:
-        if inf_mode == "return_nan":
-            # According to a strict interpretation, each norm is infinite, and
-            # and so their quotient is undefined.
-            return np.nan
-        elif inf_mode == "ignore":
-            # Replace inf values with np.nan and drop.
-            data = data.replace([-np.inf, np.inf], np.nan).dropna()
-        else:
-            raise ValueError(f"Unrecognized inf_mode `{inf_mode}")
-    dbg.dassert(data.apply(np.isfinite).all())
-    # Return NaN if there is no data.
-    if data.size == 0:
-        return np.nan
-    # Calculate norms.
-    lp = sp.linalg.norm(data, ord=p_norm)
-    l1 = sp.linalg.norm(data, ord=1)
-    # Ignore support where `signal` has NaNs.
-    scaled_support = data.size ** (1 - 1 / p_norm)
-    return scaled_support * lp / l1
-
-
-def compute_forecastability(
-    signal: pd.Series, mode: str = "welch", nan_mode: Optional[str] = None
-) -> float:
-    r"""
-    Compute frequency-domain-based "forecastability" of signal.
-
-    Reference: https://arxiv.org/abs/1205.4591
-
-    `signal` is assumed to be second-order stationary.
-
-    Denote the forecastability estimator by \Omega(\cdot).
-    Let x_t, y_t be time series. Properties of \Omega include:
-    a) \Omega(y_t) = 0 iff y_t is white noise
-    b) scale and shift-invariant:
-         \Omega(a y_t + b) = \Omega(y_t) for real a, b, a \neq 0.
-    c) max sub-additivity for uncorrelated processes:
-         \Omega(\alpha x_t + \sqrt{1 - \alpha^2} y_t) \leq
-         \max\{\Omega(x_t), \Omega(y_t)\},
-       if \E(x_t y_s) = 0 for all s, t \in \Z;
-       equality iff alpha \in \{0, 1\}.
-    """
-    dbg.dassert_isinstance(signal, pd.Series)
-    if nan_mode is None:
-        nan_mode = "fill_with_zero"
-    # Handle NaNs
-    if nan_mode == "fill_with_zero":
-        signal = signal.fillna(0)
-    elif nan_mode == "ffill":
-        signal = signal.ffill().dropna()
-    elif nan_mode == "strict":
-        if signal.hasna().any():
-            raise ValueError(f"NaNs detected in nan_mode `{nan_mode}`")
-    else:
-        raise ValueError(f"Unrecognized nan_mode `{nan_mode}")
-    # Return NaN if there is no data.
-    if signal.size == 0:
-        return np.nan
-    if mode == "welch":
-        _, psd = sp.signal.welch(signal)
-    elif mode == "periodogram":
-        # TODO(Paul): Maybe log a warning about inconsistency of periodogram
-        #     for estimating power spectral density.
-        _, psd = sp.signal.periodogram(signal)
-    else:
-        raise ValueError("Unsupported mode=`%s`" % mode)
-    forecastability = 1 - sp.stats.entropy(psd, base=psd.size)
-    return forecastability
 
 
 # #############################################################################
@@ -591,19 +462,22 @@ def compute_smooth_derivative(
     signal: Union[pd.DataFrame, pd.Series],
     tau: float,
     min_periods: int,
-    scaling: int = 0,
+    scaling: int = 1,
     order: int = 1,
 ) -> Union[pd.DataFrame, pd.Series]:
     r"""
+    Compute a "low-noise" differential operator.
+
     'Low-noise' differential operator as in 3.3.9 of Dacorogna, et al.
 
-    Compute difference of around time "now" over a time interval \tau_1
-    and an average around time "now - \tau" over a time interval \tau_2.
-    Here, \tau_1, \tau_2 are taken to be approximately \tau / 2.
+    - Computes difference of around time "now" over a time interval \tau_1 and
+      an average around time "now - \tau" over a time interval \tau_2
+    - Here, \tau_1, \tau_2 are taken to be approximately `tau`/ 2
 
-    The normalization factors are chosen so that the differential of a constant
-    is zero and so that the differential of 't' is approximately \tau (for
-    order = 0).
+    The normalization factors are chosen so that
+      - the differential of a constant is zero
+      - the differential (`scaling` = 0) of `t` is approximately `tau`
+      - the derivative (`order` = 1) of `t` is approximately 1
 
     The `scaling` parameter refers to the exponential weighting of inverse
     tau.
@@ -850,10 +724,39 @@ def compute_rolling_kurtosis(
 # #############################################################################
 
 
+def compute_rolling_annualized_sharpe_ratio(
+    signal: Union[pd.DataFrame, pd.Series],
+    tau: float,
+    min_periods: int = 2,
+    min_depth: int = 1,
+    max_depth: int = 1,
+    p_moment: float = 2,
+) -> Union[pd.DataFrame, pd.Series]:
+    """
+    Compute rolling annualized Sharpe ratio and standard error.
+
+    The standard error adjustment uses the range of the smooth moving average
+    kernel as an estimate of the "number of data points" used in the
+    calculation of the Sharpe ratio.
+    """
+    ppy = hdf.infer_sampling_points_per_year(signal)
+    sr = compute_rolling_sharpe_ratio(
+        signal, tau, min_periods, min_depth, max_depth, p_moment
+    )
+    # TODO(*): May need to rescale denominator by a constant.
+    se_sr = np.sqrt((1 + (sr ** 2) / 2) / (tau * max_depth))
+    rescaled_sr = np.sqrt(ppy) * sr
+    rescaled_se_sr = np.sqrt(ppy) * se_sr
+    df = pd.DataFrame(index=signal.index)
+    df["annualized_SR"] = rescaled_sr
+    df["annualized_SE(SR)"] = rescaled_se_sr
+    return df
+
+
 def compute_rolling_sharpe_ratio(
     signal: Union[pd.DataFrame, pd.Series],
     tau: float,
-    min_periods: int = 0,
+    min_periods: int = 2,
     min_depth: int = 1,
     max_depth: int = 1,
     p_moment: float = 2,
@@ -965,11 +868,24 @@ def process_outliers(
     Process outliers in different ways given lower / upper quantiles.
 
     Default behavior:
-    - if `min_periods` is `None` and `window` is `None`, set `min_periods` to
-      `0`
-    - if `min_periods` is `None` and `window` is not `None`, set `min_periods`
-       to `window`
-    - if `window` is `None`, set `window` to series length
+      - If `window` is `None`, set `window` to series length
+        - This works like an expanding window (we always look at the full
+          history, except for anything burned by `min_periods`)
+      - If `min_periods` is `None` and `window` is `None`, set `min_periods` to
+        `0`
+        - Like an expanding window with no data burned
+      - If `min_periods` is `None` and `window` is not `None`, set `min_periods`
+        to `window`
+        - This is a sliding window with leading data burned so that every
+          estimate uses a full window's worth of data
+
+    Note:
+      - If `window` is set to `None` according to these conventions (i.e., we
+        are in an "expanding window" mode), then outlier effects are never
+        "forgotten" and the processing of the data can depend strongly upon
+        where the series starts
+      - For this reason, it is suggested that `window` be set to a finite value
+        adapted to the data/frequency
 
     :param srs: pd.Series to process
     :param lower_quantile: lower quantile (in range [0, 1]) of the values to keep
@@ -1118,31 +1034,55 @@ def process_outlier_df(
     return ret
 
 
+def process_nonfinite(
+    srs: pd.Series,
+    remove_nan: bool = True,
+    remove_inf: bool = True,
+    info: Optional[dict] = None,
+) -> pd.Series:
+    """
+    Remove infinite and NaN values according to the parameters.
+
+    :param srs: pd.Series to process
+    :param remove_nan: remove NaN values if True and keep if False
+    :param remove_inf: remove infinite values if True and keep if False
+    :param info: empty dict-like object that this function will populate with
+        statistics about how many items were removed
+    :return: transformed copy of the input series
+    """
+    dbg.dassert_isinstance(srs, pd.Series)
+    nan_mask = np.isnan(srs)
+    inf_mask = np.isinf(srs)
+    nan_inf_mask = nan_mask | inf_mask
+    # Make a copy of input that will be processed
+    if remove_nan & remove_inf:
+        res = srs[~nan_inf_mask].copy()
+    elif remove_nan & ~remove_inf:
+        res = srs[~nan_mask].copy()
+    elif ~remove_nan & remove_inf:
+        res = srs[~inf_mask].copy()
+    else:
+        res = srs.copy()
+    if info is not None:
+        dbg.dassert_isinstance(info, dict)
+        # Dictionary should be empty.
+        dbg.dassert(not info)
+        info["series_name"] = srs.name
+        info["num_elems_before"] = len(srs)
+        info["num_nans_before"] = np.isnan(srs).sum()
+        info["num_infs_before"] = np.isinf(srs).sum()
+        info["num_elems_removed"] = len(srs) - len(res)
+        info["num_nans_removed"] = info["num_nans_before"] - np.isnan(res).sum()
+        info["num_infs_removed"] = info["num_infs_before"] - np.isinf(res).sum()
+        info["percentage_elems_removed"] = (
+            100.0 * info["num_elems_removed"] / info["num_elems_before"]
+        )
+    return res
+
+
 # #############################################################################
 # Incremental PCA
 # #############################################################################
-
-
-def compute_ipca_step(
-    u: pd.Series, v: pd.Series, alpha: float
-) -> Tuple[pd.Series, pd.Series]:
-    """
-    Single step of incremental PCA.
-
-    At each point, the norm of v is the eigenvalue estimate (for the component
-    to which u and v refer).
-
-    :param u: residualized observation for step n, component i
-    :param v: unnormalized eigenvector estimate for step n - 1, component i
-    :param alpha: compute_ema-type weight (choose in [0, 1] and typically < 0.5)
-
-    :return: (u_next, v_next), where
-      * u_next is residualized observation for step n, component i + 1
-      * v_next is unnormalized eigenvector estimate for step n, component i
-    """
-    v_next = (1 - alpha) * v + alpha * u * np.dot(u, v) / np.linalg.norm(v)
-    u_next = u - np.dot(u, v) * v / (np.linalg.norm(v) ** 2)
-    return u_next, v_next
 
 
 def compute_ipca(
@@ -1151,13 +1091,16 @@ def compute_ipca(
     """
     Incremental PCA.
 
-    df should already be centered.
+    The dataframe should already be centered.
 
     https://ieeexplore.ieee.org/document/1217609
     https://www.cse.msu.edu/~weng/research/CCIPCApami.pdf
 
-    :return: df of eigenvalue series (col 0 correspond to max eigenvalue, etc.).
-        list of dfs of unit eigenvectors (0 indexes df eigenvectors
+    :param num_pc: number of principal components to calculate
+    :param alpha: analogous to Pandas ewm's `alpha`
+    :return:
+      - df of eigenvalue series (col 0 correspond to max eigenvalue, etc.).
+      - list of dfs of unit eigenvectors (0 indexes df eigenvectors
         corresponding to max eigenvalue, etc.).
     """
     dbg.dassert_isinstance(
@@ -1199,7 +1142,7 @@ def compute_ipca(
                 unit_eigenvecs.append([v / norm])
             else:
                 # Main update step for eigenvector i.
-                u, v = compute_ipca_step(ul[-1], vsl[i - 1][-1], alpha)
+                u, v = _compute_ipca_step(ul[-1], vsl[i - 1][-1], alpha)
                 # Bookkeeping.
                 u.name = n
                 v.name = n
@@ -1220,10 +1163,34 @@ def compute_ipca(
     return lambda_df, unit_eigenvec_dfs
 
 
+def _compute_ipca_step(
+    u: pd.Series, v: pd.Series, alpha: float
+) -> Tuple[pd.Series, pd.Series]:
+    """
+    Single step of incremental PCA.
+
+    At each point, the norm of v is the eigenvalue estimate (for the component
+    to which u and v refer).
+
+    :param u: residualized observation for step n, component i
+    :param v: unnormalized eigenvector estimate for step n - 1, component i
+    :param alpha: compute_ema-type weight (choose in [0, 1] and typically < 0.5)
+
+    :return: (u_next, v_next), where
+      * u_next is residualized observation for step n, component i + 1
+      * v_next is unnormalized eigenvector estimate for step n, component i
+    """
+    v_next = (1 - alpha) * v + alpha * u * np.dot(u, v) / np.linalg.norm(v)
+    u_next = u - np.dot(u, v) * v / (np.linalg.norm(v) ** 2)
+    return u_next, v_next
+
+
 def compute_unit_vector_angular_distance(df: pd.DataFrame) -> pd.Series:
     """
-    Accept a df of unit eigenvectors (rows) and returns a series with angular
-    distance from index i to index i + 1.
+    Calculate the angular distance between unit vectors.
+
+    Accepts a df of unit vectors (each row a unit vector) and returns a series
+    of consecutive angular distances indexed according to the later time point.
 
     The angular distance lies in [0, 1].
     """
@@ -1238,7 +1205,7 @@ def compute_unit_vector_angular_distance(df: pd.DataFrame) -> pd.Series:
 
 def compute_eigenvector_diffs(eigenvecs: List[pd.DataFrame]) -> pd.DataFrame:
     """
-    Take a list of eigenvectors and returns a df of angular distances.
+    Take a list of eigenvectors and return a df of angular distances.
     """
     ang_chg = []
     for i, vec in enumerate(eigenvecs):

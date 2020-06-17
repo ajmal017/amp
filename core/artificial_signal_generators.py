@@ -5,16 +5,11 @@ import core.artificial_signal_generators as sig_gen
 """
 
 import logging
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
-# TODO(*): Disabled because of PartTask186.
-# import gluonts
-# import gluonts.dataset.artificial as gda
-# import gluonts.dataset.artificial.recipe as rcp
-# import gluonts.dataset.repository.datasets as gdrd  # isort: skip # noqa: F401 # pylint: disable=unused-import
-# import gluonts.dataset.util as gdu  # isort: skip # noqa: F401 # pylint: disable=unused-import
 import numpy as np
 import pandas as pd
+import scipy as sp
 
 # import statsmodels as sm
 import statsmodels.api as sm
@@ -27,129 +22,132 @@ import helpers.dbg as dbg
 
 _LOG = logging.getLogger(__name__)
 
+# TODO(gp): Remove after PartTask2335.
+if True:
+    import gluonts
+    import gluonts.dataset.artificial as gda
+    import gluonts.dataset.artificial.recipe as rcp
+    import gluonts.dataset.repository.datasets as gdrd  # isort: skip # noqa: F401 # pylint: disable=unused-import
+    import gluonts.dataset.util as gdu  # isort: skip # noqa: F401 # pylint: disable=unused-import
 
-# def get_gluon_dataset_names() -> List[str]:
-#    """
-#    Get names of available Gluon datasets. Each of those names can be
-#    used in `get_gluon_dataset` function.
-#
-#    :return: list of names
-#    """
-#    return list(gluonts.dataset.repository.datasets.dataset_recipes.keys())
-#
-#
-# def get_gluon_dataset(
-#    dataset_name: str = "m4_hourly",
-#    train_length: Optional[int] = None,
-#    test_length: Optional[int] = None,
-# ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-#    """
-#    Load Gluon dataset, transform it into train and test dataframes.
-#
-#    The default `m4_hourly` time series look like this:
-#    https://gluon-ts.mxnet.io/_images/examples_forecasting_tutorial_9_0.png
-#
-#    :param dataset_name: name of the dataset. Supported names can be
-#        obtained using `get_gluon_dataset_names`.
-#    :param train_length: length of the train dataset
-#    :param test_length: length of the test dataset
-#    :return: train and test dataframes
-#    """
-#    dataset = gluonts.dataset.repository.datasets.get_dataset(
-#        dataset_name, regenerate=False
-#    )
-#    train_entry = next(iter(dataset.train))
-#    test_entry = next(iter(dataset.test))
-#    train_df = gluonts.dataset.util.to_pandas(train_entry)
-#    test_df = gluonts.dataset.util.to_pandas(test_entry)
-#    train_length = train_length or train_df.shape[0]
-#    test_length = test_length or test_df.shape[0]
-#    dbg.dassert_lte(train_length, train_df.shape[0])
-#    dbg.dassert_lte(test_length, test_df.shape[0])
-#    train_df = pd.DataFrame(train_df.head(train_length), columns=["y"])
-#    test_df = pd.DataFrame(test_df.head(test_length), columns=["y"])
-#    return train_df, test_df
-#
-#
-# def evaluate_recipe(
-#    recipe: List[Tuple[str, Callable]], length: int, **kwargs: Any
-# ) -> Dict[str, np.array]:
-#    """
-#    Generate data based on recipe.
-#
-#    For documentation on recipes, see
-#    https://gluon-ts.mxnet.io/_modules/gluonts/dataset/artificial/_base.html#RecipeDataset.
-#
-#    :param recipe: [(field, function)]
-#    :param length: length of data to generate
-#    :param kwargs: kwargs passed into gluonts.dataset.artificial.recipe.evaluate
-#    :return: field names mapped to generated data
-#    """
-#    return rcp.evaluate(recipe, length, **kwargs)
-#
-#
-# def add_recipe_components(
-#    recipe: List[Tuple[str, Callable]], name: str = "signal"
-# ) -> List[Tuple[str, rcp.Lifted]]:
-#    """
-#    Append the sum of the components to the recipe.
-#
-#    :param recipe: [(field, function)]
-#    :param name: name of the sum
-#    :return: recipe with the sum component
-#    """
-#    recipe = recipe.copy()
-#    names = [name for name, _ in recipe]
-#    addition = rcp.Add(names)
-#    recipe.append((name, addition))
-#    return recipe
-#
-#
-# def generate_recipe_dataset(
-#    recipe: Union[Callable, List[Tuple[str, Callable]]],
-#    freq: str,
-#    start_date: pd.Timestamp,
-#    max_train_length: int,
-#    prediction_length: int,
-#    num_timeseries: int,
-#    trim_length_func: Callable = lambda x, **kwargs: 0,
-# ) -> gluonts.dataset.common.TrainDatasets:
-#    """
-#    Generate GluonTS TrainDatasets from recipe.
-#
-#    For more information on recipes, see
-#    https://gluon-ts.mxnet.io/_modules/gluonts/dataset/artificial/_base.html#RecipeDataset
-#    and
-#    https://gluon-ts.mxnet.io/examples/synthetic_data_generation_tutorial/tutorial.html.
-#
-#    For `feat_dynamic_cat` and `feat_dynamic_real` generation pass in
-#    `shape=(n_features, 0)`. GluonTS replaces `0` in shape with
-#    `max_train_length + prediction_length`.
-#
-#    :param recipe: GluonTS recipe. Datasets with keys `feat_dynamic_cat`,
-#        `feat_dynamic_real` and `target` are passed into `ListDataset`.
-#    :param freq: frequency
-#    :param start_date: start date of the dataset
-#    :param max_train_length: maximum length of a training time series
-#    :param prediction_length: length of prediction range
-#    :param num_timeseries: number of time series to generate
-#    :param trim_length_func: Callable f(x: int) -> int returning the
-#        (shortened) training length
-#    :return: GluonTS TrainDatasets (with `train` and `test` attributes).
-#    """
-#    names = [name for name, _ in recipe]
-#    dbg.dassert_in("target", names)
-#    metadata = gluonts.dataset.common.MetaData(freq=freq)
-#    recipe_dataset = gda.RecipeDataset(
-#        recipe,
-#        metadata,
-#        max_train_length,
-#        prediction_length,
-#        num_timeseries,
-#        trim_length_fun=trim_length_func,
-#        data_start=start_date,
-#    )
-#    return recipe_dataset.generate()
+    def get_gluon_dataset_names() -> List[str]:
+        """
+        Get names of available Gluon datasets. Each of those names can be
+        used in `get_gluon_dataset` function.
+
+        :return: list of names
+        """
+        return list(gluonts.dataset.repository.datasets.dataset_recipes.keys())
+
+    def get_gluon_dataset(
+        dataset_name: str = "m4_hourly",
+        train_length: Optional[int] = None,
+        test_length: Optional[int] = None,
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Load Gluon dataset, transform it into train and test dataframes.
+
+        The default `m4_hourly` time series look like this:
+        https://gluon-ts.mxnet.io/_images/examples_forecasting_tutorial_9_0.png
+
+        :param dataset_name: name of the dataset. Supported names can be
+            obtained using `get_gluon_dataset_names`.
+        :param train_length: length of the train dataset
+        :param test_length: length of the test dataset
+        :return: train and test dataframes
+        """
+        dataset = gluonts.dataset.repository.datasets.get_dataset(
+            dataset_name, regenerate=False
+        )
+        train_entry = next(iter(dataset.train))
+        test_entry = next(iter(dataset.test))
+        train_df = gluonts.dataset.util.to_pandas(train_entry)
+        test_df = gluonts.dataset.util.to_pandas(test_entry)
+        train_length = train_length or train_df.shape[0]
+        test_length = test_length or test_df.shape[0]
+        dbg.dassert_lte(train_length, train_df.shape[0])
+        dbg.dassert_lte(test_length, test_df.shape[0])
+        train_df = pd.DataFrame(train_df.head(train_length), columns=["y"])
+        test_df = pd.DataFrame(test_df.head(test_length), columns=["y"])
+        return train_df, test_df
+
+    def evaluate_recipe(
+        recipe: List[Tuple[str, Callable]], length: int, **kwargs: Any
+    ) -> Dict[str, np.array]:
+        """
+        Generate data based on recipe.
+
+        For documentation on recipes, see
+        https://gluon-ts.mxnet.io/_modules/gluonts/dataset/artificial/_base.html#RecipeDataset.
+
+        :param recipe: [(field, function)]
+        :param length: length of data to generate
+        :param kwargs: kwargs passed into gluonts.dataset.artificial.recipe.evaluate
+        :return: field names mapped to generated data
+        """
+        return rcp.evaluate(recipe, length, **kwargs)
+
+    def add_recipe_components(
+        recipe: List[Tuple[str, Callable]], name: str = "signal"
+    ) -> List[Tuple[str, rcp.Lifted]]:
+        """
+        Append the sum of the components to the recipe.
+
+        :param recipe: [(field, function)]
+        :param name: name of the sum
+        :return: recipe with the sum component
+        """
+        recipe = recipe.copy()
+        names = [name for name, _ in recipe]
+        addition = rcp.Add(names)
+        recipe.append((name, addition))
+        return recipe
+
+    def generate_recipe_dataset(
+        recipe: Union[Callable, List[Tuple[str, Callable]]],
+        freq: str,
+        start_date: pd.Timestamp,
+        max_train_length: int,
+        prediction_length: int,
+        num_timeseries: int,
+        trim_length_func: Callable = lambda x, **kwargs: 0,
+    ) -> gluonts.dataset.common.TrainDatasets:
+        """
+        Generate GluonTS TrainDatasets from recipe.
+
+        For more information on recipes, see
+        https://gluon-ts.mxnet.io/_modules/gluonts/dataset/artificial/_base.html#RecipeDataset
+        and
+        https://gluon-ts.mxnet.io/examples/synthetic_data_generation_tutorial/tutorial.html.
+
+        For `feat_dynamic_cat` and `feat_dynamic_real` generation pass in
+        `shape=(n_features, 0)`. GluonTS replaces `0` in shape with
+        `max_train_length + prediction_length`.
+
+        :param recipe: GluonTS recipe. Datasets with keys `feat_dynamic_cat`,
+            `feat_dynamic_real` and `target` are passed into `ListDataset`.
+        :param freq: frequency
+        :param start_date: start date of the dataset
+        :param max_train_length: maximum length of a training time series
+        :param prediction_length: length of prediction range
+        :param num_timeseries: number of time series to generate
+        :param trim_length_func: Callable f(x: int) -> int returning the
+            (shortened) training length
+        :return: GluonTS TrainDatasets (with `train` and `test` attributes).
+        """
+        names = [name for name, _ in recipe]
+        dbg.dassert_in("target", names)
+        metadata = gluonts.dataset.common.MetaData(freq=freq)
+        recipe_dataset = gda.RecipeDataset(
+            recipe,
+            metadata,
+            max_train_length,
+            prediction_length,
+            num_timeseries,
+            trim_length_fun=trim_length_func,
+            data_start=start_date,
+        )
+        return recipe_dataset.generate()
 
 
 class ArmaProcess:
@@ -208,6 +206,72 @@ class ArmaProcess:
         # Create series index and name.
         name = f"arma({len(self.ar_coeffs)},{len(self.ma_coeffs)})"
         return pd.Series(index=index, data=data, name=name)
+
+
+class MultivariateNormalProcess:
+    """
+    A wrapper around sp.stats.multivariate_normal, with Pandas support.
+    """
+
+    def __init__(
+        self,
+        mean: Optional[pd.Series] = None,
+        cov: Optional[pd.DataFrame] = None,
+        allow_singular: Optional[bool] = None,
+    ) -> None:
+        """
+        Optionally initialize mean and covariance of multivariate normal RV.
+        """
+        self.mean = self._maybe_return_values(mean, pd.Series)
+        self.cov = self._maybe_return_values(cov, pd.DataFrame)
+        self.allow_singular = allow_singular
+
+    def set_cov_from_inv_wishart_draw(
+        self, dim: int, seed: Optional[int] = None
+    ) -> None:
+        """
+        Set covariance matrix equal to a draw from Inverse Wishart.
+
+        - Defaults to least informative proper distribution
+        - Takes dof = dim, scale = identify matrix of dimension `dim`
+
+        https://docs.scipy.org/doc/scipy-0.16.0/reference/generated/scipy.stats.invwishart.html#scipy.stats.invwishart
+        """
+        scale = np.identity(dim)
+        rv = sp.stats.invwishart(df=dim, scale=scale)
+        self.cov = rv.rvs(random_state=seed)
+
+    def generate_sample(
+        self, date_range_kwargs: Dict[str, Any], seed: Optional[int] = None
+    ) -> pd.DataFrame:
+        """
+        Generate a multivariate normal distribution sample over index.
+
+        https://docs.scipy.org/doc/scipy-0.16.0/reference/generated/scipy.stats.multivariate_normal.html#scipy.stats.multivariate_normal
+        """
+        index = pd.date_range(**date_range_kwargs)
+        nsample = index.size
+        rv = sp.stats.multivariate_normal(
+            mean=self.mean, cov=self.cov, allow_singular=self.allow_singular
+        )
+        data = rv.rvs(size=nsample, random_state=seed)
+        return pd.DataFrame(index=index, data=data)
+
+    @staticmethod
+    def _maybe_return_values(
+        obj: Union[pd.Series, pd.DataFrame, None],
+        expected_type: Union[pd.Series, pd.DataFrame],
+    ) -> Union[None, np.array]:
+        """
+        Return values of series or dataframe or else None if object is None.
+
+        This is a convenience method used in initialization.
+        """
+        if obj is None:
+            return None
+        elif isinstance(obj, expected_type):
+            return obj.values
+        raise ValueError(f"Unsupported type {type(obj)}")
 
 
 def generate_arima_signal_and_response(

@@ -105,10 +105,7 @@ def get_credentials() -> Dict[str, Any]:
     #
     conda_env_path = "~/.conda/envs"
     conda_env_path = os.path.expanduser(conda_env_path)
-    if server_name == "twitter-data":
-        # P1 old server.
-        conda_sh_path = "/usr/sbin/anaconda3/etc/profile.d/conda.sh"
-    elif server_name in (
+    if server_name in (
         # P1 dev server.
         "ip-172-31-16-23",
         # P1 Jenkins server.
@@ -119,7 +116,9 @@ def get_credentials() -> Dict[str, Any]:
         # GP.
         git_user_name = "saggese"
         git_user_email = "saggese@gmail.com"
-        if server_name in ("gpmac.local", "gpmac.lan", "giacintos-mbp.lan"):
+        if server_name.startswith("gpmac") or server_name.startswith(
+            "giacintos-mbp"
+        ):
             # Laptop.
             conda_sh_path = "/Users/saggese/opt/anaconda3/etc/profile.d/conda.sh"
             conda_env_path = "/Users/saggese/.conda/envs"
@@ -130,14 +129,12 @@ def get_credentials() -> Dict[str, Any]:
                 # tunnel_info.append(service)
                 # jupyter_port = 10001
                 pass
-        elif server_name == "twitter-data":
-            # P1 old server.
-            if git_repo_name == "ParticleDev/commodity_research":
-                jupyter_port = 10002
         elif server_name == "ip-172-31-16-23":
             # P1 server.
             if git_repo_name == "ParticleDev/commodity_research":
                 jupyter_port = 10003
+        else:
+            dbg.dassert_ne(conda_sh_path, "")
     elif user_name == "paul":
         # Paul.
         git_user_name = "paul"
@@ -159,8 +156,18 @@ def get_credentials() -> Dict[str, Any]:
             conda_sh_path = "~/anaconda3/etc/profile.d/conda.sh"
             conda_env_path = "~/.conda/envs"
             jupyter_port = 9111
+        else:
+            dbg.dassert_ne(conda_sh_path, "")
         # service = ("Jupyter", get_p1_dev_server_ip(), jupyter_port, jupyter_port)
         # tunnel_info.append(service)
+    elif user_name == "kosta":
+        # Kostya naumov.
+        if server_name == "ip-172-31-16-23":
+            git_user_name = "k0nsta"
+            git_user_email = "kostya@particle.one"
+            conda_sh_path = "/anaconda3/etc/profile.d/conda.sh"
+            conda_env_path = "~/.conda/envs"
+            jupyter_port = 9556
     elif user_name == "julia":
         # Julia.
         git_user_name = "Julia"
@@ -170,30 +177,14 @@ def get_credentials() -> Dict[str, Any]:
             # Laptop.
             conda_sh_path = "/home/julia/anaconda3/etc/profile.d/conda.sh"
             conda_env_path = "/home/julia/.conda/envs"
+        else:
+            dbg.dassert_ne(conda_sh_path, "")
     elif user_name == "sonniki":
         # Sonya.
         git_user_name = "sonniki"
         git_user_email = "sonya@particle.one"
         conda_sh_path = "/anaconda3/etc/profile.d/conda.sh"
         conda_env_path = os.path.expanduser("~/.conda/envs")
-    elif user_name == "liza":
-        # Liza.
-        git_user_name = "lizvladi"
-        git_user_email = "elizaveta@particle.one"
-        jupyter_port = 9992
-        if server_name == "liza-particle-laptop":
-            # Laptop.
-            conda_sh_path = "/home/liza/anaconda3/etc/profile.d/conda.sh"
-            conda_env_path = "/home/liza/anaconda3/envs"
-    elif user_name == "stas":
-        # Stas.
-        git_user_name = "tsallagov"
-        git_user_email = "stanislav@particle.one"
-        jupyter_port = 9900
-        if server_name == "stas-Vostro-5471":
-            # Laptop.
-            conda_sh_path = "/home/stas/anaconda3/etc/profile.d/conda.sh"
-            conda_env_path = "/home/stas/anaconda3/envs"
     elif user_name == "daniil":
         # Daniil.
         git_user_name = "mongolianjesus"
@@ -207,6 +198,19 @@ def get_credentials() -> Dict[str, Any]:
             # Home laptop.
             conda_sh_path = "/Users/danya/opt/anaconda3/etc/profile.d/conda.sh"
             conda_env_path = "/Users/danya/opt/anaconda3/envs"
+        else:
+            dbg.dassert_ne(conda_sh_path, "")
+    elif user_name == "dan":
+        # Dan.
+        git_user_name = "DanilYachmenev"
+        git_user_email = "dan@particle.one"
+        jupyter_port = 9901
+        if server_name == "dan-particle-laptop":
+            # Laptop.
+            conda_sh_path = "/anaconda3/etc/profile.d/conda.sh"
+            conda_env_path = "/home/dan/anaconda3/envs"
+        else:
+            dbg.dassert_ne(conda_sh_path, "")
     elif user_name == "greg":
         # Gregory.
         git_user_name = "greg-ptcl"
@@ -216,6 +220,8 @@ def get_credentials() -> Dict[str, Any]:
             # Laptop.
             conda_sh_path = "/home/greg/anaconda3/etc/profile.d/conda.sh"
             conda_env_path = os.path.expanduser("/home/greg/anaconda3/envs")
+        else:
+            dbg.dassert_ne(conda_sh_path, "")
     elif user_name == "max_particle":
         # MaxParticle.
         git_user_name = "MaxParticle"
@@ -229,6 +235,30 @@ def get_credentials() -> Dict[str, Any]:
             # Home laptop.
             conda_sh_path = "/Users/asya/opt/anaconda3/etc/profile.d/conda.sh"
             conda_env_path = "/Users/asya/.conda/envs"
+        else:
+            dbg.dassert_ne(conda_sh_path, "")
+    elif user_name == "grisha":
+        # Grisha Pomazkin.
+        git_user_name = "PomazkinG"
+        git_user_email = "pomazkinG@particle.one"
+        jupyter_port = 9631
+        if server_name == "particle-grisha":
+            # Home laptop.
+            conda_sh_path = "/anaconda3/etc/profile.d/conda.sh"
+            conda_env_path = "~/.conda/envs"
+        else:
+            dbg.dassert_ne(conda_sh_path, "")
+    elif user_name == "dima":
+        # Dima Vypiraylenko.
+        git_user_name = "enotdima"
+        git_user_email = "dima@particle.one"
+        jupyter_port = 9233
+        if server_name == "particle-90":
+            # Home laptop.
+            conda_sh_path = "/anaconda3/etc/profile.d/conda.sh"
+            conda_env_path = "~/.conda/envs"
+        else:
+            dbg.dassert_ne(conda_sh_path, "")
     elif user_name == "jenkins":
         # Jenkins.
         # Jenkins should not commit so it doesn't neet Git credentials.
@@ -237,7 +267,7 @@ def get_credentials() -> Dict[str, Any]:
         conda_sh_path = "/anaconda3/etc/profile.d/conda.sh"
         conda_env_path = "/var/lib/jenkins/.conda/envs"
     # We use this for #1522, #1831.
-    elif server_name == "docker-instance" or user_name == 'root':
+    elif server_name == "docker-instance" or user_name == "root":
         # Docker user.
         git_user_name = "infraparticleone"
         git_user_email = "infra@particle.one"

@@ -4,27 +4,36 @@ Import as:
 import core.plotting as plot
 """
 
+import calendar
 import logging
 import math
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
+import matplotlib as mpl
 import matplotlib.colors as mpl_col
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scipy as sp
 import seaborn as sns
-import sklearn.metrics as skl_metrics
+import sklearn.decomposition as skldec
+import sklearn.metrics as sklmet
+import sklearn.utils.validation as skluv
 import statsmodels.api as sm
 
 import core.explore as expl
+import core.finance as fin
+import core.signal_processing as sigp
 import core.statistics as stats
+import helpers.dataframe as hdf
 import helpers.dbg as dbg
 import helpers.list as hlist
 
 _LOG = logging.getLogger(__name__)
 
-sns.set_palette("bright")
+_RETURNS_DICT_TYPE = Dict[str, Dict[int, pd.Series]]
+
+_PCA_TYPE = Union[skldec.PCA, skldec.IncrementalPCA]
 
 FIG_SIZE = (20, 5)
 
@@ -274,7 +283,7 @@ def plot_autocorrelation(
     zero: bool = False,
     nan_mode: str = "conservative",
     title_prefix: Optional[str] = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> None:
     """
     Plot ACF and PACF of columns.
@@ -377,7 +386,8 @@ def plot_heatmap(
     """
     # Sanity check.
     dbg.dassert_eq(corr_df.shape[0], corr_df.shape[1])
-    dbg.dassert_lte(corr_df.shape[0], 20)
+    if corr_df.shape[0] > 20:
+        _LOG.warning("The corr_df.shape[0]='%s' > 20", corr_df.shape[0])
     if corr_df.shape[0] < 2 or corr_df.shape[1] < 2:
         _LOG.warning(
             "Can't plot heatmap for corr_df with shape=%s", str(corr_df.shape)
@@ -440,6 +450,8 @@ def plot_correlation_matrix(
     annot: Union[bool, str] = False,
     figsize: Optional[Tuple[int, int]] = None,
     title: Optional[str] = None,
+    method: Optional[str] = None,
+    min_periods: Optional[int] = None,
 ) -> pd.core.frame.DataFrame:
     """
     Compute correlation matrix and plot its heatmap .
@@ -449,12 +461,16 @@ def plot_correlation_matrix(
     :annot:
     :figsize: If nothing specified, basic (20,5) used.
     :title: Title for the plot.
+    :method: "pearson", "kendall", "spearman" or callable method of correlation.
+    :min_periods: Minimum number of observations required per pair of columns to have
+        a valid result. Currently only available for Pearson and Spearman correlation.
     """
     if df.shape[1] < 2:
         _LOG.warning("Skipping correlation matrix since df is %s", str(df.shape))
         return None
     # Compute the correlation matrix.
-    corr_df = df.corr()
+    method = method or "pearson"
+    corr_df = df.corr(method=method, min_periods=min_periods)
     # Plot heatmap.
     plot_heatmap(
         corr_df,
@@ -521,9 +537,10 @@ def plot_corr_over_time(
     Plot correlation over time.
     """
     timestamps = corr_df.index.get_level_values(0).unique()
-    dbg.dassert_lte(len(timestamps), 20)
+    if len(timestamps) > 20:
+        _LOG.warning("The first level of index length='%s' > 20", len(timestamps))
     # Get the axes.
-    fig, axes = expl.get_multiple_plots(
+    fig, axes = get_multiple_plots(
         len(timestamps), num_cols=num_cols, y_scale=4, sharex=True, sharey=True
     )
     # Add color map bar on the side.
@@ -550,6 +567,67 @@ def plot_corr_over_time(
             ax=axes[i],
         )
         axes[i].set_title(timestamps[i])
+
+
+class PCA:
+    def __init__(self, mode: str, **kwargs: Any):
+        if mode == "standard":
+            self.pca = skldec.PCA(**kwargs)
+        elif mode == "incremental":
+            self.pca = skldec.IncrementalPCA(**kwargs)
+        else:
+            raise ValueError("Invalid mode='%s'" % mode)
+
+    def plot_components(
+        self, num_components: Optional[int] = None, num_cols: int = 4
+    ) -> None:
+        """
+        Plot principal components.
+
+        :param num_components: number of top components to plot
+        :param num_cols: number of columns to use in the subplot
+        """
+        skluv.check_is_fitted(self.pca)
+        pcs = pd.DataFrame(self.pca.components_)
+        max_pcs = self.pca.components_.shape[0]
+        num_components = self._get_num_pcs_to_plot(num_components, max_pcs)
+        _LOG.info("num_components=%s", num_components)
+        _, axes = get_multiple_plots(
+            num_components, num_cols=num_cols, sharex=True, sharey=True
+        )
+        plt.suptitle("Principal components")
+        for i in range(num_components):
+            pc = pcs.iloc[i, :]
+            pc.plot(
+                kind="barh", ax=axes[i], title="PC%s" % i, edgecolor="tab:blue"
+            )
+
+    def plot_explained_variance(self) -> None:
+        skluv.check_is_fitted(self.pca)
+        explained_variance_ratio = pd.Series(self.pca.explained_variance_ratio_)
+        eigenvals = pd.Series(self.pca.explained_variance_)
+        # Plot explained variance.
+        explained_variance_ratio.cumsum().plot(
+            title="Explained variance ratio", lw=5, ylim=(0, 1)
+        )
+        (eigenvals / eigenvals.max()).plot(color="g", kind="bar", rot=0)
+
+    def fit(self, X: pd.DataFrame, standardize: bool = False) -> _PCA_TYPE:
+        if standardize:
+            X = (X - X.mean()) / X.std()
+        return self.pca.fit(X)
+
+    @staticmethod
+    def _get_num_pcs_to_plot(num_pcs_to_plot: Optional[int], max_pcs: int) -> int:
+        """
+        Get the number of principal components to plot.
+        """
+        if num_pcs_to_plot is None:
+            num_pcs_to_plot = max_pcs
+            _LOG.warning("Plotting all %s components", num_pcs_to_plot)
+        dbg.dassert_lte(1, num_pcs_to_plot)
+        dbg.dassert_lte(num_pcs_to_plot, max_pcs)
+        return num_pcs_to_plot
 
 
 def _get_heatmap_mask(corr: pd.DataFrame, mode: str) -> np.ndarray:
@@ -589,11 +667,11 @@ def plot_confusion_heatmap(
     :y_pred: Predictions.
     :percentage: to represent values from confusion matrix in percentage or not.
     """
-    confusion = skl_metrics.confusion_matrix(y_true, y_pred)
+    confusion = sklmet.confusion_matrix(y_true, y_pred)
     labels = set(list(y_true))
     df_out = pd.DataFrame(confusion, index=labels, columns=labels)
     df_out_percentage = df_out.apply(lambda x: x / x.sum(), axis=1)
-    fig, (ax, ax2) = plt.subplots(figsize=(FIG_SIZE), ncols=2)
+    _, (ax, ax2) = plt.subplots(figsize=(FIG_SIZE), ncols=2)
     plot_heatmap(
         df_out,
         mode="heatmap",
@@ -613,7 +691,13 @@ def plot_confusion_heatmap(
 
 
 def multipletests_plot(
-    pvals: pd.Series, threshold: float, method: Optional[str] = None, **kwargs
+    pvals: pd.Series,
+    threshold: float,
+    adj_pvals: Optional[Union[pd.Series, pd.DataFrame]] = None,
+    num_cols: Optional[int] = None,
+    method: Optional[str] = None,
+    suptitle: Optional[str] = None,
+    **kwargs: Any,
 ) -> None:
     """
     Plot adjusted p-values and pass/fail threshold.
@@ -621,30 +705,57 @@ def multipletests_plot(
     :param pvals: unadjusted p-values
     :param threshold: threshold for adjusted p-values separating accepted and
         rejected hypotheses, e.g., "FWER", or family-wise error rate
+    :param adj_pvals: adjusted p-values, if provided, will be used instead
+        calculating inside the function
+    :param num_cols: number of columns in multiplotting
     :param method: method for performing p-value adjustment, e.g., "fdr_bh"
+    :param suptitle: overal title of all plots
     """
-    pvals = pvals.sort_values().reset_index(drop=True)
-    adj_pvals = stats.multipletests(pvals, method=method)
-    plt.plot(pvals, label="pvals", **kwargs)[0]
-    plt.plot(adj_pvals, label="adj pvals", **kwargs)
-    # Show min adj p-val in text.
-    min_adj_pval = adj_pvals[0]
-    plt.text(0.1, 0.7, "adj pval=%.3f" % min_adj_pval, fontsize=20)
-    plt.text(
-        0.1,
-        0.6,
-        weight="bold",
-        fontsize=20,
-        **(
-            {"s": "PASS", "color": "g"}
-            if min_adj_pval <= threshold
-            else {"s": "FAIL", "color": "r"}
-        ),
+
+    if adj_pvals is None:
+        pval_series = pvals.dropna().sort_values().reset_index(drop=True)
+        adj_pvals = stats.multipletests(pval_series, method=method).to_frame()
+        plt_count = 1
+    else:
+        pval_series = pvals.dropna()
+        if isinstance(adj_pvals, pd.Series):
+            adj_pvals = adj_pvals.to_frame()
+        plt_count = len(adj_pvals.columns)
+    num_cols = num_cols or 1
+    _, ax = get_multiple_plots(
+        plt_count, num_cols=num_cols, sharex=False, sharey=True, y_scale=5
     )
-    # TODO(*): Force x-ticks at integers.
-    plt.axhline(threshold, ls=":", c="k")
-    plt.ylim(0, 1)
-    plt.legend()
+    if not isinstance(ax, np.ndarray):
+        ax = [ax]
+    for i, col in enumerate(adj_pvals.columns):
+        mask = adj_pvals[col].notna()
+        adj_pval = adj_pvals.loc[mask, col].sort_values().reset_index(drop=True)
+        ax[i].plot(
+            pval_series.loc[mask].sort_values().reset_index(drop=True),
+            label="pvals",
+            **kwargs,
+        )
+        ax[i].plot(adj_pval, label="adj pvals", **kwargs)
+        # Show min adj p-val in text.
+        min_adj_pval = adj_pval.iloc[0]
+        ax[i].text(0.1, 0.7, "adj pval=%.3f" % min_adj_pval, fontsize=20)
+        ax[i].text(
+            0.1,
+            0.6,
+            weight="bold",
+            fontsize=20,
+            **(
+                {"s": "PASS", "color": "g"}
+                if min_adj_pval <= threshold
+                else {"s": "FAIL", "color": "r"}
+            ),
+        )
+        ax[i].set_title(col)
+        ax[i].axhline(threshold, ls=":", c="k")
+        ax[i].set_ylim(0, 1)
+        ax[i].legend()
+    plt.suptitle(suptitle, x=0.5105, y=1.01, fontsize=15)
+    plt.tight_layout()
 
 
 # #############################################################################
@@ -652,27 +763,42 @@ def multipletests_plot(
 # #############################################################################
 
 
-def plot_value_counts(
+def plot_value_counts(srs: pd.Series, *args: Any, **kwargs: Any) -> None:
+    """
+    Plot barplots for the counts of a series and print the values.
+
+    Same interface as plot_count_series() but computing the count of the given
+    series `srs`.
+    """
+    # Compute the counts.
+    counts = srs.value_counts()
+    # Plot.
+    return plot_counts(counts, *args, **kwargs)
+
+
+def plot_counts(
     counts: pd.Series,
     top_n_to_print: int = 10,
     top_n_to_plot: Optional[int] = None,
     plot_title: Optional[str] = None,
     label: Optional[str] = None,
     figsize: Optional[Tuple[int, int]] = None,
+    rotation: int = 0,
 ) -> None:
     """
-    Plot barplots for value counts and print the values.
+    Plot barplots for series containing counts and print the values.
 
-    The function is typically used in conjunction with value counts
-    from KGification info. If the number of labels is over 20, the plot is
-    oriented horizontally and the height of the plot is automatically adjusted.
+    If the number of labels is over 20, the plot is oriented horizontally
+    and the height of the plot is automatically adjusted.
 
-    :param counts: value counts
-    :param top_n_to_print: top N values to show. None for all. 0 for no value.
-    :param top_n_to_plot: like top_n_to_print, but for the plot.
+    :param counts: series to plot value counts for
+    :param top_n_to_print: top N values by count to print. None for all. 0 for
+        no values
+    :param top_n_to_plot: like top_n_to_print, but for the plot
     :param plot_title: title of the barplot
     :param label: label of the X axis
     :param figsize: size of the plot
+    :param rotation: rotation of xtick labels
     """
     # Get default values for plot title and label.
     if not figsize:
@@ -699,6 +825,7 @@ def plot_value_counts(
         pass
     else:
         counts_tmp = counts.copy()
+        # Subset N values to plot.
         if top_n_to_plot is not None:
             dbg.dassert_lte(1, top_n_to_plot)
             counts_tmp = counts_tmp[:top_n_to_plot]
@@ -710,69 +837,444 @@ def plot_value_counts(
             plot_barplot(
                 counts_tmp,
                 orientation="horizontal",
-                plot_title=plot_title,
+                title=plot_title,
                 figsize=figsize,
-                label=label,
+                xlabel=label,
+                rotation=rotation,
             )
         else:
             # Plot small number of categories vertically.
             plot_barplot(
                 counts_tmp,
                 orientation="vertical",
-                plot_title=plot_title,
+                title=plot_title,
                 figsize=figsize,
-                label=label,
+                xlabel=label,
+                rotation=rotation,
             )
 
 
 def plot_barplot(
-    integers: pd.Series,
-    orientation: str,
-    string_format: str = "%.2f%%",
-    plot_title: Optional[str] = None,
-    label: Optional[str] = None,
+    srs: pd.Series,
+    orientation: str = "vertical",
+    annotation_mode: str = "pct",
+    string_format: str = "%.2f",
+    title: Optional[str] = None,
+    xlabel: Optional[str] = None,
+    unicolor: bool = False,
+    colormap: Optional[mpl.colors.Colormap] = None,
     figsize: Optional[Tuple[int, int]] = None,
+    rotation: int = 0,
 ) -> None:
     """
-    Plot a barplot from value counts, using indices as x-labels.
+    Plot a barplot.
 
-    :param integers: Series of integers
-    :param plot_title: title of the plot
-    :param label: label of the X axis
+    :param srs: pd.Series
     :param orientation: vertical or horizontal bars
+    :param annotation_mode: `pct` or `value`
     :param string_format: format of bar annotations
+    :param title: title of the plot
+    :param xlabel: label of the X axis
+    :param unicolor: if True, plot all bars in neutral blue color
+    :param colormap: matplotlib colormap
     :param figsize: size of plot
+    :param rotation: rotation of xtick labels
     """
+
+    def _get_annotation_loc(
+        x_: float, y_: float, height_: float, width_: float
+    ) -> Tuple[float, float]:
+        if orientation == "vertical":
+            return x_, y_ + height_ + 0.5
+        if orientation == "horizontal":
+            return x_ + width_ + 0.5, y_
+        raise ValueError("Invalid orientation='%s'" % orientation)
 
     if figsize is None:
         figsize = FIG_SIZE
     plt.figure(figsize=figsize)
-    # Plot vertical bars.
-    if orientation == "vertical":
-        ax = sns.barplot(x=integers.index, y=integers.values)
-        for i, p in enumerate(ax.patches):
-            height = p.get_height()
-            x, y = p.get_xy()
-            # Add percentage annotations to bars.
-            ax.annotate(
-                string_format % (100 * integers.iloc[i] / integers.sum()),
-                (x, y + height + 0.5),
-            )
-    # Plot horizontal bars.
-    elif orientation == "horizontal":
-        ax = sns.barplot(y=integers.index, x=integers.values)
-        for i, p in enumerate(ax.patches):
-            width = p.get_width()
-            x, y = p.get_xy()
-            # Add percentage annotations to bars.
-            ax.annotate(
-                string_format % (100 * integers.iloc[i] / integers.sum()),
-                (x + width + 0.5, y),
-            )
+    # Choose colors.
+    colormap = colormap or sns.diverging_palette(10, 133, as_cmap=True)
+    if unicolor:
+        color = sns.color_palette("muted")[0]
     else:
-        dbg.dfatal(message="Invalid plot orientation.")
-    if label:
-        ax.set(xlabel=label)
-    if plot_title:
-        plt.title(plot_title)
+        color = srs.apply(colormap)
+    # Plot.
+    if orientation == "vertical":
+        kind = "bar"
+    elif orientation == "horizontal":
+        kind = "barh"
+    else:
+        raise ValueError("Invalid orientation='%s'" % orientation)
+    ax = srs.plot(kind=kind, color=color, rot=rotation, title=title)
+    # Add annotations to bars.
+    if annotation_mode == "pct":
+        annotations = srs * 100 / srs.sum()
+        string_format = string_format + "%%"
+        annotations = annotations.apply(lambda z: string_format % z)
+    elif annotation_mode == "value":
+        annotations = srs.apply(lambda z: string_format % z)
+    else:
+        raise ValueError("Invalid annotations_mode='%s'" % annotation_mode)
+    #
+    for i, p in enumerate(ax.patches):
+        height = p.get_height()
+        width = p.get_width()
+        x, y = p.get_xy()
+        annotation_loc = _get_annotation_loc(x, y, height, width)
+        ax.annotate(annotations.iloc[i], annotation_loc)
+    if xlabel:
+        ax.set(xlabel=xlabel)
+
+
+# #############################################################################
+# General plotting helpers
+# #############################################################################
+
+
+def get_multiple_plots(
+    num_plots: int,
+    num_cols: int,
+    y_scale: Optional[float] = None,
+    *args: Any,
+    **kwargs: Any,
+) -> Tuple[mpl.figure.Figure, np.array]:
+    """
+    Create figure to accommodate `num_plots` plots.
+    The figure is arranged in rows with `num_cols` columns.
+    :param num_plots: number of plots
+    :param num_cols: number of columns to use in the subplot
+    :param y_scale: if not None
+    :return: figure and array of axes
+    """
+    dbg.dassert_lte(1, num_plots)
+    dbg.dassert_lte(1, num_cols)
+    # Heuristic to find the dimension of the fig.
+    if y_scale is not None:
+        dbg.dassert_lt(0, y_scale)
+        ysize = math.ceil(num_plots / num_cols) * y_scale
+        figsize: Optional[Tuple[float, float]] = (20, ysize)
+    else:
+        figsize = None
+    fig, ax = plt.subplots(
+        math.ceil(num_plots / num_cols),
+        num_cols,
+        figsize=figsize,
+        *args,
+        **kwargs,
+    )
+    if isinstance(ax, np.ndarray):
+        return fig, ax.flatten()
+    return fig, ax
+
+
+def plot_cumulative_returns(
+    cumulative_rets: pd.Series,
+    mode: str,
+    unit: str = "ratio",
+    benchmark_series: Optional[pd.Series] = None,
+    title_suffix: Optional[str] = None,
+    ax: Optional[mpl.axes.Axes] = None,
+    plot_zero_line: bool = True,
+) -> None:
+    """
+    Plot cumulative returns.
+
+    :param cumulative_rets: log or pct cumulative returns
+    :param mode: log or pct, used to choose plot title
+    :param unit: `ratio`, `%` or `bps`. Both input series are rescaled appropriately
+    :param benchmark_series: additional series to plot
+    :param title_suffix: suffix added to the title
+    :param ax: axes
+    :param plot_zero_line: whether to plot horizontal line at 0
+    """
+    title_suffix = title_suffix or ""
+    scale_coeff = _choose_scaling_coefficient(unit)
+    cumulative_rets = cumulative_rets * scale_coeff
+    #
+    if mode == "log":
+        title = "Cumulative log returns"
+    elif mode == "pct":
+        title = "Cumulative returns"
+    else:
+        raise ValueError("Invalid mode='%s'" % mode)
+    label = cumulative_rets.name or "returns"
+    #
+    cumulative_rets.plot(ax=ax, title=f"{title}{title_suffix}", label=label)
+    if benchmark_series is not None:
+        benchmark_series = benchmark_series.loc[
+            cumulative_rets.index[0] : cumulative_rets.index[-1]
+        ]
+        benchmark_series = benchmark_series * scale_coeff
+        bs_label = benchmark_series.name or "benchmark_series"
+        benchmark_series.plot(ax=ax, label=bs_label, color="grey")
+    ax = ax or plt.gca()
+    if plot_zero_line:
+        ax.axhline(0, linestyle="--", linewidth=0.8, color="black", label="0")
+    ax.set_ylabel(unit)
+    plt.legend()
+
+
+def plot_rolling_annualized_sharpe_ratio(
+    srs: pd.Series,
+    tau: float,
+    min_depth: int = 1,
+    max_depth: int = 1,
+    p_moment: float = 2,
+    ci: float = 0.95,
+    title_suffix: Optional[str] = None,
+    ax: Optional[mpl.axes.Axes] = None,
+) -> None:
+    """
+    Plot rolling annualized Sharpe ratio.
+
+    :param srs: input series
+    :param tau: argument as for sigp.compute_smooth_moving_average
+    :param min_depth: argument as for sigp.compute_smooth_moving_average
+    :param max_depth: argument as for sigp.compute_smooth_moving_average
+    :param p_moment: argument as for sigp.compute_smooth_moving_average
+    :param ci: confidence interval
+    :param title_suffix: suffix added to the title
+    :param ax: axes
+    """
+    title_suffix = title_suffix or ""
+    min_periods = tau * max_depth
+    rolling_sharpe = sigp.compute_rolling_annualized_sharpe_ratio(
+        srs,
+        tau,
+        min_periods=min_periods,
+        min_depth=min_depth,
+        max_depth=max_depth,
+        p_moment=p_moment,
+    )
+    # Remove leading `NaNs`.
+    first_valid_index = rolling_sharpe.first_valid_index()
+    rolling_sharpe = rolling_sharpe.loc[first_valid_index:]
+    # Prepare for plotting SE band.
+    z = sp.stats.norm.ppf((1 - ci) / 2)
+    rolling_sharpe["sr-z*se"] = (
+        rolling_sharpe["annualized_SR"] + z * rolling_sharpe["annualized_SE(SR)"]
+    )
+    rolling_sharpe["sr+z*se"] = (
+        rolling_sharpe["annualized_SR"] - z * rolling_sharpe["annualized_SE(SR)"]
+    )
+    # Plot.
+    ax = rolling_sharpe["annualized_SR"].plot(
+        ax=ax, title=f"Annualized rolling Sharpe ratio{title_suffix}", label="SR"
+    )
+    ax.fill_between(
+        rolling_sharpe.index,
+        rolling_sharpe["sr-z*se"],
+        rolling_sharpe["sr+z*se"],
+        alpha=0.4,
+        label=f"{100*ci:.2f}% confidence interval",
+    )
+    mean_sharpe_ratio = (
+        rolling_sharpe["annualized_SR"]
+        .replace([np.inf, -np.inf], value=np.nan)
+        .mean()
+    )
+    ax = ax or plt.gca()
+    ax.axhline(
+        mean_sharpe_ratio,
+        linestyle="--",
+        linewidth=2,
+        color="green",
+        label="average SR",
+    )
+    ax.axhline(0, linewidth=0.8, color="black", label="0")
+    ax.set_ylabel("annualized SR")
+    ax.legend()
+
+
+def plot_monthly_heatmap(log_rets: pd.Series, unit: str = "ratio") -> None:
+    """
+    Plot a heatmap of log returns statistics by year and month.
+
+    :param log_rets: input series of log returns
+    :param unit: `ratio`, `%` or `bps` scaling coefficient
+    """
+    scale_coeff = _choose_scaling_coefficient(unit)
+    monthly_pct_spread = _calculate_year_to_month_spread(log_rets)
+    monthly_spread = monthly_pct_spread * scale_coeff
+    cmap = sns.diverging_palette(10, 133, as_cmap=True)
+    sns.heatmap(
+        monthly_spread, center=0, cmap=cmap, annot=True, fmt=".2f",
+    )
+    plt.title(f"Monthly returns ({unit})")
+    plt.yticks(rotation=0)
+
+
+def _calculate_year_to_month_spread(log_rets: pd.Series) -> pd.DataFrame:
+    """
+    Calculate log returns statistics by year and month.
+
+    :param srs: input series of log returns
+    :return: dataframe of log returns with years on y-axis and
+        months on x-axis
+    """
+    srs_name = log_rets.name or 0
+    log_rets_df = pd.DataFrame(log_rets)
+    log_rets_df["year"] = log_rets_df.index.year
+    log_rets_df["month"] = log_rets_df.index.month
+    log_rets_df.reset_index(inplace=True)
+    monthly_log_returns = log_rets_df.groupby(["year", "month"])[srs_name].sum()
+    monthly_pct_returns = fin.convert_log_rets_to_pct_rets(monthly_log_returns)
+    monthly_pct_spread = monthly_pct_returns.unstack()
+    monthly_pct_spread.columns = monthly_pct_spread.columns.map(
+        lambda x: calendar.month_abbr[x]
+    )
+    return monthly_pct_spread
+
+
+def plot_yearly_barplot(
+    log_rets: pd.Series,
+    unit: str = "ratio",
+    unicolor: bool = False,
+    orientation: str = "vertical",
+) -> None:
+    """
+    Plot a barplot of log returns statistics by year.
+
+    :param log_rets: input series of log returns
+    :param unit: `ratio`, `%` or `bps` scaling coefficient
+    :param unicolor: if True, plot all bars in neutral blue color
+    :param orientation: vertical or horizontal bars
+    """
+    scale_coeff = _choose_scaling_coefficient(unit)
+    yearly_log_returns = log_rets.resample("Y").sum()
+    yearly_pct_returns = fin.convert_log_rets_to_pct_rets(yearly_log_returns)
+    yearly_returns = yearly_pct_returns * scale_coeff
+    yearly_returns.index = yearly_returns.index.year
+    plot_barplot(
+        yearly_returns,
+        annotation_mode="value",
+        orientation=orientation,
+        title=f"Annual returns ({unit})",
+        unicolor=unicolor,
+    )
+    if orientation == "vertical":
+        xlabel = "year"
+        ylabel = unit
+    elif orientation == "horizontal":
+        xlabel = unit
+        ylabel = "year"
+    else:
+        raise ValueError("Invalid orientation='%s'" % orientation)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+
+
+def plot_pnl(
+    df: pd.DataFrame,
+    title: Optional[str] = None,
+    colormap: Optional[str] = None,
+    figsize: Optional[Tuple[int]] = None,
+    left_lim: Optional[Any] = None,
+    right_lim: Optional[Any] = None,
+    nan_mode: Optional[str] = None,
+    xlabel: Optional[str] = None,
+    ylabel: Optional[str] = None,
+):
+    """
+    Plot a pnl for the dataframe of pnl time series.
+
+    :param df: dataframe of pnl time series
+    :param title: plot title
+    :param colormap: matplotlib colormap
+    :param figsize: size of plot
+    :param left_lim: left limit value of the X axis
+    :param right_lim: right limit value of the X axis
+    :param nan_mode: argument for hdf.apply_nan_mode()
+    :param xlabel: label of the X axis
+    :param ylabel: label of the Y axis
+    """
+    title = title or ""
+    colormap = colormap or "rainbow"
+    figsize = figsize or (20, 5)
+    left_lim = left_lim or min(df.index)
+    right_lim = right_lim or max(df.index)
+    nan_mode = nan_mode or "ignore"
+    xlabel = xlabel or None
+    ylabel = ylabel or None
+    if df.isna().all().any():
+        empty_series = [(idx) for idx, val in df.isna().all().items() if val]
+        _LOG.warning(
+            "Empty input columns were dropped: '%s'", ", ".join(empty_series)
+        )
+        df.drop(empty_series, axis=1, inplace=True)
+    df_plot = df.apply(hdf.apply_nan_mode, mode=nan_mode)
+    fig, ax = plt.subplots(figsize=figsize)
+    df_plot.plot(x_compat=True, ax=ax, colormap=colormap)
+    # Setting fixed borders of x-axis.
+    ax.set_xlim([left_lim, right_lim])
+    # Formatting.
+    ax.set_title(title, fontsize=20)
+    plt.xticks(fontsize=13)
+    plt.yticks(fontsize=13)
+    ax.set_ylabel(ylabel, fontsize=20)
+    ax.set_xlabel(xlabel, fontsize=20)
+    ax.legend(prop=dict(size=13), loc="upper left")
     plt.show()
+
+
+def plot_drawdown(
+    log_rets: pd.Series,
+    unit: str = "%",
+    title_suffix: Optional[str] = None,
+    ax: Optional[mpl.axes.Axes] = None,
+) -> None:
+    """
+    Plot drawdown.
+
+    :param log_rets: log returns
+    :param unit: `ratio`, `%`. Input series are rescaled appropriately
+    :param title_suffix: suffix added to the title
+    :param ax: axes
+    """
+    title_suffix = title_suffix or ""
+    scale_coeff = _choose_scaling_coefficient(unit)
+    drawdown = -scale_coeff * fin.compute_perc_loss_from_high_water_mark(log_rets)
+    label = drawdown.name or "drawdown"
+    title = f"Drawdown ({unit})"
+    ax = ax or plt.gca()
+    drawdown.plot(ax=ax, label="_nolegend_", color="b", linewidth=3.5)
+    drawdown.plot.area(
+        ax=ax, title=f"{title}{title_suffix}", label=label, color="b", alpha=0.3
+    )
+    ax.set_ylim(top=0)
+    ax.set_ylabel(unit)
+    plt.legend()
+
+
+def plot_holdings(
+    holdings: pd.Series, unit: str = "ratio", ax: Optional[mpl.axes.Axes] = None
+) -> None:
+    ax = ax or plt.gca()
+    scale_coeff = _choose_scaling_coefficient(unit)
+    holdings = scale_coeff * holdings
+    holdings.plot(linewidth=1, ax=ax, label="holdings")
+    holdings.resample("M").mean().plot(
+        linewidth=2.5, ax=ax, label="average holdings by month"
+    )
+    ax.axhline(
+        holdings.mean(),
+        linestyle="--",
+        color="green",
+        label="average holdings, overall",
+    )
+    ax.set_ylabel(unit)
+    ax.legend()
+    ax.set_title(f"Total holdings ({unit})")
+
+
+def _choose_scaling_coefficient(unit: str) -> int:
+    if unit == "%":
+        scale_coeff = 100
+    elif unit == "bps":
+        scale_coeff = 10000
+    elif unit == "ratio":
+        scale_coeff = 1
+    else:
+        raise ValueError("Invalid unit='%s'" % unit)
+    return scale_coeff

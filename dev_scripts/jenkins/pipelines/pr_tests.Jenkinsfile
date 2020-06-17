@@ -395,16 +395,13 @@ pipeline {
                         }
                     }
                 }
-                // Run fast tests
+                // Run linter tests
                 script {
                     try {
                         dir(getLinterWorkspacePath()) {
                             sh('''
-                                    bash -c "source dev_scripts/jenkins/multi_repo_run_linter_on_branch.sh"
+                                    source dev_scripts/jenkins/amp.run_linter_on_branch.sh || exit 0
                                     ''')
-//                            sh('''printf "0" > ./tmp_exit_status.txt''')
-//                            sh('''printf "0" > ./tmp_message.txt''')
-                            // TODO: Remove after tests
                             def msg = getFileMessage(getLinterWorkspacePath())
                             def exitStatus = getFileExitStatus(getLinterWorkspacePath())
                             echo("message=${msg}")
@@ -486,7 +483,7 @@ pipeline {
                     try {
                         dir(getFastTestWorkspacePath()) {
                             sh('''
-                                    bash -c "source dev_scripts/jenkins/multi_repo_run_fast_tests_on_branch.sh"
+                                    bash -c "source dev_scripts/jenkins/amp.run_fast_tests.sh"
                                     ''')
 //                            sh('''printf "0" > ./tmp_exit_status.txt''')
                             // TODO: delete after tests
@@ -511,7 +508,7 @@ pipeline {
                                     echo("Entering failure branch.")
                                     labelAddToIssue('fast_tests_fail')
                                     statusSetFail(getFastTestName())
-                                    error("TEST FAILED. exitSatus=${exitStatus}")
+                                    currentBuild.result = 'FAILURE'
                                 }
                             }
                         }
@@ -576,7 +573,7 @@ pipeline {
                     try {
                         dir(getSlowTestWorkspacePath()) {
                             sh('''
-                                    bash -c "source dev_scripts/jenkins/multi_repo_run_slow_tests_on_branch.sh"
+                                    bash -c "source dev_scripts/jenkins/amp.run_slow_tests.sh"
                                     ''')
 //                            sh('''printf "0" > ./tmp_exit_status.txt''')
                             // TODO: delete after tests
@@ -601,7 +598,7 @@ pipeline {
                                     echo("Entering failure branch.")
                                     labelAddToIssue('slow_tests_fail')
                                     statusSetFail(getSlowTestName())
-                                    error("TEST FAILED. exitSatus=${exitStatus}")
+                                    currentBuild.result = 'FAILURE'
                                 }
                             }
                             dir(getSlowTestWorkspacePath()) {
