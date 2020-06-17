@@ -100,6 +100,17 @@ def _process_repo(
             # Read output from the linter.
             txt = io_.from_file(linter_log)
             output.append(txt)
+
+#def _run_linter_check() -> None:
+#    modified_files = _get_modified_files()
+#    dbg.dassert(
+#        len(modified_files) == 0,
+#        msg=f"Commit changes or stash them.\n{modified_files}",
+#    )
+#    amp_path = os.environ["AMP"]
+#    cmd = f"{amp_path}/dev_scripts/linter_master_report.py"
+#    _, output = si.system_to_string(cmd, abort_on_error=False)
+#    print(output.strip())
     #
     action = "run_tests"
     to_execute, actions = prsr.mark_action(action, actions)
