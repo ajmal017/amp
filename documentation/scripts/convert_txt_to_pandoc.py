@@ -116,15 +116,9 @@ def _process_abbreviations(in_line: str) -> str:
         (r"-^", r"\uparrow"),
         (r"-v", r"\downarrow"),
     ]:
-        line = re.sub(
-            r"$%s$" % re.escape(x), r"$%s$" % re.escape(y), line
-        )
-        line = re.sub(
-            r"$%s(\s)" % re.escape(x), r"$%s$\1" % re.escape(y), line
-        )
-        line = re.sub(
-            r"(\s)%s$" % re.escape(x), r"\1%s$" % re.escape(y), line
-        )
+        line = re.sub(r"$%s$" % re.escape(x), r"$%s$" % re.escape(y), line)
+        line = re.sub(r"$%s(\s)" % re.escape(x), r"$%s$\1" % re.escape(y), line)
+        line = re.sub(r"(\s)%s$" % re.escape(x), r"\1%s$" % re.escape(y), line)
         line = re.sub(
             r"(\s)%s(\s)" % re.escape(x), r"\1$%s$\2" % re.escape(y), line
         )

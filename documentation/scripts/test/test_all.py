@@ -436,7 +436,6 @@ $$"""
         act = prnt.remove_empty_lines(act)
         self.assert_equal(act, exp)
 
-
     # #############################################################################
 
     @staticmethod

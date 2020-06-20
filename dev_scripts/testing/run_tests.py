@@ -159,6 +159,7 @@ def _main(parser: argparse.ArgumentParser) -> None:
             dry_run=dry_run,
             log_level=logging.DEBUG,
         )
+
     #
     if args.jenkins:
         cmds = [
@@ -176,12 +177,17 @@ def _main(parser: argparse.ArgumentParser) -> None:
     #
     # Build pytest options.
     #
-    pytest_collect_opts, pytest_opts, pytest_target = _build_pytest_opts(args, test)
+    pytest_collect_opts, pytest_opts, pytest_target = _build_pytest_opts(
+        args, test
+    )
     #
     # Preview tests.
     #
     if not args.skip_collect:
-        cmd = "pytest --collect-only -q %s %s" % (pytest_collect_opts, pytest_target)
+        cmd = "pytest --collect-only -q %s %s" % (
+            pytest_collect_opts,
+            pytest_target,
+        )
         _system(cmd, dry_run=False)
     if args.collect_only:
         _LOG.warning("Not running tests as per user request")

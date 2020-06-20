@@ -430,7 +430,6 @@ if __name__ == "main":
 # pylint: disable=too-many-public-methods
 @pytest.mark.amp
 class Test_linter_py2(ut.TestCase):
-
     def _helper_check_shebang(
         self, file_name: str, txt: str, is_executable: bool, exp: str,
     ) -> None:
@@ -733,7 +732,7 @@ from typing import List
 
     '''
  """
- 
+
  :param data:
  :return:
  """
@@ -747,9 +746,11 @@ Add to the bash script `txt` diagnostic informations.
     - client_root_path: the directory that includes the executable as
       `dev_scripts/_setenv_*.py` (i.e., the dir that is ../exec_path)
     - user_name
-""" 
-    
+"""
+
     '''
+
+
 """
 When running a conda command we need to execute a script to configure conda.
 This script is typically executed in .bashrc but here we create a new bash
@@ -850,4 +851,3 @@ not
 
 $\rightarrow$ -> =>
 """
-

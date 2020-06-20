@@ -168,11 +168,11 @@
     Kalman filtering)
   - If we have a long history, it may be better to perform a single
     autoregression over the whole history
-    - This suggests 
+    - This suggests
   - What if we keep the learning rate fixed over time?
     - This would effectively allow for "drifting" dynamics
     - The proofs of the results of the paper would no longer apply
-    - It isn't obvious how the learning rate ought to be chosen 
+    - It isn't obvious how the learning rate ought to be chosen
 
 ## Predictive State Smoothing (PRESS): Scalable non-parametric regression for high-dimensional data with variable selection
 
@@ -217,14 +217,14 @@
 - Summary:
   - Learns covariance structure and model together
   - Handles series with time-varying, high-dimensional covariance structure
-  - Simultaneously handles series at different scales (in terms of the range) 
+  - Simultaneously handles series at different scales (in terms of the range)
   - Uses a non-linear, deterministic state space model with transition dynamics
     parametrized using an LSTM-RNN
 - Praises:
   - Implemented in GluonTS (https://github.com/awslabs/gluon-ts/pull/497) by
     one of the coauthors who works on time series forecasting at AWS
   - Code for the paper at https://github.com/mbohlkeschneider/gluon-ts/tree/mv_release
-  - Good choice of baselines comparisons 
+  - Good choice of baselines comparisons
   - Demonstrates the importance of data transformations
 - Next steps:
   - Use in cases where we have a large number of time series known to have

@@ -4,22 +4,16 @@ Reformat python docstring.
 """
 
 import argparse
-import itertools
 import logging
 import os
-import py_compile
 import re
 import sys
-from typing import Any, List, Tuple, Type
+from typing import List, Tuple, Type
 
 import helpers.dbg as dbg
-import helpers.git as git
 import helpers.io_ as io_
-import helpers.list as hlist
 import helpers.parser as prsr
-import helpers.printing as prnt
 import helpers.system_interaction as si
-import helpers.unit_test as ut
 
 _LOG = logging.getLogger(__name__)
 
@@ -30,7 +24,6 @@ _TMP_DIR = os.path.abspath(os.getcwd() + "/tmp.linter")
 # #############################################################################
 # Utils.
 # #############################################################################
-
 
 
 def _write_file_back(file_name: str, txt: List[str], txt_new: List[str]) -> None:
@@ -384,7 +377,7 @@ def _parse() -> argparse.ArgumentParser:
     parser.add_argument(
         "--no_cleanup", action="store_true", help="Do not clean up tmp files"
     )
-    #parser.add_argument("--jenkins", action="store_true", help="Run as jenkins")
+    # parser.add_argument("--jenkins", action="store_true", help="Run as jenkins")
     # Test.
     parser.add_argument(
         "--test_actions", action="store_true", help="Print the possible actions"

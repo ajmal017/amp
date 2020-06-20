@@ -93,20 +93,7 @@ def _system(
     """
     Execute a shell command.
 
-    :param cmd: string with command to execute
-    :param abort_on_error: whether we should assert in case of error or not
-    :param suppress_error: set of error codes to suppress
-    :param suppress_output: whether to print the output or not
-        - If "on_debug_level" then print the output if the log level is DEBUG
-    :param blocking: blocking system call or not
-    :param wrapper: another command to prepend the execution of cmd
-    :param output_file: redirect stdout and stderr to this file
-    :param tee: if True, tee stdout and stderr to output_file
-    :param dry_run: just print the final command but not execute it
-    :param log_level: print the command to execute at level "log_level".
-        - If "echo" then print the command line to screen as print and not
-          logging
-    :return: return code (int), output of the command (str)
+    See system() for options.
     """
     orig_cmd = cmd[:]
     # Prepare the command line.
@@ -222,7 +209,21 @@ def system(
 ) -> int:
     """
     Execute a shell command, without capturing its output.
-    See _system() for options.
+
+    :param cmd: string with command to execute
+    :param abort_on_error: whether we should assert in case of error or not
+    :param suppress_error: set of error codes to suppress
+    :param suppress_output: whether to print the output or not
+        - If "on_debug_level" then print the output if the log level is DEBUG
+    :param blocking: blocking system call or not
+    :param wrapper: another command to prepend the execution of cmd
+    :param output_file: redirect stdout and stderr to this file
+    :param tee: if True, tee stdout and stderr to output_file
+    :param dry_run: just print the final command but not execute it
+    :param log_level: print the command to execute at level "log_level".
+        - If "echo" then print the command line to screen as print and not
+          logging
+    :return: return code (int), output of the command (str)
     """
     rc, _ = _system(
         cmd,

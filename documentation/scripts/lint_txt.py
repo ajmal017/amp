@@ -107,9 +107,9 @@ def _prettier(txt: str, print_width: Optional[int]) -> str:
     if print_width is not None:
         dbg.dassert_lte(1, print_width)
         cmd_opts.append("--print-width %s" % print_width)
-        #assert 0, print_width
+        # assert 0, print_width
     cmd_opts.append(tmp_file_name)
-    #cmd_opts.append("2>&1 >/dev/null")
+    # cmd_opts.append("2>&1 >/dev/null")
     cmd_opts_as_str = " ".join(cmd_opts)
     cmd_as_str = " ".join([executable, cmd_opts_as_str])
     _, output_tmp = si.system_to_string(cmd_as_str, abort_on_error=True)
@@ -135,9 +135,17 @@ def _postprocess(txt: str, in_file_name: Optional[str]) -> str:
     txt_new: List[str] = []
     # Remove empty lines before / after lines with only $$.
     txt = re.sub(r"^\s*\n(\s*\$\$)", r"\1", txt, 0, flags=re.MULTILINE)
-    txt = re.sub(r"^(\s*\$\$)\n\n+(\s*[a-z])", r"\1\n\2", txt, 0, flags=re.MULTILINE)
+    txt = re.sub(
+        r"^(\s*\$\$)\n\n+(\s*[a-z])", r"\1\n\2", txt, 0, flags=re.MULTILINE
+    )
     # Inline single line math equation $$ ... $$.
-    txt = re.sub(r"^(\s*)\$\$\n\1(.{,75})\n\s*\$\$\s*$", r"\1$$\2$$", txt, 0, flags=re.MULTILINE)
+    txt = re.sub(
+        r"^(\s*)\$\$\n\1(.{,75})\n\s*\$\$\s*$",
+        r"\1$$\2$$",
+        txt,
+        0,
+        flags=re.MULTILINE,
+    )
     for i, line in enumerate(txt.split("\n")):
         # Undo the transformation `* -> STAR`.
         line = re.sub(r"^\-(\s*)STAR", r"*\1", line, 0)
@@ -169,18 +177,25 @@ def _postprocess(txt: str, in_file_name: Optional[str]) -> str:
     txt_new_as_str = "\n".join(txt_new).rstrip("\n")
     # Ensure that there is exactly one empty line before each paragraph.
     regex = (
-            # Unless it is the first line.
-            r"(\S)" +
-            # Find a paragraph with as many \n before it.
-            r"\n*(\*+ .*)")
-    txt_new_as_str = re.sub(regex, r"\1\n\n\2", txt_new_as_str, 0, flags=re.MULTILINE)
+        # Unless it is the first line.
+        r"(\S)"
+        +
+        # Find a paragraph with as many \n before it.
+        r"\n*(\*+ .*)"
+    )
+    txt_new_as_str = re.sub(
+        regex, r"\1\n\n\2", txt_new_as_str, 0, flags=re.MULTILINE
+    )
     #
     regex = (
-            # Unless it is the first line.
-            #r"([\S|^#])" +
-            # Find a paragraph with as many \n before it.
-            r"\n*(#+ .*)")
-    txt_new_as_str = re.sub(regex, r"\n\n\1", txt_new_as_str, 0, flags=re.MULTILINE)
+        # Unless it is the first line.
+        # r"([\S|^#])" +
+        # Find a paragraph with as many \n before it.
+        r"\n*(#+ .*)"
+    )
+    txt_new_as_str = re.sub(
+        regex, r"\n\n\1", txt_new_as_str, 0, flags=re.MULTILINE
+    )
     return txt_new_as_str
 
 
@@ -244,7 +259,9 @@ def _to_execute_action(action: str, actions: Optional[List[str]]) -> bool:
 
 
 def process_txt(
-    txt: str, is_md_file: bool, in_file_name: Optional[str],
+    txt: str,
+    is_md_file: bool,
+    in_file_name: Optional[str],
     print_width: Optional[int] = None,
     actions: Optional[List[str]] = None,
 ) -> str:
@@ -280,7 +297,7 @@ _VALID_ACTIONS = [
     "prettier",
     "postprocess",
     "refresh_toc",
-    #"format_headers",
+    # "format_headers",
 ]
 
 
