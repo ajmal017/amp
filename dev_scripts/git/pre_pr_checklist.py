@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 """
-Qualify a branch for being merged to master.
+Qualify a branch for submitting a PR to master.
 
-> git_merge_branch.py
+> pre_pr_checklist.py
 """
 
 import argparse
@@ -21,6 +21,16 @@ import helpers.system_interaction as si
 _LOG = logging.getLogger(__name__)
 
 # #############################################################################
+
+
+def _check_hash_against_master():
+
+    > git rev-parse master
+95eb5cf98a01864a22d62cc7bf0e886fd0924670
+
+saggese@gpmaclocal.local conda:'p1_develop' branch:'master' ~/src/commodity_research2
+> git rev-parse origin/master
+95eb5cf98a01864a22d62cc7bf0e886fd0924670
 
 
 def _process_repo(

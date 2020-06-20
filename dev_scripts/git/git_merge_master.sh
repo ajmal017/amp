@@ -6,8 +6,8 @@
 
 source helpers.sh
 
-#branch="master"
-branch="PartTask2335_Re-enable_gluonts"
+branch="master"
+#branch="PartTask2335_Re-enable_gluonts"
 
 cmd="git fetch origin $branch:$branch"
 execute $cmd
@@ -15,7 +15,7 @@ execute $cmd
 cmd="git pull --autostash"
 execute $cmd
 
-cmd="git merge $branch"
+cmd="git merge $branch --commit --no-edit"
 execute $cmd
 
 cmd="git push"
