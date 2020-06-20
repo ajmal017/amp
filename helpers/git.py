@@ -539,3 +539,20 @@ def git_stash_apply(mode: str, log_level: int = logging.DEBUG) -> None:
     else:
         raise ValueError("mode='%s'" % mode)
     si.system(cmd, suppress_output=False, log_level=log_level)
+
+
+# #############################################################################
+
+
+def verify_client_clean(abort_on_error: bool = True) -> None:
+    modified_files = get_modified_files()
+    _LOG.debug("modified_files:\n%s", "\n".join(modified_files))
+    if modified_files:
+        if not abort_on_error:
+            _LOG.warning("The Git client is not clean: continuing as requested")
+        else:
+            _LOG.error(
+                "The Git client is not clean. Found modified_files:\n%s",
+                prnt.space("\n".join(modified_files)),
+            )
+            sys.exit(-1)

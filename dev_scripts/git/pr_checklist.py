@@ -33,20 +33,6 @@ _LOG = logging.getLogger(__name__)
 _ACTIONS = List[str]
 
 
-def _test_git_client_clean(debug: bool) -> None:
-    modified_files = git.get_modified_files()
-    _LOG.debug("modified_files:\n%s", "\n".join(modified_files))
-    if modified_files:
-        if debug:
-            _LOG.warning("The Git client is not clean: continuing")
-        else:
-            _LOG.error(
-                "The Git client is not clean. " "Found modified_files:\n%s",
-                prnt.space("\n".join(modified_files)),
-            )
-            sys.exit(-1)
-
-
 def _run_linter_on_dir(
     actions: _ACTIONS,
     cd_cmd: str,
@@ -165,52 +151,6 @@ _DEFAULT_ACTIONS = [
 ]
 
 
-def _main(parser: argparse.ArgumentParser) -> None:
-    args = parser.parse_args()
-    dbg.init_logger(verbosity=args.log_level, use_exec_path=True)
-    #
-    output = []
-    output.append("cmd=%s" % dbg.get_command_line())
-    # Print actions.
-    actions = prsr.select_actions(args, _VALID_ACTIONS, _DEFAULT_ACTIONS)
-    output.append("actions=%s" % actions)
-    add_frame = True
-    actions_as_str = prsr.actions_to_string(actions, _VALID_ACTIONS, add_frame)
-    _LOG.info("\n%s", actions_as_str)
-    #
-    dir_name = "."
-    dbg.dassert_exists(dir_name)
-    _LOG.debug("\n%s", prnt.frame("Processing: %s" % dir_name, char1=">"))
-    cd_cmd = "cd %s && " % dir_name
-    debug = args.debug
-    abort_on_error = not args.continue_on_error
-    # Test that the Git client is clean.
-    _test_git_client_clean(debug)
-    # Check the hash.
-    # actions = _merge_master_into_dir(actions, cd_cmd, dir_name, dst_branch)
-    # Run linter.
-    actions, output = _run_linter_on_dir(
-        actions, cd_cmd, abort_on_error, debug, output
-    )
-    # Run unit tests.
-    actions, output = _run_tests_for_dir(
-        actions, cd_cmd, args.test_list, abort_on_error, debug, output,
-    )
-    # Report the output.
-    _LOG.info("Summary file saved into '%s'", args.summary_file)
-    output_as_txt = "\n".join(output)
-    io_.to_file(args.summary_file, output_as_txt)
-    # Print output.
-    txt = io_.from_file(args.summary_file)
-    msg = "--> Please attach this to your PR <--"
-    print(prnt.frame(msg, char1="-").rstrip("\n"))
-    print(txt + "\n")
-    print(prnt.line(char="/").rstrip("\n"))
-    # Check that everything was executed.
-    if actions:
-        _LOG.error("actions='%s' were not processed", str(actions))
-
-
 def _parse() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -242,6 +182,52 @@ def _parse() -> argparse.ArgumentParser:
     parser.add_argument("--debug", action="store_true")
     prsr.add_verbosity_arg(parser)
     return parser
+
+
+def _main(parser: argparse.ArgumentParser) -> None:
+    args = parser.parse_args()
+    dbg.init_logger(verbosity=args.log_level, use_exec_path=True)
+    #
+    output = []
+    output.append("cmd=%s" % dbg.get_command_line())
+    # Print actions.
+    actions = prsr.select_actions(args, _VALID_ACTIONS, _DEFAULT_ACTIONS)
+    output.append("actions=%s" % actions)
+    add_frame = True
+    actions_as_str = prsr.actions_to_string(actions, _VALID_ACTIONS, add_frame)
+    _LOG.info("\n%s", actions_as_str)
+    #
+    dir_name = "."
+    dbg.dassert_exists(dir_name)
+    _LOG.debug("\n%s", prnt.frame("Processing: %s" % dir_name, char1=">"))
+    cd_cmd = "cd %s && " % dir_name
+    debug = args.debug
+    abort_on_error = not args.continue_on_error
+    # Test that the Git client is clean.
+    git.verify_client_clean(abort_on_error=not debug)
+    # Check the hash.
+    # actions = _merge_master_into_dir(actions, cd_cmd, dir_name, dst_branch)
+    # Run linter.
+    actions, output = _run_linter_on_dir(
+        actions, cd_cmd, abort_on_error, debug, output
+    )
+    # Run unit tests.
+    actions, output = _run_tests_for_dir(
+        actions, cd_cmd, args.test_list, abort_on_error, debug, output,
+    )
+    # Report the output.
+    _LOG.info("Summary file saved into '%s'", args.summary_file)
+    output_as_txt = "\n".join(output)
+    io_.to_file(args.summary_file, output_as_txt)
+    # Print output.
+    txt = io_.from_file(args.summary_file)
+    msg = "--> Please attach this to your PR <--"
+    print(prnt.frame(msg, char1="-").rstrip("\n"))
+    print(txt + "\n")
+    print(prnt.line(char="/").rstrip("\n"))
+    # Check that everything was executed.
+    if actions:
+        _LOG.error("actions='%s' were not processed", str(actions))
 
 
 if __name__ == "__main__":

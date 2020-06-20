@@ -1,6 +1,8 @@
 #!/usr/bin/env python
+
 """
-Compute the change of lints of a branch with respect to master.
+Compute the change of lints of a branch with respect to the point where it was
+branched from.
 """
 
 import argparse
@@ -9,6 +11,7 @@ import os
 import sys
 from typing import List, Optional, Tuple
 
+import helpers.dbg as dbg
 import helpers.git as git
 import helpers.io_ as io_
 import helpers.parser as prsr
@@ -23,9 +26,9 @@ def _clean_up_git_client() -> None:
     si.system(cmd)
 
 
-def _lint_after_branch(base_commit_sha: str) -> Tuple[int, bool, str]:
+def _lint_branch(base_commit_sha: str) -> Tuple[int, bool, str]:
     _LOG.info("Linting branch after changes")
-    linter_message: List[str] = []
+    msg: List[str] = []
     # Clean up the client from all linter artifacts.
     _clean_up_git_client()
     # Sync at the HEAD of the branch.
@@ -39,20 +42,20 @@ def _lint_after_branch(base_commit_sha: str) -> Tuple[int, bool, str]:
     _LOG.info("Branch dirty: %s", branch_dirty)
     tmp = "%d files not linted:\n%s" + prnt.space("\n".join(changed_files))
     tmp = "```\n" + tmp + "\n```\n"
-    linter_message.append(tmp)
+    msg.append(tmp)
     # Read the lints reported from the linter.
     linter_output_filename = "./linter_warnings.txt"
     tmp = io_.from_file(linter_output_filename)
     tmp = "```\n" + tmp + "\n```\n"
-    linter_message.append(tmp)
+    msg.append(tmp)
+    #
+    msg = "\n".join(msg)
     # Clean up the client from all linter artifacts.
     _clean_up_git_client()
-    return branch_lints, branch_dirty, linter_message
+    return branch_lints, branch_dirty, msg
 
 
-def _lint_before_branch(
-    base_commit_sha: str, mod_files: List[str]
-) -> Tuple[int, int]:
+def _lint_master(base_commit_sha: str, mod_files: List[str]) -> Tuple[int, int]:
     _LOG.info("Linting branch before changes")
     # Clean up the client from all linter artifacts.
     _clean_up_git_client()
@@ -108,18 +111,6 @@ def _calculate_exit_status(
     return exit_status, "\n".join(errors)
 
 
-def _compute_stats(
-    master_dirty: int, branch_dirty: int, master_lints: int, branch_lints: int,
-) -> Tuple[bool, bool, int, str]:
-    # Prepares a message and exit status
-    master_dirty_status = master_dirty > 0
-    branch_dirty_status = branch_dirty > 0
-    exit_status, errors = _calculate_exit_status(
-        branch_dirty_status, master_lints, branch_lints
-    )
-    return master_dirty_status, branch_dirty_status, exit_status, errors
-
-
 def _calculate_stats(
     base_commit_sha: str,
     head_commit_sha: str,
@@ -136,48 +127,73 @@ def _calculate_stats(
     :return: an integer representing the exit status and an error message.
     """
     dir_name = "."
-    # TODO(Sergey): Not sure what to do with files that are not present in the
+    # Find the files that are modified in the branch.
+    # TODO(gp): Not sure what to do with files that are not present in the
     #  branch.
     remove_files_non_present = False
-    # Find the files that are modified in the branch.
     mod_files = git.get_modified_files_in_branch(
         dir_name,
         base_commit_sha,
         remove_files_non_present=remove_files_non_present,
     )
-    branch_lints, branch_dirty, linter_message = _lint_after_branch(
-        base_commit_sha
+    #
+    branch_lints, branch_dirty, linter_message = _lint_branch(base_commit_sha)
+    master_lints, master_dirty = _lint_master(base_commit_sha, mod_files)
+    # Prepare a message and exit status.
+    master_dirty_status = master_dirty > 0
+    branch_dirty_status = branch_dirty > 0
+    exit_status, errors = _calculate_exit_status(
+        branch_dirty_status, master_lints, branch_lints
     )
-    master_lints, master_dirty = _lint_before_branch(base_commit_sha, mod_files)
-    (
-        master_dirty_status,
-        branch_dirty_status,
-        exit_status,
-        errors,
-    ) = _compute_stats(master_dirty, branch_dirty, master_lints, branch_lints)
-    # Message
-    message = list()
-    # Report title
+    # Package the message.
+    # pylint: disable=line-too-long,pointless-string-statement
+    """
+    # Results of the linter build
+
+    Console output: http://52.15.239.182:8080/job/p1.ci_tests/5408/consoleFull
+
+    - Master (sha: caadd4b)
+      - Number of lints: 0
+      - Dirty (i.e., linter was not run): False
+    - Branch (PartTask3000_Look_for_copper_price_data_in_WIND: f3ade60)
+      - Number of lints: 0
+      - Dirty (i.e., linter was not run): True
+    The number of lints introduced with this change: 0
+
+    ERROR: Run linter.py. -b locally before merging.
+
+    cmd line='/var/lib/jenkins/workspace/p1.ci_tests/5408/linter_tests/amp/dev_scripts/linter.py -t caadd4bc1c0998eb754c39ec675bd885a4376171'
+    actions=14 ['check_file_property', 'basic_hygiene', 'compile_python', 'autoflake', 'isort', 'black', 'flake8', 'pydocstyle', 'pylint', 'mypy', 'sync_jupytext', 'test_jupytext', 'custom_python_checks', 'lint_markdown']
+    file_names=1 ['./automl/notebooks/PartTask3000_Look_for_copper_price_data_in_WIND.py']
+    �[0m [sync_jupytext]
+    �[0m [test_jupytext]
+    ./automl/notebooks/PartTask3000_Look_for_copper_price_data_in_WIND.py: Your code has been rated at 10.00/10 (previous run: 10.00/10, +0.00) [pylint]
+    Fixing /var/lib/jenkins/workspace/p1.ci_tests/5408/linter_tests/automl/notebooks/PartTask3000_Look_for_copper_price_data_in_WIND.py [isort]
+    num_lints=0
+    """
+    message: List[str] = []
+    # Report title.
     message.append("# Results of the linter build")
-    # Console url for Jenkins
+    # Console url for Jenkins.
     console_url = os.path.join(str(build_url), "consoleFull")
+    console_message = "Console output: "
     if build_url is not None:
-        console_message = f"Console output: {console_url}"
+        console_message += console_url
     else:
-        console_message = "Console output: No console output"
+        console_message += "no console output"
     message.append(console_message)
-    # Statuses and additional info
+    # Statuses and additional info.
     message.append(f"- Master (sha: {base_commit_sha})")
-    message.append(f"\t- Number of lints: {master_lints}")
-    message.append(f"\t- Dirty (i.e., linter was not run): {master_dirty_status}")
+    message.append(f"  - Number of lints: {master_lints}")
+    message.append(f"  - Dirty (i.e., linter was not run): {master_dirty_status}")
     message.append(f"- Branch ({head_branch_name}: {head_commit_sha})")
-    message.append(f"\t- Number of lints: {branch_lints}")
-    message.append(f"\t- Dirty (i.e., linter was not run): {branch_dirty_status}")
+    message.append(f"  - Number of lints: {branch_lints}")
+    message.append(f"  - Dirty (i.e., linter was not run): {branch_dirty_status}")
     diff_lints = branch_lints - master_lints
     message.append(
         f"\nThe number of lints introduced with this change: {diff_lints}"
     )
-    # Format report in order. Message \n Errors \n Linter output.
+    # Format report in order.
     message = "\n".join(message)
     message += "\n\n" + errors
     message += "\n" + linter_message
@@ -191,22 +207,25 @@ def _parse() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    # Select files.
     parser.add_argument(
-        "--jenkins", action="store_true", help="",
+        "--jenkins", action="store_true", help="Run as Jenkins",
     )
     parser.add_argument("--base_commit_sha", type=str, required=False, help="")
     parser.add_argument("--head_branch_name", type=str, required=False, help="")
     parser.add_argument("--head_commit_sha", type=str, required=False, help="")
-
+    parser.add_argument("--debug", action="store_true")
     prsr.add_verbosity_arg(parser)
     return parser
 
 
 def _main(args: argparse.Namespace) -> int:
+    dbg.init_logger(args.log_level)
+    # Test that the Git client is clean.
+    git.verify_client_clean(abort_on_error=not args.debug)
+    #
     build_url = None
     if args.jenkins:
-        # Fetch the environment variable as passed by Jenkins from Git web-hook
+        # Fetch the environment variable as passed by Jenkins from Git web-hook.
         base_commit_sha = os.environ["data_pull_request_base_sha"]
         head_branch_name = os.environ["data_pull_request_head_ref"]
         head_commit_sha = os.environ["data_pull_request_head_sha"]
@@ -217,6 +236,7 @@ def _main(args: argparse.Namespace) -> int:
         base_commit_sha = args.base_commit_sha or "master"
         head_branch_name = args.head_branch_name or git.get_branch_name()
         head_commit_sha = args.head_commit_sha or git.get_current_commit_hash()
+    #
     rc, message = _calculate_stats(
         base_commit_sha, head_commit_sha, head_branch_name, build_url
     )
@@ -226,10 +246,10 @@ def _main(args: argparse.Namespace) -> int:
         io_.to_file("./tmp_exit_status.txt", str(rc))
     else:
         print(message)
-    cmd = "git reset --hard"
-    si.system(cmd)
-    cmd = f"git checkout {head_branch_name} --recurse-submodules"
+    #
+    _clean_up_git_client()
     # Clean up the branch bringing to the original status.
+    cmd = f"git checkout {head_branch_name} --recurse-submodules"
     si.system(cmd)
     return rc
 
