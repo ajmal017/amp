@@ -33,7 +33,9 @@ def _lint_branch(base_commit_sha: str) -> Tuple[int, bool, str]:
     _clean_up_git_client()
     # Sync at the HEAD of the branch.
     cmd = f"linter.py -t {base_commit_sha}"
-    branch_lints = si.system(cmd, abort_on_error=False)
+    branch_lints = si.system(
+        cmd, suppress_output=False, abort_on_error=False, log_level="echo"
+    )
     # Count the lints.
     _LOG.info("Branch lints: %s", branch_lints)
     # Check if the Git client is dirty.
@@ -63,8 +65,11 @@ def _lint_master(base_commit_sha: str, mod_files: List[str]) -> Tuple[int, int]:
     cmd = f"git checkout {base_commit_sha} --recurse-submodules"
     si.system(cmd)
     mod_files_as_str = " ".join(mod_files)
-    cmd = f"linter.py --files {mod_files_as_str} --post_check"
-    branch_lints = si.system(cmd, abort_on_error=False)
+    cmd = f"linter.py --files {mod_files_as_str}"
+    branch_lints = si.system(
+        cmd, suppress_output=False, abort_on_error=False, log_level="echo"
+    )
+
     # # We run the same comment twice since we need to get 2 different information
     # # from the linter.
     # # With `--post_check` we get information about whether any file needed to be
