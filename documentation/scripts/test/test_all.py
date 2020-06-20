@@ -436,7 +436,7 @@ $$"""
         act = prnt.remove_empty_lines(act)
         self.assert_equal(act, exp)
 
-    # #############################################################################
+    # #########################################################################
 
     @staticmethod
     def _get_text_problematic_for_prettier1() -> None:

@@ -1269,10 +1269,10 @@ def display_df(
     df,
     index=True,
     inline_index=False,
-    max_columns : int = 20,
-    max_colwidth :int = 50,
-    max_rows : int = 60,
-    width : int = 80,
+    max_columns: int = 20,
+    max_colwidth: int = 50,
+    max_rows: int = 60,
+    width: int = 80,
     as_txt=False,
     tag=None,
     mode=None,
@@ -1343,19 +1343,23 @@ def display_df(
             import IPython.core.display
 
             IPython.core.display.display(df)
-                #IPython.core.display.HTML(df.to_html(index=index))
-                    #index=index
-            #)
+            # IPython.core.display.HTML(df.to_html(index=index))
+            # index=index
+            # )
 
     # https://pandas.pydata.org/pandas-docs/stable/user_guide/options.html#available-options
     if mode is None:
         with pd.option_context(
-                "display.max_columns", max_columns,
-                "display.max_colwidth", max_colwidth,
-                "display.max_rows", max_rows,
-                "display.width", width
+            "display.max_columns",
+            max_columns,
+            "display.max_colwidth",
+            max_colwidth,
+            "display.max_rows",
+            max_rows,
+            "display.width",
+            width,
         ):
-            #_print_display()
+            # _print_display()
             display(df)
             assert 0
     elif mode == "all_rows":
@@ -1452,7 +1456,7 @@ def to_qgrid(df: pd.DataFrame) -> Any:
         "autoEdit": False,
     }
     df = df.copy()
-    #if not df.index.name:
+    # if not df.index.name:
     #    df.index.name = "index"
     qgrid_widget = qgrid.show_grid(
         df, show_toolbar=True, grid_options=grid_options

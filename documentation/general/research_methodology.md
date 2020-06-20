@@ -14,6 +14,7 @@
       * [Hierarchical config](#hierarchical-config)
       * [Mapping config params to free-standing functions](#mapping-config-params-to-free-standing-functions)
       * [Use functional approach, whenever possible](#use-functional-approach-whenever-possible)
+   * [Result_bundle](#result_bundle)
    * [Building a processing pipeline](#building-a-processing-pipeline)
       * [Simple approach](#simple-approach)
    * [Experiment workflows](#experiment-workflows)
@@ -69,7 +70,7 @@
   - One models gives weird results or crashes
   - How to debug it?
 
-- **_Solution_**
+- ___Solution___
   - Plug the config of the model that gives problem in the model notebook, run
     again, and debug it
 
@@ -79,12 +80,12 @@
   - E.g., a notebook is used to compute a feature (with lots of statistics), and
     the feature becomes a piece of a model (with lots of statistics)
 
-- **_Solution_**
+- ___Solution___
   - Move the code into a library and call the same code from multiple places,
     interleaving the code with stats / plots
-  - **_Pros_**
+  - ___Pros___
     - One can reuse the same "config" to run both notebooks
-  - **_Cons_**
+  - ___Cons___
     - We still have a bit of a code replication at the least for the structural
       part instantiating the pipeline
     - Unit test / static analysis / linter should help catch issues due to not
@@ -95,7 +96,7 @@
 - Often we need to post-process different models together
   - E.g., comparing models, A/B testing, mixing models
 
-- **_Solution_**
+- ___Solution___
   - Run all the notebooks to generate `ResultBundle`s
   - Load the bundles from different runs
   - Process in a specialized notebook, e.g.,
@@ -109,7 +110,7 @@
   - E.g., we want to compare two models (e.g., with a different param X), each
     model run on a universe of assets
 
-- **_Solution_**
+- ___Solution___
   - We assume that a model can run on multiple assets
     - We need to keep clear what is part of the predictive model and what is
       part of mixing the different outputs
@@ -120,13 +121,13 @@
 
 ## Variant analysis
 
-- **_Problem_**
+- ___Problem___
   - You create a model in a notebook, then you need to run many models changing
     a set of params
   - You have replicated code in the single-model notebook vs the variant
     analysis
 
-- **_Solution_**
+- ___Solution___
   - Use the config approach
   - Ideally one could reuse the "loop-around" approach with a "variant_analysis"
     notebook reading all the results
@@ -135,13 +136,13 @@
 
 ## Convert notebook into a library
 
-- **_Problem_**
+- ___Problem___
   - Often we start with a notebook to write code / debug
   - The we need to convert it into a script
     - E.g., we want to unit test, automate some tasks, compose functionalities
   - Potentially we might need to go back to a notebook representation
 
-- **_Solution_**
+- ___Solution___
   - Use libraries and Jupytext
   - There is still the fact that the flow calling the libraries is replicated
 
@@ -226,6 +227,7 @@
   - More memory / slower
 
 # `Result_bundle`
+
 - Should become an object
 - Each stage of the pipeline adds a dictionary with the results keyed on its
   name (e.g., use the name of the function)

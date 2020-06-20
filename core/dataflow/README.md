@@ -1,7 +1,17 @@
+<!--ts-->
+   * [Conventions](#conventions)
+   * [Class diagram](#class-diagram)
+   * [Code organization](#code-organization)
+      * [Node object](#node-object)
+      * [DAG object](#dag-object)
+
+
+
+<!--te-->
+
 # Conventions
 
 - In the following we refer to instantiated objects instead of classes
-
 
 # Class diagram
 
@@ -26,4 +36,3 @@
 ## `DAG` object
 
 - `DAG`s are built using `DagBuilder` objects, which are factory classes
-

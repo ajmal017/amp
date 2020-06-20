@@ -96,7 +96,12 @@ def _prettier(txt: str, print_width: Optional[int]) -> str:
     else:
         tmp_file_name = "/tmp/tmp_prettier.txt"
     io_.to_file(tmp_file_name, txt)
-    #
+    # For some reason prettier doesn't work when running on a file in /var on macOS
+    # (see PartTask2115). We solve this problem by `cd`-ing in the dir.
+    # > prettier ... /var/folders/13/T/tmpsgozpbq9
+    # becomes:
+    # > (cd /var/folders/13/T && prettier ... tmpsgozpbq9)
+    bug2115_fix = True
     executable = "prettier"
     cmd_opts: List[str] = []
     cmd_opts.append("--parser markdown")
@@ -107,11 +112,18 @@ def _prettier(txt: str, print_width: Optional[int]) -> str:
     if print_width is not None:
         dbg.dassert_lte(1, print_width)
         cmd_opts.append("--print-width %s" % print_width)
-        # assert 0, print_width
-    cmd_opts.append(tmp_file_name)
+    if bug2115_fix:
+        # Extract dir and filename from the temporary file.
+        dir_name = os.path.dirname(tmp_file_name)
+        file_name = os.path.basename(tmp_file_name)
+        cmd_opts.append(file_name)
+    else:
+        cmd_opts.append(tmp_file_name)
     # cmd_opts.append("2>&1 >/dev/null")
     cmd_opts_as_str = " ".join(cmd_opts)
     cmd_as_str = " ".join([executable, cmd_opts_as_str])
+    if bug2115_fix:
+        cmd_as_str = f"cd {dir_name} && {cmd_as_str}"
     _, output_tmp = si.system_to_string(cmd_as_str, abort_on_error=True)
     _LOG.debug("output_tmp=%s", output_tmp)
     #

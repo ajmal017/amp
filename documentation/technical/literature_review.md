@@ -9,6 +9,10 @@
    * [Time series](#time-series)
       * [On-Line Learning of Linear Dynamical Systems: Exponential Forgetting in Kalman Filters](#on-line-learning-of-linear-dynamical-systems-exponential-forgetting-in-kalman-filters)
       * [Predictive State Smoothing (PRESS): Scalable non-parametric regression for high-dimensional data with variable selection](#predictive-state-smoothing-press-scalable-non-parametric-regression-for-high-dimensional-data-with-variable-selection)
+      * [2019, High-Dimensional Multivariate Forecasting with Low-Rank Gaussian Copula Processes](#2019-high-dimensional-multivariate-forecasting-with-low-rank-gaussian-copula-processes)
+      * [2014, The topology of macro financial flow using stochastic flow diagrams](#2014-the-topology-of-macro-financial-flow-using-stochastic-flow-diagrams)
+   * [Computer engineering](#computer-engineering)
+      * [2015, Hidden technical debt in machine learning systems](#2015-hidden-technical-debt-in-machine-learning-systems)
 
 
 
@@ -41,11 +45,9 @@
     - Read the bibliography
     - Try experiments
 
-
-
 ## To cut and paste
-
 ```
+
 ## Year - Title
 - Paper authors:
 - [Link]()
@@ -210,7 +212,7 @@
 ## 2019, High-Dimensional Multivariate Forecasting with Low-Rank Gaussian Copula Processes
 
 - Paper authors: David Salinas, Michael Bohlke-Schneider, Laurent Callot,
-    Roberto Medico, Jan Gasthaus
+  Roberto Medico, Jan Gasthaus
 - Review author: Paul, 2019-12-28
 - [arXiv](https://arxiv.org/abs/1910.03002)
 - Score: 4/5
@@ -221,9 +223,10 @@
   - Uses a non-linear, deterministic state space model with transition dynamics
     parametrized using an LSTM-RNN
 - Praises:
-  - Implemented in GluonTS (https://github.com/awslabs/gluon-ts/pull/497) by
-    one of the coauthors who works on time series forecasting at AWS
-  - Code for the paper at https://github.com/mbohlkeschneider/gluon-ts/tree/mv_release
+  - Implemented in GluonTS (https://github.com/awslabs/gluon-ts/pull/497) by one
+    of the coauthors who works on time series forecasting at AWS
+  - Code for the paper at
+    https://github.com/mbohlkeschneider/gluon-ts/tree/mv_release
   - Good choice of baselines comparisons
   - Demonstrates the importance of data transformations
 - Next steps:
@@ -231,6 +234,7 @@
     meaningful correlations
 
 ## 2014, The topology of macro financial flow using stochastic flow diagrams
+
 - Paper authors: Calkin, De Prado
 - [Link](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2379319)
 - Review author / date: GP, 2020-01-17
@@ -244,8 +248,8 @@
     - Lags are delays
     - Geometric topology represents relationships better than tables
     - Connectivity of a vertex represents importance
-  - Agreed that econometrics as it is, is close to a pseudo-science
-    that more complex techniques are needed than inverting a matrix
+  - Agreed that econometrics as it is, is close to a pseudo-science that more
+    complex techniques are needed than inverting a matrix
 - Critiques:
   - Various inflammatory remarks and very little content
 - Next steps:
