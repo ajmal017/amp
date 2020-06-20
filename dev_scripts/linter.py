@@ -263,9 +263,7 @@ def _get_files_to_lint(
     #
     _LOG.debug("file_names=(%s) %s", len(file_names), " ".join(file_names))
     if len(file_names) < 1:
-        msg = "No files that can be linted are specified"
-        _LOG.error(msg)
-        raise ValueError(msg)
+        _LOG.warning("No files that can be linted are specified")
     return file_names
 
 
@@ -1401,19 +1399,6 @@ def _check_file_property(
     return output, actions
 
 
-def _are_git_files_changed() -> bool:
-    """
-    Check changes in the local repo.
-    If any file in the local repo changed, returns False.
-    """
-    result = True
-    changed_files = git.get_modified_files()
-    if changed_files:
-        _LOG.warning("Modified files: %s.", changed_files)
-        result = False
-    return result
-
-
 # #############################################################################
 # Actions.
 # #############################################################################
@@ -1852,11 +1837,6 @@ def _parse() -> argparse.ArgumentParser:
         help="File storing the warnings",
     )
     parser.add_argument("--no_print", action="store_true")
-    parser.add_argument(
-        "--post_check",
-        action="store_true",
-        help="Add post check. Return -1 if any file changed by the linter.",
-    )
     prsr.add_verbosity_arg(parser)
     return parser
 
@@ -1865,11 +1845,4 @@ if __name__ == "__main__":
     parser_ = _parse()
     args_ = parser_.parse_args()
     rc_ = _main(args_)
-    if args_.post_check:
-        if not _are_git_files_changed():
-            rc_ = 1
-            _LOG.warning(
-                "Detected that some files were changed so returning -1 as per "
-                "the option `--post_check`"
-            )
     sys.exit(rc_)
