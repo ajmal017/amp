@@ -29,37 +29,7 @@ _LOG = logging.getLogger(__name__)
 # #############################################################################
 
 
-def _merge_master_into_dir(actions, autostash, cd_cmd, dir_name, dst_branch):
-    # TODO(gp): `git pull` ensures that the Git client is clean. We can have a
-    #  better check, if needed.
-    #
-    action = "git_fetch_dst_branch"
-    to_execute, actions = prsr.mark_action(action, actions)
-    if to_execute:
-        branch_name = git.get_branch_name(dir_name)
-        _LOG.debug("branch_name='%s'", branch_name)
-        if branch_name != "master":
-            cmd = "git fetch origin %s:%s" % (dst_branch, dst_branch)
-            si.system(cd_cmd + cmd)
-    #
-    action = "git_pull"
-    to_execute, actions = prsr.mark_action(action, actions)
-    if to_execute:
-        cmd = "git pull"
-        if autostash:
-            _LOG.warning("Using `git pull --autostash`")
-            cmd += " --autostash"
-        si.system(cd_cmd + cmd)
-    #
-    action = "git_merge_master"
-    to_execute, actions = prsr.mark_action(action, actions)
-    if to_execute:
-        cmd = "git merge master --commit --no-edit"
-        si.system(cd_cmd + cmd)
-    return actions
-
-
-def _run_linter_on_dir(actions, cd_cmd, dir_name, dst_branch, output):
+def _run_linter_on_dir(actions, cd_cmd, dir_name, debug, abort_on_error, output):
     action = "linter"
     to_execute, actions = prsr.mark_action(action, actions)
     if to_execute:
@@ -69,7 +39,12 @@ def _run_linter_on_dir(actions, cd_cmd, dir_name, dst_branch, output):
         if dir_name != ".":
             linter_log = "%s.%s" % (dir_name, linter_log)
         linter_log = os.path.abspath(linter_log)
-        cmd = "linter.py -b --linter_log %s" % linter_log
+        if debug:
+            file_name = git.find_file_in_git_tree("test_dbg.py")
+            _LOG.warning("Running a quick lint")
+            cmd = "linter.py -f %s --linter_log %s" % (file_name, linter_log)
+        else:
+            cmd = "linter.py -b --linter_log %s" % linter_log
         rc = si.system(
             cd_cmd + cmd,
             suppress_output=False,
@@ -92,19 +67,21 @@ def _run_linter_on_dir(actions, cd_cmd, dir_name, dst_branch, output):
     #    cmd = f"{amp_path}/dev_scripts/linter_master_report.py"
     #    _, output = si.system_to_string(cmd, abort_on_error=False)
     #    print(output.strip())
-    return actions
+    return actions, output
 
 
 def _run_tests_for_dir(
-    abort_on_error, actions, cd_cmd, dir_name, is_ok, output, quick, test_list
+    actions, cd_cmd, dir_name, test_list, debug, abort_on_error, output,
 ):
     action = "run_tests"
     to_execute, actions = prsr.mark_action(action, actions)
+    is_ok = True
     if to_execute:
         output.append(prnt.frame("%s: unit tests" % dir_name))
-        if quick:
+        if debug:
             _LOG.warning("Running a quick unit test")
-            cmd = "pytest -k Test_dassert1"
+            file_name = git.find_file_in_git_tree("test_dbg.py")
+            cmd = "pytest %s::Test_dassert1" % file_name
         else:
             # Delete pytest.
             si.pytest_clean_artifacts(".")
@@ -112,7 +89,8 @@ def _run_tests_for_dir(
             cmd = "run_tests.py --test %s --num_cpus -1" % test_list
         output.append("cmd line='%s'" % cmd)
         rc = si.system(
-            cd_cmd + cmd, suppress_output=False, abort_on_error=abort_on_error
+            cd_cmd + cmd, suppress_output=False, abort_on_error=abort_on_error,
+            log_level="echo"
         )
         output.append("  rc=%s" % rc)
         if not abort_on_error and rc != 0:
@@ -120,77 +98,8 @@ def _run_tests_for_dir(
                 "WARNING: unit tests failed: skipping as per user request"
             )
         # Update the function rc.
-        is_ok &= rc == 0
-    return actions, is_ok
-
-
-def _process_repo(
-    actions: List[str],
-    dir_name: str,
-    dst_branch: str,
-    test_list: str,
-    abort_on_error: bool,
-    quick: bool,
-    autostash: bool,
-) -> Tuple[bool, List[str], List[str]]:
-    """
-    Qualify a branch stored in `dir_name`, running linter and unit tests.
-
-    :param dst_branch: directory containing the branch
-    :param test_list: test list to run (e.g., fast, slow)
-    :param quick: run a single test instead of the entire regression test
-    """
-    dbg.dassert_exists(dir_name)
-    _LOG.debug("\n%s", prnt.frame("Processing: %s" % dir_name, char1=">"))
-    is_ok = True
-    output: List[str] = []
-    cd_cmd = "cd %s && " % dir_name
-
-    # actions = _merge_master_into_dir(actions, autostash, cd_cmd, dir_name, dst_branch)
-    #
-    actions = _run_linter_on_dir(actions, cd_cmd, dir_name, dst_branch, output)
-    #
-    actions, is_ok = _run_tests_for_dir(
-        abort_on_error, actions, cd_cmd, dir_name, is_ok, output, quick, test_list
-    )
-    return is_ok, output, actions
-
-
-# def _merge_all_branches(
-#     actions: List[str], dst_branch: str, target_dirs: List[str]
-# ) -> List[str]:
-#     action = "merge"
-#     to_execute, actions = prsr.mark_action(action, actions)
-#     if to_execute:
-#         # We need to merge the submodules first.
-#         for dir_name in reversed(target_dirs):
-#             branch_name = git.get_branch_name(dir_name)
-#             if branch_name == dst_branch:
-#                 _LOG.warning(
-#                     "Skipping merging in dir '%s' since it's already " "'%s'",
-#                     dir_name,
-#                     dst_branch,
-#                 )
-#             else:
-#                 _LOG.warning(
-#                     "Merging '%s' -> '%s' in dir '%s'",
-#                     branch_name,
-#                     dst_branch,
-#                     dir_name,
-#                 )
-#                 cd_cmd = "cd %s && " % dir_name
-#                 cmd_arr = []
-#                 cmd_arr.append("git checkout master")
-#                 cmd_arr.append("git pull")
-#                 msg = "Merging %s -> %s" % (branch_name, dst_branch)
-#                 cmd_arr.append(
-#                     "git merge %s -m '%s' --no-ff --commit" % (branch_name, msg)
-#                 )
-#                 cmd_arr.append("git push")
-#                 # TODO(gp): Delete branch.
-#                 cmd = " && ".join(cmd_arr)
-#                 si.system(cd_cmd + cmd)
-#     return actions  # type: ignore
+        is_ok = rc == 0
+    return actions, is_ok, output
 
 
 # #############################################################################
@@ -219,37 +128,21 @@ def _main(parser: argparse.ArgumentParser) -> None:
     add_frame = True
     actions_as_str = prsr.actions_to_string(actions, _VALID_ACTIONS, add_frame)
     _LOG.info("\n%s", actions_as_str)
-    # Find the target repos.
-    # Note that the repos should be in reversed topological order, i.e., the
-    # first one is the supermodule.
-    target_dirs = ["."]
-    if False:
-        # TODO(gp): What to do with infra?
-        dir_name = "amp"
-        if os.path.exists(dir_name):
-            target_dirs.append(dir_name)
-    msg = "target_dirs=%s" % target_dirs
-    _LOG.info(msg)
-    output.append(msg)
     #
-    is_ok = True
-    for dir_name in target_dirs:
-        actions_tmp = actions[:]
-        abort_on_error = not args.continue_on_error
-        is_ok_tmp, output_tmp, actions_tmp = _process_repo(
-            actions_tmp,
-            dir_name,
-            args.dst_branch,
-            args.test_list,
-            abort_on_error,
-            args.quick,
-            args.autostash,
-        )
-        is_ok &= is_ok_tmp
-        output.extend(output_tmp)
-        # Update the actions on the last loop.
-        if dir_name == target_dirs[-1]:
-            actions = actions_tmp
+    dir_name = "."
+    dbg.dassert_exists(dir_name)
+    _LOG.debug("\n%s", prnt.frame("Processing: %s" % dir_name, char1=">"))
+    cd_cmd = "cd %s && " % dir_name
+    debug = args.debug
+    abort_on_error = not args.continue_on_error
+    # Check the hash.
+    # actions = _merge_master_into_dir(actions, cd_cmd, dir_name, dst_branch)
+    # Run linter.
+    actions, output = _run_linter_on_dir(actions, cd_cmd, dir_name, debug, abort_on_error, output)
+    # Run unit tests.
+    actions, is_ok, output = _run_tests_for_dir(
+        actions, cd_cmd, dir_name, args.test_list, debug, abort_on_error, output,
+    )
     # Report the output.
     _LOG.info("Summary file saved into '%s'", args.summary_file)
     output_as_txt = "\n".join(output)
@@ -265,10 +158,6 @@ def _main(parser: argparse.ArgumentParser) -> None:
         _LOG.error(
             "Can't merge since some repo didn't pass the qualification process"
         )
-    else:
-        actions = _merge_all_branches(actions, args.dst_branch, target_dirs)
-    # Forward amp.
-    # TODO(gp): Implement this.
     # Check that everything was executed.
     if actions:
         _LOG.error("actions=%s were not processed", str(actions))
@@ -285,11 +174,8 @@ def _parse() -> argparse.ArgumentParser:
         help="Branch to merge into, typically " "master",
     )
     prsr.add_action_arg(parser, _VALID_ACTIONS, _DEFAULT_ACTIONS)
-    parser.add_argument(
-        "--autostash", action="store_true", help="Use --autostash in git pull"
-    )
     parser.add_argument("--test_list", action="store", default="slow")
-    parser.add_argument("--quick", action="store_true")
+    parser.add_argument("--debug", action="store_true")
     parser.add_argument(
         "--continue_on_error",
         action="store_true",

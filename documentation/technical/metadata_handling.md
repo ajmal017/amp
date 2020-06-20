@@ -38,7 +38,6 @@
 
 <!--te-->
 
-
 # Definitions and principles
 
 ## `DataSource`
@@ -529,22 +528,23 @@
 
 - P1 data
 
-It's ok if we decide not to process the data, if we don't think it's high priority. So it's ok to stop here, but we can use it to implement the rest of the KG / ETL2 flow.
-Taking a look the CSV file in the zip file is compatible to our metadata statistics flow, which we started but not finished. We should complete it at some point.
-I would still import the metadata in our system (#578, #921) even if we don't have the payload data available in accessible form through the Uniform access (#951)
-Let's start using some standard names
-#578 -> MonsterDataSourceDb
-#921 -> MonsterTimeSeriesDb
-#951 -> UniformETL
-I propose as next immediate steps to use this data source as running example to implement the entire system
-Save the csv file with the metadata in ETL2 as "raw" data
-We should be able to access this in the same way we can access "raw" data
-Map the columns of this specific metadata csv file to our general metadata flow
-Finish the metadata statistics flow
-Run the statistics flow on this data
-Import the metadata about this data source into the MonsterDataSourceDb
-We should have an entry about this data source reporting the state as "raw data downloaded, metadata processed, data not exposed through UniformETL"
-Import all the metadata about the time series into the MonsterTimeSeriesDb
+It's ok if we decide not to process the data, if we don't think it's high
+priority. So it's ok to stop here, but we can use it to implement the rest of
+the KG / ETL2 flow. Taking a look the CSV file in the zip file is compatible to
+our metadata statistics flow, which we started but not finished. We should
+complete it at some point. I would still import the metadata in our system
+(#578, #921) even if we don't have the payload data available in accessible form
+through the Uniform access (#951) Let's start using some standard names #578 ->
+MonsterDataSourceDb #921 -> MonsterTimeSeriesDb #951 -> UniformETL I propose as
+next immediate steps to use this data source as running example to implement the
+entire system Save the csv file with the metadata in ETL2 as "raw" data We
+should be able to access this in the same way we can access "raw" data Map the
+columns of this specific metadata csv file to our general metadata flow Finish
+the metadata statistics flow Run the statistics flow on this data Import the
+metadata about this data source into the MonsterDataSourceDb We should have an
+entry about this data source reporting the state as "raw data downloaded,
+metadata processed, data not exposed through UniformETL" Import all the metadata
+about the time series into the MonsterTimeSeriesDb
 
 ## Knowledge base
 
