@@ -29,22 +29,29 @@ _LOG = logging.getLogger(__name__)
 # #############################################################################
 
 
-def _run_linter_on_dir(actions, cd_cmd, dir_name, debug, abort_on_error, output):
+_ACTIONS = List[str]
+
+
+def _run_linter_on_dir(
+    actions: _ACTIONS, cd_cmd: str, debug: bool, output: List[str]
+) -> Tuple[_ACTIONS, bool, List[str]]:
     action = "linter"
     to_execute, actions = prsr.mark_action(action, actions)
+    is_ok = True
     if to_execute:
-        output.append(prnt.frame("%s: linter log" % dir_name))
-        #
-        linter_log = "linter_log.txt"
-        if dir_name != ".":
-            linter_log = "%s.%s" % (dir_name, linter_log)
-        linter_log = os.path.abspath(linter_log)
+        output.append(prnt.frame(action))
+        # Prepare the output file.
+        linter_log = os.path.abspath("linter_log.txt")
+        # Prepare command line.
         if debug:
             file_name = git.find_file_in_git_tree("test_dbg.py")
             _LOG.warning("Running a quick lint")
-            cmd = "linter.py -f %s --linter_log %s" % (file_name, linter_log)
+            cmd = f"linter.py -f {file_name}"
         else:
-            cmd = "linter.py -b --linter_log %s" % linter_log
+            cmd = "linter.py -b"
+        cmd = f"{cmd} --linter_log {linter_log}"
+        output.append("cmd line='%s'" % cmd)
+        # Run command line.
         rc = si.system(
             cd_cmd + cmd,
             suppress_output=False,
@@ -52,8 +59,13 @@ def _run_linter_on_dir(actions, cd_cmd, dir_name, debug, abort_on_error, output)
             log_level="echo",
         )
         _LOG.info("linter output=\n%s", linter_log)
-        if rc != 0:
-            _LOG.warning("There are lints. Please take time to fix them")
+        # Process result.
+        output.append("  rc=%s" % rc)
+        is_ok = rc == 0
+        if not is_ok:
+            output_tmp = "WARNING: there are lints"
+            _LOG.warning(output_tmp)
+            output.append(output_tmp)
         # Read output from the linter.
         txt = io_.from_file(linter_log)
         output.append(txt)
@@ -67,17 +79,21 @@ def _run_linter_on_dir(actions, cd_cmd, dir_name, debug, abort_on_error, output)
     #    cmd = f"{amp_path}/dev_scripts/linter_master_report.py"
     #    _, output = si.system_to_string(cmd, abort_on_error=False)
     #    print(output.strip())
-    return actions, output
+    return actions, is_ok, output
 
 
 def _run_tests_for_dir(
-    actions, cd_cmd, dir_name, test_list, debug, abort_on_error, output,
-):
+    actions: _ACTIONS,
+    cd_cmd: str,
+    test_list: List[str],
+    debug: bool,
+    output: List[str],
+) -> Tuple[_ACTIONS, bool, List[str]]:
     action = "run_tests"
     to_execute, actions = prsr.mark_action(action, actions)
     is_ok = True
     if to_execute:
-        output.append(prnt.frame("%s: unit tests" % dir_name))
+        output.append(prnt.frame(action))
         if debug:
             _LOG.warning("Running a quick unit test")
             file_name = git.find_file_in_git_tree("test_dbg.py")
@@ -88,17 +104,20 @@ def _run_tests_for_dir(
             # Run the tests.
             cmd = "run_tests.py --test %s --num_cpus -1" % test_list
         output.append("cmd line='%s'" % cmd)
+        # Run command line.
         rc = si.system(
-            cd_cmd + cmd, suppress_output=False, abort_on_error=abort_on_error,
-            log_level="echo"
+            cd_cmd + cmd,
+            suppress_output=False,
+            abort_on_error=False,
+            log_level="echo",
         )
+        # Process result.
         output.append("  rc=%s" % rc)
-        if not abort_on_error and rc != 0:
-            output.append(
-                "WARNING: unit tests failed: skipping as per user request"
-            )
-        # Update the function rc.
         is_ok = rc == 0
+        if not is_ok:
+            output_tmp = "WARNING: unit tests failed"
+            _LOG.warning(output_tmp)
+            output.append(output_tmp)
     return actions, is_ok, output
 
 
@@ -138,11 +157,15 @@ def _main(parser: argparse.ArgumentParser) -> None:
     # Check the hash.
     # actions = _merge_master_into_dir(actions, cd_cmd, dir_name, dst_branch)
     # Run linter.
-    actions, output = _run_linter_on_dir(actions, cd_cmd, dir_name, debug, abort_on_error, output)
+    actions, is_ok, output = _run_linter_on_dir(actions, cd_cmd, debug, output)
+    if abort_on_error and not is_ok:
+        _LOG.error("Found errors while linting: exiting")
     # Run unit tests.
     actions, is_ok, output = _run_tests_for_dir(
-        actions, cd_cmd, dir_name, args.test_list, debug, abort_on_error, output,
+        actions, cd_cmd, args.test_list, debug, output,
     )
+    if abort_on_error and not is_ok:
+        _LOG.error("Found errors while running unit tests: exiting")
     # Report the output.
     _LOG.info("Summary file saved into '%s'", args.summary_file)
     output_as_txt = "\n".join(output)
