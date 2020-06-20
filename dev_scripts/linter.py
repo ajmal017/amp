@@ -567,7 +567,9 @@ class _Black(_Action):
         # - All done!
         # - 1 file left unchanged.
         to_remove = ["All done!", "file left unchanged", "reformatted"]
-        output = [line for line in output if all(word not in line for word in to_remove)]
+        output = [
+            line for line in output if all(word not in line for word in to_remove)
+        ]
         return output
 
 
