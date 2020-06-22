@@ -235,7 +235,7 @@ def _main(parser: argparse.ArgumentParser) -> None:
     _LOG.info("cmd line=%s", dbg.get_command_line())
     # Slurp file.
     lines = io_.from_file(args.input).split("\n")
-    lines = [l.rstrip("\n") for l in lines]
+    lines = [line.rstrip("\n") for line in lines]
     out: List[str] = []
     # Add some directive for pandoc.
     out.append(r"""\let\emph\textit""")

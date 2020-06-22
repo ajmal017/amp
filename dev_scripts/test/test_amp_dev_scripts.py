@@ -326,15 +326,15 @@ class Test_linter_py1(ut.TestCase):
         # Process log.
         output = []
         output.append("# linter log")
-        for l in txt.split("\n"):
+        for line in txt.split("\n"):
             # Remove the line:
             #   cmd line='.../linter.py -f input.py --linter_log ./linter.log'
-            if "cmd line=" in l:
+            if "cmd line=" in line:
                 continue
             # Filter out code rate because of #2241
-            if "Your code has been rated at" in l:
+            if "Your code has been rated at" in line:
                 continue
-            output.append(l)
+            output.append(line)
         # Read output.
         _LOG.debug("file_name=%s", file_name)
         output.append("# linter file")

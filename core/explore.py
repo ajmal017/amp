@@ -155,7 +155,7 @@ def drop_axis_with_all_nans(
 
 def drop_na(df, drop_infs=False, report_stats=False, *args, **kwargs):
     """
-    Wrapper around pd.dropna() reporting information about the removed rows.
+    Wrap pd.dropna() reporting information about the removed rows.
     """
     dbg.dassert_isinstance(df, pd.DataFrame)
     num_rows_before = df.shape[0]
@@ -230,8 +230,7 @@ def drop_duplicates(
     df: pd.DataFrame, subset: Optional[List[str]] = None
 ) -> pd.DataFrame:
     """
-    Wrapper around pd.drop_duplicates() reporting information about theremoved
-    rows.
+    Wrap around pd.drop_duplicates() reporting information about theremoved rows.
 
     :df: Df to drop duplicates from.
     :subset: Columns subset.
@@ -976,7 +975,7 @@ def ols_regress(
     predicted_var_delay: int = 0,
     predictor_vars_delay: int = 0,
     max_nrows: float = 1e4,
-) -> Dict[str, Any]:
+) -> Optional[Dict[str, Any]]:
     """
     Perform OLS on columns of a dataframe.
 
@@ -1107,7 +1106,7 @@ def ols_regress_series(
     return val
 
 
-def pvalue_to_stars(pval):
+def pvalue_to_stars(pval: float) -> str:
     if np.isnan(pval):
         stars = "NA"
     else:
@@ -1360,7 +1359,7 @@ def display_df(
             width,
         ):
             # _print_display()
-            display(df)
+            IPython.core.display.display(df)
             assert 0
     elif mode == "all_rows":
         with pd.option_context(

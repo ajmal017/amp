@@ -14,6 +14,7 @@
 import argparse
 import logging
 import sys
+from typing import Tuple
 
 import helpers.dbg as dbg
 import helpers.parser as prsr
@@ -32,7 +33,9 @@ _LOG = logging.getLogger(__name__)
 #  - run all the tests there
 
 
-def _build_pytest_opts(args, test: str):
+def _build_pytest_opts(
+    args: argparse.Namespace, test: str
+) -> Tuple[str, str, str]:
     pytest_mark_opts = []
     pytest_target = ""
     if test in ("fast", "slow"):
@@ -93,29 +96,23 @@ def _parse() -> argparse.ArgumentParser:
         action="store",
         default="fast",
         type=str,
-        help="Run a given set of tests (e.g., fast) or a given test using pytest"
-        " specification style",
+        help="Run a given set of tests (e.g., fast)"
     )
     parser.add_argument(
         "--num_cpus",
         action="store",
         type=int,
-        default=1,
+        default=-1,
         help="Use up to a certain number of CPUs (1=serial, -1=all available CPUs)",
     )
     parser.add_argument("--coverage", action="store_true")
     parser.add_argument(
         "--extra_pytest_arg",
         action="store",
-        help="Options to add to the standard pytest command line",
+        help="Options to pass to pytest",
     )
     parser.add_argument(
-        "--override_pytest_arg",
-        action="store",
-        help="Options to override to the standard pytest command line",
-    )
-    parser.add_argument(
-        "--collect_only", action="store_true", help="Only collection step"
+        "--collect_only", action="store_true", help="Perform only collection step"
     )
     parser.add_argument(
         "--skip_collect", action="store_true", help="Skip the collection step"
@@ -123,10 +120,27 @@ def _parse() -> argparse.ArgumentParser:
     parser.add_argument(
         "--jenkins", action="store_true", help="Run tests as Jenkins"
     )
-    #
+    # Debug.
+    parser.add_argument(
+        "--override_pytest_arg",
+        action="store",
+        help="Override standard pytest command line",
+    )
     parser.add_argument("--dry_run", action="store_true")
     prsr.add_verbosity_arg(parser)
     return parser
+
+
+def _system(cmd: str, dry_run: bool) -> None:
+    print(pri.frame("> " + cmd))
+    wrapper = None
+    si.system(
+        cmd,
+        wrapper=wrapper,
+        suppress_output=False,
+        dry_run=dry_run,
+        log_level="echo",
+    )
 
 
 # TODO(gp): Refactor this function in smaller pieces.
@@ -139,27 +153,6 @@ def _main(parser: argparse.ArgumentParser) -> None:
     _LOG.debug("%s -> %s", args.log_level, log_level)
     #
     # Report current setup.
-    #
-    wrapper = []
-    if wrapper:
-        wrapper = " && ".join(wrapper)
-        if args.log_level >= logging.DEBUG:
-            # Silence the wrapper.
-            wrapper = "((" + wrapper + ") 2>%1 >/dev/null)"
-    else:
-        wrapper = None
-    _LOG.debug("wrapper=%s", wrapper)
-
-    def _system(cmd, dry_run):
-        print(pri.frame("> " + cmd))
-        si.system(
-            cmd,
-            wrapper=wrapper,
-            suppress_output=False,
-            dry_run=dry_run,
-            log_level=logging.DEBUG,
-        )
-
     #
     if args.jenkins:
         cmds = [

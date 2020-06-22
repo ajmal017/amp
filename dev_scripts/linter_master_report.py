@@ -43,9 +43,13 @@ def _lint_branch(base_commit_sha: str) -> Tuple[int, bool, str]:
     changed_files = git.get_modified_files()
     branch_dirty = len(changed_files) != 0
     _LOG.info("Branch dirty: %s", branch_dirty)
-    tmp = "%d files not linted:\n%s" + prnt.space("\n".join(changed_files))
-    tmp = "```\n" + tmp + "\n```\n"
-    msg.append(tmp)
+    if branch_dirty:
+        tmp = "%d files not linted:\n%s" % (
+            len(changed_files),
+            prnt.space("\n".join(changed_files)),
+        )
+        tmp = "```\n" + tmp + "\n```\n"
+        msg.append(tmp)
     # Read the lints reported from the linter.
     tmp = io_.from_file(linter_out)
     tmp = "```\n" + tmp + "\n```\n"
