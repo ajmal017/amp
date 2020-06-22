@@ -299,44 +299,47 @@ def list_to_str(
     return txt
 
 
-# TODO(gp): -> set_diff_to_str
-def print_set_diff(
+def set_diff_to_str(
     obj1: Iterable,
     obj2: Iterable,
     obj1_name: str = "obj1",
     obj2_name: str = "obj2",
     add_space: bool = False,
-) -> None:
+) -> str:
     def _to_string(obj: Iterable) -> str:
         return " ".join(map(str, obj))
-
-    print("# %s vs %s" % (obj1_name, obj2_name))
+    res : List[str] = []
+    #
+    res.append("# %s vs %s" % (obj1_name, obj2_name))
     obj1 = set(obj1)
     dbg.dassert_lte(1, len(obj1))
     print("* %s: (%s) %s" % (obj1_name, len(obj1), _to_string(obj1)))
     if add_space:
-        print()
+        res.append("")
     #
     obj2 = set(obj2)
     dbg.dassert_lte(1, len(obj2))
-    print("* %s: (%s) %s" % (obj2_name, len(obj2), _to_string(obj2)))
+    res.append("* %s: (%s) %s" % (obj2_name, len(obj2), _to_string(obj2)))
     if add_space:
-        print()
+        res.append("")
     #
     intersection = obj1.intersection(obj2)
-    print("* intersect=(%s) %s" % (len(intersection), _to_string(intersection)))
+    res.append("* intersect=(%s) %s" % (len(intersection), _to_string(intersection)))
     if add_space:
-        print()
+        res.append()
     #
     diff = obj1 - obj2
-    print("* %s-%s=(%s) %s" % (obj1_name, obj2_name, len(diff), _to_string(diff)))
+    res.append("* %s-%s=(%s) %s" % (obj1_name, obj2_name, len(diff), _to_string(diff)))
     if add_space:
-        print()
+        res.append("")
     #
     diff = obj2 - obj1
-    print("* %s-%s=(%s) %s" % (obj2_name, obj1_name, len(diff), _to_string(diff)))
+    res.append("* %s-%s=(%s) %s" % (obj2_name, obj1_name, len(diff), _to_string(diff)))
     if add_space:
-        print()
+        res.append("")
+    #
+    res = "\n".join(res)
+    return res
 
 
 def dataframe_to_str(
