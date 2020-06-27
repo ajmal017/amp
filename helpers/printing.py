@@ -342,6 +342,7 @@ def set_diff_to_str(
     return res
 
 
+# TODO(gp): This seems redundant with hut.convert_df_to_string.
 def dataframe_to_str(
     df: Any,
     max_columns: int = 10000,
