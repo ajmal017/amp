@@ -5,6 +5,7 @@ import helpers.git as git
 """
 
 import collections
+import functools
 import logging
 import os
 import re
@@ -26,6 +27,7 @@ _LOG = logging.getLogger(__name__)
 
 
 # TODO(gp): -> get_user_name(). No stuttering.
+@functools.lru_cache(maxsize=None)
 def get_git_name() -> str:
     """
     Return the git user name.
@@ -40,6 +42,7 @@ def get_git_name() -> str:
 
 # TODO(gp): Make the param mandatory.
 # TODO(gp): git_dir -> dir_name
+@functools.lru_cache(maxsize=None)
 def get_branch_name(git_dir: str = ".") -> str:
     """
     Return the name of the Git branch we are in.
@@ -56,6 +59,7 @@ def get_branch_name(git_dir: str = ".") -> str:
 # TODO(gp): Add mem caching to some functions below. We assume that one doesn't
 #  change dir (which is a horrible idea) and thus we can memoize.
 # TODO(gp): -> is_submodule
+@functools.lru_cache(maxsize=None)
 def is_inside_submodule(git_dir: str = ".") -> bool:
     """
     Return whether we are inside a Git submodule or in a Git supermodule.
@@ -70,6 +74,7 @@ def is_inside_submodule(git_dir: str = ".") -> bool:
     return ret
 
 
+@functools.lru_cache(maxsize=None)
 def get_client_root(super_module: bool) -> str:
     """
     Return the full path of the root of the Git client.
@@ -107,6 +112,7 @@ def find_file_in_git_tree(file_in: str, super_module: bool = True) -> str:
     return file_name
 
 
+@functools.lru_cache(maxsize=None)
 def get_repo_symbolic_name_from_dirname(git_dir: str) -> str:
     """
     Return the name of the repo in `git_dir`.
