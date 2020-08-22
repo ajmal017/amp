@@ -1,11 +1,12 @@
 import getpass
-import logging
+from typing import Tuple
 
 import helpers.dbg as dbg
 
 NOTIFY_JUPYTER_TOKEN = "885497142:AAHOe-Uabi2BIU-eof3Pyyjkq1bbPn1v5do"
 
-def get_info():
+
+def get_info() -> Tuple[str, str]:
 
     user = getpass.getuser()
 
@@ -17,7 +18,6 @@ def get_info():
     # https://api.telegram.org/bot<telegram_token>/getUpdates and get your chat id.
     # (If you are using @NotifyJupyterBot, go to
     # https://api.telegram.org/bot885497142:AAHOe-Uabi2BIU-eof3Pyyjkq1bbPn1v5do/getUpdates )
-
 
     if user == "julia":
         telegram_token = NOTIFY_JUPYTER_TOKEN
