@@ -217,10 +217,19 @@ def _main(parser: argparse.ArgumentParser) -> None:
         # run_tests.py --coverage --test /Users/saggese/src/commodity_research4/amp/core/dataflow/test/test_nodes.py
         # coverage report
         # coverage report --show_missing
-        # coverage report --include=core/dataflow/*
-        # coverage report --include=core/dataflow/* --omit=*/test/test_*
+        # coverage report --include=*core/dataflow/*
+        # coverage report --include=*core/dataflow/* --omit=*/test/test_*
+        # 
+        # To remove all the coverage info:
+        # > make coverage_clean
+        # > find . -name "*,cover" | xargs rm -rf
+        # > rm -rf ./htmlcov
+        #
         # Compare to master.
-        # Go to your browser at open htmlcov/index.html
+        # https://github.com/marketplace/codecov
+        #
+        # Go to your browser for the file `htmlcov/index.html`
+        # > `open htmlcov/index.html`
         # https://stackoverflow.com/questions/10252010/serializing-class-instance-to-json
         # https://github.com/jsonpickle/jsonpickle
         pass
