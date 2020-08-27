@@ -11,8 +11,8 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 import gluonts.model.deepar as gmd
 import gluonts.trainer as gt
-import numpy as np
 import pandas as pd
+import sklearn as skl
 
 import core.backtest as bcktst
 import core.data_adapters as adpt
@@ -673,6 +673,7 @@ class ContinuousSkLearnModel(FitPredictNode):
             model_attribute_info[k] = v
         info["model_attributes"] = model_attribute_info
         info["insample_perf"] = self._model_perf(fwd_y_df, fwd_y_hat)
+        info["insample_score"] = self._score(fwd_y_df, fwd_y_hat)
         self._set_info("fit", info)
         # Return targets and predictions.
         df_out = fwd_y_df.reindex(idx).merge(
@@ -707,6 +708,7 @@ class ContinuousSkLearnModel(FitPredictNode):
         info = collections.OrderedDict()
         info["model_params"] = self._model.get_params()
         info["model_perf"] = self._model_perf(fwd_y_df, fwd_y_hat)
+        info["model_score"] = self._score(fwd_y_df, fwd_y_hat)
         self._set_info("predict", info)
         # Return targets and predictions.
         df_out = fwd_y_df.reindex(idx).merge(
@@ -746,7 +748,25 @@ class ContinuousSkLearnModel(FitPredictNode):
         else:
             raise ValueError(f"Unrecognized nan_mode `{self._nan_mode}`")
 
-    # TODO(Paul): Add type hints.
+    def _score(
+        self,
+        y_true: Union[pd.Series, pd.DataFrame],
+        y_pred: Union[pd.Series, pd.DataFrame],
+    ) -> Optional[float]:
+        """
+        Compute accuracy for classification or R^2 score for regression.
+        """
+        if skl.base.is_classifier(self._model):
+            metric = skl.metrics.accuracy_score
+        elif skl.base.is_regressor(self._model):
+            metric = skl.metrics.r2_score
+        else:
+            return None
+        # In `predict()` method, `y_pred` may exist for index where `y_true`
+        # is already `NaN`.
+        y_true = y_true.loc[: y_true.last_valid_index()]
+        return metric(y_true, y_pred.loc[y_true.index])
+
     # TODO(Paul): Consider omitting this (and relying on downstream
     #     processing to e.g., adjust for number of hypotheses tested).
     @staticmethod
@@ -759,8 +779,8 @@ class ContinuousSkLearnModel(FitPredictNode):
             y_hat.rename(columns=lambda x: x.replace("_hat", ""))
         )
         info["pnl_rets"] = pnl_rets
-        info["sr"] = stats.compute_sharpe_ratio(
-            pnl_rets.resample("1B").sum(), time_scaling=252
+        info["sr"] = stats.compute_annualized_sharpe_ratio(
+            pnl_rets.resample("1B").sum()
         )
         return info
 
@@ -830,7 +850,9 @@ class UnsupervisedSkLearnModel(FitPredictNode):
     def predict(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
         return self._fit_predict_helper(df_in, fit=False)
 
-    def _fit_predict_helper(self, df_in: pd.DataFrame, fit: bool = False):
+    def _fit_predict_helper(
+        self, df_in: pd.DataFrame, fit: bool = False
+    ) -> Dict[str, pd.DataFrame]:
         """
         Factor out common flow for fit/predict.
 
@@ -961,7 +983,9 @@ class Residualizer(FitPredictNode):
     def predict(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
         return self._fit_predict_helper(df_in, fit=False)
 
-    def _fit_predict_helper(self, df_in: pd.DataFrame, fit: bool = False):
+    def _fit_predict_helper(
+        self, df_in: pd.DataFrame, fit: bool = False
+    ) -> Dict[str, pd.DataFrame]:
         """
         Factor out common flow for fit/predict.
 
@@ -987,7 +1011,6 @@ class Residualizer(FitPredictNode):
         x_transform = self._model.transform(x_fit)
         x_hat = self._model.inverse_transform(x_transform)
         #
-        x_transform.shape[1]
         x_residual = adpt.transform_from_sklearn(
             non_nan_idx, x_vars, x_fit - x_hat
         )
@@ -1026,145 +1049,6 @@ class Residualizer(FitPredictNode):
         dbg.dassert(df.index.freq)
 
     # TODO(Paul): Make this a mixin to use with all modeling nodes.
-    @staticmethod
-    def _to_list(to_list: Union[List[str], Callable[[], List[str]]]) -> List[str]:
-        """
-        Return a list given its input.
-
-        - If the input is a list, the output is the same list.
-        - If the input is a function that returns a list, then the output of
-          the function is returned.
-
-        How this might arise in practice:
-          - A ColumnTransformer returns a number of x variables, with the
-            number dependent upon a hyperparameter expressed in config
-          - The column names of the x variables may be derived from the input
-            dataframe column names, not necessarily known until graph execution
-            (and not at construction)
-          - The ColumnTransformer output columns are merged with its input
-            columns (e.g., x vars and y vars are in the same DataFrame)
-        Post-merge, we need a way to distinguish the x vars and y vars.
-        Allowing a callable here allows us to pass in the ColumnTransformer's
-        method `transformed_col_names` and defer the call until graph
-        execution.
-        """
-        if callable(to_list):
-            to_list = to_list()
-        if isinstance(to_list, list):
-            return to_list
-        raise TypeError("Data type=`%s`" % type(to_list))
-
-
-class SkLearnModel(FitPredictNode):
-    def __init__(
-        self,
-        nid: str,
-        x_vars: Union[List[str], Callable[[], List[str]]],
-        y_vars: Union[List[str], Callable[[], List[str]]],
-        model_func: Callable[..., Any],
-        model_kwargs: Optional[Any] = None,
-    ) -> None:
-        super().__init__(nid)
-        self._model_func = model_func
-        self._model_kwargs = model_kwargs or {}
-        self._x_vars = x_vars
-        self._y_vars = y_vars
-        self._model = None
-
-    def fit(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
-        SkLearnModel._validate_input_df(df_in)
-        dbg.dassert(
-            df_in[df_in.isna().any(axis=1)].index.empty,
-            "NaNs detected at index `%s`",
-            str(df_in[df_in.isna().any(axis=1)].head().index),
-        )
-        df = df_in.copy()
-        idx = df.index
-        x_vars, x_fit, y_vars, y_fit = self._to_sklearn_format(df)
-        self._model = self._model_func(**self._model_kwargs)
-        self._model = self._model.fit(x_fit, y_fit)
-        y_hat = self._model.predict(x_fit)
-        #
-        x_fit, y_fit, y_hat = self._from_sklearn_format(
-            idx, x_vars, x_fit, y_vars, y_fit, y_hat
-        )
-        # TODO(Paul): Summarize model perf or make configurable.
-        # TODO(Paul): Consider separating model eval from fit/predict.
-        info = collections.OrderedDict()
-        info["model_x_vars"] = x_vars
-        info["model_params"] = self._model.get_params()
-        self._set_info("fit", info)
-        #
-        dbg.dassert_no_duplicates(y_hat.columns)
-        return {"df_out": y_hat}
-
-    def predict(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
-        SkLearnModel._validate_input_df(df_in)
-        df = df_in.copy()
-        idx = df.index
-        x_vars, x_predict, y_vars, y_predict = self._to_sklearn_format(df)
-        dbg.dassert_is_not(
-            self._model, None, "Model not found! Check if `fit` has been run."
-        )
-        y_hat = self._model.predict(x_predict)
-        x_predict, y_predict, y_hat = self._from_sklearn_format(
-            idx, x_vars, x_predict, y_vars, y_predict, y_hat
-        )
-        info = collections.OrderedDict()
-        info["model_params"] = self._model.get_params()
-        info["model_perf"] = self._model_perf(x_predict, y_predict, y_hat)
-        self._set_info("predict", info)
-        #
-        dbg.dassert_no_duplicates(y_hat.columns)
-        return {"df_out": y_hat}
-
-    @staticmethod
-    def _validate_input_df(df: pd.DataFrame) -> None:
-        """
-        Assert if df violates constraints, otherwise return `None`.
-        """
-        dbg.dassert_isinstance(df, pd.DataFrame)
-        dbg.dassert_no_duplicates(df.columns)
-
-    # TODO(Paul): Add type hints.
-    @staticmethod
-    def _model_perf(
-        x: pd.DataFrame, y: pd.DataFrame, y_hat: pd.DataFrame
-    ) -> collections.OrderedDict:
-        _ = x
-        info = collections.OrderedDict()
-        # info["hitrate"] = pip._compute_model_hitrate(self.model, x, y)
-        pnl_rets = y.multiply(y_hat.rename(columns=lambda x: x.strip("_hat")))
-        info["pnl_rets"] = pnl_rets
-        info["sr"] = stats.compute_sharpe_ratio(
-            pnl_rets.resample("1B").sum(), time_scaling=252
-        )
-        return info
-
-    def _to_sklearn_format(
-        self, df: pd.DataFrame
-    ) -> Tuple[List[str], np.array, List[str], np.array]:
-        x_vars = self._to_list(self._x_vars)
-        y_vars = self._to_list(self._y_vars)
-        x_vals, y_vals = adpt.transform_to_sklearn_old(df, x_vars, y_vars)
-        return x_vars, x_vals, y_vars, y_vals
-
-    @staticmethod
-    def _from_sklearn_format(
-        idx: pd.Index,
-        x_vars: List[str],
-        x_vals: np.array,
-        y_vars: List[str],
-        y_vals: np.array,
-        y_hat: np.array,
-    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-        x = adpt.transform_from_sklearn(idx, x_vars, x_vals)
-        y = adpt.transform_from_sklearn(idx, y_vars, y_vals)
-        y_h = adpt.transform_from_sklearn(
-            idx, [y + "_hat" for y in y_vars], y_hat
-        )
-        return x, y, y_h
-
     @staticmethod
     def _to_list(to_list: Union[List[str], Callable[[], List[str]]]) -> List[str]:
         """
@@ -1356,7 +1240,7 @@ class ContinuousDeepArModel(FitPredictNode):
         dbg.dassert_no_duplicates(df.columns)
         dbg.dassert(df.index.freq)
 
-    def _get_fwd_y_df(self, df):
+    def _get_fwd_y_df(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Return dataframe of `steps_ahead` forward y values.
         """

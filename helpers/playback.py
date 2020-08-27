@@ -1,5 +1,4 @@
-"""
-Code to automatically generate unit tests for functions.
+"""Code to automatically generate unit tests for functions.
 
 Import as:
 
@@ -10,10 +9,9 @@ import json
 import logging
 from typing import Any
 
-import jsonpickle
-
+import jsonpickle  # type: ignore
 # Register the pandas handler.
-import jsonpickle.ext.pandas as jsonpickle_pd
+import jsonpickle.ext.pandas as jsonpickle_pd  # type: ignore
 import pandas as pd
 
 import helpers.dbg as dbg
@@ -25,8 +23,7 @@ _LOG = logging.getLogger(__name__)
 
 # TODO: Unit test and add more types.
 def to_python_code(obj: Any) -> str:
-    """
-    Serialize an object into a string of python code.
+    """Serialize an object into a string of python code.
 
     :param obj: an object to serialize
     :return: a string of python code building the object
@@ -41,8 +38,8 @@ def to_python_code(obj: Any) -> str:
     elif isinstance(obj, list):
         # List ["a", 1] -> '["a", 1]'.
         output_tmp = "["
-        for l in obj:
-            output_tmp += to_python_code(l) + ", "
+        for line in obj:
+            output_tmp += to_python_code(line) + ", "
         output_tmp = output_tmp.rstrip(", ") + "]"
         output.append(output_tmp)
     elif isinstance(obj, dict):
@@ -76,8 +73,7 @@ class Playback:
     def __init__(
         self, mode: str, func_name: str, *args: Any, **kwargs: Any
     ) -> None:
-        """
-        Initialize the class variables.
+        """Initialize the class variables.
 
         :param mode: the type of unit test to be generated (e.g. "assert_equal")
         :param func_name: the name of the function to test
@@ -93,8 +89,7 @@ class Playback:
         self.kwargs = kwargs
 
     def run(self, func_output: Any) -> str:
-        """
-        Generate a unit test for the function.
+        """Generate a unit test for the function.
 
         The unit test compares the actual function output with the expected
         `func_output`.
@@ -169,12 +164,11 @@ class Playback:
         # Try to execute in a fake environment.
         # local_env = {}
         # _ = exec(output, local_env)
-        _ = exec(output)
+        _ = exec(output)  # pylint: disable=exec-used
 
 
 def json_pretty_print(parsed: Any) -> str:
-    """
-    Pretty print a json object.
+    """Pretty print a json object.
 
     :param parsed: a json object
     :return: a prettified json object
@@ -187,8 +181,8 @@ def json_pretty_print(parsed: Any) -> str:
 
 
 def round_trip_convert(obj1: Any, log_level: int) -> Any:
-    """
-    Encode and decode with `jsonpickle` ensuring the object remains the same.
+    """Encode and decode with `jsonpickle` ensuring the object remains the
+    same.
 
     :param obj1: the initial object
     :param log_level: the level of logging

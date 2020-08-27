@@ -788,7 +788,7 @@ def plot_time_distributions(dts, mode, density=True):
         ),
     )
     if mode == "time_of_the_day":
-        # Converts in minutes from the beginning of the day.
+        # Convert in minutes from the beginning of the day.
         data = [dt.time() for dt in dts]
         data = [t.hour * 60 + t.minute for t in data]
         # 1 hour bucket.
