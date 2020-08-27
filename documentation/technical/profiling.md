@@ -10,18 +10,131 @@
 
 <!--te-->
 
-# Profiling
+# To run:
+#   python -m cProfile -o prof.bin CMD
+#   python -m cProfile -o prof.bin test/run_tests.py -v 10 TestComputeDerivedFeatures2.test3
 
-## Selected profilers
-You can find all of the examples below in action in the
-[time_memory_profiling_example.ipynb](https://github.com/alphamatic/amp/blob/master/core/notebooks/time_memory_profiling_example.ipynb)
-notebook.
+# cProfile
+- Profile functions
+  > profile $CMD
+- Follow instruction on screen to plot call graph and or post process the
+  profiling data
 
-### Time profilers
+# line_profiler
+- Profile a function line by line
+- Decorate target function with @profile (or check kernprof.py -h for more
+  ways of marking the interesting parts of code)
+  > kernprof -l -o line_profile.lprof $CMD
+  > python -m line_profiler line_profile.lprof
 
-#### Overall
+python3 -m cProfile -o profile -m pytest edgar/forms8/test/test_edgar_utils.py::TestExtractTablesFromForms::test_table_extraction_example_2
 
-In a notebook, execute cell with
+# Profiling from command line
+
+## Profiling time and max memory
+
+- You can use the time tested `time`
+
+```bash
+> /usr/bin/time -v COMMAND 2>&1 | tee time.log
+
+Command being timed: "...COMMAND..."
+User time (seconds): 187.70
+System time (seconds): 16.27
+Percent of CPU this job got: 96%
+Elapsed (wall clock) time (h:mm:ss or m:ss): 3:31.38
+Average shared text size (kbytes): 0
+Average unshared data size (kbytes): 0
+Average stack size (kbytes): 0
+Average total size (kbytes): 0
+Maximum resident set size (kbytes): 13083892
+Average resident set size (kbytes): 0
+Major (requiring I/O) page faults: 0
+Minor (reclaiming a frame) page faults: 9911066
+Voluntary context switches: 235772
+Involuntary context switches: 724
+Swaps: 0
+File system inputs: 424
+File system outputs: 274320
+Socket messages sent: 0
+Socket messages received: 0
+Signals delivered: 0
+Page size (bytes): 4096
+Exit status: 0
+```
+
+- Information about the spent time are:
+  ```bash
+  User time (seconds): 187.70
+  System time (seconds): 16.27
+  Percent of CPU this job got: 96%
+  Elapsed (wall clock) time (h:mm:ss or m:ss): 3:31.38
+  ```
+
+- The relevant part is the following line representing the amount of resident
+  memory (which is ~13GB)
+  ```bash
+  ...
+  Maximum resident set size (kbytes): 13083892
+  ...
+  ```
+
+##
+
+```
+> gprof2dot -h
+```
+
+Interesting options are:
+
+Options:
+  -h, --help            show this help message and exit
+  -o FILE, --output=FILE
+                        output filename [stdout]
+  -n PERCENTAGE, --node-thres=PERCENTAGE
+                        eliminate nodes below this threshold [default: 0.5]
+  -e PERCENTAGE, --edge-thres=PERCENTAGE
+                        eliminate edges below this threshold [default: 0.1]
+
+  --node-label=MEASURE  measurements to on show the node (can be specified
+                        multiple times): self-time, self-time-percentage,
+                        total-time or total-time-percentage [default: total-
+                        time-percentage, self-time-percentage]
+  -z ROOT, --root=ROOT  prune call graph to show only descendants of specified
+                        root function
+  -l LEAF, --leaf=LEAF  prune call graph to show only ancestors of specified
+                        leaf function
+  --depth=DEPTH         prune call graph to show only descendants or ancestors
+                        until specified depth
+  --skew=THEME_SKEW     skew the colorization curve.  Values < 1.0 give more
+                        variety to lower percentages.  Values > 1.0 give less
+                        variety to lower percentages
+  -p FILTER_PATHS, --path=FILTER_PATHS
+                        Filter all modules not in a specified path
+
+
+gprof2dot -f pstats profile | dot -Tpng -o output.png
+
+gprof2dot -n 10 -f pstats profile | dot -Tpng -o output.png
+
+gprof2dot -n 10 -f pstats profile -l "*extract_tables_from_forms*" | dot -Tpng -o output.png
+
+
+Removing the pytest
+
+python -m cProfile -o profile edgar/forms8/test/test_edgar_utils.py
+
+# Profiling in a Jupyter notebook
+
+- You can find all of the examples below in action in the
+  [time_memory_profiling_example.ipynb](https://github.com/alphamatic/amp/blob/master/core/notebooks/time_memory_profiling_example.ipynb)
+  notebook.
+
+## Time profilers
+
+### Overall
+
+- In a notebook, execute cell with
 [%time](https://ipython.readthedocs.io/en/stable/interactive/magics.html#magic-time)
 cell-magic:
 
@@ -30,14 +143,14 @@ cell-magic:
 func()
 ```
 
-#### By function
+### By function
 
-We selected
+- We prefer
 [cProfile](https://docs.python.org/2/library/profile.html#module-cProfile) for
 profiling and [gprof2dot](https://github.com/jrfonseca/gprof2dot) for
 visualization.
 
-The documentation does not state this, but
+- The documentation does not state this, but
 [%prun](https://github.com/ipython/ipython/blob/master/IPython/core/magics/execution.py#L22)
 magic now
 [uses](https://github.com/ipython/ipython/blob/master/IPython/core/magics/execution.py#L22)
@@ -65,23 +178,24 @@ that make output more readable:
 dspl.Image(filename="output.png")
 ```
 
-This will filter the output into something like this:
+- This will filter the output into something like this:
 
 ![](img/gprof2dot_output2.png)
 
-### Memory profilers
+## Memory profilers
 
-We are using [memory-profiler](https://github.com/pythonprofilers/memory_profiler).
+- We prefer using [memory-profiler](https://github.com/pythonprofilers/memory_profiler).
 
-#### Peak memory
+### Peak memory
 
 ```python
 %%memit
 func()
 ```
 
-#### Memory by line
+### Memory by line
 
 ```python
 %mprun -f func func()
 ```
+
