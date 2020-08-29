@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 
 """
-- To run the tests
+# To run the tests
 > run_tests.py
 
-- To dry run
+# To dry run
 > run_tests.py --dry_run -v DEBUG
 
-- To run coverage
+# To run coverage
 > run_tests.py --test datetime_utils_test.py --coverage -v DEBUG
 """
 
@@ -219,7 +219,7 @@ def _main(parser: argparse.ArgumentParser) -> None:
         # coverage report --show_missing
         # coverage report --include=*core/dataflow/*
         # coverage report --include=*core/dataflow/* --omit=*/test/test_*
-        # 
+        #
         # To remove all the coverage info:
         # > make coverage_clean
         # > find . -name "*,cover" | xargs rm -rf
