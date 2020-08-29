@@ -301,6 +301,7 @@ def plot_barplot(
     orientation: str = "vertical",
     annotation_mode: str = "pct",
     string_format: str = "%.2f",
+    top_n_to_plot: Optional[int] = None,
     title: Optional[str] = None,
     xlabel: Optional[str] = None,
     unicolor: bool = False,
@@ -316,6 +317,7 @@ def plot_barplot(
     :param orientation: vertical or horizontal bars
     :param annotation_mode: `pct`, `value` or None
     :param string_format: format of bar annotations
+    :param top_n_to_plot: number of top N integers to plot
     :param title: title of the plot
     :param xlabel: label of the X axis
     :param unicolor: if True, plot all bars in neutral blue color
@@ -334,15 +336,26 @@ def plot_barplot(
             return x_ + max(width_, 0), y_
         raise ValueError("Invalid orientation='%s'" % orientation)
 
+    # Get default figure size.
     if figsize is None:
         figsize = FIG_SIZE
+    if top_n_to_plot is None:
+        # If top_n not specified, plot all values.
+        srs_top_n = srs
+    else:
+        # Assert N>0.
+        dbg.dassert_lte(1, top_n_to_plot)
+        # Sort in descending order.
+        srs_sorted = srs.sort_values(ascending=False)
+        # Select top N.
+        srs_top_n = srs_sorted[:top_n_to_plot]
     # Choose colors.
     if unicolor:
         color = sns.color_palette("muted")[0]
     else:
         color_palette = color_palette or sns.diverging_palette(10, 133, n=2)
         color = (srs > 0).map({True: color_palette[-1], False: color_palette[0]})
-    # Plot.
+    # Choose orientation.
     if orientation == "vertical":
         kind = "bar"
     elif orientation == "horizontal":
@@ -350,10 +363,13 @@ def plot_barplot(
     else:
         raise ValueError("Invalid orientation='%s'" % orientation)
     ax = ax or plt.gca()
-    srs.plot(
+    # Plot top N.
+    srs_top_n.plot(
         kind=kind, color=color, rot=rotation, title=title, ax=ax, figsize=figsize
     )
     # Add annotations to bars.
+    # Note: annotations in both modes are taken from
+    # entire series, not top N.
     if annotation_mode:
         if annotation_mode == "pct":
             annotations = srs * 100 / srs.sum()
@@ -363,12 +379,14 @@ def plot_barplot(
             annotations = srs.apply(lambda z: string_format % z)
         else:
             raise ValueError("Invalid annotations_mode='%s'" % annotation_mode)
+        # Annotate bars.
         for i, p in enumerate(ax.patches):
             height = p.get_height()
             width = p.get_width()
             x, y = p.get_xy()
             annotation_loc = _get_annotation_loc(x, y, height, width)
             ax.annotate(annotations.iloc[i], annotation_loc)
+    # Set X-axis label.
     if xlabel:
         ax.set(xlabel=xlabel)
 
@@ -1584,6 +1602,66 @@ def plot_rolling_beta(
     ax.set_xlabel("period")
     ax.set_ylabel("beta")
     _maybe_add_events(ax=ax, events=events)
+    ax.legend()
+
+
+def plot_sharpe_ratio_panel(
+    log_rets: pd.Series,
+    frequencies: Optional[List[str]] = None,
+    ax: Optional[mpl.axes.Axes] = None,
+) -> None:
+    """
+    Plot how SRs vary under resampling.
+
+    :param log_rets: log returns
+    :param frequencies: frequencies to calculate SR for
+    :param ax: axis
+    """
+    dbg.dassert_isinstance(log_rets, pd.Series)
+    frequencies = frequencies or ["B", "D", "W", "M", "Q"]
+    srs_freq = pd.infer_freq(log_rets.index)
+    if not srs_freq:
+        _LOG.warning("Input has no frequency and it has been rescaled to 'D'")
+        srs_freq = "D"
+    # Resample input for assuring input frequency in calculations.
+    log_rets = sigp.resample(log_rets, rule=srs_freq).sum()
+    # Initiate series for Sharpe ratios of selected frequencies.
+    sr_series = pd.Series([], dtype="object")
+    # Initiate list for Sharpe ratios' standard errors for error bars.
+    res_se = []
+    # Initiate list for frequencies that do not lead to upsampling.
+    valid_frequencies = []
+    # Compute input frequency points per year for identifying upsampling.
+    input_freq_points_per_year = hdf.infer_sampling_points_per_year(log_rets)
+    for freq in frequencies:
+        freq_points_per_year = hdf.compute_points_per_year_for_given_freq(freq)
+        if freq_points_per_year > input_freq_points_per_year:
+            _LOG.warning(
+                "Upsampling from input freq='%s' to freq='%s' is blocked"
+                % (srs_freq, freq)
+            )
+            continue
+        resampled_log_rets = sigp.resample(log_rets, rule=freq).sum()
+        if len(resampled_log_rets) == 1:
+            _LOG.warning(
+                "Resampling to freq='%s' is blocked because resampled series has only 1 observation"
+                % freq
+            )
+            continue
+        sr = stats.compute_annualized_sharpe_ratio(resampled_log_rets)
+        se = stats.compute_annualized_sharpe_ratio_standard_error(
+            resampled_log_rets
+        )
+        sr_series[freq] = sr
+        res_se.append(se)
+        valid_frequencies.append(freq)
+    ax = ax or plt.gca()
+    sr_series.plot(
+        yerr=res_se, marker="o", capsize=2, ax=ax, label="Sharpe ratio"
+    )
+    ax.set_xticks(range(len(valid_frequencies)))
+    ax.set_xticklabels(valid_frequencies)
+    ax.set_xlabel("Frequencies")
     ax.legend()
 
 
