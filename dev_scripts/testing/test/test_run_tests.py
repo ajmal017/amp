@@ -16,6 +16,18 @@ import helpers.unit_test as ut
 
 _LOG = logging.getLogger(__name__)
 
+import dev_scripts.testing.run_tests as run_tests
 
-class Test_url_py1(ut.TestCase):
-    def test_get_file_name1(self) -> None:
+
+class Test_RunTests1(ut.TestCase):
+    def_test(self):
+
+    def test_build_pytest_opts1(self) -> None:
+        args = Dict()
+        args.test = "fast"
+        collect_opts, opts = run_tests._build_pytest_opts(args)
+
+    def test_build_pytest_opts2(self) -> None:
+        args = Dict()
+        args.test = "slow"
+        collect_opts, opts = run_tests._build_pytest_opts(args)

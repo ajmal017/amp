@@ -32,59 +32,77 @@ _LOG = logging.getLogger(__name__)
 #  - find all the largest subset of including dirs
 #  - run all the tests there
 
-
 def _build_pytest_opts(
-    args: argparse.Namespace, test: str
-) -> Tuple[str, str, str]:
-    pytest_mark_opts = []
-    pytest_target = ""
-    if test in ("fast", "slow"):
-        if test == "fast":
-            mark_opts = "not slow"
-        elif test == "slow":
-            mark_opts = ""
-        else:
-            raise ValueError("Invalid '%s'" % test)
-        if mark_opts:
-            mark_opts += " and"
-        # Skip certain tests, if needed.
-        mark_opts += " not broken_deps"
-        if si.get_server_name() in ("gpmac",):
-            mark_opts += " and not aws_deps"
-        pytest_mark_opts.append(mark_opts)
+    args: argparse.Namespace
+) -> Tuple[str, str]:
+    """
+    Build the command options for pytest from the command line.
+
+    :return:
+        - options for pytest collect step
+        - options for pytest
+    """
+    #
+    # Build the marker.
+    #
+    test = args.test
+    # Options for pytest.
+    # -> opts
+    opts = []
+    marker = []
+    if test == "fast":
+        # `> pytest`
+        if args.ci:
+            # Report all the tests.
+            # opts += " --durations=0"
+            # 5 secs limit.
+            opts.append(" --durations=5")
+    elif test == "slow":
+        # `> pytest -m "slow"`
+        marker.append("slow")
+        if args.ci:
+            # 2 mins limit.
+            opts.append(" --durations=120")
+    elif test == "superslow":
+        # `> pytest -m "superslow"`
+        marker.append("superslow")
+        if args.ci:
+            # 30 mins limit.
+            opts.append(" --durations=1800")
     else:
-        # Pick a specific test.
-        if test:
-            pytest_target = test
-        else:
-            pytest_target = "."
-    # Build the options.
-    pytest_opts = ""
-    if pytest_mark_opts:
-        pytest_opts += '-m "' + " and ".join(pytest_mark_opts) + '"'
-    #
-    pytest_collect_opts = pytest_opts
-    #
-    if args.jenkins:
-        # Report the tests with a certain duration.
-        # pytest_opts += " --durations=0"
-        pytest_opts += " --durations=20"
+        dbg.dfatal("Invalid test='%s'" % test)
+    collect_opts = '-m "' + " and ".join(marker) + '"'
+    opts.append(collect_opts)
     # Add coverage, if needed.
     if args.coverage:
-        pytest_opts += (
-            " --cov"
-            " --cov-branch"
-            " --cov-report term-missing"
-            " --cov-report html"
-            " --cov-report annotate"
-        )
+        opts.extend([
+            "--cov",
+            "--cov-branch",
+            "--cov-report term-missing",
+            "--cov-report html",
+            "--cov-report annotate",
+            ])
     # Nice verbose mode.
-    pytest_opts += " -vv"
+    opts.append("-vv")
     # Report the results.
-    pytest_opts += " -rpa"
+    opts.append("-rpa")
+    # Add extra options from the user.
     if args.extra_pytest_arg:
-        pytest_opts += " " + args.extra_pytest_arg
-    return pytest_collect_opts, pytest_opts, pytest_target
+        opts.append(args.extra_pytest_arg)
+    opts = " ".join(opts)
+    return collect_opts, opts
+
+
+def _system(cmd: str, dry_run: bool) -> None:
+    print(pri.frame("> " + cmd))
+    wrapper = None
+    si.system(
+        cmd,
+        wrapper=wrapper,
+        suppress_output=False,
+        dry_run=dry_run,
+        log_level="echo",
+    )
 
 
 def _parse() -> argparse.ArgumentParser:
@@ -118,7 +136,7 @@ def _parse() -> argparse.ArgumentParser:
         "--skip_collect", action="store_true", help="Skip the collection step"
     )
     parser.add_argument(
-        "--jenkins", action="store_true", help="Run tests as Jenkins"
+        "--ci", action="store_true", help="Run tests in CI mode"
     )
     # Debug.
     parser.add_argument(
@@ -131,47 +149,17 @@ def _parse() -> argparse.ArgumentParser:
     return parser
 
 
-def _system(cmd: str, dry_run: bool) -> None:
-    print(pri.frame("> " + cmd))
-    wrapper = None
-    si.system(
-        cmd,
-        wrapper=wrapper,
-        suppress_output=False,
-        dry_run=dry_run,
-        log_level="echo",
-    )
-
-
-# TODO(gp): Refactor this function in smaller pieces.
 def _main(parser: argparse.ArgumentParser) -> None:
     args = parser.parse_args()
     dbg.init_logger(verbosity=args.log_level, use_exec_path=True)
     #
-    test = args.test
     log_level = logging.getLevelName(args.log_level)
     _LOG.debug("%s -> %s", args.log_level, log_level)
-    #
-    # Report current setup.
-    #
-    if args.jenkins:
-        cmds = [
-            # TODO(gp): For some reason `system("conda")` doesn't work from
-            #  this script. Maybe we need to use the hco.conda_system().
-            # "conda list",
-            "git log -5",
-            "whoami",
-            "printenv",
-            "pwd",
-            "date",
-        ]
-        for cmd in cmds:
-            _system(cmd, dry_run=False)
     #
     # Build pytest options.
     #
     pytest_collect_opts, pytest_opts, pytest_target = _build_pytest_opts(
-        args, test
+        args
     )
     #
     # Preview tests.

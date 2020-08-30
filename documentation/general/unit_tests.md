@@ -39,7 +39,7 @@
          * [Use the appropriate self.assert*](#use-the-appropriate-selfassert)
          * [Do not use dbg.dassert](#do-not-use-dbgdassert)
          * [Interesting testing functions](#interesting-testing-functions)
-         
+
      * [Update test tags](#Update-test-tags)
 
 <!-- #region -->
@@ -51,48 +51,62 @@
   tests to make sure we didn't introduce no new bugs
 - We use `pytest` and `unittest` as testing framework
 
-- We have different test sets:
-  - `fast`
-    - Tests that are quick to execute (typically < 5 secs per test class)
-    - We want to run these tests after every commit / PR to make sure things are
-      not horrible broken
-  - `slow`
-    - Tests that we don't want to run all the times because they are:
-      - Slow (typically < 2 minutes per test)
-      - Related to pieces of code that don't change often
-      - External APIs we don't want to hit continuously
-  - `superslow`
-    - Tests that run long workload, e.g., running a production model
-
-- `fast` tests are a subset of `slow` tests
-
 ## Using `run_tests.py`
 
 - `dev_scripts/testing/run_tests.py` is a wrapper around `pytest` to implement
   some typical workflows
 
-### Run fast tests
+### Run test suites
 
-- Run only fast tests:
+- We have different test sets:
+  - `fast`
+    - Tests that are quick to execute
+      - The limit is 5 secs per test
+    - We want to run these tests after every commit / PR to make sure things are
+      not horrible broken
+  - `slow`
+    - Tests that we don't want to run all the times because they are:
+      - Slow
+        - The limit is 2 mins per test
+      - Related to pieces of code that don't change often
+      - External APIs we don't want to hit continuously
+  - `superslow`
+    - Tests that run long workloads, e.g., running a production model
+      - The limit is 30 mins per test
+
+
   ```bash
+  # Run only fast tests.
   > run_tests.py
   > run_tests.py --test fast
-  ```
 
-### Run slow tests
-
-- Run all tests:
-  ```bash
+  # Run slow tests.
   > run_tests.py --test slow
+
+  # Run super-slow tests.
+  > run_tests.py --test superslow
   ```
 
 ### Run parallel tests
 
-- You can use the switch `--num_cpus -1` to use all the available CPUs:
+- By default `run_tests` runs using all the available CPUs
+- The option `--num_cpus` allows to control how many CPUs to use
   ```bash
+  # Run serially.
+  > run_tests.py --test fast --num_cpus "serially"
+
+  # Run with 2 CPUs.
+  > run_tests.py --test fast --num_cpus 2
+
+  # Run with all the CPUs.
   > run_tests.py --test fast --num_cpus -1
-  > run_tests.py --test slow --num_cpus -1
   ```
+
+### Run coverage
+
+- Add the coverage
+
+###
 
 ## Using `pytest` directly
 
@@ -449,16 +463,16 @@
   - [General python](https://docs.python.org/2/library/unittest.html#test-cases)
   - [Numpy](https://docs.scipy.org/doc/numpy-1.15.0/reference/routines.testing.html)
   - [Pandas](https://pandas.pydata.org/pandas-docs/version/0.21/api.html#testing-functions)
-  
+
 ## Update test tags
 
 - There are 2 files with the list of tests' tags:
   - `amp/pytest.ini`
   - `commodity_research/pytest.ini`
-  
-  
+
+
 - In order to update the tags (do it in the both files):
   - in the `markers` section add a name of a new tag
-  - afther a `:` add a short description 
+  - afther a `:` add a short description
   - keep tags in the alpabetical order
 <!-- #endregion -->
