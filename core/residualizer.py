@@ -1,5 +1,4 @@
-"""
-Implement a residualizer pipeline that, given data (e.g., returns or features),
+"""Implement a residualizer pipeline that, given data (e.g., returns or features),
 computes:
 1) factors
 2) loadings
@@ -19,7 +18,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
-from scipy.spatial.distance import cosine
+from scipy.spatial.distance import cosine  # type: ignore
 
 import core.explore as exp
 import core.plotting as plot
@@ -31,9 +30,9 @@ _LOG = logging.getLogger(__name__)
 # TODO(gp): This is probably general and should be moved somewhere else.
 # TODO(gp): -> stack_df or better name.
 def linearize_df(df: pd.DataFrame, prefix: str) -> pd.Series:
-    """
-    Transform a pd.DataFrame like:
-                 0         1         2
+    """Transform a pd.DataFrame like:
+
+    0         1         2
         0  0.691443 -0.088121  0.717036
         1  0.656170 -0.338633 -0.674366
         2  0.302238  0.936783 -0.176323
@@ -67,6 +66,14 @@ class FactorComputer:
     def __init__(self) -> None:
         pass
 
+    def __call__(self, obj: pd.DataFrame, *args: int, **kwargs: Any) -> pd.Series:
+        if isinstance(obj, pd.Series):
+            df = pd.DataFrame(obj)
+        else:
+            df = obj
+        dbg.dassert_isinstance(df, pd.DataFrame)
+        return self._execute(obj, *args, **kwargs)
+
     def fit(self) -> None:
         # TODO(gp): Implement sklearn complaint method.
         raise NotImplementedError
@@ -78,14 +85,6 @@ class FactorComputer:
     def get_factors(self) -> None:
         raise NotImplementedError
 
-    def __call__(self, obj: pd.DataFrame, *args: int, **kwargs: Any) -> pd.Series:
-        if isinstance(obj, pd.Series):
-            df = pd.DataFrame(obj)
-        else:
-            df = obj
-        dbg.dassert_isinstance(df, pd.DataFrame)
-        return self._execute(obj, *args, **kwargs)
-
     def _execute(self, df: pd.DataFrame, ts: int) -> pd.Series:
         raise NotImplementedError
 
@@ -96,9 +95,7 @@ class FactorComputer:
 # TODO(gp): eigval_df -> eigval since it's a Series?
 # eigvec_df -> eigvec
 class PcaFactorComputer(FactorComputer):
-    """
-    Compute factors using a rolling PCA decomposition.
-    """
+    """Compute factors using a rolling PCA decomposition."""
 
     def __init__(
         self,
@@ -131,28 +128,20 @@ class PcaFactorComputer(FactorComputer):
 
     @property
     def eig_num(self) -> Optional[int]:
-        """
-        Number of eigenvalue / vectors.
-        """
+        """Return number of eigenvalue / vectors."""
         return self._eig_num
 
     @property
     def eig_comp_num(self) -> Optional[int]:
-        """
-        Number of components for each eigenvector.
-        """
+        """Return number of components for each eigenvector."""
         return self._eig_comp_num
 
     def get_eigval_names(self) -> List[str]:
-        """
-        Return the names of the eigenvalues column in the result df.
-        """
+        """Return the names of the eigenvalues column in the result df."""
         return ["eigval%s" % i for i in range(self.eig_num)]
 
     def get_eigvec_names(self, i: int) -> List[str]:
-        """
-        Return the names of the i-th eigenvector in the result df.
-        """
+        """Return the names of the i-th eigenvector in the result df."""
         dbg.dassert_lte(0, i)
         dbg.dassert_lt(i, self.eig_num)
         return ["eigvec%s_%s" % (i, j) for j in range(self.eig_comp_num)]
@@ -170,6 +159,169 @@ class PcaFactorComputer(FactorComputer):
         dbg.dassert_eq(eigval_df.shape[1], 1)
         res = res.append(eigval_df.iloc[:, 0])
         return res
+
+    @staticmethod
+    def sort_eigval(
+        eigval: np.array, eigvec: np.array
+    ) -> Tuple[np.bool_, np.array, np.array]:
+        are_eigval_sorted = (np.diff(eigval) <= 0).all()
+        if not are_eigval_sorted:
+            _LOG.debug(
+                "eigvals not sorted:\neigval=\n%s\neigvec=\n%s", eigval, eigvec
+            )
+            # Sort eigvals in descending order.
+            idx = eigval.argsort()[::-1]
+            eigval = eigval[idx]
+            eigvec = eigvec[:, idx]
+            # Make sure it's sorted in descending order.
+            dbg.dassert_eq_all(eigval, np.sort(eigval)[::-1])
+        return are_eigval_sorted, eigval, eigvec
+
+    # TODO(gp): -> eig_distance
+    @staticmethod
+    def eigvec_distance(v1: pd.Series, v2: pd.Series) -> np.float64:
+        # TODO(gp): Maybe the max of the diff of the component is a better
+        # metric.
+        diff = np.linalg.norm(v1 - v2)
+        # _LOG.debug("v1=%s\nv2=%s\ndiff=%s", v1, v2, diff)
+        return diff
+
+    @staticmethod
+    def check_stabilized_eigvec(
+        col_map: Union[
+            Dict[int, Tuple[int, int]], Dict[int, Tuple[int, np.int64]]
+        ],
+        n: int,
+    ) -> bool:
+        # Check that col_map contains a permutation of the index.
+        col_map_src = col_map.keys()
+        col_map_dst = [x[1] for x in col_map.values()]
+        exp_idxs = list(range(n))
+        dbg.dassert_eq_all(sorted(col_map_src), exp_idxs)
+        dbg.dassert_eq_all(sorted(col_map_dst), exp_idxs)
+        return True
+
+    @staticmethod
+    def shuffle_eigval_eigvec(
+        eigval_df: pd.DataFrame,
+        eigvec_df: pd.DataFrame,
+        col_map: Union[
+            Dict[int, Tuple[int, int]], Dict[int, Tuple[int, np.int64]]
+        ],
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """Transform the eigenvalues / eigenvectors according to a col_map
+        returned by `_build_stable_eig_map()`.
+
+        :return: updated eigvalues and eigenvectors
+        """
+        dbg.dassert_isinstance(eigval_df, pd.DataFrame)
+        dbg.dassert_isinstance(eigvec_df, pd.DataFrame)
+        _LOG.debug("col_map=%s", col_map)
+        # Apply the permutation to the eigenvalues / eigenvectors.
+        permutation = [col_map[i][1] for i in sorted(col_map.keys())]
+        _LOG.debug("permutation=%s", permutation)
+        shuffled_eigvec_df = eigvec_df.reindex(columns=permutation)
+        shuffled_eigvec_df.columns = range(shuffled_eigvec_df.shape[1])
+        shuffled_eigval_df = eigval_df.reindex(columns=permutation)
+        shuffled_eigval_df.columns = range(shuffled_eigval_df.shape[1])
+        # Change the sign of the eigenvectors. We don't need to change the
+        # sign of the eigenvalues.
+        coeffs = pd.Series([col_map[i][0] for i in sorted(col_map.keys())])
+        _LOG.debug("coeffs=%s", coeffs)
+        shuffled_eigvec_df *= coeffs
+        return shuffled_eigval_df, shuffled_eigvec_df
+
+    @staticmethod
+    def are_eigenvectors_stable(
+        prev_eigvec_df: pd.DataFrame, eigvec_df: pd.DataFrame, thr: float = 0.1
+    ) -> int:
+        """Return whether eigvec_df are "stable" in the sense that the change
+        of corresponding of each eigenvec is smaller than a certain
+        threshold."""
+        dbg.dassert_eq(
+            prev_eigvec_df.shape,
+            eigvec_df.shape,
+            "prev_eigvec_df=\n%s\neigvec_df=\n%s",
+            prev_eigvec_df,
+            eigvec_df,
+        )
+        num_fails = 0
+        for i in range(eigvec_df.shape[1]):
+            v1 = prev_eigvec_df.iloc[:, i]
+            v2 = eigvec_df.iloc[:, i]
+            _LOG.debug("v1=%s\nv2=%s", v1, v2)
+            diff = PcaFactorComputer.eigvec_distance(v1, v2)
+            if diff > thr:
+                _LOG.debug(
+                    "diff=%s > thr=%s -> num_fails=%d", diff, thr, num_fails
+                )
+                num_fails += 1
+        return num_fails
+
+    @staticmethod
+    def are_eigenvalues_stable(
+        prev_eigval_df: pd.DataFrame, eigval_df: pd.DataFrame, thr: float = 1e-3
+    ) -> bool:
+        _LOG.debug(
+            "prev_eigval_df=\n%s\neigval_df=\n%s\n", prev_eigval_df, eigval_df
+        )
+        dbg.dassert_eq(prev_eigval_df.shape, eigval_df.shape)
+        are_stable = True
+        diff = PcaFactorComputer.eigvec_distance(prev_eigval_df, eigval_df)
+        _LOG.debug("diff=%s", diff)
+        if diff > thr:
+            _LOG.debug("diff=%s > thr=%s", diff, thr)
+            are_stable = False
+        return are_stable
+
+    def plot_over_time(
+        self, res_df: pd.DataFrame, num_pcs_to_plot: int = 0, num_cols: int = 2
+    ) -> None:
+        """Similar to plot_pca_analysis() but over time."""
+        # Plot eigenvalues.
+        cols = [c for c in res_df.columns if c.startswith("eigval")]
+        eigval_df = res_df[cols]
+        dbg.dassert_lte(1, eigval_df.shape[1])
+        eigval_df.plot(title="Eigenvalues over time", ylim=(0, 1))
+        # Plot cumulative variance.
+        eigval_df.cumsum(axis=1).plot(
+            title="Fraction of variance explained by top PCs over time",
+            ylim=(0, 1),
+        )
+        # Plot eigenvectors.
+        cols = [c for c in res_df.columns if c.startswith("eigvec")]
+        eigvec_df = res_df[cols]
+        dbg.dassert_lte(1, eigvec_df.shape[1])
+        # TODO(gp): Fix this.
+        # max_pcs = len([c for c in res_df.columns if c.startswith("eigvec_")])
+        max_pcs = 3
+        num_pcs_to_plot = self._get_num_pcs_to_plot(num_pcs_to_plot, max_pcs)
+        _LOG.info("num_pcs_to_plot=%s", num_pcs_to_plot)
+        if num_pcs_to_plot > 0:
+            _, axes = plot.get_multiple_plots(
+                num_pcs_to_plot,
+                num_cols=num_cols,
+                y_scale=4,
+                sharex=True,
+                sharey=True,
+            )
+            for i in range(num_pcs_to_plot):
+                col_names = [
+                    c for c in eigvec_df.columns if c.startswith("eigvec%s" % i)
+                ]
+                dbg.dassert_lte(1, len(col_names))
+                eigvec_df[col_names].plot(
+                    ax=axes[i], ylim=(-1, 1), title="PC%s" % i
+                )
+
+    @staticmethod
+    def _get_num_pcs_to_plot(num_pcs_to_plot: int, max_pcs: int) -> int:
+        """Get the number of principal components to plot."""
+        if num_pcs_to_plot == -1:
+            num_pcs_to_plot = max_pcs
+        dbg.dassert_lte(0, num_pcs_to_plot)
+        dbg.dassert_lte(num_pcs_to_plot, max_pcs)
+        return num_pcs_to_plot
 
     def _execute(self, df: pd.DataFrame, ts: int) -> pd.Series:
         _LOG.debug("ts=%s", ts)
@@ -215,6 +367,86 @@ class PcaFactorComputer(FactorComputer):
         dbg.dassert_isinstance(res, pd.Series)
         return res
 
+    @staticmethod
+    def _build_stable_eig_map(
+        prev_eigvec_df: pd.DataFrame, eigvec_df: pd.DataFrame
+    ) -> Tuple[Dict[int, Tuple[int, np.int64]], np.array]:
+        """Try to find a permutation and sign changes of the columns in
+        `prev_eigvec_df` to ensure continuity with `eigvec_df`.
+
+        :return: map column index of original eigvec to (sign, column index
+            of transformed eigvec)
+        """
+
+        def dist(v1: pd.Series, v2: pd.Series) -> np.float64:
+            # return res.PcaFactorComputer.eigvec_distance(v1, v2)
+            return 1 - cosine(v1, v2)
+
+        # Build a matrix with the distances between corresponding vectors.
+        num_cols = prev_eigvec_df.shape[1]
+        distances = np.zeros((num_cols, num_cols)) * np.nan
+        for i in range(num_cols):
+            for j in range(num_cols):
+                distances[i, j] = dist(
+                    prev_eigvec_df.iloc[:, i], eigvec_df.iloc[:, j]
+                )
+        _LOG.debug("distances=\n%s", distances)
+        # Find the row with the max abs value for each column.
+        max_abs_cos = np.argmax(np.abs(distances), axis=1)
+        _LOG.debug("max_abs_cos=%s", max_abs_cos)
+        signs = np.sign(distances[range(0, num_cols), max_abs_cos])
+        signs = list(map(int, signs))
+        _LOG.debug("signs=%s", signs)
+        # Package the results into col_map.
+        col_map = {k: (signs[k], max_abs_cos[k]) for k in range(0, num_cols)}
+        _LOG.debug("col_map=%s", col_map)
+        #
+        PcaFactorComputer.check_stabilized_eigvec(col_map, num_cols)
+        return col_map, distances
+
+    @staticmethod
+    def _build_stable_eig_map2(
+        prev_eigvec_df: pd.DataFrame, eigvec_df: pd.DataFrame
+    ) -> Tuple[Dict[int, Tuple[Optional[int], int]], None]:
+        """Different implementation of `_build_stable_eig_map()`."""
+
+        def eigvec_coeff(
+            v1: pd.Series, v2: pd.Series, thr: float = 1e-3
+        ) -> Optional[int]:
+            for sign in (-1, 1):
+                diff = PcaFactorComputer.eigvec_distance(v1, sign * v2)
+                _LOG.debug("v1=\n%s\nv2=\n%s\n-> diff=%s", v1, sign * v2, diff)
+                if diff < thr:
+                    return sign
+            return None
+
+        dbg.dassert_strictly_increasing_index(prev_eigvec_df)
+        dbg.dassert_strictly_increasing_index(eigvec_df)
+        # TODO(gp): This code can be sped up by:
+        # 1) keeping a running list of the v2 columns already mapped so that
+        #    we don't have to check over and over.
+        # 2) once we find a match between columns, move to the next one v1
+        # For now we just care about functionality.
+        num_cols = eigvec_df.shape[1]
+        col_map: Dict[int, Tuple[Optional[int], int]] = {}
+        for i in range(num_cols):
+            for j in range(num_cols):
+                coeff = eigvec_coeff(
+                    prev_eigvec_df.iloc[:, i], eigvec_df.iloc[:, j]
+                )
+                _LOG.debug("i=%s, j=%s, coeff=%s", i, j, coeff)
+                if coeff:
+                    _LOG.debug("i=%s -> j=%s", i, j)
+                    dbg.dassert_not_in(
+                        i, col_map, msg="i=%s col_map=%s" % (i, col_map)
+                    )
+                    col_map[i] = (coeff, j)
+        # Sanity check.
+        PcaFactorComputer.check_stabilized_eigvec(col_map, num_cols)
+        # Add dummy var to keep the same interface of _build_stable_eig_map.
+        dummy = None
+        return col_map, dummy
+
     def _stabilize_eig(
         self, eigval_df: pd.DataFrame, eigvec_df: pd.DataFrame
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -257,266 +489,13 @@ class PcaFactorComputer(FactorComputer):
             eigvec_df = shuffled_eigvec_df
         return eigval_df, eigvec_df
 
-    @staticmethod
-    def sort_eigval(
-        eigval: np.array, eigvec: np.array
-    ) -> Tuple[np.bool_, np.array, np.array]:
-        are_eigval_sorted = (np.diff(eigval) <= 0).all()
-        if not are_eigval_sorted:
-            _LOG.debug(
-                "eigvals not sorted:\neigval=\n%s\neigvec=\n%s", eigval, eigvec
-            )
-            # Sort eigvals in descending order.
-            idx = eigval.argsort()[::-1]
-            eigval = eigval[idx]
-            eigvec = eigvec[:, idx]
-            # Make sure it's sorted in descending order.
-            dbg.dassert_eq_all(eigval, np.sort(eigval)[::-1])
-        return are_eigval_sorted, eigval, eigvec
-
-    # TODO(gp): -> eig_distance
-    @staticmethod
-    def eigvec_distance(v1: pd.Series, v2: pd.Series) -> np.float64:
-        # TODO(gp): Maybe the max of the diff of the component is a better
-        # metric.
-        diff = np.linalg.norm(v1 - v2)
-        # _LOG.debug("v1=%s\nv2=%s\ndiff=%s", v1, v2, diff)
-        return diff
-
-    @staticmethod
-    def check_stabilized_eigvec(
-        col_map: Union[
-            Dict[int, Tuple[int, int]], Dict[int, Tuple[int, np.int64]]
-        ],
-        n: int,
-    ) -> bool:
-        # Check that col_map contains a permutation of the index.
-        col_map_src = col_map.keys()
-        col_map_dst = [x[1] for x in col_map.values()]
-        exp_idxs = list(range(n))
-        dbg.dassert_eq_all(sorted(col_map_src), exp_idxs)
-        dbg.dassert_eq_all(sorted(col_map_dst), exp_idxs)
-        return True
-
-    @staticmethod
-    def _build_stable_eig_map(
-        prev_eigvec_df: pd.DataFrame, eigvec_df: pd.DataFrame
-    ) -> Tuple[Dict[int, Tuple[int, np.int64]], np.array]:
-        """
-        Try to find a permutation and sign changes of the columns in
-        `prev_eigvec_df` to ensure continuity with `eigvec_df`.
-
-        :return: map column index of original eigvec to (sign, column index
-            of transformed eigvec)
-        """
-
-        def dist(v1: pd.Series, v2: pd.Series) -> np.float64:
-            # return res.PcaFactorComputer.eigvec_distance(v1, v2)
-            return 1 - cosine(v1, v2)
-
-        # Build a matrix with the distances between corresponding vectors.
-        num_cols = prev_eigvec_df.shape[1]
-        distances = np.zeros((num_cols, num_cols)) * np.nan
-        for i in range(num_cols):
-            for j in range(num_cols):
-                distances[i, j] = dist(
-                    prev_eigvec_df.iloc[:, i], eigvec_df.iloc[:, j]
-                )
-        _LOG.debug("distances=\n%s", distances)
-        # Find the row with the max abs value for each column.
-        max_abs_cos = np.argmax(np.abs(distances), axis=1)
-        _LOG.debug("max_abs_cos=%s", max_abs_cos)
-        signs = np.sign(distances[range(0, num_cols), max_abs_cos])
-        signs = list(map(int, signs))
-        _LOG.debug("signs=%s", signs)
-        # Package the results into col_map.
-        col_map = {k: (signs[k], max_abs_cos[k]) for k in range(0, num_cols)}
-        _LOG.debug("col_map=%s", col_map)
-        #
-        PcaFactorComputer.check_stabilized_eigvec(col_map, num_cols)
-        return col_map, distances
-
-    @staticmethod
-    def _build_stable_eig_map2(
-        prev_eigvec_df: pd.DataFrame, eigvec_df: pd.DataFrame
-    ) -> Tuple[Dict[int, Tuple[Optional[int], int]], None]:
-        """
-        Different implementation of `_build_stable_eig_map()`.
-        """
-
-        def eigvec_coeff(
-            v1: pd.Series, v2: pd.Series, thr: float = 1e-3
-        ) -> Optional[int]:
-            for sign in (-1, 1):
-                diff = PcaFactorComputer.eigvec_distance(v1, sign * v2)
-                _LOG.debug("v1=\n%s\nv2=\n%s\n-> diff=%s", v1, sign * v2, diff)
-                if diff < thr:
-                    return sign
-            return None
-
-        dbg.dassert_strictly_increasing_index(prev_eigvec_df)
-        dbg.dassert_strictly_increasing_index(eigvec_df)
-        # TODO(gp): This code can be sped up by:
-        # 1) keeping a running list of the v2 columns already mapped so that
-        #    we don't have to check over and over.
-        # 2) once we find a match between columns, move to the next one v1
-        # For now we just care about functionality.
-        num_cols = eigvec_df.shape[1]
-        col_map: Dict[int, Tuple[Optional[int], int]] = {}
-        for i in range(num_cols):
-            for j in range(num_cols):
-                coeff = eigvec_coeff(
-                    prev_eigvec_df.iloc[:, i], eigvec_df.iloc[:, j]
-                )
-                _LOG.debug("i=%s, j=%s, coeff=%s", i, j, coeff)
-                if coeff:
-                    _LOG.debug("i=%s -> j=%s", i, j)
-                    dbg.dassert_not_in(
-                        i, col_map, msg="i=%s col_map=%s" % (i, col_map)
-                    )
-                    col_map[i] = (coeff, j)
-        # Sanity check.
-        PcaFactorComputer.check_stabilized_eigvec(col_map, num_cols)
-        # Add dummy var to keep the same interface of _build_stable_eig_map.
-        dummy = None
-        return col_map, dummy
-
-    @staticmethod
-    def shuffle_eigval_eigvec(
-        eigval_df: pd.DataFrame,
-        eigvec_df: pd.DataFrame,
-        col_map: Union[
-            Dict[int, Tuple[int, int]], Dict[int, Tuple[int, np.int64]]
-        ],
-    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        """
-        Transform the eigenvalues / eigenvectors according to a col_map
-        returned by `_build_stable_eig_map()`.
-
-        :return: updated eigvalues and eigenvectors
-        """
-        dbg.dassert_isinstance(eigval_df, pd.DataFrame)
-        dbg.dassert_isinstance(eigvec_df, pd.DataFrame)
-        _LOG.debug("col_map=%s", col_map)
-        # Apply the permutation to the eigenvalues / eigenvectors.
-        permutation = [col_map[i][1] for i in sorted(col_map.keys())]
-        _LOG.debug("permutation=%s", permutation)
-        shuffled_eigvec_df = eigvec_df.reindex(columns=permutation)
-        shuffled_eigvec_df.columns = range(shuffled_eigvec_df.shape[1])
-        shuffled_eigval_df = eigval_df.reindex(columns=permutation)
-        shuffled_eigval_df.columns = range(shuffled_eigval_df.shape[1])
-        # Change the sign of the eigenvectors. We don't need to change the
-        # sign of the eigenvalues.
-        coeffs = pd.Series([col_map[i][0] for i in sorted(col_map.keys())])
-        _LOG.debug("coeffs=%s", coeffs)
-        shuffled_eigvec_df *= coeffs
-        return shuffled_eigval_df, shuffled_eigvec_df
-
-    @staticmethod
-    def are_eigenvectors_stable(
-        prev_eigvec_df: pd.DataFrame, eigvec_df: pd.DataFrame, thr: float = 0.1
-    ) -> int:
-        """
-        Return whether eigvec_df are "stable" in the sense that the change of
-        corresponding of each eigenvec is smaller than a certain threshold.
-        """
-        dbg.dassert_eq(
-            prev_eigvec_df.shape,
-            eigvec_df.shape,
-            "prev_eigvec_df=\n%s\neigvec_df=\n%s",
-            prev_eigvec_df,
-            eigvec_df,
-        )
-        num_fails = 0
-        for i in range(eigvec_df.shape[1]):
-            v1 = prev_eigvec_df.iloc[:, i]
-            v2 = eigvec_df.iloc[:, i]
-            _LOG.debug("v1=%s\nv2=%s", v1, v2)
-            diff = PcaFactorComputer.eigvec_distance(v1, v2)
-            if diff > thr:
-                _LOG.debug(
-                    "diff=%s > thr=%s -> num_fails=%d", diff, thr, num_fails
-                )
-                num_fails += 1
-        return num_fails
-
-    @staticmethod
-    def are_eigenvalues_stable(
-        prev_eigval_df: pd.DataFrame, eigval_df: pd.DataFrame, thr: float = 1e-3
-    ) -> bool:
-        _LOG.debug(
-            "prev_eigval_df=\n%s\neigval_df=\n%s\n", prev_eigval_df, eigval_df
-        )
-        dbg.dassert_eq(prev_eigval_df.shape, eigval_df.shape)
-        are_stable = True
-        diff = PcaFactorComputer.eigvec_distance(prev_eigval_df, eigval_df)
-        _LOG.debug("diff=%s", diff)
-        if diff > thr:
-            _LOG.debug("diff=%s > thr=%s", diff, thr)
-            are_stable = False
-        return are_stable
-
-    def plot_over_time(
-        self, res_df: pd.DataFrame, num_pcs_to_plot: int = 0, num_cols: int = 2
-    ) -> None:
-        """
-        Similar to plot_pca_analysis() but over time.
-        """
-        # Plot eigenvalues.
-        cols = [c for c in res_df.columns if c.startswith("eigval")]
-        eigval_df = res_df[cols]
-        dbg.dassert_lte(1, eigval_df.shape[1])
-        eigval_df.plot(title="Eigenvalues over time", ylim=(0, 1))
-        # Plot cumulative variance.
-        eigval_df.cumsum(axis=1).plot(
-            title="Fraction of variance explained by top PCs over time",
-            ylim=(0, 1),
-        )
-        # Plot eigenvectors.
-        cols = [c for c in res_df.columns if c.startswith("eigvec")]
-        eigvec_df = res_df[cols]
-        dbg.dassert_lte(1, eigvec_df.shape[1])
-        # TODO(gp): Fix this.
-        # max_pcs = len([c for c in res_df.columns if c.startswith("eigvec_")])
-        max_pcs = 3
-        num_pcs_to_plot = self._get_num_pcs_to_plot(num_pcs_to_plot, max_pcs)
-        _LOG.info("num_pcs_to_plot=%s", num_pcs_to_plot)
-        if num_pcs_to_plot > 0:
-            _, axes = plot.get_multiple_plots(
-                num_pcs_to_plot,
-                num_cols=num_cols,
-                y_scale=4,
-                sharex=True,
-                sharey=True,
-            )
-            for i in range(num_pcs_to_plot):
-                col_names = [
-                    c for c in eigvec_df.columns if c.startswith("eigvec%s" % i)
-                ]
-                dbg.dassert_lte(1, len(col_names))
-                eigvec_df[col_names].plot(
-                    ax=axes[i], ylim=(-1, 1), title="PC%s" % i
-                )
-
-    @staticmethod
-    def _get_num_pcs_to_plot(num_pcs_to_plot: int, max_pcs: int) -> int:
-        """
-        Get the number of principal components to plot.
-        """
-        if num_pcs_to_plot == -1:
-            num_pcs_to_plot = max_pcs
-        dbg.dassert_lte(0, num_pcs_to_plot)
-        dbg.dassert_lte(num_pcs_to_plot, max_pcs)
-        return num_pcs_to_plot
-
 
 # #############################################################################
 
 
 # TODO(gp): Factor out interface once this code is stable.
 class FactorLoadingStatsmodelComputer:
-    """
-    Compute factor loading from target df (e.g., returns) and factor df.
+    """Compute factor loading from target df (e.g., returns) and factor df.
 
     Timing assumption:
     - All timing info are in terms of timestamps (date times and not dates)
@@ -529,6 +508,5 @@ class FactorLoadingStatsmodelComputer:
         self._residuals = []
 
     def transform(self, target_df: pd.DataFrame, factor_df: pd.DataFrame) -> None:
-        """
-        Express each row of target_df in terms of previous rows of factor_df.
-        """
+        """Express each row of target_df in terms of previous rows of
+        factor_df."""

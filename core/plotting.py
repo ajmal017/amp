@@ -1,5 +1,4 @@
-"""
-Import as:
+"""Import as:
 
 import core.plotting as plot
 """
@@ -9,6 +8,13 @@ import logging
 import math
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import core.explore as expl
+import core.finance as fin
+import core.signal_processing as sigp
+import core.statistics as stats
+import helpers.dataframe as hdf
+import helpers.dbg as dbg
+import helpers.list as hlist
 import matplotlib as mpl
 import matplotlib.cm as cm
 import matplotlib.colors as mpl_col
@@ -22,14 +28,6 @@ import sklearn.metrics as sklmet
 import sklearn.utils.validation as skluv
 import statsmodels.api as sm
 import statsmodels.regression.rolling as smrr
-
-import core.explore as expl
-import core.finance as fin
-import core.signal_processing as sigp
-import core.statistics as stats
-import helpers.dataframe as hdf
-import helpers.dbg as dbg
-import helpers.list as hlist
 
 _LOG = logging.getLogger(__name__)
 
@@ -62,8 +60,7 @@ def plot_non_na_cols(
     ascending: bool = True,
     max_num: Optional[int] = None,
 ) -> Any:
-    """
-    Plot a diagram describing the non-nans intervals for the columns of df.
+    """Plot a diagram describing the non-nans intervals for the columns of df.
 
     :param df: usual df indexed with times
     :param sort: sort the columns by number of non-nans
@@ -118,8 +115,7 @@ def plot_categories_count(
     title: Optional[str] = None,
     label: Optional[str] = None,
 ) -> None:
-    """
-    Plot countplot of a given `category_column`.
+    """Plot countplot of a given `category_column`.
 
     :param df: df to plot
     :param category_column: categorical column to subset plots by
@@ -169,9 +165,8 @@ def get_multiple_plots(
     *args: Any,
     **kwargs: Any,
 ) -> Tuple[mpl.figure.Figure, np.array]:
-    """
-    Create figure to accommodate `num_plots` plots.
-    The figure is arranged in rows with `num_cols` columns.
+    """Create figure to accommodate `num_plots` plots. The figure is arranged
+    in rows with `num_cols` columns.
 
     :param num_plots: number of plots
     :param num_cols: number of columns to use in the subplot
@@ -207,11 +202,10 @@ def get_multiple_plots(
 def plot_value_counts(
     srs: pd.Series, dropna: bool = True, *args: Any, **kwargs: Any
 ) -> None:
-    """
-    Plot barplots for the counts of a series and print the values.
+    """Plot barplots for the counts of a series and print the values.
 
-    Same interface as plot_count_series() but computing the count of the given
-    series `srs`.
+    Same interface as plot_count_series() but computing the count of the
+    given series `srs`.
     """
     # Compute the counts.
     counts = srs.value_counts(dropna=dropna)
@@ -228,8 +222,7 @@ def plot_counts(
     figsize: Optional[Tuple[int, int]] = None,
     rotation: int = 0,
 ) -> None:
-    """
-    Plot barplots for series containing counts and print the values.
+    """Plot barplots for series containing counts and print the values.
 
     If the number of labels is over 20, the plot is oriented horizontally
     and the height of the plot is automatically adjusted.
@@ -310,8 +303,7 @@ def plot_barplot(
     rotation: int = 0,
     ax: Optional[mpl.axes.Axes] = None,
 ) -> None:
-    """
-    Plot a barplot.
+    """Plot a barplot.
 
     :param srs: pd.Series
     :param orientation: vertical or horizontal bars
@@ -399,8 +391,8 @@ def plot_barplot(
 def plot_timeseries_distribution(
     srs: pd.Series, datetime_types: Optional[List[str]] = None,
 ) -> None:
-    """
-    Plot timeseries distribution by
+    """Plot timeseries distribution by.
+
     - "year",
     - "month",
     - "quarter",
@@ -438,8 +430,7 @@ def plot_timeseries_per_category(
     top_n: Optional[int] = None,
     figsize: Optional[Tuple[int, int]] = None,
 ) -> None:
-    """
-    Plot distribution (where `datetime_types` has the same meaning as in
+    """Plot distribution (where `datetime_types` has the same meaning as in
     plot_headlines) for a given list of categories.
 
     If `categories` param is not specified, `top_n` must be specified and plots
@@ -495,8 +486,7 @@ def plot_cols(
     axes: Optional[List[mpl.axes.Axes]] = None,
     figsize: Optional[Tuple[float, float]] = (20, 10),
 ) -> None:
-    """
-    Plot lineplot and density plot for the given dataframe.
+    """Plot lineplot and density plot for the given dataframe.
 
     :param data: data to plot
     :param colormap: preferred colors
@@ -527,15 +517,16 @@ def plot_autocorrelation(
     nan_mode: str = "conservative",
     fft: bool = False,
     title_prefix: Optional[str] = None,
-    axes: Optional[List[mpl.axes.Axes]] = [[None, None]],
+    axes: Optional[List[mpl.axes.Axes]] = None,
     **kwargs: Any,
 ) -> None:
-    """
-    Plot ACF and PACF of columns.
+    """Plot ACF and PACF of columns.
 
     https://www.statsmodels.org/stable/_modules/statsmodels/graphics/tsaplots.html#plot_acf
     https://www.statsmodels.org/stable/_modules/statsmodels/tsa/stattools.html#acf
     """
+    if axes is None:
+        axes = [[None, None]]
     if isinstance(signal, pd.Series):
         signal = signal.to_frame()
     nrows = len(signal.columns)
@@ -567,10 +558,9 @@ def plot_spectrum(
     signal: Union[pd.Series, pd.DataFrame],
     nan_mode: str = "conservative",
     title_prefix: Optional[str] = None,
-    axes: Optional[List[mpl.axes.Axes]] = [[None, None]],
+    axes: Optional[List[mpl.axes.Axes]] = None,
 ) -> None:
-    """
-    Plot power spectral density and spectrogram of columns.
+    """Plot power spectral density and spectrogram of columns.
 
     PSD:
       - Estimate the power spectral density using Welch's method.
@@ -580,6 +570,8 @@ def plot_spectrum(
         "Spectrograms can be used as a way of visualizing the change of a
          nonstationary signal's frequency content over time."
     """
+    if axes is None:
+        axes = [[None, None]]
     if isinstance(signal, pd.Series):
         signal = signal.to_frame()
     if title_prefix is None:
@@ -624,8 +616,7 @@ def plot_heatmap(
     vmax: float = 1.0,
     ax: Optional[plt.axes] = None,
 ) -> None:
-    """
-    Plot a heatmap for a corr / cov df.
+    """Plot a heatmap for a corr / cov df.
 
     :param corr_df: df to plot a heatmap
     :param mode: "heatmap_semitriangle", "heatmap" or "clustermap"
@@ -705,8 +696,7 @@ def plot_correlation_matrix(
     method: Optional[str] = None,
     min_periods: Optional[int] = None,
 ) -> pd.core.frame.DataFrame:
-    """
-    Compute correlation matrix and plot its heatmap.
+    """Compute correlation matrix and plot its heatmap.
 
     :param df: Df to compute correlation matrix and plot a heatmap
     :param mode: "heatmap_semitriangle", "heatmap" or "clustermap"
@@ -737,9 +727,7 @@ def plot_correlation_matrix(
 
 
 def display_corr_df(df: pd.core.frame.DataFrame) -> None:
-    """
-    Display a correlation df with values with 2 decimal places.
-    """
+    """Display a correlation df with values with 2 decimal places."""
     if df is not None:
         df_tmp = df.applymap(lambda x: "%.2f" % x)
         expl.display_df(df_tmp)
@@ -750,8 +738,7 @@ def display_corr_df(df: pd.core.frame.DataFrame) -> None:
 def plot_dendrogram(
     df: pd.core.frame.DataFrame, figsize: Optional[Tuple[int, int]] = None
 ) -> None:
-    """
-    Plot a dendrogram.
+    """Plot a dendrogram.
 
     A dendrogram is a diagram representing a tree.
 
@@ -789,9 +776,7 @@ def plot_corr_over_time(
     annot: bool = False,
     num_cols: int = 4,
 ) -> None:
-    """
-    Plot correlation over time.
-    """
+    """Plot correlation over time."""
     timestamps = corr_df.index.get_level_values(0).unique()
     if len(timestamps) > 20:
         _LOG.warning("The first level of index length='%s' > 20", len(timestamps))
@@ -837,8 +822,7 @@ class PCA:
     def plot_components(
         self, num_components: Optional[int] = None, num_cols: int = 4
     ) -> None:
-        """
-        Plot principal components.
+        """Plot principal components.
 
         :param num_components: number of top components to plot
         :param num_cols: number of columns to use in the subplot
@@ -875,9 +859,7 @@ class PCA:
 
     @staticmethod
     def _get_num_pcs_to_plot(num_pcs_to_plot: Optional[int], max_pcs: int) -> int:
-        """
-        Get the number of principal components to plot.
-        """
+        """Get the number of principal components to plot."""
         if num_pcs_to_plot is None:
             num_pcs_to_plot = max_pcs
             _LOG.warning("Plotting all %s components", num_pcs_to_plot)
@@ -899,9 +881,7 @@ def _get_heatmap_mask(corr: pd.DataFrame, mode: str) -> np.ndarray:
 
 
 def _get_heatmap_colormap() -> mpl_col.LinearSegmentedColormap:
-    """
-    Generate a custom diverging colormap useful for heatmaps.
-    """
+    """Generate a custom diverging colormap useful for heatmaps."""
     cmap = sns.diverging_palette(220, 10, as_cmap=True)
     return cmap
 
@@ -916,8 +896,8 @@ def plot_confusion_heatmap(
     y_pred: Union[List[Union[float, int]], np.array],
     return_results: bool = False,
 ) -> Any:
-    """
-    Construct and plot a heatmap for a confusion matrix of fact and prediction.
+    """Construct and plot a heatmap for a confusion matrix of fact and
+    prediction.
 
     :param y_true: true values
     :param y_pred: predictions
@@ -944,6 +924,7 @@ def plot_confusion_heatmap(
     )
     if return_results:
         return df_out, df_out_percentage
+    return None
 
 
 def multipletests_plot(
@@ -955,8 +936,7 @@ def multipletests_plot(
     suptitle: Optional[str] = None,
     **kwargs: Any,
 ) -> None:
-    """
-    Plot adjusted p-values and pass/fail threshold.
+    """Plot adjusted p-values and pass/fail threshold.
 
     :param pvals: unadjusted p-values
     :param threshold: threshold for adjusted p-values separating accepted and
@@ -1031,8 +1011,7 @@ def plot_cumulative_returns(
     plot_zero_line: bool = True,
     events: Optional[List[Tuple[str, Optional[str]]]] = None,
 ) -> None:
-    """
-    Plot cumulative returns.
+    """Plot cumulative returns.
 
     :param cumulative_rets: log or pct cumulative returns
     :param mode: log or pct, used to choose plot title
@@ -1084,8 +1063,7 @@ def plot_rolling_annualized_volatility(
     ax: Optional[mpl.axes.Axes] = None,
     events: Optional[List[Tuple[str, Optional[str]]]] = None,
 ) -> None:
-    """
-    Plot rolling annualized volatility.
+    """Plot rolling annualized volatility.
 
     :param srs: input series
     :param tau: argument as for sigp.compute_rolling_std
@@ -1160,8 +1138,7 @@ def plot_rolling_annualized_sharpe_ratio(
     ax: Optional[mpl.axes.Axes] = None,
     events: Optional[List[Tuple[str, Optional[str]]]] = None,
 ) -> None:
-    """
-    Plot rolling annualized Sharpe ratio.
+    """Plot rolling annualized Sharpe ratio.
 
     :param srs: input series
     :param tau: argument as for sigp.compute_smooth_moving_average
@@ -1237,8 +1214,7 @@ def plot_yearly_barplot(
     figsize: Optional[Tuple[int, int]] = None,
     ax: Optional[mpl.axes.Axes] = None,
 ) -> None:
-    """
-    Plot a barplot of log returns statistics by year.
+    """Plot a barplot of log returns statistics by year.
 
     :param log_rets: input series of log returns
     :param unit: "ratio", "%" or "bps" scaling coefficient
@@ -1277,8 +1253,7 @@ def plot_yearly_barplot(
 def plot_monthly_heatmap(
     log_rets: pd.Series, unit: str = "ratio", ax: Optional[mpl.axes.Axes] = None
 ) -> None:
-    """
-    Plot a heatmap of log returns statistics by year and month.
+    """Plot a heatmap of log returns statistics by year and month.
 
     :param log_rets: input series of log returns
     :param unit: "ratio", `%` or "bps" scaling coefficient
@@ -1306,8 +1281,7 @@ def plot_pnl(
     ylabel: Optional[str] = None,
     ax: Optional[mpl.axes.Axes] = None,
 ) -> None:
-    """
-    Plot pnls for dict of pnl time series.
+    """Plot pnls for dict of pnl time series.
 
     :param pnls: dict of pnl time series
     :param title: plot title
@@ -1339,7 +1313,7 @@ def plot_pnl(
     if empty_srs:
         _LOG.warning(
             "Empty input series were dropped: '%s'",
-            ", ".join(empty_srs.astype(str)),
+            ", ".join([str(x) for x in empty_srs]),
         )
     df_plot = pd.concat(pnls_notna, axis=1)
     # Compute sharpe ratio for every time series.
@@ -1385,8 +1359,7 @@ def plot_drawdown(
     ax: Optional[mpl.axes.Axes] = None,
     events: Optional[List[Tuple[str, Optional[str]]]] = None,
 ) -> None:
-    """
-    Plot drawdown.
+    """Plot drawdown.
 
     :param log_rets: log returns
     :param unit: `ratio`, `%`, input series is rescaled appropriately
@@ -1416,8 +1389,7 @@ def plot_holdings(
     ax: Optional[mpl.axes.Axes] = None,
     events: Optional[List[Tuple[str, Optional[str]]]] = None,
 ) -> None:
-    """
-    Plot holdings, average holdings and average holdings by month.
+    """Plot holdings, average holdings and average holdings by month.
 
     :param holdings: pnl series to plot
     :param unit: "ratio", "%" or "bps" scaling coefficient
@@ -1449,8 +1421,8 @@ def plot_qq(
     dist: Optional[str] = None,
     nan_mode: Optional[str] = None,
 ) -> None:
-    """
-    Plot ordered values against theoretical quantiles of the given distribution.
+    """Plot ordered values against theoretical quantiles of the given
+    distribution.
 
     :param srs: data to plot
     :param ax: axes in which to draw the plot
@@ -1471,8 +1443,7 @@ def plot_turnover(
     ax: Optional[mpl.axes.Axes] = None,
     events: Optional[List[Tuple[str, Optional[str]]]] = None,
 ) -> None:
-    """
-    Plot turnover, average turnover by month and overall average turnover.
+    """Plot turnover, average turnover by month and overall average turnover.
 
     :param positions: series of positions to plot
     :param unit: "ratio", "%" or "bps" scaling coefficient
@@ -1506,8 +1477,7 @@ def plot_allocation(
     ax: Optional[mpl.axes.Axes] = None,
     events: Optional[List[Tuple[str, Optional[str]]]] = None,
 ) -> None:
-    """
-    Plot position allocations over time.
+    """Plot position allocations over time.
 
     :param position_df: dataframe with position time series
     :param config: information about time series
@@ -1541,8 +1511,7 @@ def plot_rolling_beta(
     events: Optional[List[Tuple[str, Optional[str]]]] = None,
     **kwargs: Any,
 ) -> None:
-    """
-    Regress returns against benchmark series and plot rolling beta.
+    """Regress returns against benchmark series and plot rolling beta.
 
     :param rets: returns
     :param benchmark_rets: benchmark returns
@@ -1586,7 +1555,9 @@ def plot_rolling_beta(
     # Calculate and plot rolling beta.
     model_rolling = smrr.RollingOLS(rets, benchmark_rets, window=window, **kwargs)
     res_rolling = model_rolling.fit()
-    beta_rolling = res_rolling.params[benchmark_name]
+    beta_rolling = res_rolling.params[
+        benchmark_name
+    ]  # pylint: disable=unsubscriptable-object
     # Return NaN periods to the rolling beta series for the plot.
     beta_rolling = beta_rolling.reindex(common_index)
     beta_rolling.plot(
@@ -1605,13 +1576,77 @@ def plot_rolling_beta(
     ax.legend()
 
 
+def plot_rolling_correlation(
+    srs1: pd.Series,
+    srs2: pd.Series,
+    tau: float,
+    demean: bool = True,
+    min_periods: int = 0,
+    min_depth: int = 1,
+    max_depth: int = 1,
+    p_moment: float = 2,
+    mode: Optional[str] = None,
+    ax: Optional[mpl.axes.Axes] = None,
+    events: Optional[List[Tuple[str, Optional[str]]]] = None,
+) -> None:
+    """
+    Return rolling correlation between 2 series and plot rolling correlation.
+
+    :param srs1: first series
+    :param srs2: second series
+    :param tau: tau correlation coefficient
+    :param demean: bool demean
+    :param min_periods: min periods
+    :param min_depth: min depth
+    :param max_depth: max depth
+    :param p_moment: p moment
+    :param mode: corr or zcorr
+    :param ax: axis
+    :param events: list of tuples with dates and labels to point out on the plot
+    """
+    mode = mode or "corr"
+    # Calculate and plot rolling correlation.
+    ax = ax or plt.gca()
+    # Calculate rolling correlation.
+    if mode == "zcorr":
+        roll_correlation = sigp.compute_rolling_zcorr
+        title = "Z Correlation of 2 time series"
+        label = "Rolling z correlation"
+    elif mode == "corr":
+        roll_correlation = sigp.compute_rolling_corr
+        title = "Correlation of 2 time series"
+        label = "Rolling correlation"
+    else:
+        raise ValueError("Invalid mode='%s'" % mode)
+    # Calculate rolling correlation with the given mode.
+    roll_corr = roll_correlation(
+        srs1,
+        srs2,
+        tau=tau,
+        demean=demean,
+        min_periods=min_periods,
+        min_depth=min_depth,
+        max_depth=max_depth,
+        p_moment=p_moment,
+    )
+    # Plot rolling correlation.
+    roll_corr.plot(ax=ax, title=title, label=label)
+    # Calculate correlation whole period.
+    whole_period = srs1.corr(srs2)
+    # Plot correlation whole period.
+    ax.axhline(whole_period, ls="--", c="k", label="Whole-period correlation")
+    ax.set_xlabel("period")
+    ax.set_ylabel("correlation")
+    _maybe_add_events(ax=ax, events=events)
+    ax.legend()
+
+
 def plot_sharpe_ratio_panel(
     log_rets: pd.Series,
     frequencies: Optional[List[str]] = None,
     ax: Optional[mpl.axes.Axes] = None,
 ) -> None:
-    """
-    Plot how SRs vary under resampling.
+    """Plot how SRs vary under resampling.
 
     :param log_rets: log returns
     :param frequencies: frequencies to calculate SR for
@@ -1637,15 +1672,16 @@ def plot_sharpe_ratio_panel(
         freq_points_per_year = hdf.compute_points_per_year_for_given_freq(freq)
         if freq_points_per_year > input_freq_points_per_year:
             _LOG.warning(
-                "Upsampling from input freq='%s' to freq='%s' is blocked"
-                % (srs_freq, freq)
+                "Upsampling from input freq='%s' to freq='%s' is blocked",
+                srs_freq,
+                freq,
             )
             continue
         resampled_log_rets = sigp.resample(log_rets, rule=freq).sum()
         if len(resampled_log_rets) == 1:
             _LOG.warning(
-                "Resampling to freq='%s' is blocked because resampled series has only 1 observation"
-                % freq
+                "Resampling to freq='%s' is blocked because resampled series has only 1 observation",
+                freq,
             )
             continue
         sr = stats.compute_annualized_sharpe_ratio(resampled_log_rets)
@@ -1678,8 +1714,7 @@ def _choose_scaling_coefficient(unit: str) -> int:
 
 
 def _calculate_year_to_month_spread(log_rets: pd.Series) -> pd.DataFrame:
-    """
-    Calculate log returns statistics by year and month.
+    """Calculate log returns statistics by year and month.
 
     :param log_rets: input series of log returns
     :return: dataframe of log returns with years on y-axis and
@@ -1702,8 +1737,7 @@ def _calculate_year_to_month_spread(log_rets: pd.Series) -> pd.DataFrame:
 def _maybe_add_events(
     ax: mpl.axes.Axes, events: Optional[List[Tuple[str, Optional[str]]]]
 ) -> None:
-    """
-    Add labeled vertical lines at events' dates on a plot.
+    """Add labeled vertical lines at events' dates on a plot.
 
     :param ax: axes
     :param events: list of tuples with dates and labels to point out on the plot
@@ -1715,3 +1749,4 @@ def _maybe_add_events(
         ax.axvline(
             x=pd.Timestamp(event[0]), label=event[1], color=color, linestyle="--",
         )
+    return None
