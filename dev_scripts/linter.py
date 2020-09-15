@@ -567,9 +567,7 @@ class _Black(_Action):
         # - All done!
         # - 1 file left unchanged.
         to_remove = ["All done!", "file left unchanged", "reformatted"]
-        output = [
-            line for line in output if all(word not in line for word in to_remove)
-        ]
+        output = [l for l in output if all(w not in l for w in to_remove)]
         return output
 
 
@@ -962,14 +960,14 @@ class _Pylint(_Action):
             output_tmp.append(line)
         output = output_tmp
         # Remove lines.
-        output = [line for line in output if ("-" * 20) not in line]
+        output = [l for l in output if ("-" * 20) not in l]
         # Remove:
         #    ************* Module dev_scripts.generate_script_catalog
         output_as_str = ut.filter_text(
             re.escape("^************* Module "), "\n".join(output)
         )
         # Remove empty lines.
-        output = [line for line in output if line.rstrip().lstrip() != ""]
+        output = [l for l in output if l.rstrip().lstrip() != ""]
         #
         output = output_as_str.split("\n")
         return output
@@ -1378,7 +1376,7 @@ class _LintMarkdown(_Action):
         cmd_as_str = " ".join(cmd)
         _, output = _tee(cmd_as_str, executable, abort_on_error=True)
         # Remove cruft.
-        output = [line for line in output if "Saving log to file" not in line]
+        output = [l for l in output if "Saving log to file" not in l]
         return output
 
 
@@ -1399,6 +1397,19 @@ def _check_file_property(
     actions = [a for a in actions if a != action]
     _LOG.debug("actions=%s", actions)
     return output, actions
+
+
+def _are_git_files_changed() -> bool:
+    """
+    Check changes in the local repo.
+    If any file in the local repo changed, returns False.
+    """
+    result = True
+    changed_files = git.get_modified_files()
+    if changed_files:
+        _LOG.warning("Modified files: %s.", changed_files)
+        result = False
+    return result
 
 
 # #############################################################################
@@ -1642,6 +1653,86 @@ def _count_lints(lints: List[str]) -> int:
 # #############################################################################
 
 
+def _main(args: argparse.Namespace) -> int:
+    dbg.init_logger(args.log_level)
+    #
+    if args.test_actions:
+        _LOG.warning("Testing actions...")
+        _test_actions()
+        _LOG.warning("Exiting as requested")
+        sys.exit(0)
+    if args.no_print:
+        global NO_PRINT
+        NO_PRINT = True
+    # Get all the files to process.
+    all_file_names = _get_files(args)
+    _LOG.info("# Found %d files to process", len(all_file_names))
+    # Select files.
+    file_names = _get_files_to_lint(args, all_file_names)
+    _LOG.info(
+        "\n%s\n%s",
+        prnt.frame("# Found %d files to lint:" % len(file_names)),
+        prnt.space("\n".join(file_names)),
+    )
+    if args.collect_only:
+        _LOG.warning("Exiting as requested")
+        sys.exit(0)
+    # Select actions.
+    actions = _select_actions(args)
+    all_actions = actions[:]
+    _LOG.debug("actions=%s", actions)
+    # Create tmp dir.
+    io_.create_dir(_TMP_DIR, incremental=False)
+    _LOG.info("tmp_dir='%s'", _TMP_DIR)
+    # Check the files.
+    lints: List[str] = []
+    lints_tmp, actions = _check_file_property(
+        actions, all_file_names, args.pedantic
+    )
+    lints.extend(lints_tmp)
+    # Run linter.
+    lints_tmp = _run_linter(actions, args, file_names)
+    _dassert_list_of_strings(lints_tmp)
+    lints.extend(lints_tmp)
+    # Sort the errors.
+    lints = sorted(lints)
+    lints = hlist.remove_duplicates(lints)
+    # Count number of lints.
+    num_lints = _count_lints(lints)
+    #
+    output: List[str] = []
+    output.append("cmd line='%s'" % dbg.get_command_line())
+    # TODO(gp): datetime_.get_timestamp().
+    # output.insert(1, "datetime='%s'" % datetime.datetime.now())
+    output.append("actions=%d %s" % (len(all_actions), all_actions))
+    output.append("file_names=%d %s" % (len(file_names), file_names))
+    output.extend(lints)
+    output.append("num_lints=%d" % num_lints)
+    # Write the file.
+    output_as_str = "\n".join(output)
+    io_.to_file(args.linter_log, output_as_str)
+    # Print linter output.
+    txt = io_.from_file(args.linter_log)
+    _print(prnt.frame(args.linter_log, char1="/").rstrip("\n"))
+    _print(txt + "\n")
+    _print(prnt.line(char="/").rstrip("\n"))
+    #
+    if num_lints != 0:
+        _LOG.warning(
+            "You can quickfix the issues with\n> vim -c 'cfile %s'",
+            args.linter_log,
+        )
+    #
+    if not args.no_cleanup:
+        io_.delete_dir(_TMP_DIR)
+    else:
+        _LOG.warning("Leaving tmp files in '%s'", _TMP_DIR)
+    if args.jenkins:
+        _LOG.warning("Skipping returning an error because of --jenkins")
+        num_lints = 0
+    return num_lints
+
+
 def _parse() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -1759,92 +1850,26 @@ def _parse() -> argparse.ArgumentParser:
         help="File storing the warnings",
     )
     parser.add_argument("--no_print", action="store_true")
+    parser.add_argument(
+        "--post_check",
+        action="store_true",
+        help="Add post check. Return -1 if any file changed by the linter.",
+    )
     prsr.add_verbosity_arg(parser)
     return parser
-
-
-def _main(args: argparse.Namespace) -> int:
-    dbg.init_logger(args.log_level)
-    #
-    if args.test_actions:
-        _LOG.warning("Testing actions...")
-        _test_actions()
-        _LOG.warning("Exiting as requested")
-        sys.exit(0)
-    if args.no_print:
-        global NO_PRINT
-        NO_PRINT = True
-    # Get all the files to process.
-    all_file_names = _get_files(args)
-    _LOG.info("# Found %d files to process", len(all_file_names))
-    # Select files.
-    file_names = _get_files_to_lint(args, all_file_names)
-    _LOG.info(
-        "\n%s\n%s",
-        prnt.frame("# Found %d files to lint:" % len(file_names)),
-        prnt.space("\n".join(file_names)),
-    )
-    if args.collect_only:
-        _LOG.warning("Exiting as requested")
-        sys.exit(0)
-    # Select actions.
-    actions = _select_actions(args)
-    all_actions = actions[:]
-    _LOG.debug("actions=%s", actions)
-    # Create tmp dir.
-    io_.create_dir(_TMP_DIR, incremental=False)
-    _LOG.info("tmp_dir='%s'", _TMP_DIR)
-    # Check the files.
-    lints: List[str] = []
-    lints_tmp, actions = _check_file_property(
-        actions, all_file_names, args.pedantic
-    )
-    lints.extend(lints_tmp)
-    # Run linter.
-    lints_tmp = _run_linter(actions, args, file_names)
-    _dassert_list_of_strings(lints_tmp)
-    lints.extend(lints_tmp)
-    # Sort the errors.
-    lints = sorted(lints)
-    lints = hlist.remove_duplicates(lints)
-    # Count number of lints.
-    num_lints = _count_lints(lints)
-    #
-    output: List[str] = []
-    output.append("cmd line='%s'" % dbg.get_command_line())
-    # TODO(gp): datetime_.get_timestamp().
-    # output.insert(1, "datetime='%s'" % datetime.datetime.now())
-    output.append("actions=%d %s" % (len(all_actions), all_actions))
-    output.append("file_names=%d %s" % (len(file_names), file_names))
-    output.extend(lints)
-    output.append("num_lints=%d" % num_lints)
-    # Write the file.
-    output_as_str = "\n".join(output)
-    io_.to_file(args.linter_log, output_as_str)
-    # Print linter output.
-    txt = io_.from_file(args.linter_log)
-    _print(prnt.frame(args.linter_log, char1="/").rstrip("\n"))
-    _print(txt + "\n")
-    _print(prnt.line(char="/").rstrip("\n"))
-    #
-    if num_lints != 0:
-        _LOG.warning(
-            "You can quickfix the issues with\n> vim -c 'cfile %s'",
-            args.linter_log,
-        )
-    #
-    if not args.no_cleanup:
-        io_.delete_dir(_TMP_DIR)
-    else:
-        _LOG.warning("Leaving tmp files in '%s'", _TMP_DIR)
-    if args.jenkins:
-        _LOG.warning("Skipping returning an error because of --jenkins")
-        num_lints = 0
-    return num_lints
 
 
 if __name__ == "__main__":
     parser_ = _parse()
     args_ = parser_.parse_args()
     rc_ = _main(args_)
+    if args_.post_check:
+        if not _are_git_files_changed():
+            rc_ = 1
+            _LOG.warning(
+                "Detected that some files were changed so returning -1 as per "
+                "the option `--post_check`"
+            )
+        else:
+            rc_ = 0
     sys.exit(rc_)
