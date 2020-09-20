@@ -1,3 +1,19 @@
+<!--ts-->
+   * [Brief introduction to c4](#brief-introduction-to-c4)
+      * [Different levels of detail](#different-levels-of-detail)
+         * [System context (Level 1)](#system-context-level-1)
+         * [Container (Level 2)](#container-level-2)
+         * [Component (level 3)](#component-level-3)
+         * [Code (level 4)](#code-level-4)
+   * [Our conventions](#our-conventions)
+      * [Use classes!](#use-classes)
+      * [Mapping C4 and code structure](#mapping-c4-and-code-structure)
+      * [Generating class diagram](#generating-class-diagram)
+   * [Brief introduction to PlantUML](#brief-introduction-to-plantuml)
+
+
+
+<!--te-->
 - We describe the high level architecture of our system using the c4 methodology
   and PlantUML
 
@@ -38,8 +54,8 @@
   - Low-level details
 
 - Audience:
-  - both technical and non-technical people
-  - both inside and outside the software development team
+  - Both technical and non-technical people
+  - Both inside and outside the software development team
 
 - A system system is made of one or more containers
 
@@ -47,33 +63,33 @@
 
 - A container represents an application
   - E.g.,
-    - server-side web application (e.g., Tomcat running Java EE web application,
+    - Server-side web application (e.g., Tomcat running Java EE web application,
       Ruby on Rails application)
-    - client-side web application (e.g., JavaScript running in a web browser, e.g.,
-      using Angular)
-    - client-side desktop application (e.g., an macOS application)
-    - mobile app (e.g., an iOS or Android app)
-    - server-side console application
-    - server-less function (e.g., AWS Lambda)
-    - database (e.g., MySQL, MongoDB)
-    - content-store (e.g., AWS S3)
-    - file-system (e.g., a local filesystem)
-    - shell script
+    - Client-side web application (e.g., JavaScript running in a web browser,
+      e.g., using Angular)
+    - Client-side desktop application (e.g., an macOS application)
+    - Mobile app (e.g., an iOS or Android app)
+    - Server-side console application
+    - Server-less function (e.g., AWS Lambda)
+    - Database (e.g., MySQL, MongoDB)
+    - Content-store (e.g., AWS S3)
+    - File-system (e.g., a local filesystem)
+    - Shell script
 
 - A container runs some code and store some data
   - Typically each container runs in its own process space
   - Containers communicate through inter-process communication
 
-- A container diagram shows the high-level shape of the software architecture and
-  how responsibilities are distributed across it
+- A container diagram shows the high-level shape of the software architecture
+  and how responsibilities are distributed across it
 
 - A container is the sum of components
   - All components inside a container execute together
   - Components can't be deployed as separate units
 
 - Audience:
-  - technical people
-  - inside and outside of the software development team
+  - Technical people
+  - Inside and outside of the software development team
 
 ### Component (level 3)
 
@@ -107,10 +123,10 @@
   - In fact there is no C++ program that can't be expressed in C
 
 - Classes has the advantage of:
-  - organize the code in cohesive parts
-  - make clear what is public interface vs private interface (e.g., helpers)
-  - highlight responsibility (e.g., builder, annotation, processor, analyzer)
-  - simplify the interface of functions by sharing state in the object
+  - Organize the code in cohesive parts
+  - Make clear what is public interface vs private interface (e.g., helpers)
+  - Highlight responsibility (e.g., builder, annotation, processor, analyzer)
+  - Simplify the interface of functions by sharing state in the object
 
 - Note that classes still allow our favorite functional style of programming
   - E.g., pandas is implemented with classes and it allows functional style
@@ -128,8 +144,8 @@
 - To simplify we map the 4 levels of C4 in the code structure
 
 - Level 1
-  - System context = big picture of how the system interacts with users and other
-    systems
+  - System context = big picture of how the system interacts with users and
+    other systems
   - A system is typically mapped onto a code repository
   - E.g.,
     - `//p1` is a system providing data and analytics for commodity
@@ -140,14 +156,15 @@
     split in the system
   - A container is the first level of directories in a repo
   - E.g., in `//p1`
-    - `automl`: application for automatic machine learning for commodity analysis
+    - `automl`: application for automatic machine learning for commodity
+      analysis
     - `edgar`: application to handle EDGAR data
     - `etl3`: back-end db for timeseries with real-time and point-in-time
       semantics
 
 - Level 3
-  - Component = a group of related functionality encapsulated behind a well-defined interface
-    (e.g., collection of classes behind an interface)
+  - Component = a group of related functionality encapsulated behind a
+    well-defined interface (e.g., collection of classes behind an interface)
   - Components correspond to the second level of directory
   - E.g., in `//p1/edgar`
     - `api`: real-time system storing the data from EDGAR
@@ -162,7 +179,7 @@
     - `analyze_results.py`: classes and functions to analyze results from the
       data pipeline
     - `extract_tables.py`: class `TableExtractor` extracting tables from Form 8
-    - `filter_tables.py`: class `TableFilterer` 
+    - `filter_tables.py`: class `TableFilterer`
     - `match_targets.py`
     - `normalize_table.py`
 
@@ -175,8 +192,8 @@
 
 # Brief introduction to PlantUML
 
-- Unified Modeling Language (UML) is a modeling language for software engineering
-  to provide standard way to visualize design of a system
+- Unified Modeling Language (UML) is a modeling language for software
+  engineering to provide standard way to visualize design of a system
 
 - We use mainly Class Diagrams
   - For information on some class diagram convention see
@@ -187,14 +204,14 @@
   - You are mainly interested in the "Class diagram" section
 
 - We use PlantUML for making the diagrams
-- Embed the diagrams in a `architecture.md` or a `README.md` in the corresponding
-  folders
+- Embed the diagrams in a `architecture.md` or a `README.md` in the
+  corresponding folders
 
-- We are implementing a `render.py` tool that can render a markdown with PlantUML
-  embedded in the browser or GitHub
+- We are implementing a `render.py` tool that can render a markdown with
+  PlantUML embedded in the browser or GitHub
 - For interactive use you can rely on on-line tools like:
-  - https://www.planttext.com/
-  - https://liveuml.com/
+  - [planttext](https://www.planttext.com/)
+  - [liveuml](https://liveuml.com/)
 
 - The website https://structurizr.com has lots of information on using tools for
   C4
