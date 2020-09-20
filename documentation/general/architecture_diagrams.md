@@ -97,15 +97,9 @@
 - Audience
   - Software architects and developers
 
-# Brief introduction to PlantUML
-- 
-
-- Unified Modeling Language (UML) is a modeling language for software engineering
-  to provide standard way to visualize design of a system
-
-- For information see https://en.wikipedia.org/wiki/Class_diagram
-
 # Our conventions
+
+## Use classes!
 
 - In order to be able to describe the system with C4 we need to use classes to
   separate responsibilities and package code
@@ -129,33 +123,78 @@
     o(some argument).f(other arguments)
     ```
 
+## Mapping C4 and code structure
+
 - To simplify we map the 4 levels of C4 in the code structure
 
-- System is typically mapped onto a repo
-  - E.g., `//p1` contains code for the 
+- Level 1
+  - System context = big picture of how the system interacts with users and other
+    systems
+  - A system is typically mapped onto a code repository
+  - E.g.,
+    - `//p1` is a system providing data and analytics for commodity
+    - `//pre-commit` is a system implementing a code linter
 
-- Container is the second level directory 
+- Level 2:
+  - Container = high-level software architecture and how responsibilities are
+    split in the system
+  - A container is the first level of directories in a repo
+  - E.g., in `//p1`
+    - `automl`: application for automatic machine learning for commodity analysis
+    - `edgar`: application to handle EDGAR data
+    - `etl3`: back-end db for timeseries with real-time and point-in-time
+      semantics
 
+- Level 3
+  - Component = a group of related functionality encapsulated behind a well-defined interface
+    (e.g., collection of classes behind an interface)
+  - Components correspond to the second level of directory
+  - E.g., in `//p1/edgar`
+    - `api`: real-time system storing the data from EDGAR
+    - `company_commodity_mapping`: data pipeline to process mapping between
+      commodities and companies
+    - `form8`: data pipeline processing form 8
 
-(p1.knowledge_graph)
-Component is the 3rd level (p1.knowledge_graph.mapping)
-Classes are TimeSeriesNameCleaner, CommodityMapper
+- Level 4
+  - Classes
+  - Typically we organize multiple related classes in files
+  - E.g., in `//p1/edgar/form8`
+    - `analyze_results.py`: classes and functions to analyze results from the
+      data pipeline
+    - `extract_tables.py`: class `TableExtractor` extracting tables from Form 8
+    - `filter_tables.py`: class `TableFilterer` 
+    - `match_targets.py`
+    - `normalize_table.py`
 
 ## Generating class diagram
 
 - To generate class diagram (level 4 of c4) you can run
   ```
-  //amp/dev_scripts/create_class_diagram.sh
+  > dev_scripts/create_class_diagram.sh
   ```
 
+# Brief introduction to PlantUML
 
+- Unified Modeling Language (UML) is a modeling language for software engineering
+  to provide standard way to visualize design of a system
 
+- We use mainly Class Diagrams
+  - For information on some class diagram convention see
+    https://en.wikipedia.org/wiki/Class_diagram
 
-Follow the approach of https://c4model.com/
-Use PlantUML for making the diagrams
-Embed the diagrams in a README.md at top-level in the KG folder
-We'll eventually use pandoc to render, but until then, you can use the renderers on plantuml.com
-This reference guide may be helpful
-We probably want to mainly use "component diagrams" (in the world of plantuml and as a way to express multiple levels of c4 diagrams)
-We can start with sketches and add more detail in iterations as usual
+- You can refer to the PDF guide at http://plantuml.com/guide for an extensive
+  description of what PlantUML can do
+  - You are mainly interested in the "Class diagram" section
 
+- We use PlantUML for making the diagrams
+- Embed the diagrams in a `architecture.md` or a `README.md` in the corresponding
+  folders
+
+- We are implementing a `render.py` tool that can render a markdown with PlantUML
+  embedded in the browser or GitHub
+- For interactive use you can rely on on-line tools like:
+  - https://www.planttext.com/
+  - https://liveuml.com/
+
+- The website https://structurizr.com has lots of information on using tools for
+  C4
