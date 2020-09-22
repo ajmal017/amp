@@ -203,15 +203,26 @@
   description of what PlantUML can do
   - You are mainly interested in the "Class diagram" section
 
-- We use PlantUML for making the diagrams
-- Embed the diagrams in a `architecture.md` or a `README.md` in the
-  corresponding folders
-
-- We are implementing a `render.py` tool that can render a markdown with
-  PlantUML embedded in the browser or GitHub
-- For interactive use you can rely on on-line tools like:
-  - [planttext](https://www.planttext.com/)
-  - [liveuml](https://liveuml.com/)
-
 - The website https://structurizr.com has lots of information on using tools for
   C4
+
+# PlantUML is Markdown
+
+- We use PlantUML for rendering diagrams in our documentation
+  - For interactive use you can rely on on-line tools like:
+    - [planttext](https://www.planttext.com/)
+    - [liveuml](https://liveuml.com/)
+
+- You can embed the diagrams in a `architecture.md` or a `README.md` in the
+  corresponding folders
+
+- To render PlantUML in our markdown files instead of `@startuml` you need to use
+  the tag:
+  ```
+  \`\`\`plantuml
+  ...
+  \\\
+  ```
+
+- We are implementing a `render.py` tool that can render a markdown with PlantUML
+  embedded in the browser or GitHub
