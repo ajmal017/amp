@@ -16,7 +16,9 @@
 
 # cProfile
 - Profile functions
+  ```
   > profile $CMD
+  ```
 - Follow instruction on screen to plot call graph and or post process the
   profiling data
 
