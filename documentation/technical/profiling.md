@@ -130,19 +130,6 @@
     ...
   ```
 
-
-
-
-## Profiling a unit test
-
-```bash
-```
-
-## Post-processing the results
-
-- We have a little script
-  dev_scripts/process_prof.py
-
 # Profiling in a Jupyter notebook
 
 - You can find all of the examples below in action in the
@@ -154,26 +141,25 @@
 ### Overall
 
 - In a notebook, execute cell with
-[%time](https://ipython.readthedocs.io/en/stable/interactive/magics.html#magic-time)
-cell-magic:
-
-```python
-%%time
-func()
-```
+  [%time](https://ipython.readthedocs.io/en/stable/interactive/magics.html#magic-time)
+  cell-magic:
+  ```python
+  %%time
+  func()
+  ```
 
 ### By function
 
 - We prefer
-[cProfile](https://docs.python.org/2/library/profile.html#module-cProfile) for
-profiling and [gprof2dot](https://github.com/jrfonseca/gprof2dot) for
-visualization.
+  [cProfile](https://docs.python.org/2/library/profile.html#module-cProfile) for
+  profiling and [gprof2dot](https://github.com/jrfonseca/gprof2dot) for
+  visualization.
 
 - The documentation does not state this, but
-[%prun](https://github.com/ipython/ipython/blob/master/IPython/core/magics/execution.py#L22)
-magic now
-[uses](https://github.com/ipython/ipython/blob/master/IPython/core/magics/execution.py#L22)
-cProfile under the hood, so we can use it in the notebook instead:
+  [%prun](https://github.com/ipython/ipython/blob/master/IPython/core/magics/execution.py#L22)
+  magic now
+  [uses](https://github.com/ipython/ipython/blob/master/IPython/core/magics/execution.py#L22)
+  cProfile under the hood, so we can use it in the notebook instead:
 
   ```python
   # We can suppress output to the notebook by specifying "-q".
@@ -183,38 +169,34 @@ cProfile under the hood, so we can use it in the notebook instead:
   dspl.Image(filename="output.png")
   ```
 
-This will output something like this:
+- This will output something like this:
+  ![](img/gprof2dot_output1.png)
 
-![](img/gprof2dot_output1.png)
+- If you open the output image in the new tab, you can zoom in and look at the
+  graph in detail.
 
-If you open the output image in the new tab, you can zoom in and look at the
-graph in detail.
-
-`gprof2dot`
-[supports thresholds](https://github.com/jrfonseca/gprof2dot#documentation)
-that make output more readable:
-```python
-!gprof2dot -n 5 -e 5 -f pstats tmp.pstats | dot -Tpng -o output.png
-dspl.Image(filename="output.png")
-```
+- `gprof2dot` 
+  [supports thresholds](https://github.com/jrfonseca/gprof2dot#documentation) that make
+  output more readable:
+  ```python
+  !gprof2dot -n 5 -e 5 -f pstats tmp.pstats | dot -Tpng -o output.png
+  dspl.Image(filename="output.png")
+  ```
 
 - This will filter the output into something like this:
-
-![](img/gprof2dot_output2.png)
+  ![](img/gprof2dot_output2.png)
 
 ## Memory profilers
 
 - We prefer using [memory-profiler](https://github.com/pythonprofilers/memory_profiler).
 
-### Peak memory
+- Peak memory
+  ```python
+  %%memit
+  func()
+  ```
 
-```python
-%%memit
-func()
-```
-
-### Memory by line
-
-```python
-%mprun -f func func()
-```
+- Memory by line
+  ```python
+  %mprun -f func func()
+  ```
