@@ -10,60 +10,38 @@
 
 <!--te-->
 
-# To run:
-#   python -m cProfile -o prof.bin CMD
-#   python -m cProfile -o prof.bin test/run_tests.py -v 10 TestComputeDerivedFeatures2.test3
+# Profiling end-to-end a command line
 
-# cProfile
-- Profile functions
+- You can use the time-tested Linux `time` command to profile both time and
+  memory
+
+  ```bash
+  > /usr/bin/time -v COMMAND 2>&1 | tee time.log
+
+  Command being timed: "...COMMAND..."
+  User time (seconds): 187.70
+  System time (seconds): 16.27
+  Percent of CPU this job got: 96%
+  Elapsed (wall clock) time (h:mm:ss or m:ss): 3:31.38
+  Average shared text size (kbytes): 0
+  Average unshared data size (kbytes): 0
+  Average stack size (kbytes): 0
+  Average total size (kbytes): 0
+  Maximum resident set size (kbytes): 13083892
+  Average resident set size (kbytes): 0
+  Major (requiring I/O) page faults: 0
+  Minor (reclaiming a frame) page faults: 9911066
+  Voluntary context switches: 235772
+  Involuntary context switches: 724
+  Swaps: 0
+  File system inputs: 424
+  File system outputs: 274320
+  Socket messages sent: 0
+  Socket messages received: 0
+  Signals delivered: 0
+  Page size (bytes): 4096
+  Exit status: 0
   ```
-  > profile $CMD
-  ```
-- Follow instruction on screen to plot call graph and or post process the
-  profiling data
-
-# line_profiler
-- Profile a function line by line
-- Decorate target function with @profile (or check kernprof.py -h for more
-  ways of marking the interesting parts of code)
-  > kernprof -l -o line_profile.lprof $CMD
-  > python -m line_profiler line_profile.lprof
-
-python3 -m cProfile -o profile -m pytest edgar/forms8/test/test_edgar_utils.py::TestExtractTablesFromForms::test_table_extraction_example_2
-
-# Profiling from command line
-
-## Profiling time and max memory
-
-- You can use the time tested `time`
-
-```bash
-> /usr/bin/time -v COMMAND 2>&1 | tee time.log
-
-Command being timed: "...COMMAND..."
-User time (seconds): 187.70
-System time (seconds): 16.27
-Percent of CPU this job got: 96%
-Elapsed (wall clock) time (h:mm:ss or m:ss): 3:31.38
-Average shared text size (kbytes): 0
-Average unshared data size (kbytes): 0
-Average stack size (kbytes): 0
-Average total size (kbytes): 0
-Maximum resident set size (kbytes): 13083892
-Average resident set size (kbytes): 0
-Major (requiring I/O) page faults: 0
-Minor (reclaiming a frame) page faults: 9911066
-Voluntary context switches: 235772
-Involuntary context switches: 724
-Swaps: 0
-File system inputs: 424
-File system outputs: 274320
-Socket messages sent: 0
-Socket messages received: 0
-Signals delivered: 0
-Page size (bytes): 4096
-Exit status: 0
-```
 
 - Information about the spent time are:
   ```bash
@@ -81,50 +59,89 @@ Exit status: 0
   ...
   ```
 
-##
+# Profiling Python code from command line
 
+## `line_profiler`
+- Profile a function line by line
+- Decorate target function with `@profile`
+  - Check `kernprof.py -h` for more ways of marking the interesting parts of
+    code
+  ```bash
+  > kernprof -l -o line_profile.lprof $CMD
+  > python -m line_profiler line_profile.lprof
+  ```
+
+- TODO(*): Finish this
+
+## `cProfile`
+- You need to run the code first with profiling enabled
+
+- Example of command lines:
+  ```bash
+  # Profile a python script.
+  > python -m cProfile -o prof.bin CMD
+
+  # Profile with run_tests.py.
+  > python -m cProfile -o prof.bin test/run_tests.py -v 10 TestComputeDerivedFeatures2.test3
+
+  # Profile a unit test.
+  > python -m cProfile -o profile edgar/forms8/test/test_edgar_utils.py
+  > python3 -m cProfile -o profile -m pytest edgar/forms8/test/test_edgar_utils.py::TestExtractTablesFromForms::test_table_extraction_example_2
+  ```
+
+- Then you can use the script `dev_scripts/process_prof.py` to automate some
+  top-level statistics
+
+- TODO(gp): Add examples
+
+- Plotting the results
+
+  ```bash
+  > gprof2dot -f pstats profile | dot -Tpng -o output.png
+  > gprof2dot -n 10 -f pstats profile | dot -Tpng -o output.png
+  > gprof2dot -n 10 -f pstats profile -l "*extract_tables_from_forms*" | dot -Tpng -o output.png
+  ```
+
+- `gprof2dot` has lots of interesting options, e.g.,
+  ```bash
+  gprof2dot -h
+
+    ...
+    -n PERCENTAGE, --node-thres=PERCENTAGE
+                          eliminate nodes below this threshold [default: 0.5]
+    -e PERCENTAGE, --edge-thres=PERCENTAGE
+                          eliminate edges below this threshold [default: 0.1]
+
+    --node-label=MEASURE  measurements to on show the node (can be specified
+                          multiple times): self-time, self-time-percentage,
+                          total-time or total-time-percentage [default: total-
+                          time-percentage, self-time-percentage]
+    -z ROOT, --root=ROOT  prune call graph to show only descendants of specified
+                          root function
+    -l LEAF, --leaf=LEAF  prune call graph to show only ancestors of specified
+                          leaf function
+    --depth=DEPTH         prune call graph to show only descendants or ancestors
+                          until specified depth
+    --skew=THEME_SKEW     skew the colorization curve.  Values < 1.0 give more
+                          variety to lower percentages.  Values > 1.0 give less
+                          variety to lower percentages
+    -p FILTER_PATHS, --path=FILTER_PATHS
+                          Filter all modules not in a specified path
+    ...
+  ```
+
+
+
+
+## Profiling a unit test
+
+```bash
 ```
-> gprof2dot -h
-```
 
-Interesting options are:
+## Post-processing the results
 
-Options:
-  -h, --help            show this help message and exit
-  -o FILE, --output=FILE
-                        output filename [stdout]
-  -n PERCENTAGE, --node-thres=PERCENTAGE
-                        eliminate nodes below this threshold [default: 0.5]
-  -e PERCENTAGE, --edge-thres=PERCENTAGE
-                        eliminate edges below this threshold [default: 0.1]
-
-  --node-label=MEASURE  measurements to on show the node (can be specified
-                        multiple times): self-time, self-time-percentage,
-                        total-time or total-time-percentage [default: total-
-                        time-percentage, self-time-percentage]
-  -z ROOT, --root=ROOT  prune call graph to show only descendants of specified
-                        root function
-  -l LEAF, --leaf=LEAF  prune call graph to show only ancestors of specified
-                        leaf function
-  --depth=DEPTH         prune call graph to show only descendants or ancestors
-                        until specified depth
-  --skew=THEME_SKEW     skew the colorization curve.  Values < 1.0 give more
-                        variety to lower percentages.  Values > 1.0 give less
-                        variety to lower percentages
-  -p FILTER_PATHS, --path=FILTER_PATHS
-                        Filter all modules not in a specified path
-
-
-gprof2dot -f pstats profile | dot -Tpng -o output.png
-
-gprof2dot -n 10 -f pstats profile | dot -Tpng -o output.png
-
-gprof2dot -n 10 -f pstats profile -l "*extract_tables_from_forms*" | dot -Tpng -o output.png
-
-
-Removing the pytest
-
-python -m cProfile -o profile edgar/forms8/test/test_edgar_utils.py
+- We have a little script
+  dev_scripts/process_prof.py
 
 # Profiling in a Jupyter notebook
 
@@ -158,13 +175,14 @@ magic now
 [uses](https://github.com/ipython/ipython/blob/master/IPython/core/magics/execution.py#L22)
 cProfile under the hood, so we can use it in the notebook instead:
 
-```python
-# We can suppress output to the notebook by specifying "-q".
-%prun -D tmp.pstats func()
+  ```python
+  # We can suppress output to the notebook by specifying "-q".
+  %prun -D tmp.pstats func()
 
-!gprof2dot -f pstats tmp.pstats | dot -Tpng -o output.png
-dspl.Image(filename="output.png")
-```
+  !gprof2dot -f pstats tmp.pstats | dot -Tpng -o output.png
+  dspl.Image(filename="output.png")
+  ```
+
 This will output something like this:
 
 ![](img/gprof2dot_output1.png)
@@ -200,4 +218,3 @@ func()
 ```python
 %mprun -f func func()
 ```
-
