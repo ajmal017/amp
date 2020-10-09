@@ -109,6 +109,35 @@ def set_weekends_to_nan(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def estimate_spread(srs: pd.Series,
+                    tick_size: float = 0.01,
+                    tau: float = 16,
+                    min_periods: Optional[int] = None,
+                    ) -> pd.Series:
+    """
+    Estimate spread from prices using Roll's model.
+
+    TODO(*): Add Roll's estimator that is based on percentage returns rather
+        than prices (which provides an estimate of the percentage bid-ask
+        spread).
+
+    :param srs: series of prices
+    :return: series of estimated spread
+    """
+    # Calculate rolling covariance of price changes.
+    cov = sigp.compute_rolling_cov(srs.diff(),
+                                   srs.shift(1).diff(),
+                                   tau=tau,
+                                   demean=True,
+                                   min_periods=min_periods,
+                                   )
+    # Clip the covariance estimate to ensure a nonnegative number under the
+    # square root.
+    roll_spread_estimate = np.sqrt(-1 * cov.clip(upper=0))
+    # Require that the spread be at least the minimum tick size.
+    return roll_spread_estimate.clip(lower=tick_size)
+
+
 # #############################################################################
 # Returns calculation and helpers.
 # #############################################################################
