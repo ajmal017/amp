@@ -2,6 +2,6 @@ STAGE=LOCAL
 
 # PostgreSQL
 # ------------------------------------------------------------------------------
-POSTGRES_HOST=particle_local
-POSTGRES_DB=65241hjgnoadawdWDAsb
+POSTGRES_USER=particle_local
+POSTGRES_PASSWORD=65241hjgnoadawdWDAsb
 POSTGRES_PORT=5432
