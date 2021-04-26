@@ -9,6 +9,7 @@ import logging
 import re
 from typing import Any, Dict, Iterable, List, Tuple, Union
 
+import numpy as np
 import pandas as pd
 
 import helpers.dbg as dbg
@@ -108,7 +109,7 @@ class Config:
         for k, v in self._config.items():
             if isinstance(v, Config):
                 txt_tmp = str(v)
-                txt.append("%s:\n%s" % (k, pri.space(txt_tmp)))
+                txt.append("%s:\n%s" % (k, pri.indent(txt_tmp)))
             else:
                 txt.append("%s: %s" % (k, v))
         ret = "\n".join(txt)
@@ -117,7 +118,7 @@ class Config:
         memory_loc_pattern = r"(<function \w+.+) at \dx\w+"
         ret = re.sub(memory_loc_pattern, r"\1", ret)
         # Remove memory locations of objects, if config contains them, e.g.,
-        # "<dataflow_p1.task2538_pipeline.ArPredictorBuilder object at 0x7f7c7991d390>"
+        # "<dataflow.task2538_pipeline.ArPredictorBuilder object at 0x7f7c7991d390>"
         memory_loc_pattern = r"(<\w+.+ object) at \dx\w+"
         ret = re.sub(memory_loc_pattern, r"\1", ret)
         return ret
@@ -176,7 +177,8 @@ class Config:
     def from_python(cls, code: str) -> "Config":
         """Create an object from the code returned by `to_python()`."""
         dbg.dassert_isinstance(code, str)
-        val = eval(code)
+        # eval function need unknown globals to be set.
+        val = eval(code, {"nan": np.nan, "Config": Config})
         dbg.dassert_isinstance(val, Config)
         return val  # type: ignore
 
@@ -241,13 +243,11 @@ class Config:
         """Raise an exception when a key is not present."""
         raise ValueError(
             "Invalid %s='%s' in config=\n%s"
-            % (key, self._config[key], pri.space(str(self)))
+            % (key, self._config[key], pri.indent(str(self)))
         )
 
     def _to_dict_except_for_leaves(self) -> Dict[str, Any]:
-        """
-        Convert as in `to_dict` except for leaf values.
-        """
+        """Convert as in `to_dict` except for leaf values."""
         # pylint: disable=unsubscriptable-object
         dict_: collections.OrderedDict[str, Any] = collections.OrderedDict()
         for k, v in self._config.items():
@@ -348,8 +348,8 @@ def convert_to_series(config: Config) -> pd.Series:
     dbg.dassert_isinstance(config, Config)
     dbg.dassert(config, msg="`config` is empty")
     flat = config.flatten()
-    keys = []
-    vals = []
+    keys: List[str] = []
+    vals: List[tuple] = []
     for k, v in flat.items():
         key = ".".join(k)
         keys.append(key)

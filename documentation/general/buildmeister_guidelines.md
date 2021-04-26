@@ -3,6 +3,9 @@
    * [Notification system](#notification-system)
    * [Buildmeister instructions](#buildmeister-instructions)
    * [Post-mortem analysis](#post-mortem-analysis)
+
+
+
 <!--te-->
 
 # General
@@ -10,13 +13,15 @@
 - Buildmeister rotates every 2 weeks
   - To see who is the Buildmeister now refer to
     [Buildmeister spreadsheet "Buildmeister rotation"](https://docs.google.com/spreadsheets/d/1AajgLnRQka9-W8mKOkobg8QOzaEVOnIMlDi8wWVATeA/edit#gid=0),
+  - Each rotation should be confirmed by a 'handshake' between the outgoing
+    Buildmeister and the new one in the related Telegram chat.
 - Buildmeister is responsible for:
   - Pushing team members to fix broken tests
   - Conducting post-mortem analysis, see
     [Buildmeister spreadsheet, "Post-mortem breaks analysis"](https://docs.google.com/spreadsheets/d/1AajgLnRQka9-W8mKOkobg8QOzaEVOnIMlDi8wWVATeA/edit#gid=1363431255),
 
 - Testing workflows are available via
-  [github actions](https://github.com/ParticleDev/commodity_research/tree/master/documentation_p1/general/github_actions.md):
+  [github actions](https://github.com/.../.../tree/master/documentation_p1/general/github_actions.md):
   - The fast tests workflow is triggered every 2 hours
   - The slow tests workflow is triggered every 4 hours
   - The super-slow tests workflow is to be implemented
@@ -31,14 +36,14 @@
 
 # Notification system
 
-- `@p1_GH_bot` notifies the team about breaks via Telegram channel `@ALL`
+- `GH_bot` notifies the team about breaks via Telegram channel `@ALL`
 - A notification contains:
   - Failing tests type: fast/slow/super-slow
   - Link to a failing run
   - Example:
     ```python
     Build failure 'Fast tests'.
-    https://github.com/ParticleDev/commodity_research/actions/runs/248816321
+    https://github.com/.../.../actions/runs/248816321
     ```
 
 # Buildmeister instructions
@@ -49,7 +54,7 @@
 - Notify the team
   - Post on the `@ALL` Telegram channel what tests broke, e.g.,
     ```python
-    FAILED knowledge_graph/vendors/p1/test/test_p1_utils.py::TestClean::test_clean
+    FAILED knowledge_graph/vendors/test/test_utils.py::TestClean::test_clean
     FAILED knowledge_graph/vendors/nbsc/test/test_nbsc_utils.py::TestExposeNBSCMetadata::test_expose_nbsc_metadata
     ```
   - Ask if somebody knows what is the problem
@@ -62,26 +67,26 @@
   - Issue title template `Build fail (test type) (run number)`
     - Example: `Build fail fast_tests (987074894)`
   - Paste the URL of a failing run
-    - Example: https://github.com/ParticleDev/commodity_research/runs/987074894
+    - Example: https://github.com/.../.../runs/987074894
   - Provide as much information as possible to give an understanding of the
     problem
     - List all the tests with FAILED status in a github run
       ```python
-      FAILED knowledge_graph/vendors/p1/test/test_p1_utils.py::TestClean::test_clean
+      FAILED knowledge_graph/vendors/test/test_p1_utils.py::TestClean::test_clean
       FAILED knowledge_graph/vendors/nbsc/test/test_nbsc_utils.py::TestExposeNBSCMetadata::test_expose_nbsc_metadata
       ```
     - Stack trace or part of it (if it's too large)
       ```python
       Traceback (most recent call last):
-      File "/commodity_research/automl/hypotheses/test/test_rh_generator.py", line 104, in test1
+      File "/.../automl/hypotheses/test/test_rh_generator.py", line 104, in test1
         kg_metadata, _ = p1ut.load_release(version="0.5.2")
-      File "/commodity_research/knowledge_graph/vendors/p1/utils.py", line 53, in load_release
+      File "/.../knowledge_graph/vendors/utils.py", line 53, in load_release
         % version,
-      File "/commodity_research/amp/helpers/dbg.py", line 335, in dassert_dir_exists
+      File "/.../amp/helpers/dbg.py", line 335, in dassert_dir_exists
         _dfatal(txt, msg, *args)
-      File "/commodity_research/amp/helpers/dbg.py", line 97, in _dfatal
+      File "/.../amp/helpers/dbg.py", line 97, in _dfatal
         dfatal(dfatal_txt)
-      File "/commodity_research/amp/helpers/dbg.py", line 48, in dfatal
+      File "/.../amp/helpers/dbg.py", line 48, in dfatal
         raise assertion_type(ret)
       AssertionError:
       ################################################################################
@@ -90,7 +95,7 @@
       The requested version 0.5.2 has no directory associated with it.
       ```
   - Add the issue to the
-    [BUILD - Breaks](https://app.zenhub.com/workspaces/particle-one-5e4448e6b9975964dfe1582f/issues/particledev/commodity_research/1564)
+    [BUILD - Breaks](https://app.zenhub.com/workspaces/...-5e4448e6b9975964dfe1582f/issues/.../.../1564)
     Epic so that we can track it
   - If the failures are not connected to each other, file separate issues for
     each of the potential root cause
@@ -113,10 +118,13 @@
     resort!
 
 - Regularly check issues that belong to the Epic
-  [BUILD - Breaks](https://app.zenhub.com/workspaces/particle-one-5e4448e6b9975964dfe1582f/issues/particledev/commodity_research/1564).
+  [BUILD - Breaks](https://app.zenhub.com/workspaces/...-5e4448e6b9975964dfe1582f/issues/.../.../1564).
   - You have to update the break issues if the problem was solved or partially
     solved.
   - Pay special attention to the failures which resulted in disabling tests
+  
+- When your time of the Buildmeister duties is over, confirm the rotation with
+  the next responsible person in the related Telegram chat.
 
 # Post-mortem analysis
 
@@ -134,7 +142,7 @@
 - `Repo` column:
   - Specify the repo where break occurred
     - `amp`
-    - `commodity_research`
+    - `...`
 - `Test type` column:
   - Specify the type of the failing tests
     - Fast
@@ -147,6 +155,7 @@
     - Merged a branch with broken tests
     - Master was not merged in a branch
     - Merged broken slow tests without knowing that
+    - Underlying data changed
 - `Issue` column:
   - Provide the link to the ZH issue with the break description
 - `Solution` column:

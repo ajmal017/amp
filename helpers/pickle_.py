@@ -5,31 +5,33 @@ import marshal
 import os
 import pickle
 import types
-from typing import Callable
+from typing import Any, Callable
 
 import helpers.dbg as dbg
-import helpers.io_ as io_
-import helpers.timer as timer
+import helpers.io_ as hio
+import helpers.timer as htimer
 
 _LOG = logging.getLogger(__name__)
 
 
-def _replace_extension(file_name, ext):
+def _replace_extension(file_name: str, ext: str) -> str:
     dbg.dassert(not ext.startswith("."), msg="ext='%s'" % ext)
     return "%s.%s" % (os.path.splitext(file_name)[0], ext)
 
 
 def to_pickle(
-        obj: object,
-        file_name: str,
-        backend: str = "pickle",
-        log_level: int = logging.DEBUG,
-        verbose: bool = True
+    obj: object,
+    file_name: str,
+    backend: str = "pickle",
+    log_level: int = logging.DEBUG,
+    verbose: bool = True,
 ) -> None:
-    """Pickle object <obj> into file <file_name>."""
+    """
+    Pickle object <obj> into file <file_name>.
+    """
     dbg.dassert_type_is(file_name, str)
-    dtmr = timer.dtimer_start(log_level, "Pickling to '%s'" % file_name)
-    io_.create_enclosing_dir(file_name, incremental=True)
+    dtmr = htimer.dtimer_start(log_level, "Pickling to '%s'" % file_name)
+    hio.create_enclosing_dir(file_name, incremental=True)
     # We assume that the user always specifies a .pkl extension and then we
     # change the extension based on the backend.
     if backend in ("pickle", "dill"):
@@ -50,13 +52,13 @@ def to_pickle(
         dbg.dassert(
             file_name.endswith(".pkl.gz"), msg="Invalid file_name=%s" % file_name
         )
-        with gzip.open(file_name, "wb") as fd:
-            pickler = pickle.Pickler(fd, pickle.HIGHEST_PROTOCOL)
+        with gzip.open(file_name, "wb") as zfd:
+            pickler = pickle.Pickler(zfd, pickle.HIGHEST_PROTOCOL)
             pickler.fast = True
             pickler.dump(obj)
     else:
         raise ValueError("Invalid backend='%s'" % backend)
-    _, elapsed_time = timer.dtimer_stop(dtmr)
+    _, elapsed_time = htimer.dtimer_stop(dtmr)
     size_mb = os.path.getsize(file_name) / (1024.0 ** 2)
     if verbose:
         _LOG.info(
@@ -68,11 +70,16 @@ def to_pickle(
 
 
 def from_pickle(
-    file_name: str, backend: str = "pickle", log_level: int = logging.DEBUG, verbose: bool = True
-):
-    """Unpickle and return object stored in <file_name>."""
+    file_name: str,
+    backend: str = "pickle",
+    log_level: int = logging.DEBUG,
+    verbose: bool = True,
+) -> Any:
+    """
+    Unpickle and return object stored in <file_name>.
+    """
     dbg.dassert_type_is(file_name, str)
-    dtmr = timer.dtimer_start(log_level, "Unpickling from '%s'" % file_name)
+    dtmr = htimer.dtimer_start(log_level, "Unpickling from '%s'" % file_name)
     # We assume that the user always specifies a .pkl extension and then we
     # change the extension based on the backend.
     if backend in ("pickle", "dill"):
@@ -92,12 +99,12 @@ def from_pickle(
         dbg.dassert(
             file_name.endswith(".pkl.gz"), msg="Invalid file_name=%s" % file_name
         )
-        with gzip.open(file_name, "rb") as fd:
-            unpickler = pickle.Unpickler(fd)
+        with gzip.open(file_name, "rb") as zfd:
+            unpickler = pickle.Unpickler(zfd)
             obj = unpickler.load()
     else:
         raise ValueError("Invalid backend='%s'" % backend)
-    _, elapsed_time = timer.dtimer_stop(dtmr)
+    _, elapsed_time = htimer.dtimer_stop(dtmr)
     size_mb = os.path.getsize(file_name) / (1024.0 ** 2)
     if verbose:
         _LOG.info(
@@ -110,23 +117,25 @@ def from_pickle(
 
 
 def pickle_function(func: Callable) -> str:
-    """Pickle a function into bytecode stored into a string.
+    """
+    Pickle a function into bytecode stored into a string.
 
     - return: string
     """
     dbg.dassert(callable(func))
-    code_as_str = marshal.dumps(func.__code__)
-    return code_as_str
+    code_as_bytes = marshal.dumps(func.__code__)
+    return code_as_bytes.decode()
 
 
 def unpickle_function(code_as_str: str, func_name: str) -> Callable:
-    """Unpickle a function saved into string <code_as_str>. The function is
+    """
+    Unpickle a function saved into string <code_as_str>. The function is
     injected in the global namespace as <func_name>.
 
     - return: function
     """
     dbg.dassert_type_is(code_as_str, str)
-    code = marshal.loads(code_as_str)
+    code = marshal.loads(code_as_str.encode())
     func = types.FunctionType(code, globals(), name=func_name)
     return func
 
@@ -143,5 +152,5 @@ def to_json(file_name: str, obj: object) -> None:
 
 def from_json(file_name: str) -> object:
     dbg.dassert_exists(file_name)
-    obj = json.loads(io_.from_file(file_name))
+    obj = json.loads(hio.from_file(file_name))
     return obj

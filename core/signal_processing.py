@@ -1,215 +1,192 @@
-"""Import as:
+"""
+Import as:
 
-import core.signal_processing as sigp
+import core.signal_processing as csigna
 """
 
+import collections
 import functools
 import logging
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pywt
-import scipy as sp
-import statsmodels.api as sm
 
-import helpers.dataframe as hdf
+import helpers.dataframe as hdataf
 import helpers.dbg as dbg
 
 _LOG = logging.getLogger(__name__)
 
 
 # #############################################################################
-# Graphical tools for time and frequency analysis
+# Correlation helpers
 # #############################################################################
 
-# Some use cases include:
-#   - Determining whether a predictor exhibits autocorrelation
-#   - Determining the characteristic time scale of a signal
-#   - Signal filtering
-#   - Lag determination
-#   - etc.
 
-
-# TODO(*): Deprecate. Keep for now as a nice way to arrange subplots.
-def plot_wavelet_levels(
-    signal: Union[pd.DataFrame, pd.Series], wavelet_name: str, levels: int
-) -> None:
-    """Wavelet level decomposition plot. Higher levels are smoother.
-
-    :param signal: Series-like numerical object
-    :param wavelet_name: One of the names in pywt.wavelist()
-    :param levels: The number of levels to plot
+def correlate_with_lag(
+    df: pd.DataFrame, lag: Union[int, List[int]]
+) -> pd.DataFrame:
     """
-    _, ax = plt.subplots(figsize=(6, 1))
-    ax.set_title("Original signal")
-    ax.plot(signal)
-    plt.show()
+    Combine cols of `df` with their lags and compute the correlation matrix.
 
-    data = signal.copy()
-    _, axarr = plt.subplots(nrows=levels, ncols=2, figsize=(6, 6))
-    for idx in range(levels):
-        (data, coeff_d) = pywt.dwt(data, wavelet_name)
-        axarr[idx, 0].plot(data, "r")
-        axarr[idx, 1].plot(coeff_d, "g")
-        axarr[idx, 0].set_ylabel(
-            "Level {}".format(idx + 1), fontsize=14, rotation=90
-        )
-        axarr[idx, 0].set_yticklabels([])
-        if idx == 0:
-            axarr[idx, 0].set_title("Approximation coefficients", fontsize=14)
-            axarr[idx, 1].set_title("Detail coefficients", fontsize=14)
-        axarr[idx, 1].set_yticklabels([])
-    plt.tight_layout()
-    plt.show()
-
-
-def filter_low_pass(
-    signal: Union[pd.DataFrame, pd.Series], wavelet_name: str, threshold: float
-) -> pd.Series:
-    """Wavelet low-pass filtering using a threshold.
-
-    Currently configured to use 'periodic' mode.
-    See https://pywavelets.readthedocs.io/en/latest/regression/modes.html.
-    Uses soft thresholding.
-
-    :param signal: Signal as pd.Series
-    :param wavelet_name: One of the names in pywt.wavelist()
-    :param threshold: Coefficient threshold (>= passes)
-
-    :return: Smoothed signal as pd.Series, indexed like signal.index
+    :param df: dataframe of numeric values
+    :param lag: number of lags to apply or list of number of lags
+    :return: correlation matrix with `(1 + len(lag)) * df.columns` columns
     """
-    threshold = threshold * np.nanmax(signal)
-    coeff = pywt.wavedec(signal, wavelet_name, mode="per")
-    coeff[1:] = (
-        pywt.threshold(i, value=threshold, mode="soft") for i in coeff[1:]
+    dbg.dassert_isinstance(df, pd.DataFrame)
+    if isinstance(lag, int):
+        lag = [lag]
+    elif isinstance(lag, list):
+        pass
+    else:
+        raise ValueError("Invalid `type(lag)`='%s'" % type(lag))
+    lagged_dfs = [df]
+    for lag_curr in lag:
+        df_lagged = df.shift(lag_curr)
+        df_lagged.columns = df_lagged.columns.astype(str) + f"_lag_{lag_curr}"
+        lagged_dfs.append(df_lagged)
+    merged_df = pd.concat(lagged_dfs, axis=1)
+    return merged_df.corr()
+
+
+def correlate_with_lagged_cumsum(
+    df: pd.DataFrame,
+    lag: int,
+    y_vars: List[str],
+    x_vars: Optional[List[str]] = None,
+    nan_mode: Optional[str] = None,
+) -> pd.DataFrame:
+    """
+    Compute correlation matrix of `df` cols and lagged cumulative sums.
+
+    The flow is the following:
+        - Compute cumulative sums of `y_vars` columns for `num_steps = lag`
+        - Lag them so that `x_t` aligns with `y_{t+1} + ... + y{t+lag}`
+        - Compute correlation of `df` columns (other than `y_vars`) and the
+          lagged cumulative sums of `y_vars`
+
+    This function can be applied to compute correlations between predictors and
+    cumulative log returns.
+
+    :param df: dataframe of numeric values
+    :param lag: number of time points to shift the data by. Number of steps to
+        compute rolling sum is `lag` too.
+    :param y_vars: names of columns for which to compute cumulative sum
+    :param x_vars: names of columns to correlate the `y_vars` with. If `None`,
+        defaults to all columns except `y_vars`
+    :param nan_mode: argument for hdataf.apply_nan_mode()
+    :return: correlation matrix of `(len(x_vars), len(y_vars))` shape
+    """
+    dbg.dassert_isinstance(df, pd.DataFrame)
+    dbg.dassert_isinstance(y_vars, list)
+    x_vars = x_vars or df.columns.difference(y_vars).tolist()
+    dbg.dassert_isinstance(x_vars, list)
+    dbg.dassert_lte(
+        1,
+        len(x_vars),
+        "There are no columns to compute the correlation of cumulative "
+        "returns with. ",
     )
-    rec = pywt.waverec(coeff, wavelet_name, mode="per")
-    if rec.size > signal.size:
-        rec = rec[1:]
-    reconstructed_signal = pd.Series(rec, index=signal.index)
-    return reconstructed_signal
+    df = df[x_vars + y_vars].copy()
+    cumsum_df = _compute_lagged_cumsum(df, lag, y_vars=y_vars, nan_mode=nan_mode)
+    corr_df = cumsum_df.corr()
+    y_cumsum_vars = cumsum_df.columns.difference(x_vars)
+    return corr_df.loc[x_vars, y_cumsum_vars]
 
 
-def plot_scaleogram(
-    signal: Union[pd.DataFrame, pd.Series],
-    scales: np.array,
-    wavelet_name: str,
-    cmap: plt.cm = plt.cm.seismic,  # pylint: disable=no-member
-    title: str = "Wavelet Spectrogram of signal",
-    ylabel: str = "Period",
-    xlabel: str = "Time",
-) -> None:
-    r"""Plot wavelet-based spectrogram (aka scaleogram).
-
-    A nice reference and utility for plotting can be found at
-    https://github.com/alsauve/scaleogram.
-
-    Also see:
-    https://github.com/PyWavelets/pywt/blob/master/demo/wp_scalogram.py.
-
-    :param signal: signal to transform
-    :param scales: numpy array, e.g., np.arange(1, 128)
-    :param wavelet_name: continuous wavelet, e.g., 'cmor' or 'morl'
+def _compute_lagged_cumsum(
+    df: pd.DataFrame,
+    lag: int,
+    y_vars: Optional[List[str]] = None,
+    nan_mode: Optional[str] = None,
+) -> pd.DataFrame:
     """
-    time = np.arange(0, signal.size)
-    dt = time[1] - time[0]
-    [coeffs, freqs] = pywt.cwt(signal, scales, wavelet_name, dt)
-    power = np.abs(coeffs) ** 2
-    periods = 1.0 / freqs
-    levels = [0.0625, 0.125, 0.25, 0.5, 1, 2, 4, 8]
-    contour_levels = np.log2(levels)
+    Compute lagged cumulative sum for selected columns.
 
-    fig, ax = plt.subplots(figsize=(15, 10))
-    im = ax.contourf(
-        time,
-        np.log2(periods),
-        np.log2(power),
-        contour_levels,
-        extend="both",
-        cmap=cmap,
-    )
+    Align `x_t` with `y_{t+1} + ... + y{t+lag}`.
 
-    ax.set_title(title, fontsize=20)
-    ax.set_ylabel(ylabel, fontsize=18)
-    ax.set_xlabel(xlabel, fontsize=18)
-
-    yticks = 2 ** np.arange(
-        np.ceil(np.log2(periods.min())), np.ceil(np.log2(periods.max()))
-    )
-    ax.set_yticks(np.log2(yticks))
-    ax.set_yticklabels(yticks)
-    ax.invert_yaxis()
-    ylim = ax.get_ylim()
-    ax.set_ylim(ylim[0], -1)
-
-    cbar_ax = fig.add_axes([0.95, 0.5, 0.03, 0.25])
-    fig.colorbar(im, cax=cbar_ax, orientation="vertical")
-    plt.show()
-
-
-# #############################################################################
-# Basic modeling
-# #############################################################################
-
-
-def fit_random_walk_plus_noise(
-    signal: Union[pd.DataFrame, pd.Series]
-) -> Tuple[sm.tsa.UnobservedComponents, sm.tsa.statespace.MLEResults]:
-    """Fit a random walk + Gaussian noise model using state space methods.
-
-    After convergence the resulting model is equivalent to exponential
-    smoothing. Using the state space approach we can
-      - Calculate the signal-to-noise ratio
-      - Determine an optimal (under model assumptions) ewma com
-      - Analyze residuals
-
-    :return: SSM model and fitted result
+    :param df: dataframe of numeric values
+    :param lag: number of time points to shift the data by. Number of steps to
+        compute rolling sum is `lag`
+    :param y_vars: names of columns for which to compute cumulative sum. If
+        `None`, compute for all columns
+    :param nan_mode: argument for hdataf.apply_nan_mode()
+    :return: dataframe with lagged cumulative sum columns
     """
-    model = sm.tsa.UnobservedComponents(
-        signal, level="local level", initialization="diffuse"
-    )
-    result = model.fit(method="powell", disp=True)
-    # Signal-to-noise ratio.
-    q = result.params[1] / result.params[0]
-    _LOG.info("Signal-to-noise ratio q = %f", q)
-    p = 0.5 * (q + np.sqrt(q ** 2 + 4 * q))
-    kalman_gain = p / (p + 1)
-    _LOG.info("Steady-state Kalman gain = %f", kalman_gain)
-    # EWMA com.
-    com = 1 / kalman_gain - 1
-    _LOG.info("EWMA com = %f", com)
-    print(result.summary())
-    result.plot_diagnostics()
-    result.plot_components(legend_loc="lower right", figsize=(15, 9))
-    return model, result
+    dbg.dassert_isinstance(df, pd.DataFrame)
+    y_vars = y_vars or df.columns.tolist()
+    dbg.dassert_isinstance(y_vars, list)
+    x_vars = df.columns.difference(y_vars)
+    y = df[y_vars].copy()
+    x = df[x_vars].copy()
+    # Compute cumulative sum.
+    y_cumsum = y.apply(accumulate, num_steps=lag, nan_mode=nan_mode)
+    y_cumsum.rename(columns=lambda x: f"{x}_cumsum_{lag}", inplace=True)
+    # Let's lag `y` so that `x_t` aligns with `y_{t+1} + ... + y{t+lag}`.
+    y_cumsum_lagged = y_cumsum.shift(-lag)
+    y_cumsum_lagged.rename(columns=lambda z: f"{z}_lag_{lag}", inplace=True)
+    #
+    merged_df = x.merge(y_cumsum_lagged, left_index=True, right_index=True)
+    return merged_df
 
 
-# #############################################################################
-# Multisignal or predictor/response functions
-# #############################################################################
-
-
-def plot_crosscorrelation(
-    x: Union[pd.DataFrame, pd.Series], y: Union[pd.DataFrame, pd.Series]
-) -> None:
-    r"""Assume x, y have been approximately demeaned and normalized (e.g.,
-    z-scored with ewma).
-
-    At index `k` in the result, the value is given by
-        (1 / n) * \sum_{l = 0}^{n - 1} x_l * y_{l + k}
+def calculate_inverse(
+    df: pd.DataFrame,
+    p_moment: Optional[Any] = None,
+    info: Optional[collections.OrderedDict] = None,
+) -> pd.DataFrame:
     """
-    joint_idx = x.index.intersection(y.index)
-    corr = sp.signal.correlate(x.loc[joint_idx], y.loc[joint_idx])
-    # Normalize by number of points in series (e.g., take expectations)
-    n = joint_idx.size
-    corr /= n
-    step_idx = pd.RangeIndex(-1 * n + 1, n)
-    pd.Series(data=corr, index=step_idx).plot()
+    Calculate an inverse matrix.
+
+    :param df: matrix to invert
+    :param p_moment: order of the matrix norm as in `np.linalg.cond`
+    :param info: dict with info to add the condition number to
+    """
+    dbg.dassert_isinstance(df, pd.DataFrame)
+    dbg.dassert_eq(
+        df.shape[0], df.shape[1], "Only square matrices are invertible."
+    )
+    dbg.dassert(
+        df.apply(lambda s: pd.to_numeric(s, errors="coerce").notnull()).all(
+            axis=None
+        ),
+        "The matrix is not numeric.",
+    )
+    dbg.dassert_ne(np.linalg.det(df), 0, "The matrix is non-invertible.")
+    if info is not None:
+        info["condition_number"] = np.linalg.cond(df, p_moment)
+    return pd.DataFrame(np.linalg.inv(df), df.columns, df.index)
 
 
-# TODO(Paul): Add coherence plotting function.
+def calculate_pseudoinverse(
+    df: pd.DataFrame,
+    rcond: Optional[float] = 1e-15,
+    hermitian: Optional[bool] = False,
+    p_moment: Optional[Any] = None,
+    info: Optional[collections.OrderedDict] = None,
+) -> pd.DataFrame:
+    """
+    Calculate a pseudoinverse matrix.
+
+    :param df: matrix to pseudo-invert
+    :param rcond: cutoff for small singular values as in `np.linalg.pinv`
+    :param hermitian: if True, `df` is assumed to be Hermitian
+    :param p_moment: order of the matrix norm as in `np.linalg.cond`
+    :param info: dict with info to add the condition number to
+    """
+    dbg.dassert_isinstance(df, pd.DataFrame)
+    dbg.dassert(
+        df.apply(lambda s: pd.to_numeric(s, errors="coerce").notnull()).all(
+            axis=None
+        ),
+        "The matrix is not numeric.",
+    )
+    if info is not None:
+        info["condition_number"] = np.linalg.cond(df, p_moment)
+    return pd.DataFrame(
+        np.linalg.pinv(df, rcond=rcond, hermitian=hermitian), df.columns, df.index
+    )
 
 
 # #############################################################################
@@ -220,7 +197,8 @@ def plot_crosscorrelation(
 def squash(
     signal: Union[pd.DataFrame, pd.Series], scale: int = 1
 ) -> Union[pd.DataFrame, pd.Series]:
-    """Apply squashing function to data.
+    """
+    Apply squashing function to data.
 
     :param signal: data
     :param scale: Divide data by scale and multiply squashed output by scale.
@@ -233,24 +211,47 @@ def squash(
 
 
 def accumulate(
-    srs: pd.Series, num_steps: int, nan_mode: Optional[str] = None,
-) -> pd.Series:
-    """Accumulate series for step.
-
-    :param srs: time series
-    :param num_steps: number of steps to compute rolling sum for
-    :param nan_mode: argument for hdf.apply_nan_mode()
-    :return: time series for step
+    signal: Union[pd.DataFrame, pd.Series],
+    num_steps: int,
+    nan_mode: Optional[str] = None,
+) -> Union[pd.DataFrame, pd.Series]:
     """
+    Accumulate series for step.
+
+    :param signal: time series or dataframe
+    :param num_steps: number of steps to compute rolling sum for
+    :param nan_mode: argument for hdataf.apply_nan_mode()
+    :return: time series or dataframe accumulated
+    """
+    dbg.dassert_isinstance(num_steps, int)
+    dbg.dassert_lte(
+        1,
+        num_steps,
+        "`num_steps=0` returns all-zero dataframe. Passed in `num_steps`='%s'",
+        num_steps,
+    )
     nan_mode = nan_mode or "leave_unchanged"
-    srs = hdf.apply_nan_mode(srs, mode=nan_mode)
-    return srs.rolling(window=num_steps).sum()
+
+    if isinstance(signal, pd.Series):
+        signal_cleaned = hdataf.apply_nan_mode(signal, mode=nan_mode)
+        signal_cumulative = signal_cleaned.rolling(window=num_steps).sum()
+    elif isinstance(signal, pd.DataFrame):
+        signal_cleaned = signal.apply(
+            (lambda x: hdataf.apply_nan_mode(x, mode=nan_mode)), axis=0
+        )
+        signal_cumulative = signal_cleaned.apply(
+            (lambda x: x.rolling(window=num_steps).sum()), axis=0
+        )
+    else:
+        raise ValueError(f"Invalid input type `{type(signal)}`")
+    return signal_cumulative
 
 
 def get_symmetric_equisized_bins(
     signal: pd.Series, bin_size: float, zero_in_bin_interior: bool = False
 ) -> np.array:
-    """Get bins of equal size, symmetric about zero, adapted to `signal`.
+    """
+    Get bins of equal size, symmetric about zero, adapted to `signal`.
 
     :param bin_size: width of bin
     :param zero_in_bin_interior: Determines whether `0` is a bin edge or not.
@@ -279,7 +280,8 @@ def get_symmetric_equisized_bins(
 
 
 def digitize(signal: pd.Series, bins: np.array, right: bool = False) -> pd.Series:
-    """Digitize (i.e., discretize) `signal` into `bins`.
+    """
+    Digitize (i.e., discretize) `signal` into `bins`.
 
     - In the output, bins are referenced with integers and are such that `0`
       always belongs to bin `0`
@@ -311,7 +313,8 @@ def digitize(signal: pd.Series, bins: np.array, right: bool = False) -> pd.Serie
 
 
 def _wrap(signal: pd.Series, num_cols: int) -> pd.DataFrame:
-    """Convert a 1-d series into a 2-d dataframe left-to-right top-to-bottom.
+    """
+    Convert a 1-d series into a 2-d dataframe left-to-right top-to-bottom.
 
     :param num_cols: number of columns to use for wrapping
     """
@@ -336,7 +339,8 @@ def _wrap(signal: pd.Series, num_cols: int) -> pd.DataFrame:
 def _unwrap(
     df: pd.DataFrame, idx: pd.Index, name: Optional[Any] = None
 ) -> pd.Series:
-    """Undo `_wrap`.
+    """
+    Undo `_wrap`.
 
     We allow `index.size` to be less than nrows * ncols of `df`, in which case
     values are truncated from the end of the unwrapped dataframe.
@@ -361,8 +365,8 @@ def skip_apply_func(
     func: Callable[[pd.Series], pd.DataFrame],
     **kwargs: Any,
 ) -> pd.DataFrame:
-    """Apply `func` to each col of `signal` after a wrap, then unwrap and
-    merge.
+    """
+    Apply `func` to each col of `signal` after a wrap, then unwrap and merge.
 
     :param skip_size: num_cols used for wrapping each col of `signal`
     :param kwargs: forwarded to `func`
@@ -382,8 +386,9 @@ def skip_apply_func(
 # #############################################################################
 
 
-def _calculate_tau_from_com(com: float) -> float:
-    """Transform center-of-mass (com) into tau parameter.
+def _calculate_tau_from_com(com: float) -> Union[float, np.float]:
+    """
+    Transform center-of-mass (com) into tau parameter.
 
     This is the function inverse of `_calculate_com_from_tau`.
     """
@@ -391,8 +396,9 @@ def _calculate_tau_from_com(com: float) -> float:
     return 1.0 / np.log(1 + 1.0 / com)
 
 
-def _calculate_com_from_tau(tau: float) -> float:
-    """Transform tau parameter into center-of-mass (com).
+def _calculate_com_from_tau(tau: float) -> Union[float, np.float]:
+    """
+    Transform tau parameter into center-of-mass (com).
 
     We use the tau parameter for kernels (as in Dacorogna, et al), but for the
     compute_ema operator want to take advantage of pandas' implementation, which uses
@@ -570,7 +576,8 @@ def compute_rolling_norm(
     max_depth: int = 1,
     p_moment: float = 2,
 ) -> Union[pd.DataFrame, pd.Series]:
-    """Implement smooth moving average norm (when p_moment >= 1).
+    """
+    Implement smooth moving average norm (when p_moment >= 1).
 
     Moving average corresponds to compute_ema when min_depth = max_depth = 1.
     """
@@ -588,7 +595,8 @@ def compute_rolling_var(
     max_depth: int = 1,
     p_moment: float = 2,
 ) -> Union[pd.DataFrame, pd.Series]:
-    """Implement smooth moving average central moment.
+    """
+    Implement smooth moving average central moment.
 
     Moving average corresponds to compute_ema when min_depth = max_depth = 1.
     """
@@ -608,7 +616,8 @@ def compute_rolling_std(
     max_depth: int = 1,
     p_moment: float = 2,
 ) -> Union[pd.DataFrame, pd.Series]:
-    """Implement normalized smooth moving average central moment.
+    """
+    Implement normalized smooth moving average central moment.
 
     Moving average corresponds to compute_ema when min_depth = max_depth = 1.
     """
@@ -625,7 +634,9 @@ def compute_rolling_demean(
     min_depth: int = 1,
     max_depth: int = 1,
 ) -> Union[pd.DataFrame, pd.Series]:
-    """Demean signal on a rolling basis with compute_smooth_moving_average."""
+    """
+    Demean signal on a rolling basis with compute_smooth_moving_average.
+    """
     signal_ma = compute_smooth_moving_average(
         signal, tau, min_periods, min_depth, max_depth
     )
@@ -643,7 +654,8 @@ def compute_rolling_zscore(
     delay: int = 0,
     atol: float = 0,
 ) -> Union[pd.DataFrame, pd.Series]:
-    """Z-score using compute_smooth_moving_average and compute_rolling_std.
+    """
+    Z-score using compute_smooth_moving_average and compute_rolling_std.
 
     If delay > 0, then pay special attention to 0 and NaN handling to avoid
     extreme values.
@@ -685,7 +697,9 @@ def compute_rolling_skew(
     max_depth: int = 1,
     p_moment: float = 2,
 ) -> Union[pd.DataFrame, pd.Series]:
-    """Smooth moving average skew of z-scored signal."""
+    """
+    Smooth moving average skew of z-scored signal.
+    """
     z_signal = compute_rolling_zscore(
         signal, tau_z, min_periods, min_depth, max_depth, p_moment
     )
@@ -704,7 +718,9 @@ def compute_rolling_kurtosis(
     max_depth: int = 1,
     p_moment: float = 2,
 ) -> Union[pd.DataFrame, pd.Series]:
-    """Smooth moving average kurtosis of z-scored signal."""
+    """
+    Smooth moving average kurtosis of z-scored signal.
+    """
     z_signal = compute_rolling_zscore(
         signal, tau_z, min_periods, min_depth, max_depth, p_moment
     )
@@ -727,13 +743,14 @@ def compute_rolling_annualized_sharpe_ratio(
     max_depth: int = 1,
     p_moment: float = 2,
 ) -> Union[pd.DataFrame, pd.Series]:
-    """Compute rolling annualized Sharpe ratio and standard error.
+    """
+    Compute rolling annualized Sharpe ratio and standard error.
 
     The standard error adjustment uses the range of the smooth moving
     average kernel as an estimate of the "number of data points" used in
     the calculation of the Sharpe ratio.
     """
-    ppy = hdf.infer_sampling_points_per_year(signal)
+    ppy = hdataf.infer_sampling_points_per_year(signal)
     sr = compute_rolling_sharpe_ratio(
         signal, tau, min_periods, min_depth, max_depth, p_moment
     )
@@ -755,8 +772,9 @@ def compute_rolling_sharpe_ratio(
     max_depth: int = 1,
     p_moment: float = 2,
 ) -> Union[pd.DataFrame, pd.Series]:
-    """Sharpe ratio using compute_smooth_moving_average and
-    compute_rolling_std."""
+    """
+    Sharpe ratio using compute_smooth_moving_average and compute_rolling_std.
+    """
     signal_ma = compute_smooth_moving_average(
         signal, tau, min_periods, min_depth, max_depth
     )
@@ -772,7 +790,7 @@ def compute_rolling_sharpe_ratio(
 # #############################################################################
 
 
-def compute_rolling_corr(
+def compute_rolling_cov(
     srs1: Union[pd.DataFrame, pd.Series],
     srs2: Union[pd.DataFrame, pd.Series],
     tau: float,
@@ -780,9 +798,10 @@ def compute_rolling_corr(
     min_periods: int = 0,
     min_depth: int = 1,
     max_depth: int = 1,
-    p_moment: float = 2,
 ) -> Union[pd.DataFrame, pd.Series]:
-    """Smooth moving correlation."""
+    """
+    Smooth moving covariance.
+    """
     if demean:
         srs1_adj = srs1 - compute_smooth_moving_average(
             srs1, tau, min_periods, min_depth, max_depth
@@ -793,7 +812,35 @@ def compute_rolling_corr(
     else:
         srs1_adj = srs1
         srs2_adj = srs2
+    smooth_prod = compute_smooth_moving_average(
+        srs1_adj.multiply(srs2_adj), tau, min_periods, min_depth, max_depth
+    )
+    return smooth_prod
 
+
+def compute_rolling_corr(
+    srs1: Union[pd.DataFrame, pd.Series],
+    srs2: Union[pd.DataFrame, pd.Series],
+    tau: float,
+    demean: bool = True,
+    min_periods: int = 0,
+    min_depth: int = 1,
+    max_depth: int = 1,
+    p_moment: float = 2,
+) -> Union[pd.DataFrame, pd.Series]:
+    """
+    Smooth moving correlation.
+    """
+    if demean:
+        srs1_adj = srs1 - compute_smooth_moving_average(
+            srs1, tau, min_periods, min_depth, max_depth
+        )
+        srs2_adj = srs2 - compute_smooth_moving_average(
+            srs2, tau, min_periods, min_depth, max_depth
+        )
+    else:
+        srs1_adj = srs1
+        srs2_adj = srs2
     smooth_prod = compute_smooth_moving_average(
         srs1_adj.multiply(srs2_adj), tau, min_periods, min_depth, max_depth
     )
@@ -816,7 +863,8 @@ def compute_rolling_zcorr(
     max_depth: int = 1,
     p_moment: float = 2,
 ) -> Union[pd.DataFrame, pd.Series]:
-    """Z-score srs1, srs2 then calculate moving average of product.
+    """
+    Z-score srs1, srs2 then calculate moving average of product.
 
     Not guaranteed to lie in [-1, 1], but bilinear in the z-scored
     variables.
@@ -854,7 +902,8 @@ def process_outliers(
     min_periods: Optional[int] = None,
     info: Optional[dict] = None,
 ) -> pd.Series:
-    """Process outliers in different ways given lower / upper quantiles.
+    """
+    Process outliers in different ways given lower / upper quantiles.
 
     Default behavior:
       - If `window` is `None`, set `window` to series length
@@ -983,10 +1032,11 @@ def process_outlier_df(
     min_periods: Optional[int] = None,
     info: Optional[dict] = None,
 ) -> pd.DataFrame:
-    """Extend `process_outliers` to dataframes.
+    """
+    Extend `process_outliers` to dataframes.
 
     TODO(*): Revisit this with a decorator approach:
-    https://github.com/ParticleDev/commodity_research/issues/568
+    https://github.com/.../.../issues/568
     """
     if info is not None:
         dbg.dassert_isinstance(info, dict)
@@ -1028,7 +1078,8 @@ def process_nonfinite(
     remove_inf: bool = True,
     info: Optional[dict] = None,
 ) -> pd.Series:
-    """Remove infinite and NaN values according to the parameters.
+    """
+    Remove infinite and NaN values according to the parameters.
 
     :param srs: pd.Series to process
     :param remove_nan: remove NaN values if True and keep if False
@@ -1073,9 +1124,13 @@ def process_nonfinite(
 
 
 def compute_ipca(
-    df: pd.DataFrame, num_pc: int, tau: float, nan_mode: Optional[str] = None,
+    df: pd.DataFrame,
+    num_pc: int,
+    tau: float,
+    nan_mode: Optional[str] = None,
 ) -> Tuple[pd.DataFrame, List[pd.DataFrame]]:
-    """Incremental PCA.
+    """
+    Incremental PCA.
 
     The dataframe should already be centered.
 
@@ -1086,7 +1141,7 @@ def compute_ipca(
     :param tau: parameter used in (continuous) compute_ema and compute_ema-derived kernels. For
         typical ranges it is approximately but not exactly equal to the
         center-of-mass (com) associated with an compute_ema kernel.
-    :param nan_mode: argument for hdf.apply_nan_mode()
+    :param nan_mode: argument for hdataf.apply_nan_mode()
     :return:
       - df of eigenvalue series (col 0 correspond to max eigenvalue, etc.).
       - list of dfs of unit eigenvectors (0 indexes df eigenvectors
@@ -1111,20 +1166,22 @@ def compute_ipca(
     _LOG.debug("com = %0.2f", com)
     _LOG.debug("alpha = %0.2f", alpha)
     nan_mode = nan_mode or "fill_with_zero"
-    df = df.apply(hdf.apply_nan_mode, mode=nan_mode)
-    lambdas = {k: [] for k in range(num_pc)}
+    df = df.apply(hdataf.apply_nan_mode, mode=nan_mode)
+    lambdas: Dict[int, list] = {k: [] for k in range(num_pc)}
     # V's are eigenvectors with norm equal to corresponding eigenvalue.
-    vs = {k: [] for k in range(num_pc)}
-    unit_eigenvecs = {k: [] for k in range(num_pc)}
+    vs: Dict[int, list] = {k: [] for k in range(num_pc)}
+    unit_eigenvecs: Dict[int, list] = {k: [] for k in range(num_pc)}
     step = 0
-    for step, n in enumerate(df.index):
+    for n in df.index:
         # Initialize u(n).
         u = df.loc[n].copy()
         for i in range(min(num_pc, step + 1)):
             # Initialize ith eigenvector.
             if i == step:
-                _LOG.debug("Initializing eigenvector %i...", i)
                 v = u.copy()
+                if np.linalg.norm(v):
+                    _LOG.debug(f"Initializing eigenvector {i}...")
+                    step += 1
             else:
                 # Main update step for eigenvector i.
                 u, v = _compute_ipca_step(u, vs[i][-1], alpha)
@@ -1134,13 +1191,15 @@ def compute_ipca(
             norm = np.linalg.norm(v)
             lambdas[i].append(norm)
             unit_eigenvecs[i].append(v / norm)
-    _LOG.debug("Completed %i steps of incremental PCA.", step + 1)
+    _LOG.debug(f"Completed {len(df)} steps of incremental PCA.")
     # Convert lambda dict of lists to list of series.
     # Convert unit_eigenvecs dict of lists to list of dataframes.
     lambdas_srs = []
     unit_eigenvec_dfs = []
     for i in range(num_pc):
-        lambdas_srs.append(pd.Series(index=df.index[i:], data=lambdas[i]))
+        lambdas_srs.append(
+            pd.Series(index=df.index[-len(lambdas[i]) :], data=lambdas[i])
+        )
         unit_eigenvec_dfs.append(pd.concat(unit_eigenvecs[i], axis=1).transpose())
     lambda_df = pd.concat(lambdas_srs, axis=1)
     return lambda_df, unit_eigenvec_dfs
@@ -1149,7 +1208,8 @@ def compute_ipca(
 def _compute_ipca_step(
     u: pd.Series, v: pd.Series, alpha: float
 ) -> Tuple[pd.Series, pd.Series]:
-    """Single step of incremental PCA.
+    """
+    Single step of incremental PCA.
 
     At each point, the norm of v is the eigenvalue estimate (for the component
     to which u and v refer).
@@ -1172,7 +1232,8 @@ def _compute_ipca_step(
 
 
 def compute_unit_vector_angular_distance(df: pd.DataFrame) -> pd.Series:
-    """Calculate the angular distance between unit vectors.
+    """
+    Calculate the angular distance between unit vectors.
 
     Accepts a df of unit vectors (each row a unit vector) and returns a series
     of consecutive angular distances indexed according to the later time point.
@@ -1189,7 +1250,9 @@ def compute_unit_vector_angular_distance(df: pd.DataFrame) -> pd.Series:
 
 
 def compute_eigenvector_diffs(eigenvecs: List[pd.DataFrame]) -> pd.DataFrame:
-    """Take a list of eigenvectors and return a df of angular distances."""
+    """
+    Take a list of eigenvectors and return a df of angular distances.
+    """
     ang_chg = []
     for i, vec in enumerate(eigenvecs):
         srs = compute_unit_vector_angular_distance(vec)
@@ -1212,7 +1275,8 @@ def get_trend_residual_decomp(
     max_depth: int = 1,
     nan_mode: Optional[str] = None,
 ) -> pd.DataFrame:
-    """Decompose a signal into trend + residual.
+    """
+    Decompose a signal into trend + residual.
 
     - The `trend` warm-up period is set by `min_periods`
     - If `min_periods` is positive, then leading values of `trend` are NaN
@@ -1260,7 +1324,8 @@ def get_swt(
     timing_mode: Optional[str] = None,
     output_mode: Optional[str] = None,
 ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, pd.DataFrame]]:
-    """Get stationary wt details and smooths for all available scales.
+    """
+    Get stationary wt details and smooths for all available scales.
 
     If sig.index.freq == "B", then there is the following rough correspondence
     between wavelet levels and time scales:
@@ -1365,8 +1430,49 @@ def get_swt(
     raise ValueError("Unsupported output_mode `{output_mode}`")
 
 
+def get_swt_level(
+    sig: Union[pd.DataFrame, pd.Series],
+    wavelet: str,
+    level: int,
+    timing_mode: Optional[str] = None,
+    output_mode: Optional[str] = None,
+) -> pd.Series:
+    """
+    Wraps `get_swt` and extracts a single wavelet level.
+
+    :param sig: input signal
+    :param wavelet: pywt wavelet name, e.g., "db8"
+    :param level: the wavelet level to extract
+    :param timing_mode: supported timing modes are
+        - "knowledge_time":
+            - reindex transform according to knowledge times
+            - remove warm-up artifacts
+        - "zero_phase":
+            - no reindexing (e.g., no phase lag in output, but transform
+              timestamps are not necessarily knowledge times)
+            - remove warm-up artifacts
+        - "raw": `pywt.swt` as-is
+    :param output_mode: valid output modes are
+        - "smooth": return smooth_df for `level`
+        - "detail": return detail_df for `level`
+    :return: see `output_mode`
+    """
+    dbg.dassert_in(output_mode, ["smooth", "detail"])
+    swt = get_swt(
+        sig,
+        wavelet=wavelet,
+        depth=level,
+        timing_mode=timing_mode,
+        output_mode=output_mode,
+    )
+    dbg.dassert_in(level, swt.columns)
+    return swt[level]
+
+
 def _pad_to_pow_of_2(arr: np.array) -> np.array:
-    """Minimally extend `arr` with zeros so that len is a power of 2."""
+    """
+    Minimally extend `arr` with zeros so that len is a power of 2.
+    """
     sig_len = arr.shape[0]
     _LOG.debug("signal length=%d", sig_len)
     pow2_ceil = int(2 ** np.ceil(np.log2(sig_len)))
@@ -1376,7 +1482,8 @@ def _pad_to_pow_of_2(arr: np.array) -> np.array:
 
 
 def _set_warmup_region_to_nan(srs: pd.Series, width: int, level: int) -> None:
-    """Remove warm-up artifacts by setting to `NaN`.
+    """
+    Remove warm-up artifacts by setting to `NaN`.
 
     NOTE: Modifies `srs` in-place.
 
@@ -1390,7 +1497,8 @@ def _set_warmup_region_to_nan(srs: pd.Series, width: int, level: int) -> None:
 def _reindex_by_knowledge_time(
     srs: pd.Series, width: int, level: int
 ) -> pd.Series:
-    """Shift series so that indexing is according to knowledge time.
+    """
+    Shift series so that indexing is according to knowledge time.
 
     :srs: swt
     :width: width (length of support of mother wavelet)
@@ -1402,7 +1510,8 @@ def _reindex_by_knowledge_time(
 def get_dyadic_zscored(
     sig: pd.Series, demean: bool = False, **kwargs: Any
 ) -> pd.DataFrame:
-    """Z-score `sig` with successive powers of 2.
+    """
+    Z-score `sig` with successive powers of 2.
 
     :return: dataframe with cols named according to the exponent of 2. Number
         of cols is determined based on signal length.
@@ -1423,9 +1532,11 @@ def get_dyadic_zscored(
 
 
 def resample(
-    data: Union[pd.Series, pd.DataFrame], **resample_kwargs: Any,
-):
-    """Execute series resampling with specified `.resample()` arguments.
+    data: Union[pd.Series, pd.DataFrame],
+    **resample_kwargs: Any,
+) -> Union[pd.Series, pd.DataFrame]:
+    """
+    Execute series resampling with specified `.resample()` arguments.
 
     The `rule` argument must always be specified and the `closed` and `label`
     arguments are treated specially by default.
@@ -1447,3 +1558,50 @@ def resample(
     # Execute resampling with specified kwargs.
     resampled_data = data.resample(**resample_kwargs)
     return resampled_data
+
+
+# #############################################################################
+# Special functions
+# #############################################################################
+
+
+def c_infinity(x: float) -> float:
+    """
+    Return C-infinity function evaluated at x.
+
+    This function is zero for x <= 0 and approaches exp(1) as x ->
+    infinity.
+    """
+    if x > 0:
+        return np.exp(-1 / x)
+    return 0
+
+
+def c_infinity_step_function(x: float) -> float:
+    """
+    Return C-infinity step function evaluated at x.
+
+    This function is
+      - 0 for x <= 0
+      - 1 for x >= 1
+    """
+    fx = c_infinity(x)
+    f1mx = c_infinity(1 - x)
+    if fx + f1mx == 0:
+        return np.nan
+    return fx / (fx + f1mx)
+
+
+def c_infinity_bump_function(x: float, a: float, b: float) -> float:
+    """
+    Return value of C-infinity bump function evaluated at x.
+
+    :param x: point at which to evaluate
+    :param a: function is 1 between -a and a
+    :param b: function is zero for abs(x) >= b
+    """
+    dbg.dassert_lt(0, a)
+    dbg.dassert_lt(a, b)
+    y = (x ** 2 - a ** 2) / (b ** 2 - a ** 2)
+    inverse_bump = c_infinity_step_function(y)
+    return 1 - inverse_bump

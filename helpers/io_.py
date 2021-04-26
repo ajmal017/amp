@@ -1,10 +1,12 @@
-"""Functions to handle filesystem operations.
+"""
+Functions to handle filesystem operations.
 
 Import as:
 
-import helpers.io_ as io_
+import helpers.io_ as hio
 """
 
+import datetime
 import fnmatch
 import gzip
 import json
@@ -12,12 +14,12 @@ import logging
 import os
 import shutil
 import time
+import uuid
 from typing import Any, List, Optional
 
-import pandas as pd
-
 import helpers.dbg as dbg
-import helpers.system_interaction as si
+import helpers.printing as hprint
+import helpers.system_interaction as hsyste
 
 _LOG = logging.getLogger(__name__)
 
@@ -27,7 +29,8 @@ _LOG = logging.getLogger(__name__)
 
 
 def find_files(directory: str, pattern: str) -> List[str]:
-    """Recursive glob.
+    """
+    Recursive glob.
 
     :param pattern: pattern to match a filename against
     """
@@ -42,7 +45,7 @@ def find_files(directory: str, pattern: str) -> List[str]:
 
 def find_regex_files(src_dir: str, regex: str) -> List[str]:
     cmd = 'find %s -name "%s"' % (src_dir, regex)
-    _, output = si.system_to_string(cmd)
+    _, output = hsyste.system_to_string(cmd)
     file_names = [f for f in output.split("\n") if f != ""]
     _LOG.debug("Found %s files in %s", len(file_names), src_dir)
     _LOG.debug("\n".join(file_names))
@@ -55,8 +58,9 @@ def find_regex_files(src_dir: str, regex: str) -> List[str]:
 
 
 def create_soft_link(src: str, dst: str) -> None:
-    """Create a soft-link to <src> called <dst> (where <src> and <dst> are
-    files or directories as in a Linux ln command).
+    """
+    Create a soft-link to <src> called <dst> (where <src> and <dst> are files
+    or directories as in a Linux ln command).
 
     This is equivalent to a command like "cp <src> <dst>" but creating a
     soft link.
@@ -69,7 +73,7 @@ def create_soft_link(src: str, dst: str) -> None:
     # Create the link. Note that the link source needs to be an absolute path.
     src = os.path.abspath(src)
     cmd = "ln -s %s %s" % (src, dst)
-    si.system(cmd)
+    hsyste.system(cmd)
 
 
 def delete_file(file_name: str) -> None:
@@ -96,7 +100,8 @@ def delete_dir(
     num_retries: int = 1,
     num_secs_retry: int = 1,
 ) -> None:
-    """Delete a directory.
+    """
+    Delete a directory.
 
     - change_perms: change permissions to -R rwx before deleting to deal with
       incorrect permissions left over
@@ -110,7 +115,7 @@ def delete_dir(
         return
     if change_perms and os.path.isdir(dir_):
         cmd = "chmod -R +rwx " + dir_
-        si.system(cmd)
+        hsyste.system(cmd)
     i = 1
     while True:
         try:
@@ -143,31 +148,37 @@ def create_dir(
     abort_if_exists: bool = False,
     ask_to_delete: bool = False,
 ) -> None:
-    """Create a directory `dir_name` if it doesn't exist.
+    """
+    Create a directory `dir_name` if it doesn't exist.
 
-    - param incremental: if False then the directory is deleted and
+    :param incremental: if False then the directory is deleted and
         re-created, otherwise it skips
-    - param abort_if_exists:
-    - param ask_to_delete: if it is not incremental and the dir exists,
+    :param abort_if_exists:
+    :param ask_to_delete: if it is not incremental and the dir exists,
         asks before deleting
     """
+    _LOG.debug(hprint.to_str("dir_name incremental abort_if_exists ask_to_delete"))
     dbg.dassert_is_not(dir_name, None)
-    dbg.dassert(
-        os.path.normpath(dir_name) != ".", msg="Can't create the current dir"
-    )
+    dir_name = os.path.normpath(dir_name)
+    if os.path.normpath(dir_name) == ".":
+        _LOG.debug("Can't create dir '%s'", dir_name)
+    exists = os.path.exists(dir_name)
+    is_dir = os.path.isdir(dir_name)
+    _LOG.debug(hprint.to_str("dir_name exists is_dir"))
     if abort_if_exists:
         dbg.dassert_not_exists(dir_name)
     #                   dir exists / dir does not exist
     # incremental       no-op        mkdir
     # not incremental   rm+mkdir     mkdir
-    if os.path.isdir(dir_name):
-        if incremental:
+    if exists:
+        if incremental and is_dir:
             # The dir exists and we want to keep it it exists (i.e.,
             # incremental), so we are done.
             # os.chmod(dir_name, 0755)
+            _LOG.debug("The dir '%s' exists and incremental=True: exiting", dir_name)
             return
         if ask_to_delete:
-            si.query_yes_no(
+            hsyste.query_yes_no(
                 "Do you really want to delete dir '%s'?" % dir_name,
                 abort_on_no=True,
             )
@@ -186,6 +197,7 @@ def create_dir(
     try:
         os.makedirs(dir_name)
     except OSError as e:
+        _LOG.error(str(e))
         # It can happen that we try to create the directory while somebody else
         # created it, so we neutralize the corresponding exception.
         if e.errno == 17:
@@ -195,17 +207,29 @@ def create_dir(
             raise e
 
 
-# TODO(gp): Shouldn't be always incremental=False?
-def create_enclosing_dir(file_name: str, incremental: bool = False) -> str:
-    """Create the dir enclosing file_name, if needed.
-
-    <incremental> has the same meaning as in create_dir().
-    """
+def _is_valid_file_name(file_name: str) -> None:
+    #dbg.dassert_in(type(file_name), (str, unicode))
+    dbg.dassert_in(type(file_name), [str])
     dbg.dassert_is_not(file_name, None)
-    # dbg.dassert_isinstance(file_name, str)
+    dbg.dassert_ne(file_name, "")
+
+
+# TODO(gp): Don't use default incremental.
+def create_enclosing_dir(file_name: str, incremental: bool = False) -> str:
+    """
+    Create the dir enclosing file_name, if needed.
+
+    :param incremental: same meaning as in `create_dir()`
+    """
+    _LOG.debug(hprint.to_str("file_name incremental"))
+    _is_valid_file_name(file_name)
+    #
     dir_name = os.path.dirname(file_name)
-    if dir_name != "" and not os.path.isdir(dir_name):
-        create_dir(dir_name, incremental)
+    _LOG.debug(hprint.to_str("dir_name"))
+    if dir_name != "":
+        _LOG.debug("Creating dir_name='%s' for file_name='%s'", dir_name, file_name)
+        create_dir(dir_name, incremental=incremental)
+    dbg.dassert_dir_exists(dir_name, "file_name='%s'", file_name)
     return dir_name
 
 
@@ -222,8 +246,9 @@ def to_file(
     mode: Optional[str] = None,
     force_flush: bool = False,
 ) -> None:
-    """Write the content of lines into file_name, creating the enclosing
-    directory if needed.
+    """
+    Write the content of lines into file_name, creating the enclosing directory
+    if needed.
 
     :param file_name: name of written file
     :param lines: content of the file
@@ -231,21 +256,16 @@ def to_file(
     :param mode: file writing mode
     :param force_flush: whether to forcibly clear the file buffer
     """
-    # TODO(gp): create_enclosing_dir().
-    # Verify that the file name is correct.
-    dbg.dassert_is_not(file_name, None)
-    dbg.dassert_ne(file_name, "")
+    _LOG.debug(hprint.to_str("file_name use_gzip mode force_flush"))
+    _is_valid_file_name(file_name)
     # Choose default writing mode based on compression.
     if mode is None:
         if use_gzip:
             mode = "wt"
         else:
             mode = "w"
-    # dbg.dassert_in(type(file_name), (str, unicode))
     # Create the enclosing dir, if needed.
-    dir_name = os.path.dirname(file_name)
-    if dir_name != "" and not os.path.isdir(dir_name):
-        create_dir(dir_name, incremental=True)
+    create_enclosing_dir(file_name, incremental=True)
     if use_gzip:
         # Check if user provided correct file name.
         if not file_name.endswith(("gz", "gzip")):
@@ -265,7 +285,8 @@ def to_file(
 
 
 def _raise_file_decode_error(error: Exception, file_name: str) -> None:
-    """Raise UnicodeDecodeError with detailed error message.
+    """
+    Raise UnicodeDecodeError with detailed error message.
 
     :param error: raised UnicodeDecodeError
     :param file_name: name of read file that raised the exception
@@ -281,7 +302,8 @@ def _raise_file_decode_error(error: Exception, file_name: str) -> None:
 def from_file(
     file_name: str, use_gzip: bool = False, encoding: Optional[Any] = None
 ) -> str:
-    """Read contents of a file as string.
+    """
+    Read contents of a file as string.
 
     Use `use_gzip` flag to load a compressed file with correct extenstion.
 
@@ -333,7 +355,8 @@ def get_size_as_str(file_name: str) -> str:
 
 
 def change_filename_extension(filename: str, old_ext: str, new_ext: str) -> str:
-    """Change extension of a filename (e.g. "data.csv" to "data.json").
+    """
+    Change extension of a filename (e.g. "data.csv" to "data.json").
 
     :param filename: the old filename (including extension)
     :param old_ext: the extension of the old filename
@@ -353,8 +376,41 @@ def change_filename_extension(filename: str, old_ext: str, new_ext: str) -> str:
     return new_filename
 
 
+def serialize_custom_types_for_json_encoder(obj: Any) -> Any:
+    """
+    Serialize DataFrame and other objects for JSON.
+
+    E.g. dataframe {"A": [0, 1], "B": [0, 1]} will go to a list of dictionaries:
+    [{"A": 0, "B": 0}, {"A": 1, "B": 1}] - each dictionary is for one row.
+    """
+    import numpy as np
+    import pandas as pd
+
+    result = None
+    if isinstance(obj, pd.DataFrame):
+        result = obj.to_dict("records")
+    elif isinstance(obj, pd.Series):
+        result = obj.to_dict()
+    elif isinstance(obj, np.int64):
+        result = int(obj)
+    elif isinstance(obj, np.float):
+        result = float(obj)
+    elif isinstance(obj, uuid.UUID):
+        result = str(obj)
+    elif isinstance(obj, datetime.date):
+        result = obj.isoformat()
+    elif isinstance(obj, type(pd.NaT)):
+        result = None
+    elif isinstance(obj, type(pd.NA)):
+        result = None
+    else:
+        raise TypeError("Can not serialize %s of type %s" % (obj, type(obj)))
+    return result
+
+
 def to_json(file_name: str, obj: dict) -> None:
-    """Write an object into a JSON file.
+    """
+    Write an object into a JSON file.
 
     :param obj: data for writing
     :param file_name: name of file
@@ -363,13 +419,18 @@ def to_json(file_name: str, obj: dict) -> None:
     dir_name = os.path.dirname(file_name)
     if dir_name != "" and not os.path.isdir(dir_name):
         create_dir(dir_name, incremental=True)
-
     with open(file_name, "w") as outfile:
-        json.dump(obj, outfile, indent=4)
+        json.dump(
+            obj,
+            outfile,
+            indent=4,
+            default=serialize_custom_types_for_json_encoder,
+        )
 
 
 def from_json(file_name: str) -> dict:
-    """Read object from JSON file.
+    """
+    Read object from JSON file.
 
     :param file_name: name of file
     :return: dict with data
@@ -380,12 +441,15 @@ def from_json(file_name: str) -> dict:
     return data
 
 
-def load_df_from_json(path_to_json: str) -> pd.DataFrame:
-    """Load a dataframe from a json file.
+def load_df_from_json(path_to_json: str) -> "pd.DataFrame":
+    """
+    Load a dataframe from a json file.
 
     :param path_to_json: path to the json file
     :return:
     """
+    import pandas as pd
+
     # Load the dict with the data.
     data = from_json(path_to_json)
     # Preprocess the dict to handle arrays with different length.

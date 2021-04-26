@@ -11,7 +11,7 @@ import helpers.list as hlist
 
 _LOG = logging.getLogger(__name__)
 
-# TODO(gp): Remove after PartTask2335.
+# TODO(gp): Remove after PTask2335.
 if True:
     import gluonts
     import gluonts.evaluation.backtest
@@ -49,6 +49,7 @@ if True:
         else:
             use_feat_dynamic_real = True
         #
+        y_truncate: Optional[int]
         if use_feat_dynamic_real:
             y_truncate = prediction_length
         else:

@@ -1,4 +1,5 @@
-"""Import as:
+"""
+Import as:
 
 import helpers.dbg as dbg
 """
@@ -9,6 +10,8 @@ import os
 import pprint
 import sys
 from typing import Any, Iterable, List, Optional, Tuple, Type, Union
+
+# This module should not depend on anything else than Python standard modules.
 
 _LOG = logging.getLogger(__name__)
 
@@ -25,7 +28,8 @@ def _line(chars: str = "#", num_cols: int = 80) -> str:
 
 
 def _frame(x: str, chars: str = "#", num_cols: int = 80) -> str:
-    """Return a string with a frame of num_cols chars around the object x.
+    """
+    Return a string with a frame of num_cols chars around the object x.
 
     :param x: object to print through str()
     :param num_cols: number
@@ -39,7 +43,9 @@ def _frame(x: str, chars: str = "#", num_cols: int = 80) -> str:
 
 
 def dfatal(message: str, assertion_type: Optional[Any] = None) -> None:
-    """Print an error message and exits."""
+    """
+    Print an error message and exits.
+    """
     ret = ""
     message = str(message)
     ret = "\n" + _frame(message, "#", 80)
@@ -63,7 +69,9 @@ def dfatal(message: str, assertion_type: Optional[Any] = None) -> None:
 
 
 def _to_msg(msg: Optional[str], *args: Any) -> str:
-    """Format the error message with the params."""
+    """
+    Format the error message with the params.
+    """
     if msg is None:
         # If there is no message, we should have no arguments to format.
         assert not args, "args=%s" % str(args)
@@ -254,7 +262,9 @@ def dassert_set_eq(
 def dassert_is_subset(
     val1: Any, val2: Any, msg: Optional[str] = None, *args: Any
 ) -> None:
-    """Check that val1 is a subset of val2, raise otherwise."""
+    """
+    Check that val1 is a subset of val2, raise otherwise.
+    """
     val1 = set(val1)
     val2 = set(val2)
     if not val1.issubset(val2):
@@ -269,7 +279,9 @@ def dassert_is_subset(
 def dassert_not_intersection(
     val1: Any, val2: Any, msg: Optional[str] = None, *args: Any
 ) -> None:
-    """Check that val1 has no intersection val2, raise otherwise."""
+    """
+    Check that val1 has no intersection val2, raise otherwise.
+    """
     val1 = set(val1)
     val2 = set(val2)
     if val1.intersection(val2):
@@ -326,20 +338,26 @@ def dassert_exists(file_name: str, msg: Optional[str] = None, *args: Any) -> Non
 def dassert_dir_exists(
     dir_name: str, msg: Optional[str] = None, *args: Any
 ) -> None:
-    """Assert unless `dir_name` exists and it's a directory."""
+    """
+    Assert unless `dir_name` exists and it's a directory.
+    """
     dir_name = os.path.abspath(dir_name)
-    is_ok = os.path.exists(dir_name) and os.path.isdir(dir_name)
-    if not is_ok:
-        txt = []
-        txt.append("dir='%s' doesn't exist or it's not a dir" % dir_name)
+    exists = os.path.exists(dir_name)
+    if not exists:
+        txt = "dir='%s' doesn't exist" % dir_name
+        _dfatal(txt, msg, *args)
+    is_dir = os.path.isdir(dir_name)
+    if not is_dir:
+        txt = "dir='%s' is not a dir" % dir_name
         _dfatal(txt, msg, *args)
 
 
 def dassert_not_exists(
     file_name: str, msg: Optional[str] = None, *args: Any
 ) -> None:
-    """Ensure that a file or a dir `file_name` doesn't exist, otherwise
-    raises."""
+    """
+    Ensure that a file or a dir `file_name` doesn't exist, otherwise raises.
+    """
     file_name = os.path.abspath(file_name)
     # pylint: disable=superfluous-parens,unneeded-not
     if not (not os.path.exists(file_name)):
@@ -417,8 +435,9 @@ def dassert_array_has_same_type_element(
     msg: Optional[str] = None,
     *args: Any
 ) -> None:
-    """Check that two objects iterables like arrays (e.g., pd.Index) have
-    elements of the same type.
+    """
+    Check that two objects iterables like arrays (e.g., pd.Index) have elements
+    of the same type.
 
     :param only_first_elem: whether to check only the first element or all the
         elements of the iterable.
@@ -453,6 +472,7 @@ def dassert_list_of_strings(output: List[str], *args: Any) -> None:
 # Logger.
 # #############################################################################
 
+# TODO(gp): Separate this to helpers/log.py
 
 # From https://stackoverflow.com/questions/15411967
 def is_running_in_ipynb() -> bool:
@@ -515,12 +535,29 @@ def get_user_name() -> str:
     return res
 
 
+# TODO(gp): Replace `force_print_format` and `force_verbose_format` with `mode`.
 def _get_logging_format(
-    force_print_format: bool, force_verbose_format: bool
+    force_print_format: bool,
+    force_verbose_format: bool,
+    force_no_warning: bool,
+    date_format_mode: str = "date_time",
 ) -> Tuple[str, str]:
-    if is_running_in_ipynb():
+    """
+    Compute the logging format depending whether running on notebook or in a
+    shell.
+
+    The logging format can be:
+    - print: looks like a `print` statement
+    -
+
+    :param force_print_form: force to use the non-verbose format
+    :param force_verbose_format: force to use the verbose format
+    :param force_no_warning:
+    """
+    if is_running_in_ipynb() and not force_no_warning:
         print("WARNING: Running in Jupyter")
     verbose_format = not is_running_in_ipynb()
+    #
     dassert(
         not (force_verbose_format and force_print_format),
         "Can't use both force_verbose_format=%s and force_print_format=%s",
@@ -531,6 +568,7 @@ def _get_logging_format(
         verbose_format = True
     if force_print_format:
         verbose_format = False
+        #
     if verbose_format:
         # TODO(gp): We would like to have filename.name.funcName:lineno all
         #  justified on the 15.
@@ -538,21 +576,33 @@ def _get_logging_format(
         #  -alternative-formatting-styles
         #  Something like:
         #   {{asctime}-5s {{filename}{name}{funcname}{linedo}d}-15s {message}
-        # log_format = "%(asctime)-5s %(levelname)-5s: %(funcName)-15s: %(message)s"
-        log_format = (
-            "%(asctime)-5s %(levelname)-5s: "
-            "%(funcName)-15s:%(lineno)-4d: "
-            "%(message)s"
-            # "[%(name)s][%(levelname)s]  %(message)s (%(filename)s:%(lineno)d)")
-        )
-        # date_fmt = "%Y-%m-%d %I:%M:%S %p"
-        date_fmt = "%m-%d_%H:%M"
-        # Print also the executable name, since Jenkins scripts launch
-        # executables from executables.
-        if get_user_name() == "jenkins":
-            exec_name = os.path.basename(get_exec_name())
-            # print("WARNING: Running as jenkins: exec_name='%s'" % exec_name)
-            log_format = exec_name + "::" + log_format
+        #
+        # %(pathname)s Full pathname of the source file where the logging call was
+        #   issued(if available).
+        # %(filename)s Filename portion of pathname.
+        # %(module)s Module (name portion of filename).
+        if True:
+            log_format = (
+                "%(asctime)-5s %(levelname)-5s:"
+                " %(funcName)-30s:%(lineno)-4d"
+                "%(message)s"
+            )
+        else:
+            # Super verbose.
+            log_format = (
+                "%(asctime)-5s %(levelname)-5s:"
+                " %(module)s:%(pathname)s:%(filename)s"
+                "  %(funcName)-30s:%(lineno)-4d: "
+                "%(message)s"
+            )
+        if date_format_mode == "time":
+            date_fmt = "%H:%M"
+        elif date_format_mode == "date_time":
+            date_fmt = "%m-%d_%H:%M"
+        elif date_format_mode == "date_timestamp":
+            date_fmt = "%Y-%m-%d %I:%M:%S %p"
+        else:
+            raise ValueError("Invalid date_format_mode='%s'" % date_format_mode)
     else:
         # Make logging look like a normal print().
         # TODO(gp): We want to still prefix with WARNING and ERROR.
@@ -570,8 +620,11 @@ def init_logger(
     force_verbose_format: bool = False,
     force_print_format: bool = False,
     force_white: bool = True,
+    force_no_warning: bool = False,
+    in_pytest: bool = False,
 ) -> None:
-    """Send stderr and stdout to logging (optionally teeing the logs to file).
+    """
+    Send stderr and stdout to logging (optionally teeing the logs to file).
 
     - Note that:
         - logging.DEBUG = 10
@@ -584,6 +637,8 @@ def init_logger(
     :param force_print_format: use the print format for the logging
     :param force_write: use white color for printing. This can pollute the
         output of a script when redirected to file with echo characters
+    :param in_pytest: True when we are running through pytest, so that we
+        can overwrite the default logger from pytest
     """
     if force_white:
         sys.stdout.write("\033[0m")
@@ -605,15 +660,14 @@ def init_logger(
     #     for handler in root_logger.handlers:
     #         handler.setLevel(verbosity)
     # Exit to avoid to replicate the same output multiple times.
-    if root_logger.handlers:
+    if not in_pytest and root_logger.handlers:
         print("WARNING: Logger already initialized: skipping")
         return
-    #
     ch = logging.StreamHandler(sys.stdout)
     ch.setLevel(verbosity)
     # Decide whether to use verbose or print format.
     date_fmt, log_format = _get_logging_format(
-        force_print_format, force_verbose_format
+        force_print_format, force_verbose_format, force_no_warning
     )
     # Use normal formatter.
     # formatter = logging.Formatter(log_format, datefmt=date_fmt)
@@ -657,7 +711,8 @@ def init_logger(
 def set_logger_verbosity(
     verbosity: int, module_name: Optional[str] = None
 ) -> None:
-    """Change the verbosity of the logging after the initialization.
+    """
+    Change the verbosity of the logging after the initialization.
 
     Passing a module_name (e.g., matplotlib) one can change the logging of
     that specific module.
@@ -683,41 +738,74 @@ def get_logger_verbosity() -> int:
 
 
 def get_all_loggers() -> List:
-    """Return list of all registered loggers."""
+    """
+    Return list of all registered loggers.
+    """
     logger_dict = logging.root.manager.loggerDict  # type: ignore
     loggers = [logging.getLogger(name) for name in logger_dict]
     return loggers
 
 
-def get_matching_loggers(module_names: Union[str, Iterable[str]]) -> List:
-    """Find loggers that match a name or a name in a set."""
-    loggers = get_all_loggers()
+def get_matching_loggers(
+    module_names: Union[str, Iterable[str]], verbose: bool
+) -> List:
+    """
+    Find loggers that match a name or a name in a set.
+    """
     if isinstance(module_names, str):
         module_names = [module_names]
+    loggers = get_all_loggers()
+    if verbose:
+        print("loggers=\n", "\n".join(map(str, loggers)))
+    #
     sel_loggers = []
     for module_name in module_names:
+        if verbose:
+            print("module_name=%s" % module_name)
+        # TODO(gp): We should have a regex.
+        # str(logger) looks like `<Logger tornado.application (DEBUG)>`
         sel_loggers_tmp = [
-            logger for logger in loggers if module_name in str(logger)
+            logger
+            for logger in loggers
+            if str(logger).startswith("<Logger " + module_name)
+            # logger for logger in loggers if module_name in str(logger)
         ]
+        # print(sel_loggers_tmp)
         sel_loggers.extend(sel_loggers_tmp)
-    # sel_loggers = sorted(list(set(sel_loggers)))
+    if verbose:
+        print("sel_loggers=%s" % sel_loggers)
     return sel_loggers
 
 
-def shutup_chatty_modules(verbosity: int = logging.CRITICAL) -> None:
-    """Reduce the verbosity for external modules that are very chatty."""
+def shutup_chatty_modules(
+    verbosity: int = logging.CRITICAL, verbose: bool = False
+) -> None:
+    """
+    Reduce the verbosity for external modules that are very chatty.
+    """
     module_names = [
-        "matplotlib",
+        "aiobotocore",
+        "asyncio",
         "boto",
-        "urllib3",
-        "s3transfer",
         "boto3",
         "botocore",
+        "fsspec",
+        "hooks",
+        "ib_insync",
+        "matplotlib",
         "nose",
+        "s3fs",
+        "s3transfer",
+        "urllib3",
     ]
-    loggers = get_matching_loggers(module_names)
+    loggers = get_matching_loggers(module_names, verbose)
     print("Shutting up %s modules" % len(loggers))
-    _LOG.debug("Shutting up modules: (%d) %s", len(loggers), loggers)
+    loggers = sorted(loggers, key=lambda logger: logger.name)
+    if verbose:
+        print(
+            "Shutting up modules: (%d)\n%s"
+            % (len(loggers), "\n".join([logger.name for logger in loggers]))
+        )
     for logger in loggers:
         logger.setLevel(verbosity)
 

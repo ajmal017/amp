@@ -377,15 +377,15 @@
 ## Solution
 
 - Install the package in whatever way you want (`conda`, `pip`, install from
-  source) on top of your `p1_develop` conda environment
+  source) on top of your `develop` conda environment
   - If you don't know how to install, file a bug for Sergey and we can help
 
 - You should document how you install the package so that anyone who runs the
-  notebook can install the package on top of `p1_develop` in the same way
+  notebook can install the package on top of `develop` in the same way
 
 - Once the code is reviewed and promoted to a lib / unit tested, the conda
   recipe is updated as part of the PR
-  - The team needs to update their `p1_develop` package to pick up the
+  - The team needs to update their `develop` package to pick up the
     dependencies
 
 - This applies to both code and notebooks
@@ -437,6 +437,23 @@
     noun or type
   - Type hinting makes the `:type ...` redundant and you should use only type
     hinting
+  - As a result, an example of a function definition is:
+
+    ```python
+    def my_function(param1: str) -> str:
+        """
+        A one-line description of what the function does.
+
+        A longer description (possibly on multiple lines) with a more detailed
+        explanation of what the function does, trying to not be redundant with
+        the parameter / return description below. The focus is on the interface
+        and what the user should know to use the function and not how the
+        function is implemented.
+
+        :param param1: this is a first param
+        :return: this is a description of what is returned
+        """
+    ```
 
 - More examples of and discussions on python docstrings are
   [here](https://stackoverflow.com/questions/3898572)
@@ -519,6 +536,22 @@
   # Print results.
   _LOG.info("Results are %s", ...)
   ```
+
+## Commenting out code
+
+- When we comment out code, we should explain why it is no longer relevant and
+  what we need to do before removing the commented out code:
+  - E.g., instead of
+    ```python
+    is_alive = pd.Series(True, index=metadata.index)
+    # is_alive = kgutils.annotate_alive(metadata, self.alive_cutoff)
+    ```
+    use:
+    ```python
+    # TODO(*): As discussed in PTask5047 for now we set all timeseries to be alive.
+    # is_alive = kgutils.annotate_alive(metadata, self.alive_cutoff)
+    is_alive = pd.Series(True, index=metadata.index)
+    ```
 
 ## If you find a bug or obsolete docstring/TODO in the code
 
@@ -1141,7 +1174,7 @@ def _get_zero_element(list_: list):
     else:
         return list*[0]
 
-vendors/kibot/utils.py:394: [R1705(no-else-return), ExpiryContractMapper.extract_contract_expiry] Unnecessary "else" after "return" [pylint]
+instrument_master.kibot/utils.py:394: [R1705(no-else-return), ExpiryContractMapper.extract_contract_expiry] Unnecessary "else" after "return" [pylint]
 ```
 
 - Try to have a single exit point from a function, since this guarantees that
@@ -1544,7 +1577,7 @@ def ...(...):
 ## Research quality vs production quality
 
 - Code belonging to top level libraries (e.g., `//amp/core`, `//amp/helpers`)
-  and production (e.g., `//p1/db`, `vendors`) needs to meet high quality
+  and production (e.g., `//.../db`, `vendors`) needs to meet high quality
   standards, e.g.,
   - Well commented
   - Following our style guide
@@ -1702,7 +1735,7 @@ def ...(...):
    e.g.,
    - Screwing up some formatting you care about for some reason, or
    - Suggesting changes that you are worried might introduce bugs you can commit
-     your code and then do a "lint commit" with a message "PartTaskXYZ: Lint"
+     your code and then do a "lint commit" with a message "PTaskXYZ: Lint"
 
 - In this way you have a backup state that you can rollback to, if you want
 

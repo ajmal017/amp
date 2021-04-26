@@ -1,12 +1,13 @@
 import logging
-from typing import List, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import pandas as pd
-import psycopg2 as pg
+import psycopg2 as psycop
+import psycopg2.sql as psql
 
-import helpers.timer as timer
+import helpers.timer as htimer
 
-_log = logging.getLogger(__name__)
+_LOG = logging.getLogger(__name__)
 
 
 def get_connection(
@@ -16,8 +17,8 @@ def get_connection(
     port: int,
     password: str,
     autocommit: bool = True,
-) -> Tuple[pg.extensions.connection, pg.extensions.cursor]:
-    connection = pg.connect(
+) -> Tuple[psycop.extensions.connection, psycop.extensions.cursor]:
+    connection = psycop.connect(
         dbname=dbname, host=host, user=user, port=port, password=password
     )
     cursor = connection.cursor()
@@ -26,13 +27,28 @@ def get_connection(
     return connection, cursor
 
 
-def get_engine_version(connection: pg.extensions.connection) -> str:
-    """Report information on the SQL engine.
+def get_connection_from_string(
+        conn_as_str: str,
+        autocommit: bool = True,
+) -> Tuple[psycop.extensions.connection, psycop.extensions.cursor]:
+    """ 
+    Create a connection from a string.
+    """
+    connection = psycop.connect(conn_as_str)
+    cursor = connection.cursor()
+    if autocommit:
+        connection.autocommit = True
+    return connection, cursor
+
+
+def get_engine_version(connection: psycop.extensions.connection) -> str:
+    """
+    Report information on the SQL engine.
 
     E.g.,
     ```
     PostgreSQL 11.5 on x86_64-pc-linux-gnu
-        compiled by gcc (GCC) 4.8.3 20140911 (Red Hat 4.8.3-9), 64-bit
+    compiled by gcc (GCC) 4.8.3 20140911 (Red Hat 4.8.3-9), 64-bit
     ```
     """
     query = "SELECT version();"
@@ -42,8 +58,9 @@ def get_engine_version(connection: pg.extensions.connection) -> str:
     return info
 
 
-def get_db_names(connection: pg.extensions.connection) -> List[str]:
-    """Return the names of the available DBs.
+def get_db_names(connection: psycop.extensions.connection) -> List[str]:
+    """
+    Return the names of the available DBs.
 
     E.g., ['postgres', 'rdsadmin', 'template0', 'template1']
     """
@@ -56,20 +73,20 @@ def get_db_names(connection: pg.extensions.connection) -> List[str]:
 
 
 def get_table_size(
-    connection: pg.extensions.connection,
+    connection: psycop.extensions.connection,
     only_public: bool = True,
     summary: bool = True,
 ) -> pd.DataFrame:
-    """Report the size of each table.
+    """
+    Report the size of each table.
 
-     E.g.,
-    ```
-      table_name  row_estimate    total    index       toast    table
-    0     events           0.0   262 GB  0 bytes  8192 bytes   262 GB
-    1    stories           0.0   165 GB    43 GB  8192 bytes   122 GB
-    2   entities    10823400.0   706 MB  0 bytes  8192 bytes   706 MB
-    3   taxonomy       20691.0  6960 kB  0 bytes  8192 bytes  6952 kB
-    ```
+    E.g.,
+
+      table_name  row_estimate   total    index      toast  table
+    0     events           0.0   26 GB  0 bytes  192 bytes  26 GB
+    1    stories           0.0   15 GB    43 GB  192 bytes  12 GB
+    2   entities    10823400.0   76 MB  0 bytes  192 bytes  76 MB
+    3   taxonomy       20691.0  690 kB  0 bytes  192 bytes 652 kB
     """
     q = """SELECT *, pg_size_pretty(total_bytes) AS total
         , pg_size_pretty(index_bytes) AS INDEX
@@ -97,8 +114,9 @@ def get_table_size(
     return df
 
 
-def get_table_names(connection: pg.extensions.connection) -> List[str]:
-    """Report the name of the tables.
+def get_table_names(connection: psycop.extensions.connection) -> List[str]:
+    """
+    Report the name of the tables.
 
     E.g., tables=['entities', 'events', 'stories', 'taxonomy']
     """
@@ -115,18 +133,20 @@ def get_table_names(connection: pg.extensions.connection) -> List[str]:
 
 
 # TODO(gp): Test / fix this.
-def get_indexes(connection: pg.extensions.connection) -> dict:
+def get_indexes(connection: psycop.extensions.connection) -> pd.DataFrame:
     res = []
     tables = get_table_names(connection)
     cursor = connection.cursor()
     for table in tables:
-        query = """select * from pg_indexes where tablename = '{table}' """.format(
-            table=table
+        query = (
+            """SELECT * FROM pg_indexes WHERE tablename = '{table}' """.format(
+                table=table
+            )
         )
         cursor.execute(query)
         z = cursor.fetchall()
         res.append(pd.DataFrame(z))
-    tmp = pd.concat(res)
+    tmp: pd.DataFrame = pd.concat(res)
     tmp["index_type"] = tmp[4].apply(
         lambda w: w.split("USING")[1].lstrip().split(" ")[0]
     )
@@ -143,7 +163,9 @@ def get_indexes(connection: pg.extensions.connection) -> dict:
     return tmp
 
 
-def get_columns(connection: pg.extensions.connection, table_name: str) -> list:
+def get_columns(
+    connection: psycop.extensions.connection, table_name: str
+) -> list:
     query = (
         """SELECT column_name
             FROM information_schema.columns
@@ -156,16 +178,52 @@ def get_columns(connection: pg.extensions.connection, table_name: str) -> list:
     return columns
 
 
+# ##################################################################################
+
+# TODO(plyq): Add tests.
+# TODO(*): Rename force -> overwrite or not_incremental.
+def create_database(
+        connection: psycop.extensions.connection,
+        db: str,
+        force: Optional[bool] = None,
+) -> None:
+    """
+    Create empty database.
+
+    :param connection: database connection
+    :param db: database to create
+    :param force: overwrite existing database
+    """
+    _LOG.debug("connection=%s", connection)
+    with connection.cursor() as cursor:
+        if force:
+            cursor.execute(
+                psql.SQL("DROP DATABASE IF EXISTS {};").format(
+                    psql.Identifier(db)
+                )
+            )
+        else:
+            raise ValueError("Database %s already exists" % db)
+        cursor.execute(
+            psql.SQL("CREATE DATABASE {};").format(psql.Identifier(db))
+        )
+
+
+# ##################################################################################
+
+
 def execute_query(
-    connection: pg.extensions.connection,
+    connection: psycop.extensions.connection,
     query: str,
-    limit=None,
-    offset=None,
-    use_timer=False,
-    profile=False,
-    verbose=True,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
+    use_timer: bool = False,
+    profile: bool = False,
+    verbose: bool = False,
 ) -> Union[None, pd.DataFrame]:
-    """Execute a query."""
+    """
+    Execute a query.
+    """
     if limit is not None:
         query += " LIMIT %s" % limit
     if offset is not None:
@@ -176,50 +234,64 @@ def execute_query(
         print(("> " + query))
     # Compute.
     if use_timer:
-        idx = timer.dtimer_start(0, "Sql time")
+        idx = htimer.dtimer_start(0, "Sql time")
     df = None
     cursor = connection.cursor()
     try:
         df = pd.read_sql_query(query, connection)
-    except pg.OperationalError:
+    except psycop.OperationalError:
         # Catch error and execute query directly to print error.
         try:
             cursor.execute(query)
-        except pg.Error as e:
+        except psycop.Error as e:
             print((e.pgerror))
-            raise pg.Error
+            raise psycop.Error
     if use_timer:
-        timer.dtimer_stop(idx)
+        htimer.dtimer_stop(idx)
     if profile:
         print(df)
         return None
     return df
 
 
-def head_table(connection: pg.extensions.connection, table: str, limit=5, as_txt=False) -> str:
+def head_table(
+    connection: psycop.extensions.connection,
+    table: str,
+    limit: int = 5,
+) -> str:
+    """
+    Report the head of the table as str.
+    """
+    txt = []
     query = "SELECT * FROM %s LIMIT %s " % (table, limit)
     df = execute_query(connection, query)
-    if as_txt:
-        # pd.options.display.max_columns = 1000
-        # pd.options.display.width = 130
-        print(df)
-    else:
-        import IPython
-
-        IPython.core.display.display(df)
+    # pd.options.display.max_columns = 1000
+    # pd.options.display.width = 130
+    txt.append(str(df))
+    txt = "\n".join(txt)
+    return txt
 
 
-def head_tables(connection: pg.extensions.connection, tables=None, limit=5, as_txt=False) -> None:
+def head_tables(
+    connection: psycop.extensions.connection,
+    tables: Optional[List[str]] = None,
+    limit: int = 5,
+) -> str:
+    txt = []
     if tables is None:
         tables = get_table_names(connection)
     for table in tables:
-        print(("\n" + "#" * 80 + "\n" + table + "\n" + "#" * 80))
-        head_table(connection, table, limit=limit, as_txt=as_txt)
+        txt.append("\n" + "#" * 80 + "\n" + table + "\n" + "#" * 80)
+        txt_tmp = head_table(connection, table, limit=limit)
+        txt.append(txt_tmp)
+    txt = "\n".join(txt)
+    return txt
 
 
 def find_common_columns(
-        connection: pg.extensions.connection,
-        tables: List[str], as_df=False
+    connection: psycop.extensions.connection,
+    tables: List[str],
+    as_df: bool = False,
 ) -> Union[None, pd.DataFrame]:
     limit = 5
     df = []
@@ -227,10 +299,14 @@ def find_common_columns(
         table = tables[i]
         query = "SELECT * FROM %s LIMIT %s " % (table, limit)
         df1 = execute_query(connection, query, verbose=False)
+        if df1 is None:
+            continue
         for j in range(i + 1, len(tables)):
             table = tables[j]
             query = "SELECT * FROM %s LIMIT %s " % (table, limit)
             df2 = execute_query(connection, query, verbose=False)
+            if df2 is None:
+                continue
             common_cols = [c for c in df1 if c in df2]
             if as_df:
                 df.append(

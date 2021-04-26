@@ -1,0 +1,18 @@
+# TODO(gp): Merge devops/compose/docker-compose-user-space.yml with
+# devops/compose/docker-compose.yml and remove the first one.
+version: '3'
+
+services:
+  user_space:
+    image: $IMAGE
+    restart: "no"
+    volumes:
+      # TODO(gp): Remove this since it's in docker-compose-jupyter.yml.
+      - ../../:/app
+      - ~/.aws:/root/.aws
+      - ~/.config/gspread_pandas/:/root/.config/gspread_pandas/
+      # No need to mount file systems.
+      #- ../docker_build/fstab:/etc/fstab
+    privileged: true
+    cap_add:
+      - SYS_ADMIN

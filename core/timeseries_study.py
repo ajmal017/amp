@@ -4,12 +4,14 @@ import core.timeseries_study as tss
 """
 
 import logging
-from typing import Any, Callable, Dict, Iterable, Optional
+from typing import Any, Callable, Dict, Iterable, List, Optional, Union
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import pandas as pd
 from tqdm.auto import tqdm
 
+import core.plotting as plot
 import helpers.dbg as dbg
 import helpers.introspection as intr
 
@@ -56,7 +58,10 @@ class _TimeSeriesAnalyzer:
         self._sharey = sharey
         self._disabled_methods = disabled_methods or []
 
-    def plot_time_series(self):
+    def plot_time_series(
+        self,
+        ax: Optional[mpl.axes.Axes] = None,
+    ) -> Optional[mpl.figure.Figure]:
         """Plot timeseries on its original time scale."""
         func_name = intr.get_function_name()
         _LOG.debug(func_name)
@@ -64,47 +69,73 @@ class _TimeSeriesAnalyzer:
             _LOG.debug("Skipping '%s' as per user request", func_name)
             return
         #
-        self._time_series.plot()
-        plt.title(
+        ax = self._time_series.plot(ax=ax)
+        ax.set_title(
             f"{self._freq_name.capitalize()} {self._ts_name}"
             f"{self._title_suffix}"
         )
-        plt.xticks(
-            self._time_series.resample("YS").sum().index,
+        xticklabels = self._time_series.resample("YS").sum().index
+        ax.set_xticks(xticklabels)
+        ax.set_xticklabels(
+            xticklabels,
             ha="right",
             rotation=30,
             rotation_mode="anchor",
         )
-        plt.show()
+        return ax.get_figure()
 
-    def plot_by_year(self):
+    def plot_by_year(
+        self,
+        last_n_years: Optional[int] = None,
+        axes: Optional[List[mpl.axes.Axes]] = None,
+    ) -> Optional[mpl.figure.Figure]:
         """Resample yearly and then plot each year on a different plot."""
         func_name = intr.get_function_name()
         if self._need_to_skip(func_name):
             return
-        #
         # Split by year.
-        yearly_resample = self._time_series.resample("y")
-        # Create as many subplots as years.
-        _, axis = plt.subplots(
-            len(yearly_resample),
-            figsize=(20, 5 * len(yearly_resample)),
-            sharey=self._sharey,
-        )
+        time_series = self._time_series.dropna()
+        yearly_resample = time_series.resample("y")
+        # Include only the years with enough data to plot.
+        yearly_resample_count = yearly_resample.count()
+        years_to_plot_data_mask = yearly_resample_count > 1
+        # Limit to top n years, if set.
+        if last_n_years:
+            years_to_plot_data_mask[: -last_n_years - 1] = False
+        num_plots = years_to_plot_data_mask.sum()
+        if num_plots == 0:
+            _LOG.warning("Not enough data to plot year-by-year.")
+            return
+        if axes is None:
+            # Create as many subplots as years.
+            _, axes = plot.get_multiple_plots(
+                num_plots,
+                num_cols=1,
+                y_scale=5,
+                sharey=self._sharey,
+            )
+            plt.suptitle(
+                f"{self._freq_name.capitalize()} {self._ts_name} by year"
+                f"{self._title_suffix}",
+                # Set suptitle at the top of the plots.
+                y=1.005,
+            )
         # Plot each year in a subplot.
-        for i, year_ts in enumerate(yearly_resample):
-            # resample() is a groupby() returning the value on which we
-            # perform the split and the extracted time series.
-            group_by, ts = year_ts
-            ts.plot(ax=axis[i], title=group_by.year)
-        plt.suptitle(
-            f"{self._freq_name.capitalize()} {self._ts_name} by year"
-            f"{self._title_suffix}",
-            # Set suptitle at the top of the plots.
-            y=1.005,
-        )
-        plt.tight_layout()
-        plt.show()
+        if (~years_to_plot_data_mask).sum() > 0:
+            years_with_not_enough_data = years_to_plot_data_mask[
+                ~years_to_plot_data_mask
+            ].index.year.tolist()
+            _LOG.info(
+                "Skipping years %s: not enough data to plot",
+                years_with_not_enough_data,
+            )
+        years_with_enough_data = yearly_resample_count[
+            years_to_plot_data_mask
+        ].index
+        for ax, group_by_timestamp in zip(axes, years_with_enough_data):
+            ts = yearly_resample.get_group(group_by_timestamp)
+            ts.plot(ax=ax, title=group_by_timestamp.year)
+        return axes[-1].get_figure()
 
     # TODO(gp): Think if it makes sense to generalize this by passing a lambda
     #  that define the timescale, e.g.,
@@ -114,54 +145,69 @@ class _TimeSeriesAnalyzer:
     # TODO(gp): It would be nice to plot the timeseries broken down by
     #  different timescales instead of doing the mean in each step
     #  (see https://en.wikipedia.org/wiki/Seasonality#Detecting_seasonality)
-    def boxplot_day_of_month(self):
+    def boxplot_day_of_month(
+        self, ax: Optional[mpl.axes.Axes] = None
+    ) -> Optional[mpl.figure.Figure]:
         """Plot the mean value of the timeseries for each day."""
         func_name = intr.get_function_name()
         if self._need_to_skip(func_name):
             return
         #
-        self._boxplot(self._time_series, self._time_series.index.day)
-        plt.xlabel("day of month")
-        plt.title(
+        self._boxplot(self._time_series, self._time_series.index.day, ax=ax)
+        ax = ax or plt.gca()
+        ax.set_xlabel("day of month")
+        ax.set_title(
             f"{self._freq_name} {self._ts_name} on different days of "
             f"month{self._title_suffix}"
         )
-        plt.show()
-        # We need to close the plot otherwise there is a coupling between
-        # plots that makes matplotlib assert.
-        plt.close()
+        return ax.get_figure()
 
-    def boxplot_day_of_week(self):
+    def boxplot_day_of_week(
+        self, ax: Optional[mpl.axes.Axes] = None
+    ) -> Optional[mpl.figure.Figure]:
         """Plot the mean value of the timeseries for year."""
         func_name = intr.get_function_name()
         if self._need_to_skip(func_name):
             return
         #
-        self._boxplot(self._time_series, self._time_series.index.dayofweek)
-        plt.xlabel("day of week")
-        plt.title(
+        self._boxplot(self._time_series, self._time_series.index.dayofweek, ax=ax)
+        ax = ax or plt.gca()
+        ax.set_xlabel("day of week")
+        ax.set_title(
             f"{self._freq_name} {self._ts_name} on different days of "
             f"week{self._title_suffix}"
         )
-        plt.show()
-        # We need to close the plot otherwise there is a coupling between
-        # plots that makes matplotlib assert.
-        plt.close()
+        return ax.get_figure()
 
-    def execute(self):
-        self.plot_time_series()
-        self.plot_by_year()
-        self.boxplot_day_of_month()
-        self.boxplot_day_of_week()
+    def execute(
+        self,
+        last_n_years: Optional[int] = None,
+        axes: Optional[
+            List[Union[mpl.axes.Axes, List[mpl.axes.Axes], None]]
+        ] = None,
+    ) -> List[Optional[mpl.figure.Figure]]:
+        """
+        :param axes: list of `ax`/`axes` parameters for each method. If the
+            method is skipped, should be `None`
+        """
+        axes = axes or [None] * 4
+        figs = []
+        figs.append(self.plot_time_series(ax=axes[0]))
+        figs.append(self.plot_by_year(last_n_years=last_n_years, axes=axes[1]))
+        figs.append(self.boxplot_day_of_month(ax=axes[2]))
+        figs.append(self.boxplot_day_of_week(ax=axes[3]))
+        return figs
 
     @staticmethod
-    def _boxplot(ts, groupby):
+    def _boxplot(
+        ts: pd.Series, groupby: str, ax: Optional[mpl.axes.Axes] = None
+    ) -> None:
         ts_df = pd.DataFrame(ts)
         ts_df["groupby"] = groupby
-        ts_df.boxplot(by="groupby", column=ts.name)
+        ts_df.boxplot(by="groupby", column=ts.name, ax=ax)
         plt.suptitle("")
 
-    def _need_to_skip(self, func_name):
+    def _need_to_skip(self, func_name: str) -> bool:
         _LOG.debug(func_name)
         if func_name in self._disabled_methods:
             _LOG.debug("Skipping '%s' as per user request", func_name)
@@ -169,7 +215,7 @@ class _TimeSeriesAnalyzer:
         return False
 
     @property
-    def _title_suffix(self):
+    def _title_suffix(self) -> str:
         if self._data_name is not None:
             ret = f" for {self._data_name}"
         else:
@@ -192,19 +238,32 @@ class TimeSeriesDailyStudy(_TimeSeriesAnalyzer):
 
 
 class TimeSeriesMinutelyStudy(_TimeSeriesAnalyzer):
-    def boxplot_minutely_hour(self):
+    def boxplot_minutely_hour(
+        self, ax: Optional[mpl.axes.Axes] = None
+    ) -> Optional[mpl.figure.Figure]:
         func_name = intr.get_function_name()
         if self._need_to_skip(func_name):
             return
         #
-        self._boxplot(self._time_series, self._time_series.index.hour)
-        plt.title(f"{self._ts_name} during different hours {self._title_suffix}")
-        plt.xlabel("hour")
-        plt.show()
+        self._boxplot(self._time_series, self._time_series.index.hour, ax=ax)
+        ax = ax or plt.gca()
+        ax.set_title(
+            f"{self._ts_name} during different hours {self._title_suffix}"
+        )
+        ax.set_xlabel("hour")
+        return ax.get_figure()
 
-    def execute(self):
-        super().execute()
-        self.boxplot_minutely_hour()
+    def execute(
+        self,
+        last_n_years: Optional[int] = None,
+        axes: Optional[
+            List[Union[mpl.axes.Axes, List[mpl.axes.Axes], None]]
+        ] = None,
+    ) -> List[Optional[mpl.figure.Figure]]:
+        axes = axes or [None] * 5
+        figs = super().execute(last_n_years=last_n_years, axes=axes[:-1])
+        figs.append(self.boxplot_minutely_hour(ax=axes[-1]))
+        return figs
 
 
 # Functions for processing dict of time series to generate a df with statistics

@@ -4,6 +4,7 @@
          * [Run fast tests](#run-fast-tests)
          * [Run slow tests](#run-slow-tests)
          * [Run parallel tests](#run-parallel-tests)
+         * [Compute tests coverage](#compute-tests-coverage)
       * [Using pytest directly](#using-pytest-directly)
          * [Usage and Invocations reference](#usage-and-invocations-reference)
          * [Stop at first failure](#stop-at-first-failure)
@@ -39,10 +40,10 @@
          * [Use the appropriate self.assert*](#use-the-appropriate-selfassert)
          * [Do not use dbg.dassert](#do-not-use-dbgdassert)
          * [Interesting testing functions](#interesting-testing-functions)
+      * [Update test tags](#update-test-tags)
 
-     * [Update test tags](#Update-test-tags)
 
-<!-- #region -->
+
 <!--te-->
 
 # Running unit tests
@@ -51,62 +52,73 @@
   tests to make sure we didn't introduce no new bugs
 - We use `pytest` and `unittest` as testing framework
 
+- We have different test sets:
+  - `fast`
+    - Tests that are quick to execute (typically < 5 secs per test class)
+    - We want to run these tests after every commit / PR to make sure things are
+      not horrible broken
+  - `slow`
+    - Tests that we don't want to run all the times because they are:
+      - Slow (typically < 2 minutes per test)
+      - Related to pieces of code that don't change often
+      - External APIs we don't want to hit continuously
+  - `superslow`
+    - Tests that run long workload, e.g., running a production model
+
+- `fast` tests are a subset of `slow` tests
+
 ## Using `run_tests.py`
 
 - `dev_scripts/testing/run_tests.py` is a wrapper around `pytest` to implement
   some typical workflows
 
-### Run test suites
+### Run fast tests
 
-- We have different test sets:
-  - `fast`
-    - Tests that are quick to execute
-      - The limit is 5 secs per test
-    - We want to run these tests after every commit / PR to make sure things are
-      not horrible broken
-  - `slow`
-    - Tests that we don't want to run all the times because they are:
-      - Slow
-        - The limit is 2 mins per test
-      - Related to pieces of code that don't change often
-      - External APIs we don't want to hit continuously
-  - `superslow`
-    - Tests that run long workloads, e.g., running a production model
-      - The limit is 30 mins per test
-
-
+- Run only fast tests:
   ```bash
-  # Run only fast tests.
   > run_tests.py
   > run_tests.py --test fast
+  ```
 
-  # Run slow tests.
+### Run slow tests
+
+- Run all tests:
+  ```bash
   > run_tests.py --test slow
-
-  # Run super-slow tests.
-  > run_tests.py --test superslow
   ```
 
 ### Run parallel tests
 
-- By default `run_tests` runs using all the available CPUs
-- The option `--num_cpus` allows to control how many CPUs to use
+- You can use the switch `--num_cpus -1` to use all the available CPUs:
   ```bash
-  # Run serially.
-  > run_tests.py --test fast --num_cpus "serially"
-
-  # Run with 2 CPUs.
-  > run_tests.py --test fast --num_cpus 2
-
-  # Run with all the CPUs.
   > run_tests.py --test fast --num_cpus -1
+  > run_tests.py --test slow --num_cpus -1
   ```
 
-### Run coverage
+### Compute tests coverage
 
-- Add the coverage
-
-###
+- You can use `run_tests2.py` instead of `run_tests.py` to compute the coverage:
+  ```bash
+  > run_tests2.py --test_suite fast --test ./test --coverage
+  ```
+- It will create a coverage report. If you want to customize your report:
+  ```bash
+  > coverage report --include=*.py --omit=test_*.py -m
+  ```
+  [Here](https://coverage.readthedocs.io/en/latest/cmd.html#reporting) is an
+  official documentation about reporting.
+- It will also create `htmlcov/` folder, where coverage results are stored as
+  `html` files. You can easy share them or review yourself with:
+  ```bash
+  > cd htmlcov; python -m http.server 33333
+  ```
+  After that you will be able to go `http://research:33333` or
+  `http://localhost:33333` depending where do you start your server and review
+  results.
+- To find an original command was called by `run_test2.py` you can:
+  ```bash
+  > run_tests2.py --coverage --dry_run
+  ```
 
 ## Using `pytest` directly
 
@@ -468,11 +480,10 @@
 
 - There are 2 files with the list of tests' tags:
   - `amp/pytest.ini`
-  - `commodity_research/pytest.ini`
-
+  - `.../pytest.ini`
 
 - In order to update the tags (do it in the both files):
-  - in the `markers` section add a name of a new tag
-  - afther a `:` add a short description
-  - keep tags in the alpabetical order
-<!-- #endregion -->
+  - In the `markers` section add a name of a new tag
+  - Afther a `:` add a short description
+  - Keep tags in the alpabetical order
+  <!-- #endregion -->

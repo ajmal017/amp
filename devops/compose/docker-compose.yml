@@ -1,0 +1,14 @@
+# For local runs in user space.
+
+version: '3'
+
+services:
+  app:
+    image: ${IMAGE}
+    volumes:
+      - ../../:/app
+      - ~/.aws:/root/.aws
+      - ../docker_build/fstab:/etc/fstab
+    privileged: true
+    cap_add:
+      - SYS_ADMIN

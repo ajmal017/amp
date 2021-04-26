@@ -1,10 +1,9 @@
 import abc
 import logging
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
-import core.config as cfg
+import core.config as cconfi
 from core.dataflow.core import DAG
-
 
 _LOG = logging.getLogger(__name__)
 
@@ -43,7 +42,7 @@ class DagBuilder(abc.ABC):
         return self._nid_prefix
 
     @abc.abstractmethod
-    def get_config_template(self) -> cfg.Config:
+    def get_config_template(self) -> cconfi.Config:
         """
         Return a config template compatible with `self.get_dag`.
 
@@ -52,7 +51,7 @@ class DagBuilder(abc.ABC):
         """
 
     @abc.abstractmethod
-    def get_dag(self, config: cfg.Config, dag: Optional[DAG] = None) -> DAG:
+    def get_dag(self, config: cconfi.Config, dag: Optional[DAG] = None) -> DAG:
         """
         Build DAG given `config`.
 
@@ -69,6 +68,25 @@ class DagBuilder(abc.ABC):
             created.
         :return: `dag` with all builder operations applied
         """
+
+    @property
+    def methods(self) -> List[str]:
+        """
+        Methods supported by the DAG.
+        """
+        # TODO(*): Consider make this an abstractmethod.
+        return ["fit", "predict"]
+
+    def get_column_to_tags_mapping(
+        self, config: cconfi.Config
+    ) -> Optional[Dict[Any, List[str]]]:
+        """
+        Get a dictionary of result nid column names to semantic tags.
+
+        :return: dictionary keyed by column names and with values that are
+            lists of str tag names
+        """
+        return None
 
     def _get_nid(self, stage_name: str) -> str:
         nid = self._nid_prefix + stage_name

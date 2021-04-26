@@ -1,6 +1,7 @@
-"""Import as:
+"""
+Import as:
 
-import helpers.system_interaction as si
+import helpers.system_interaction as hsyste
 
 Contain all the code needed to interact with the outside world, e.g., through
 system commands, env vars, ...
@@ -17,8 +18,7 @@ import time
 from typing import Any, Callable, List, Optional, Tuple, Union
 
 import helpers.dbg as dbg
-import helpers.io_ as io_
-import helpers.printing as prnt
+import helpers.printing as hprint
 
 _LOG = logging.getLogger(__name__)
 
@@ -29,7 +29,8 @@ _USER_NAME = None
 
 
 def set_user_name(user_name: str) -> None:
-    """To impersonate a user.
+    """
+    To impersonate a user.
 
     To use only in rare cases.
     """
@@ -86,13 +87,30 @@ def _system(
     blocking: bool,
     wrapper: Optional[Any],
     output_file: Optional[Any],
+    num_error_lines: Optional[int],
     tee: bool,
     dry_run: bool,
     log_level: Union[int, str],
 ) -> Tuple[int, str]:
-    """Execute a shell command.
+    """
+    Execute a shell command.
 
-    See system() for options.
+    :param cmd: string with command to execute
+    :param abort_on_error: whether we should assert in case of error or not
+    :param suppress_error: set of error codes to suppress
+    :param suppress_output: whether to print the output or not
+        - If "on_debug_level" then print the output if the log level is DEBUG
+    :param blocking: blocking system call or not
+    :param wrapper: another command to prepend the execution of cmd
+    :param output_file: redirect stdout and stderr to this file
+    :param num_error_lines: number of lines of the output to display when
+        raising `RuntimeError`
+    :param tee: if True, tee stdout and stderr to output_file
+    :param dry_run: just print the final command but not execute it
+    :param log_level: print the command to execute at level "log_level".
+        - If "echo" then print the command line to screen as print and not
+          logging
+    :return: return code (int), output of the command (str)
     """
     orig_cmd = cmd[:]
     # Prepare the command line.
@@ -183,12 +201,18 @@ def _system(
     if abort_on_error and rc != 0:
         msg = (
             "\n"
-            + prnt.frame("cmd='%s' failed with rc='%s'" % (cmd, rc))
+            + hprint.frame("cmd='%s' failed with rc='%s'" % (cmd, rc))
             + "\nOutput of the failing command is:\n%s\n%s\n%s"
-            % (prnt.line(">"), output, prnt.line("<"))
+            % (hprint.line(">"), output, hprint.line("<"))
         )
         _LOG.error("%s", msg)
-        raise RuntimeError("cmd='%s' failed with rc='%s'" % (cmd, rc))
+        # Report the first `num_error_lines` of the output.
+        num_error_lines = num_error_lines or 30
+        output_error = "\n".join(output.split("\n")[:num_error_lines])
+        raise RuntimeError(
+            "cmd='%s' failed with rc='%s'\ntruncated output=\n%s"
+            % (cmd, rc, output_error)
+        )
     # dbg.dassert_type_in(output, (str, ))
     return rc, output
 
@@ -202,27 +226,15 @@ def system(
     blocking: bool = True,
     wrapper: Optional[Any] = None,
     output_file: Optional[Any] = None,
+    num_error_lines: Optional[int] = None,
     tee: bool = False,
     dry_run: bool = False,
     log_level: Union[int, str] = logging.DEBUG,
 ) -> int:
-    """Execute a shell command, without capturing its output.
+    """
+    Execute a shell command, without capturing its output.
 
-
-    :param cmd: string with command to execute
-    :param abort_on_error: whether we should assert in case of error or not
-    :param suppress_error: set of error codes to suppress
-    :param suppress_output: whether to print the output or not
-        - If "on_debug_level" then print the output if the log level is DEBUG
-    :param blocking: blocking system call or not
-    :param wrapper: another command to prepend the execution of cmd
-    :param output_file: redirect stdout and stderr to this file
-    :param tee: if True, tee stdout and stderr to output_file
-    :param dry_run: just print the final command but not execute it
-    :param log_level: print the command to execute at level "log_level".
-        - If "echo" then print the command line to screen as print and not
-          logging
-    :return: return code (int), output of the command (str)
+    See _system() for options.
     """
     rc, _ = _system(
         cmd,
@@ -232,6 +244,7 @@ def system(
         blocking=blocking,
         wrapper=wrapper,
         output_file=output_file,
+        num_error_lines=num_error_lines,
         tee=tee,
         dry_run=dry_run,
         log_level=log_level,
@@ -259,7 +272,8 @@ def system_to_string(
     dry_run: bool = False,
     log_level: Union[int, str] = logging.DEBUG,
 ) -> Tuple[int, str]:
-    """Execute a shell command and capture its output.
+    """
+    Execute a shell command and capture its output.
 
     See _system() for options.
     """
@@ -272,6 +286,7 @@ def system_to_string(
         blocking=True,
         wrapper=wrapper,
         output_file=None,
+        num_error_lines=None,
         tee=False,
         dry_run=dry_run,
         log_level=log_level,
@@ -281,12 +296,13 @@ def system_to_string(
 
 
 def get_first_line(output: str) -> str:
-    """Return the first (and only) line from a string.
+    """
+    Return the first (and only) line from a string.
 
     This is used when calling system_to_string() and expecting a single
     line output.
     """
-    output = prnt.remove_empty_lines(output)
+    output = hprint.remove_empty_lines(output)
     output_as_arr: List[str] = output.split("\n")
     dbg.dassert_eq(len(output_as_arr), 1, "output='%s'", output)
     output = output_as_arr[0]
@@ -295,7 +311,8 @@ def get_first_line(output: str) -> str:
 
 
 def system_to_one_line(cmd: str, *args: Any, **kwargs: Any) -> Tuple[int, str]:
-    """Execute a shell command and capture its output (expected to be a single
+    """
+    Execute a shell command, capturing its output (expected to be a single
     line).
 
     This is a thin wrapper around system_to_string().
@@ -311,8 +328,9 @@ def system_to_one_line(cmd: str, *args: Any, **kwargs: Any) -> Tuple[int, str]:
 def get_process_pids(
     keep_line: Callable[[str], bool]
 ) -> Tuple[List[int], List[str]]:
-    """Find all the processes corresponding to `ps ax` filtered line by line
-    with `keep_line()`.
+    """
+    Find all the processes corresponding to `ps ax` filtered line by line with
+    `keep_line()`.
 
     :return: list of pids and filtered output of `ps ax`
     """
@@ -352,7 +370,8 @@ def kill_process(
     timeout_in_secs: int = 5,
     polltime_in_secs: float = 0.1,
 ) -> None:
-    """Kill all the processes returned by the function `get_pids()`.
+    """
+    Kill all the processes returned by the function `get_pids()`.
 
     :param timeout_in_secs: how many seconds to wait at most before giving up
     :param polltime_in_secs: how often to check for dead processes
@@ -381,7 +400,8 @@ def kill_process(
 
 
 def check_exec(tool: str) -> bool:
-    """Check if an executable can be executed.
+    """
+    Check if an executable can be executed.
 
     :return: True if the executables "tool" can be executed.
     """
@@ -401,7 +421,8 @@ def check_exec(tool: str) -> bool:
 
 
 def query_yes_no(question: str, abort_on_no: bool) -> bool:
-    """Ask a yes/no question via raw_input() and return their answer.
+    """
+    Ask a yes/no question via raw_input() and return their answer.
 
     "question" is a string that is presented to the user.
     "default" is the presumed answer if the user just hits <Enter>.
@@ -433,68 +454,21 @@ def query_yes_no(question: str, abort_on_no: bool) -> bool:
 
 
 def create_executable_script(file_name: str, content: str) -> None:
+    # To avoid circular dependencies.
+    import helpers.io_ as hio
+
     dbg.dassert_isinstance(content, str)
-    io_.to_file(file_name, content)
+    hio.to_file(file_name, content)
     cmd = "chmod +x " + file_name
     system(cmd)
 
 
 # #############################################################################
 
-# TODO(gp): Move it helpers/tools_interaction.py ?
+def is_inside_docker() -> bool:
+    """
+    Return whether we are inside a container or not.
+    """
+    # From https://stackoverflow.com/questions/23513045
+    return os.path.exists("/.dockerenv")
 
-
-def pytest_show_artifacts(dir_name: str, tag: Optional[str] = None) -> List[str]:
-    dbg.dassert_ne(dir_name, "")
-    dbg.dassert_dir_exists(dir_name)
-    cd_cmd = "cd %s && " % dir_name
-    # There might be no pytest artifacts.
-    abort_on_error = False
-    file_names: List[str] = []
-    # Find pytest artifacts.
-    cmd = 'find . -name ".pytest_cache" -type d'
-    _, output_tmp = system_to_string(cd_cmd + cmd, abort_on_error=abort_on_error)
-    file_names.extend(output_tmp.split())
-    #
-    cmd = 'find . -name "__pycache__" -type d'
-    _, output_tmp = system_to_string(cd_cmd + cmd, abort_on_error=abort_on_error)
-    file_names.extend(output_tmp.split())
-    # Find .pyc artifacts.
-    cmd = 'find . -name "*.pyc" -type f'
-    _, output_tmp = system_to_string(cd_cmd + cmd, abort_on_error=abort_on_error)
-    file_names.extend(output_tmp.split())
-    # Remove empty lines.
-    file_names = prnt.remove_empty_lines_from_string_list(file_names)
-    #
-    if tag is not None:
-        num_files = len(file_names)
-        _LOG.info("%s: %d", tag, num_files)
-        _LOG.debug("\n%s", prnt.space("\n".join(file_names)))
-    return file_names  # type: ignore
-
-
-def pytest_clean_artifacts(dir_name: str, preview: bool = False) -> None:
-    _LOG.warning("Cleaning pytest artifacts")
-    dbg.dassert_ne(dir_name, "")
-    dbg.dassert_dir_exists(dir_name)
-    if preview:
-        _LOG.warning("Preview only: nothing will be deleted")
-    # Show before cleaning.
-    file_names = pytest_show_artifacts(dir_name, tag="Before cleaning")
-    # Clean.
-    for f in file_names:
-        exists = os.path.exists(f)
-        _LOG.debug("%s -> exists=%s", f, exists)
-        if exists:
-            if not preview:
-                if os.path.isdir(f):
-                    shutil.rmtree(f)
-                elif os.path.isfile(f):
-                    os.remove(f)
-                else:
-                    raise ValueError("Can't delete %s" % f)
-            else:
-                _LOG.debug("rm %s", f)
-    # Show after cleaning.
-    file_names = pytest_show_artifacts(dir_name, tag="After cleaning")
-    dbg.dassert_eq(len(file_names), 0)
