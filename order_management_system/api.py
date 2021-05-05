@@ -52,14 +52,23 @@ class Contract:
 
 
 class ContinuousFutures(Contract):
+    """
+    TODO(*): Populate `sec_type`
+    """
     pass
 
 
 class Futures(Contract):
+    """
+    TODO(*): Populate `sec_type`
+    """
     pass
 
 
 class Stock(Contract):
+    """
+    TODO(*): Populate `sec_type`
+    """
     pass
 
 
@@ -127,9 +136,23 @@ class Position:
     Modelled after:
 
     https://ib-insync.readthedocs.io/api.html#ib_insync.objects.Position
+
+    IB callback:
+    http://interactivebrokers.github.io/tws-api/interfaceIBApi_1_1EWrapper.html#af4105e2dae9efd6f6bb56f706374c9d6
     """
 
-    def __init__(self, contract: Contract, position: float):
+    def __init__(
+            self,
+            contract: Contract,
+            position: float,
+            # TODO(*): Consider adding `avg_cost` as in IB.
+    ) -> None:
+        """
+        Initialize with a contract and number of units.
+
+        :param contract: the position's `Contract`.
+        :param position: the number of positions held.
+        """
         self.contract = contract
         # We don't allow a position with no shares.
         dbg.dassert_ne(0, position)
@@ -173,7 +196,7 @@ class OrderStatus:
     """
     Status of order.
 
-    IB Documentation:
+    IB callback:
     https://interactivebrokers.github.io/tws-api/interfaceIBApi_1_1EWrapper.html#a17f2a02d6449710b6394d0266a353313
     """
 
@@ -185,6 +208,16 @@ class OrderStatus:
         remaining: float,
         avg_fill_price: float
     ) -> None:
+        """
+        Order status that simulates result of IB callback.
+
+        :param order_id: the order's client id.
+        :param status: the current status of the order. Possible values:
+            PendingSubmit...
+        :param filled: number of filled positions.
+        :param remaining: the remnant positions.
+        :param avg_fill_price: average filling price.
+        """
         # Pointer to the corresponding Order.
         dbg.dassert_lte(0, order_id)
         self.order_id = order_id
@@ -284,6 +317,13 @@ class OMS:
 
     # TODO(gp): To be implemented.
     def pnl(self):
+        """
+
+        - Maybe just do positions (in dollar value)...
+        - Dataframe representation with columns for position, etc.
+
+        :return:
+        """
         pass
 
     def place_order(
@@ -299,7 +339,7 @@ class OMS:
 
         :param contract:
         :param order:
-        :param timestamp:
+        :param timestamp: time at which the order was placed
         :return:
         """
         self._orders.append(order)
