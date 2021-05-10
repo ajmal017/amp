@@ -1,0 +1,20 @@
+- Get the standard branch name corresponding to a GH issue
+  ```
+  > i gh_issue_title 1310
+  WARNING: No module named 'pandas'
+  WARNING: No module named 'matplotlib'
+  INFO: > cmd='/Users/saggese/src/venv/client_setup/bin/invoke gh_issue_title 1310'
+  ## gh_issue_title:
+  AmpTask1310_Implement_RH1E
+  ```
+
+- Create the branch
+  ```
+  > i git_create_branch -b AmpTask1310_Implement_RH1E
+  ...
+  To github.com:alphamatic/amp
+   * [new branch]        AmpTask1310_Implement_RH1E -> AmpTask1310_Implement_RH1E
+  Branch 'AmpTask1310_Implement_RH1E' set up to track remote branch 'AmpTask1310_Implement_RH1E' from 'origin'.
+  ```
+
+- Create a draft PR

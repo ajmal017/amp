@@ -21,25 +21,32 @@ class FitPredictDagRunner:
 
     def __init__(self, config: cconfi.Config, dag_builder: DagBuilder) -> None:
         """
-        Initialize DAG.
 
         :param config: config for DAG
         :param dag_builder: `DagBuilder` instance
         """
+        # Save input parameters.
         self.config = config
         self._dag_builder = dag_builder
         # Create DAG using DAG builder.
         self.dag = self._dag_builder.get_dag(self.config)
+        _LOG.info("dag=%s", self.dag)
         self._methods = self._dag_builder.methods
+        _LOG.info("_methods=%s", self._methods)
         self._column_to_tags_mapping = (
             self._dag_builder.get_column_to_tags_mapping(self.config)
         )
+        _LOG.info("_column_to_tags_mapping=%s", self._column_to_tags_mapping)
         # Confirm that "fit" and "predict" are registered DAG methods.
+        # TODO(gp): Factor this out.
         dbg.dassert_in("fit", self._methods)
         dbg.dassert_in("predict", self._methods)
+        # Save the sink node.
+        # TODO(gp): Factor this out.
         result_nids = self.dag.get_sinks()
         dbg.dassert_eq(len(result_nids), 1)
         self._result_nid = result_nids[0]
+        _LOG.info("_result_nid=%s", self._result_nid)
 
     def set_fit_intervals(
         self, intervals: Optional[List[Tuple[Any, Any]]]
@@ -82,6 +89,7 @@ class FitPredictDagRunner:
         :return: `ResultBundle` class containing `config`, `nid`, `method`,
             result dataframe and DAG info
         """
+        # TODO(gp): Factor out this in _run_dag_helper().
         dbg.dassert_in(method, self._methods)
         df_out = self.dag.run_leq_node(nid, method)["df_out"]
         info = extract_info(self.dag, [method])
@@ -105,12 +113,7 @@ class PredictionDagRunner(FitPredictDagRunner):
 
     def _run_dag(self, nid: str, method: str) -> PredictionResultBundle:
         """
-        Run DAG and return a `PredictionResultBundle`.
-
-        :param nid: identifier of terminal node for execution
-        :param method: `Node` subclass method to be executed
-        :return: `PredictionResultBundle` class containing `config`, `nid`,
-            `method`, result dataframe and DAG info
+        Same as super class but return a `PredictionResultBundle`.
         """
         dbg.dassert_in(method, self._methods)
         df_out = self.dag.run_leq_node(nid, method)["df_out"]
@@ -127,7 +130,8 @@ class PredictionDagRunner(FitPredictDagRunner):
 
 class IncrementalDagRunner:
     """
-    Class for running DAGs.
+    # TODO(gp): Improve.
+    Class for running DAGs in incremental fashion, i.e., running one step at a time.
     """
 
     def __init__(
@@ -154,6 +158,7 @@ class IncrementalDagRunner:
         :param fit_state: Config containing any learned state required for
             initializing the DAG
         """
+        # TODO(gp): Call super.__init__ to avoid some repeatition.
         self.config = config
         self._dag_builder = dag_builder
         self._start = start
@@ -221,6 +226,7 @@ class IncrementalDagRunner:
         :return: `ResultBundle` class containing `config`, `nid`, `method`,
             result dataframe and DAG info
         """
+        # TODO(gp): This seems the same code as the base class.
         dbg.dassert_in(method, self._methods)
         df_out = self.dag.run_leq_node(nid, method)["df_out"]
         info = extract_info(self.dag, [method])

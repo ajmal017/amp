@@ -24,9 +24,18 @@ class DagBuilder(abc.ABC):
     Abstract class for creating DAGs.
 
     Concrete classes must specify:
-      - a default configuration (which may depend upon variables used in class
-        initialization)
-      - the construction of a DAG
+      1) `get_config_template()`
+        - It returns a Config object that represents the parameters used to build
+          the DAG
+        - The config can depend upon variables used in class initialization
+        - A config can be incomplete, e.g., "_DUMMY_" is used for required
+          fields that must be defined before the config can be used to initialize
+          a DAG
+      2) `get_dag()`
+        - It builds a DAG
+        - This function defines the DAG nodes and how they are connected to each
+          other. The passed-in config object tells this function how to
+          configure/initialize the various nodes.
     """
 
     def __init__(self, nid_prefix: Optional[str] = None) -> None:
@@ -42,8 +51,8 @@ class DagBuilder(abc.ABC):
         # Make sure the nid_prefix ends with "/" (unless it is "").
         if self._nid_prefix and not self._nid_prefix.endswith("/"):
             _LOG.warning(
-                "Appended '/' to nid_prefix. To avoid this warning, "
-                "only pass nid prefixes ending in '/'."
+                "Appended '/' to nid_prefix '%s'. To avoid this warning, "
+                "only pass nid prefixes ending in '/'.", self._nid_prefix
             )
             self._nid_prefix += "/"
 
@@ -88,6 +97,7 @@ class DagBuilder(abc.ABC):
         # TODO(*): Consider make this an abstractmethod.
         return ["fit", "predict"]
 
+    # TODO(gp): -> Dict[str, ... ?
     def get_column_to_tags_mapping(
         self, config: cconfi.Config
     ) -> Optional[Dict[Any, List[str]]]:
@@ -97,6 +107,7 @@ class DagBuilder(abc.ABC):
         :return: dictionary keyed by column names and with values that are
             lists of str tag names
         """
+        _ = self, config
         return None
 
     def _get_nid(self, stage_name: str) -> str:
@@ -115,7 +126,6 @@ class ArmaReturnsBuilder(DagBuilder):
 
         :return: reference config
         """
-
         config = cfgb.get_config_from_nested_dict(
             {
                 # Load prices.
