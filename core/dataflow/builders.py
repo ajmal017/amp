@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 import core.config as cconfi
 import core.config_builders as cfgb
 import core.finance as fin
+# TODO(gp): Use `import core.dataflow` if possible
 from core.dataflow.core import DAG, Node
 from core.dataflow.models import VolatilityModel
 from core.dataflow.nodes import (
@@ -113,6 +114,13 @@ class DagBuilder(abc.ABC):
     def _get_nid(self, stage_name: str) -> str:
         nid = self._nid_prefix + stage_name
         return nid
+
+    @staticmethod
+    def _append(dag: DAG, tail_nid: Optional[str], node: Node) -> str:
+        dag.add_node(node)
+        if tail_nid is not None:
+            dag.connect(tail_nid, node.nid)
+        return node.nid
 
 
 class ArmaReturnsBuilder(DagBuilder):

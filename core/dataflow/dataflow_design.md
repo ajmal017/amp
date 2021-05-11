@@ -40,7 +40,7 @@
     about DAG connectivity, which is specified in the DAG builder
 - Template configs:
   - Are incomplete configs, with some "mandatory" parameters unspecified but
-    identified, e.g., with "_DUMMY_"
+    identified, e.g., with `_DUMMY_`
   - Have reasonable defaults for specified parameters
     - This facilitates config extension (e.g., if we add additional parameters /
       flexibility in the future, then we should not have to regenerate old

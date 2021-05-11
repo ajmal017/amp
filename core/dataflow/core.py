@@ -16,17 +16,18 @@ _LOG = logging.getLogger(__name__)
 # #############################################################################
 
 
+# TODO(gp): This seems private to this file.
 class NodeInterface(abc.ABC):
     """
     Abstract node class for creating DAGs of functions.
 
-    Common use case: Nodes wrap functions with a common method (e.g., `fit`).
+    Common use case: `Node`s wrap functions with a common method (e.g., `fit`).
 
     This class provides some convenient introspection (input/output names)
     accessors and, importantly, a unique identifier (`nid`) for building
     graphs of nodes. The `nid` is also useful for config purposes.
 
-    For nodes requiring fit/transform, we can subclass / provide a mixin with
+    For nodes requiring fit/transform, we can subclass/provide a mixin with
     the desired methods.
     """
 
@@ -59,13 +60,16 @@ class NodeInterface(abc.ABC):
     def output_names(self) -> List[str]:
         return self._output_names
 
+    # TODO(gp): Consider using the more common approach with `_check_validity()`.
     @staticmethod
     def _init_validation_helper(items: Optional[List[str]]) -> List[str]:
         """
-        Ensure that items are valid.
+        Ensure that items are valid and returns the validated items.
         """
         if items is None:
             return []
+        # Make sure the items are all strings.
+        # TODO(gp): Should we check for empty strings.
         for item in items:
             dbg.dassert_isinstance(item, str)
         return items
@@ -76,7 +80,7 @@ class Node(NodeInterface):
     A node class that stores and retrieves its output values on a "per-method"
     basis.
 
-    TODO: Explain use case.
+    TODO(*): Explain use case.
     """
 
     def __init__(
@@ -89,6 +93,7 @@ class Node(NodeInterface):
         Implement the same interface as `NodeInterface`.
         """
         super().__init__(nid=nid, inputs=inputs, outputs=outputs)
+        # Dictionary "method name -> output node name -> output".
         self._output_vals: Dict[str, Dict[str, Any]] = {}
 
     def get_output(self, method: str, name: str) -> Any:
@@ -96,17 +101,17 @@ class Node(NodeInterface):
         Return the value of output `name` for the requested `method`.
         """
         dbg.dassert_in(
-            name,
-            self.output_names,
-            "%s is not an output of node %s!",
-            name,
-            self.nid,
-        )
-        dbg.dassert_in(
             method,
             self._output_vals.keys(),
             "%s of node %s has no output!",
             method,
+            self.nid,
+        )
+        dbg.dassert_in(
+            name,
+            self.output_names,
+            "%s is not an output of node %s!",
+            name,
             self.nid,
         )
         return self._output_vals[method][name]

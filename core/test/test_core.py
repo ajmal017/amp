@@ -28,6 +28,9 @@ _LOG = logging.getLogger(__name__)
 # #############################################################################
 
 
+# TODO(gp): Move to test_config.py
+
+
 class Test_config1(hut.TestCase):
     def test_config1(self) -> None:
         """
@@ -374,6 +377,7 @@ class Test_subtract_config1(hut.TestCase):
 # dataflow_core.py
 # #############################################################################
 
+# TODO(gp): Move to core/test/test_core.py
 
 class _Dataflow_helper(hut.TestCase):
     @staticmethod
@@ -399,7 +403,7 @@ class _Dataflow_helper(hut.TestCase):
 class Test_dataflow_core_DAG1(_Dataflow_helper):
     def test_add_nodes1(self) -> None:
         """
-        Creates a node and adds it to a DAG.
+        Create a node and add it to a DAG.
         """
         dag = dtf.DAG()
         n1 = dtf.Node("n1")
@@ -408,7 +412,7 @@ class Test_dataflow_core_DAG1(_Dataflow_helper):
 
     def test_add_nodes2(self) -> None:
         """
-        Demonstrates "strict" and "loose" behavior on repeated add_node().
+        Demonstrate "strict" and "loose" behavior on repeated add_node().
         """
         dag_strict = dtf.DAG(mode="strict")
         m1 = dtf.Node("m1")
