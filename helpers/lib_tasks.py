@@ -124,6 +124,49 @@ def _run(ctx: Any, cmd: str, *args: Any, **kwargs: Any) -> None:
     ctx.run(cmd, *args, **kwargs)
 
 
+def _get_files_to_process(modified: bool, branch: bool, files: str) -> List[str]:
+    """
+    Get a list of files to process that have been changed in the branch,
+    in the client, or passed by the user.
+    """
+    dbg.dassert_lte(
+        int(modified) + int(branch) + int(files != ""),
+        1,
+        msg="You can specify only one option among --modified, --branch, or --files",
+        )
+    if modified:
+        files = git.get_modified_files()
+        files = " ".join(files)
+    elif branch:
+        cmd = "git diff --name-only master..."
+        files = hsinte.system_to_string(cmd)[1]
+        files = " ".join(files.split("\n"))
+    #
+    dbg.dassert_isinstance(files, str)
+    _LOG.debug("files='%s'", str(files))
+    # Convert into a list.
+    files_as_list = files.split(" ")
+    files_as_list = [f for f in files_as_list if f != ""]
+    if len(files_as_list) == 0:
+        dbg.dfatal(
+            "You need to specify one option among --modified, --branch, or --files"
+        )
+    dbg.dassert_lte(1, len(files_as_list))
+    return files_as_list
+
+# Copied from helpers.datetime_ to avoid dependency from pandas.
+
+
+def _get_timestamp(utc: bool = False) -> str:
+    if utc:
+        timestamp = datetime.datetime.utcnow()
+    else:
+        timestamp = datetime.datetime.now()
+    return timestamp.strftime("%Y%m%d_%H%M%S")
+
+
+# End copy.
+
 # #############################################################################
 # Set-up.
 # #############################################################################
@@ -302,12 +345,98 @@ def git_create_branch(ctx, branch_name=""):  # type: ignore
     _run(ctx, cmd)
 
 
+@task
+def git_create_patch(  # type: ignore
+        ctx, mode="tar",
+        modified=False, branch=False, files=""):
+    """
+    Create a patch file for the entire repo client from the base revision.
+    This script accepts a list of files to package, if specified.
+
+    :param mode: "tar" creates a tar ball with all the files
+        "diff" creates a patch with the diff of the files
+    :param modified: select the files modified in the client
+    :param branch: select the files modified in the current branch
+    :param files: specify a space-separated list of files
+    """
+    _report_task()
+    dbg.dassert_in(mode, ("tar", "diff"))
+    # For now we just create a patch for the current submodule.
+    super_module = False
+    git_client_root = git.get_client_root(super_module)
+    hash_ = git.get_head_hash(git_client_root, short_hash=True)
+    timestamp = _get_timestamp(utc=False)
+    #
+    tag = os.path.dirname(git_client_root)
+    dst_file = f"patch.{tag}.{hash_}.{timestamp}"
+    if mode == "tar":
+        dst_file += ".tgz"
+    elif mode == "diff":
+        dst_file += ".txt"
+    else:
+        dbg.dfatal("Invalid code path")
+    _LOG.debug("dst_file=%s", dst_file)
+    # Get the files.
+    files_as_list = _get_files_to_process(modified, branch, files)
+    _LOG.info("Files to save:\n%s", "\n".join(files_as_list))
+    files_as_str = " ".join(files_as_list)
+    # echo "Creating patch ..."
+    # HASH_=$(git rev-parse --short HEAD)
+    # TIMESTAMP=$(timestamp)
+    # GIT_ROOT=$(git rev-parse --show-toplevel)
+    # BASENAME=$(basename $GIT_ROOT)
+    # echo "GIT_ROOT=$GIT_ROOT"
+    # cd $GIT_ROOT
+    # DST_FILE="$git_root/patch.$BASENAME.$HASH_.$TIMESTAMP.txt"
+    # echo "DST_FILE=$DST_FILE"
+    # git status -s $*
+    # # Find all files modified (instead of --cached).
+    # git diff HEAD $* >$DST_FILE
+    cmd = ""
+    if modified or len(files) > 0:
+        if mode == "tar":
+            cmd = f"tar czvf {dst_file} {files_as_str}"
+            cmd_inv = "tar xvzf "
+        elif mode == "diff":
+            cmd = f"git diff HEAD {files_as_str} >{dst_file}"
+            cmd_inv = "git apply "
+    elif branch:
+        if mode == "tar":
+            cmd = f"tar czvf {dst_file} {files_as_str}"
+            cmd_inv = "tar xvzf "
+        elif mode == "diff":
+            cmd = f"git diff master... {files_as_str} >{dst_file}"
+            cmd_inv = "git apply "
+    # Create patch.
+    _LOG.info("Creating the patch into %s", dst_file)
+    dbg.dassert_ne(cmd, "")
+    _LOG.debug("cmd=%s", cmd)
+    _run(ctx, cmd)
+    # Print message to apply the patch.
+    remote_file = os.path.basename(dst_file)
+    msg = f"""
+    # To apply the patch and execute:
+    > git checkout {hash_}
+    > {cmd_inv} {dst_file}
+    
+    # To apply the patch to a remote client:
+    > export FILE=$(basename {dst_file})
+    > export SERVER="server"
+    > export CLIENT_PATH="~/src"
+    > scp {dst_file} $SERVER:
+    > ssh $SERVER 'cd $CLIENT_PATH && {cmd_inv} ~/{remote_file}'"
+    """
+    print(hprint.dedent(msg))
+
+
 # TODO(gp): Add dev_scripts/git/git_create_patch*.sh
 # dev_scripts/git/git_backup.sh
 # dev_scripts/git/gcl
 # dev_scripts/git/gd_master.sh
 # dev_scripts/git/git_branch.sh
 # dev_scripts/git/git_branch_point.sh
+
+# amp/dev_scripts/create_class_diagram.sh
 
 # #############################################################################
 # Docker.
@@ -1544,7 +1673,6 @@ def pytest_clean(ctx):  # type: ignore
 # Linter.
 # #############################################################################
 
-
 @task
 def lint(ctx, modified=False, branch=False, files="", phases=""):  # type: ignore
     """
@@ -1556,28 +1684,8 @@ def lint(ctx, modified=False, branch=False, files="", phases=""):  # type: ignor
     :param phases: specify the lint phases to execute
     """
     _report_task()
-    dbg.dassert_lte(
-        int(modified) + int(branch) + int(files != ""),
-        1,
-        msg="You can specify only one option among --modified, --branch, or --files",
-    )
-    if modified:
-        files = git.get_modified_files()
-        files = " ".join(files)
-    elif branch:
-        cmd = "git diff --name-only master..."
-        files = hsinte.system_to_string(cmd)[1]
-        files = " ".join(files.split("\n"))
-    #
-    dbg.dassert_isinstance(files, str)
-    _LOG.debug("files='%s'", str(files))
-    files_as_list = files.split(" ")
-    files_as_list = [f for f in files_as_list if f != ""]
-    if len(files_as_list) == 0:
-        dbg.dfatal(
-            "You need specify one option among --modified, --branch, or --files"
-        )
-    dbg.dassert_lte(1, len(files_as_list))
+    # Get the files.
+    files_as_list = _get_files_to_process(modified, branch, files)
     _LOG.info("Files to lint:\n%s", "\n".join(files_as_list))
     files_as_str = " ".join(files_as_list)
     #

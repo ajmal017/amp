@@ -21,6 +21,7 @@ from helpers.lib_tasks import (
     docker_release_dev_image,
     docker_release_prod_image,
     docker_stats,
+    #
     find_test_class,
     find_test_decorator,
     get_amp_files,
@@ -31,6 +32,7 @@ from helpers.lib_tasks import (
     git_branch_files,
     git_clean,
     git_create_branch,
+    git_create_patch,
     git_delete_merged_branches,
     git_merge_master,
     git_pull,
