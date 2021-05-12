@@ -673,28 +673,7 @@ class TestCacheDecorator(_TestClassHelper):
         self.assertEqual(exp_f_state, f.executed)
 
 
-# ###################
-
-
-# class _AmpTask1407Class:
-#     def __init__(self, string: str) -> None:
-#         self._string = string
-#
-#     @hcache.cache
-#     def print(self, n: int) -> str:
-#         string = ""
-#         for _ in range(n):
-#             string += "hello" + ("o" * len(self._string)) + " "
-#         return string
-#
-#     @staticmethod
-#     @hcache.cache
-#     def static_print(n: int) -> str:
-#         print("--> hello: ", n)
-#         string = ""
-#         for _ in range(n):
-#             string += "hello" + ("o" * len("world")) + " "
-#         return string
+# #############################################################################
 
 
 class TestAmpTask1407(_TestClassHelper):
@@ -722,7 +701,7 @@ class TestAmpTask1407(_TestClassHelper):
 
     def test2(self) -> None:
         """
-        A static method can't be cached.
+        A static method can be cached.
         """
 
         class _AmpTask1407Class:
