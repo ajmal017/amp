@@ -102,25 +102,128 @@ class TestDryRunTasks2(hut.TestCase):
       one using mocks to return ok for every system call.
     """
 
-    def test_print_setup(self) -> None:
+    def setUp(self) -> None:
+        super().setUp()
         params = _get_default_params()
         ltasks.set_default_params(params)
-        #
-        target = "print_setup"
-        self._check_output(target)
+
+    def tearDown(self) -> None:
         ltasks.reset_default_params()
+        super().tearDown()
+
+    def test_print_setup(self) -> None:
+        target = "print_setup(ctx)"
+        self._check_output(target)
 
     def test_git_pull(self) -> None:
-        target = "git_pull"
+        target = "git_pull(ctx)"
         self._check_output(target)
 
     def test_git_pull_master(self) -> None:
-        target = "git_pull_master"
+        target = "git_pull_master(ctx)"
         self._check_output(target)
 
-    def test_git_clean2(self) -> None:
-        target = "git_clean"
+    def test_git_clean(self) -> None:
+        target = "git_clean(ctx)"
         self._check_output(target)
+
+    def test_docker_images_ls_repo(self) -> None:
+        target = "docker_images_ls_repo(ctx)"
+        self._check_output(target)
+
+    # def test_(self) -> None:
+    #     target = "(ctx)"
+    #     self._check_output(target)
+
+    def test_docker_kill_all(self) -> None:
+        target = "docker_kill_all(ctx)"
+        self._check_output(target)
+
+    def test_docker_kill_last(self) -> None:
+        target = "docker_kill_last(ctx)"
+        self._check_output(target)
+
+    def test_docker_ps(self) -> None:
+        target = "docker_ps(ctx)"
+        self._check_output(target)
+
+    def test_docker_pull(self) -> None:
+        target = "docker_pull(ctx)"
+        self._check_output(target)
+
+    def test_docker_stats(self) -> None:
+        target = "docker_stats(ctx)"
+        self._check_output(target)
+
+    def test_gh_create_pr(self) -> None:
+        target = "gh_create_pr(ctx)"
+        self._check_output(target)
+
+    def test_gh_issue_title(self) -> None:
+        target = "gh_issue_title(ctx, 1)"
+        self._check_output(target)
+
+    def test_gh_workflow_list(self) -> None:
+        target = "gh_workflow_list(ctx)"
+        self._check_output(target)
+
+    def test_gh_workflow_run(self) -> None:
+        target = "gh_workflow_run(ctx)"
+        self._check_output(target)
+
+    def test_git_branch_files(self) -> None:
+        target = "git_branch_files(ctx)"
+        self._check_output(target)
+
+    def test_git_clean(self) -> None:
+        target = "git_clean(ctx)"
+        self._check_output(target)
+
+    def test_git_create_branch(self) -> None:
+        target = "git_create_branch(ctx)"
+        self._check_output(target)
+
+    # def test_(self) -> None:
+    #     target = ""
+    #     self._check_output(target)
+    #
+    # def test_(self) -> None:
+    #     target = ""
+    #     self._check_output(target)
+    #
+    # def test_(self) -> None:
+    #     target = ""
+    #     self._check_output(target)
+    #
+    # def test_(self) -> None:
+    #     target = ""
+    #     self._check_output(target)
+    #
+    # def test_(self) -> None:
+    #     target = ""
+    #     self._check_output(target)
+    #
+    # def test_(self) -> None:
+    #     target = ""
+    #     self._check_output(target)
+    #
+    # def test_(self) -> None:
+    #     target = ""
+    #     self._check_output(target)
+
+    # git_branch_files,
+    # git_clean,
+    # git_create_branch,
+    # git_create_patch,
+    # git_delete_merged_branches,
+    # git_merge_master,
+    # git_pull,
+    # git_pull_master,
+    # #
+    # jump_to_pytest_error,
+    # lint,
+    # print_setup,
+    #
 
     # #########################################################################
 
@@ -168,8 +271,9 @@ class TestDryRunTasks2(hut.TestCase):
         expected one.
         """
         ctx = self._build_mock_context_returning_ok()
-        func = eval(f"ltasks.{target}")
-        func(ctx)
+        #func = eval(f"ltasks.{target}")
+        #func(ctx)
+        exec(f"ltasks.{target}")
         # Check the outcome.
         self._check_calls(ctx)
 

@@ -317,7 +317,8 @@ def git_delete_merged_branches(ctx, confirm_delete=True):  # type: ignore
 
 
 @task
-def git_create_branch(ctx, branch_name=""):  # type: ignore
+def git_create_branch(  # type: ignore
+        ctx, branch_name="", create_from_master=False):
     """
     Create and push upstream a branch called `branch_name`.
 
@@ -326,8 +327,10 @@ def git_create_branch(ctx, branch_name=""):  # type: ignore
     upstream origin LemTask169_Get_GH_actions_working_on_lemonade
     """
     _report_task()
+    curr_branch = git.get_branch_name()
+    if
+    if create_from_master:
     dbg.dassert_eq(
-        git.get_branch_name(),
         "master",
         "Typically you should branch from `master`",
     )
@@ -1851,7 +1854,7 @@ def _get_gh_issue_title(issue_id: int, repo: str) -> str:
 
 
 @task
-def gh_issue_title(ctx, issue_id, repo="current"):  # type: ignore
+def gh_issue_title(ctx, issue_id=0, repo="current"):  # type: ignore
     """
     Print the title that corresponds to the given issue and repo.
 
@@ -1860,6 +1863,7 @@ def gh_issue_title(ctx, issue_id, repo="current"):  # type: ignore
     _report_task()
     _ = ctx
     issue_id = int(issue_id)
+    dbg.dassert_lte(1, issue_id)
     print(_get_gh_issue_title(issue_id, repo))
 
 
