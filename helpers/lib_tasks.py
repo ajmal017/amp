@@ -29,8 +29,6 @@ import helpers.table as htable
 import helpers.unit_test as hut
 import helpers.versioning as hversi
 
-# TODO(gp): -> helpers.lib_tasks so we can share across repos (e.g., dev_tools)
-# TODO(gp): Do we need to move / rename test_tasks.py?
 
 _LOG = logging.getLogger(__name__)
 
@@ -159,10 +157,7 @@ def _get_files_to_process(modified: bool, branch: bool, files: str) -> List[str]
     _LOG.debug("files='%s'", str(files))
     # Ensure that there are files to process.
     if not files_as_list:
-        dbg.dfatal(
-            "You need to specify one option among --modified, --branch, or --files"
-        )
-    dbg.dassert_lte(1, len(files_as_list))
+        _LOG.warning("No files were selected")
     return files_as_list
 
 # Copied from helpers.datetime_ to avoid dependency from pandas.
@@ -433,6 +428,82 @@ def git_create_patch(  # type: ignore
 
 # To apply the patch to a remote client:
 > export FILE="{dst_file}"
+> export SERVER="server"
+> export CLIENT_PATH="~/src"
+> scp {dst_file} $SERVER:
+> ssh $SERVER 'cd $CLIENT_PATH && {cmd_inv} ~/{remote_file}'"
+    """
+    print(msg)
+
+
+@task
+def git_create_patch(  # type: ignore
+        ctx, mode="tar",
+        modified=False, branch=False, files=""):
+    """
+    Create a patch file for the entire repo client from the base revision.
+    This script accepts a list of files to package, if specified.
+
+    :param mode: "tar" creates a tar ball with all the files
+        "diff" creates a patch with the diff of the files
+    :param modified: select the files modified in the client
+    :param branch: select the files modified in the current branch
+    :param files: specify a space-separated list of files
+    """
+    _report_task(hprint.to_str("mode modified branch files"))
+    dbg.dassert_in(mode, ("tar", "diff"))
+    # For now we just create a patch for the current submodule.
+    super_module = False
+    git_client_root = git.get_client_root(super_module)
+    hash_ = git.get_head_hash(git_client_root, short_hash=True)
+    timestamp = _get_timestamp(utc=False)
+    #
+    tag = os.path.basename(git_client_root)
+    dst_file = f"patch.{tag}.{hash_}.{timestamp}"
+    if mode == "tar":
+        dst_file += ".tgz"
+    elif mode == "diff":
+        dst_file += ".txt"
+    else:
+        dbg.dfatal("Invalid code path")
+    _LOG.debug("dst_file=%s", dst_file)
+    # Get the files.
+    files_as_list = _get_files_to_process(modified, branch, files)
+    _LOG.info("Files to save:\n%s", "\n".join(files_as_list))
+    if not files_as_list:
+        _LOG.warning("Nothing to patch: exiting")
+        return
+    files_as_str = " ".join(files_as_list)
+    #
+    cmd = ""
+    if modified or len(files) > 0:
+        if mode == "tar":
+            cmd = f"tar czvf {dst_file} {files_as_str}"
+            cmd_inv = "tar xvzf"
+        elif mode == "diff":
+            cmd = f"git diff HEAD {files_as_str} >{dst_file}"
+            cmd_inv = "git apply"
+    elif branch:
+        if mode == "tar":
+            cmd = f"tar czvf {dst_file} {files_as_str}"
+            cmd_inv = "tar xvzf"
+        elif mode == "diff":
+            cmd = f"git diff master... {files_as_str} >{dst_file}"
+            cmd_inv = "git apply "
+    # Create patch.
+    _LOG.info("Creating the patch into %s", dst_file)
+    dbg.dassert_ne(cmd, "")
+    _LOG.debug("cmd=%s", cmd)
+    _run(ctx, cmd)
+    # Print message to apply the patch.
+    remote_file = os.path.basename(dst_file)
+    abs_path_dst_file = os.path.abspath(dst_file)
+    msg = f"""
+# To apply the patch and execute:
+> git checkout {hash_}
+> {cmd_inv} {abs_path_dst_file}
+
+# To apply the patch to a remote client:
 > export SERVER="server"
 > export CLIENT_PATH="~/src"
 > scp {dst_file} $SERVER:
@@ -1703,6 +1774,9 @@ def lint(ctx, modified=False, branch=False, files="", phases=""):  # type: ignor
     # Get the files.
     files_as_list = _get_files_to_process(modified, branch, files)
     _LOG.info("Files to lint:\n%s", "\n".join(files_as_list))
+    if not files_as_list:
+        _LOG.warning("Nothing to lint: exiting")
+        return
     files_as_str = " ".join(files_as_list)
     #
     cmd = (
