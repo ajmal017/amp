@@ -144,7 +144,21 @@ def _get_files_to_process(modified: bool, branch: bool, files: str) -> List[str]
     # Convert into a list.
     files_as_list = files.split(" ")
     files_as_list = [f for f in files_as_list if f != ""]
-    if len(files_as_list) == 0:
+    # Remove dirs.
+    files_tmp: List[str] = []
+    dirs_tmp: List[str] = []
+    for file in files_as_list:
+        _LOG.debug("file='%s' is a dir: skipping", file)
+        if os.path.isdir(file):
+            dirs_tmp.append(file)
+        else:
+            files_tmp.append(file)
+    if dirs_tmp:
+        _LOG.warning("Removing dirs: %s", ", ".join(dirs_tmp))
+    files_as_list = files_tmp
+    _LOG.debug("files='%s'", str(files))
+    # Ensure that there are files to process.
+    if not files_as_list:
         dbg.dfatal(
             "You need to specify one option among --modified, --branch, or --files"
         )
@@ -322,18 +336,26 @@ def git_create_branch(  # type: ignore
     """
     Create and push upstream a branch called `branch_name`.
 
-    E.g., > git checkout -b
-    LemTask169_Get_GH_actions_working_on_lemonade > git push --set-
-    upstream origin LemTask169_Get_GH_actions_working_on_lemonade
+    E.g.,
+    ```
+    > git checkout -b LemTask169_Get_GH_actions
+    > git push --set- upstream origin LemTask169_Get_GH_actions
+    ```
+
+    :param branch_name: name of the branch to create (e.g.,
+        `LemTask169_Get_GH_actions`)
+    :param create_from_master: only branch from master
     """
     _report_task()
+    dbg.dassert_ne(branch_name, "")
+    # Make sure we are branching from `master`, unless that's what the
+    # user wants.
     curr_branch = git.get_branch_name()
-    if
-    if create_from_master:
-    dbg.dassert_eq(
-        "master",
-        "Typically you should branch from `master`",
-    )
+    if curr_branch != "master" and create_from_master:
+        dbg.dassert_eq(
+            "master",
+            "Typically you should branch from `master`",
+        )
     # Fetch master.
     cmd = "git pull --autostash"
     _run(ctx, cmd)
@@ -409,7 +431,7 @@ def git_create_patch(  # type: ignore
 > {cmd_inv} {dst_file}
 
 # To apply the patch to a remote client:
-> export FILE=$(basename {dst_file})
+> export FILE="{dst_file}"
 > export SERVER="server"
 > export CLIENT_PATH="~/src"
 > scp {dst_file} $SERVER:
@@ -652,6 +674,7 @@ def _get_amp_docker_compose_path() -> Optional[str]:
     return docker_compose_path
 
 
+# TODO(gp): Isn't this in helper.git?
 def _get_git_hash() -> str:
     cmd = "git rev-parse HEAD"
     git_hash: str = hsinte.system_to_one_line(cmd)[1]
@@ -1454,11 +1477,14 @@ def _run_test_cmd(
     _docker_cmd(ctx, docker_cmd_)
     # Print message about coverage.
     if coverage:
-        msg = """- The coverage results in textual form are above.
+        msg = """
+- The coverage results in textual form are above
 
-- To browse the files annotate with coverage, start a server (not from the container):
+- To browse the files annotate with coverage, start a server (not from the
+  container):
   > (cd ./htmlcov; python -m http.server 33333)
-  then go with your browser to `localhost:33333`
+- Then go with your browser to `localhost:33333` to see which code is
+  covered
 """
         print(msg)
 

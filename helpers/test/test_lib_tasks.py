@@ -18,6 +18,18 @@ import helpers.lib_tasks as ltasks
 _LOG = logging.getLogger(__name__)
 
 
+def _build_mock_context_returning_ok() -> invoke.MockContext:
+    """
+    Build a MockContext catching any command and returning rc=0.
+    """
+    ctx = invoke.MockContext(
+        repeat=True, run={re.compile(".*"): invoke.Result(exited=0)}
+    )
+    return ctx
+
+
+
+
 # TODO(gp): We should introspect lib_tasks.py and find all the functions decorated
 #  with `@tasks`, instead of maintaining a (incomplete) list of tasks.
 class TestDryRunTasks1(hut.TestCase):
@@ -131,10 +143,6 @@ class TestDryRunTasks2(hut.TestCase):
         target = "docker_images_ls_repo(ctx)"
         self._check_output(target)
 
-    # def test_(self) -> None:
-    #     target = "(ctx)"
-    #     self._check_output(target)
-
     def test_docker_kill_all(self) -> None:
         target = "docker_kill_all(ctx)"
         self._check_output(target)
@@ -164,12 +172,13 @@ class TestDryRunTasks2(hut.TestCase):
         self._check_output(target)
 
     def test_gh_workflow_list(self) -> None:
-        target = "gh_workflow_list(ctx)"
+        target = "gh_workflow_list(ctx, branch='master')"
         self._check_output(target)
 
-    def test_gh_workflow_run(self) -> None:
-        target = "gh_workflow_run(ctx)"
-        self._check_output(target)
+    # This is an action with side effects so we can't test it.
+    # def test_gh_workflow_run(self) -> None:
+    #     target = "gh_workflow_run(ctx)"
+    #     self._check_output(target)
 
     def test_git_branch_files(self) -> None:
         target = "git_branch_files(ctx)"
@@ -180,50 +189,36 @@ class TestDryRunTasks2(hut.TestCase):
         self._check_output(target)
 
     def test_git_create_branch(self) -> None:
-        target = "git_create_branch(ctx)"
+        target = ("git_create_branch(ctx, branch_name='test', "
+                  "create_from_master=False)")
         self._check_output(target)
 
-    # def test_(self) -> None:
-    #     target = ""
-    #     self._check_output(target)
-    #
-    # def test_(self) -> None:
-    #     target = ""
-    #     self._check_output(target)
-    #
-    # def test_(self) -> None:
-    #     target = ""
-    #     self._check_output(target)
-    #
-    # def test_(self) -> None:
-    #     target = ""
-    #     self._check_output(target)
-    #
-    # def test_(self) -> None:
-    #     target = ""
-    #     self._check_output(target)
-    #
-    # def test_(self) -> None:
-    #     target = ""
-    #     self._check_output(target)
-    #
-    # def test_(self) -> None:
-    #     target = ""
+    # This is an action with side effects so we can't test it.
+    # def test_git_delete_merged_branches(self) -> None:
+    #     target = "git_delete_merged_branches(ctx)"
     #     self._check_output(target)
 
-    # git_branch_files,
-    # git_clean,
-    # git_create_branch,
-    # git_create_patch,
-    # git_delete_merged_branches,
-    # git_merge_master,
-    # git_pull,
-    # git_pull_master,
-    # #
-    # jump_to_pytest_error,
-    # lint,
-    # print_setup,
-    #
+    def test_git_merge_master(self) -> None:
+        target = "git_merge_master(ctx)"
+        self._check_output(target)
+
+    def test_lint1(self) -> None:
+        target = "lint(ctx, modified=True)"
+        self._check_output(target)
+
+    def test_lint2(self) -> None:
+        target = "lint(ctx, branch=True)"
+        self._check_output(target)
+
+    def test_lint3(self) -> None:
+        file = __file__
+        target = f"lint(ctx, files='{file}')"
+        self._check_output(target)
+
+    def test_find_test_class1(self) -> None:
+        class_name = self.__class__.__name__
+        target = f"find_test_class(ctx, class_name='{class_name}')"
+        self._check_output(target)
 
     # #########################################################################
 
@@ -246,17 +241,6 @@ class TestDryRunTasks2(hut.TestCase):
 
     # #########################################################################
 
-    # TODO(gp): Remove this and use the global one.
-    @staticmethod
-    def _build_mock_context_returning_ok() -> invoke.MockContext:
-        """
-        Build a MockContext catching any command and returning rc=0.
-        """
-        ctx = invoke.MockContext(
-            repeat=True, run={re.compile(".*"): invoke.Result(exited=0)}
-        )
-        return ctx
-
     def _check_calls(self, ctx: invoke.MockContext) -> None:
         """
         check_string() the sequence of commands issued in the context.
@@ -270,9 +254,7 @@ class TestDryRunTasks2(hut.TestCase):
         Dry run target checking that the sequence of commands issued is the
         expected one.
         """
-        ctx = self._build_mock_context_returning_ok()
-        #func = eval(f"ltasks.{target}")
-        #func(ctx)
+        ctx = _build_mock_context_returning_ok()
         exec(f"ltasks.{target}")
         # Check the outcome.
         self._check_calls(ctx)
@@ -810,16 +792,6 @@ class TestLibTasksRunTests1(hut.TestCase):
 
 
 # #############################################################################
-
-
-def _build_mock_context_returning_ok() -> invoke.MockContext:
-    """
-    Build a MockContext catching any command and returning rc=0.
-    """
-    ctx = invoke.MockContext(
-        repeat=True, run={re.compile(".*"): invoke.Result(exited=0)}
-    )
-    return ctx
 
 
 class TestLibTasksGitCreatePatch1(hut.TestCase):
