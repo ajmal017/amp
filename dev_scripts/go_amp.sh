@@ -9,8 +9,8 @@ if [[ -z $IDX ]]; then
 fi;
 
 DIR_NAME="$HOME/src/amp$IDX"
-FILE="dev_scripts/tmux_amp.sh amp$IDX"
-echo "script: $DIR/$FILE"
+FILE="dev_scripts/tmux_amp.sh $IDX"
+echo "> $DIR/$FILE"
 
 cd $DIR_NAME
 exec $FILE
