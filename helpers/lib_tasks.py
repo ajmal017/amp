@@ -94,9 +94,6 @@ else:
 
 
 def _report_task(txt: str = "") -> None:
-    if hut.in_unit_test_mode():
-        # In unit test don't print anything.
-        return
     func_name = hintros.get_function_name(count=1)
     msg = "## %s: %s" % (func_name, txt)
     # TODO(gp): Do not print during unit tests.
@@ -367,7 +364,7 @@ def git_create_patch(  # type: ignore
     hash_ = git.get_head_hash(git_client_root, short_hash=True)
     timestamp = _get_timestamp(utc=False)
     #
-    tag = os.path.dirname(git_client_root)
+    tag = os.path.basename(git_client_root)
     dst_file = f"patch.{tag}.{hash_}.{timestamp}"
     if mode == "tar":
         dst_file += ".tgz"
@@ -380,30 +377,19 @@ def git_create_patch(  # type: ignore
     files_as_list = _get_files_to_process(modified, branch, files)
     _LOG.info("Files to save:\n%s", "\n".join(files_as_list))
     files_as_str = " ".join(files_as_list)
-    # echo "Creating patch ..."
-    # HASH_=$(git rev-parse --short HEAD)
-    # TIMESTAMP=$(timestamp)
-    # GIT_ROOT=$(git rev-parse --show-toplevel)
-    # BASENAME=$(basename $GIT_ROOT)
-    # echo "GIT_ROOT=$GIT_ROOT"
-    # cd $GIT_ROOT
-    # DST_FILE="$git_root/patch.$BASENAME.$HASH_.$TIMESTAMP.txt"
-    # echo "DST_FILE=$DST_FILE"
-    # git status -s $*
-    # # Find all files modified (instead of --cached).
-    # git diff HEAD $* >$DST_FILE
+    #
     cmd = ""
     if modified or len(files) > 0:
         if mode == "tar":
             cmd = f"tar czvf {dst_file} {files_as_str}"
-            cmd_inv = "tar xvzf "
+            cmd_inv = "tar xvzf"
         elif mode == "diff":
             cmd = f"git diff HEAD {files_as_str} >{dst_file}"
-            cmd_inv = "git apply "
+            cmd_inv = "git apply"
     elif branch:
         if mode == "tar":
             cmd = f"tar czvf {dst_file} {files_as_str}"
-            cmd_inv = "tar xvzf "
+            cmd_inv = "tar xvzf"
         elif mode == "diff":
             cmd = f"git diff master... {files_as_str} >{dst_file}"
             cmd_inv = "git apply "
@@ -415,18 +401,18 @@ def git_create_patch(  # type: ignore
     # Print message to apply the patch.
     remote_file = os.path.basename(dst_file)
     msg = f"""
-    # To apply the patch and execute:
-    > git checkout {hash_}
-    > {cmd_inv} {dst_file}
-    
-    # To apply the patch to a remote client:
-    > export FILE=$(basename {dst_file})
-    > export SERVER="server"
-    > export CLIENT_PATH="~/src"
-    > scp {dst_file} $SERVER:
-    > ssh $SERVER 'cd $CLIENT_PATH && {cmd_inv} ~/{remote_file}'"
+# To apply the patch and execute:
+> git checkout {hash_}
+> {cmd_inv} {dst_file}
+
+# To apply the patch to a remote client:
+> export FILE=$(basename {dst_file})
+> export SERVER="server"
+> export CLIENT_PATH="~/src"
+> scp {dst_file} $SERVER:
+> ssh $SERVER 'cd $CLIENT_PATH && {cmd_inv} ~/{remote_file}'"
     """
-    print(hprint.dedent(msg))
+    print(msg)
 
 
 # TODO(gp): Add dev_scripts/git/git_create_patch*.sh

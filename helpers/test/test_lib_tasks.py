@@ -3,8 +3,10 @@
 
 import logging
 import os
+import re
 from typing import Dict
 
+import invoke
 import pytest
 
 import helpers.git as git
@@ -14,6 +16,165 @@ import helpers.unit_test as hut
 import helpers.lib_tasks as ltasks
 
 _LOG = logging.getLogger(__name__)
+
+
+# TODO(gp): We should introspect lib_tasks.py and find all the functions decorated
+#  with `@tasks`, instead of maintaining a (incomplete) list of tasks.
+class TestDryRunTasks1(hut.TestCase):
+    """
+    - Run invoke in dry-run mode
+    - Capture its output
+    - Compare the output to the golden outcomes
+    """
+
+    def test_print_setup(self) -> None:
+        target = "print_setup"
+        self._dry_run(target)
+
+    def test_git_pull(self) -> None:
+        target = "git_pull"
+        self._dry_run(target)
+
+    def test_git_pull_master(self) -> None:
+        target = "git_pull_master"
+        self._dry_run(target)
+
+    def test_git_clean(self) -> None:
+        target = "git_clean"
+        self._dry_run(target)
+
+    def test_docker_images_ls_repo(self) -> None:
+        target = "docker_images_ls_repo"
+        self._dry_run(target)
+
+    def test_docker_ps(self) -> None:
+        target = "docker_ps"
+        self._dry_run(target)
+
+    def test_docker_stats(self) -> None:
+        target = "docker_stats"
+        self._dry_run(target)
+
+    def test_docker_kill_last(self) -> None:
+        target = "docker_kill_last"
+        self._dry_run(target)
+
+    def test_docker_kill_all(self) -> None:
+        target = "docker_kill_all"
+        self._dry_run(target)
+
+    def _dry_run(self, target: str) -> None:
+        """
+        Invoke the given target with dry run.
+
+        This is used to test the commands that we can't actually
+        execute.
+        """
+        cmd = f"invoke --dry {target} | grep -v INFO | grep -v 'code_version='"
+        _, act = hsinte.system_to_string(cmd)
+        # TODO(gp): pylint doesn't find this because it uses the copy of helpers in
+        #  the container.
+        act = hprint.remove_non_printable_chars(act)
+        self.check_string(act)
+
+
+# #############################################################################
+
+
+def _get_default_params() -> Dict[str, str]:
+    """
+    Get fake params pointing to a different image so we can test the code
+    without affecting the official images.
+    """
+    ecr_base_path = "665840871993.dkr.ecr.us-east-1.amazonaws.com"
+    default_params = {
+        "ECR_BASE_PATH": ecr_base_path,
+        "BASE_IMAGE": "amp_test",
+        "DEV_TOOLS_IMAGE_PROD": f"{ecr_base_path}/dev_tools:prod",
+    }
+    return default_params
+
+
+class TestDryRunTasks2(hut.TestCase):
+    """
+    - Call the invoke task directly from Python
+    - `check_string()` the sequence of commands issued by the target is the expected
+      one using mocks to return ok for every system call.
+    """
+
+    def test_print_setup(self) -> None:
+        params = _get_default_params()
+        ltasks.set_default_params(params)
+        #
+        target = "print_setup"
+        self._check_output(target)
+        ltasks.reset_default_params()
+
+    def test_git_pull(self) -> None:
+        target = "git_pull"
+        self._check_output(target)
+
+    def test_git_pull_master(self) -> None:
+        target = "git_pull_master"
+        self._check_output(target)
+
+    def test_git_clean2(self) -> None:
+        target = "git_clean"
+        self._check_output(target)
+
+    # #########################################################################
+
+    def test_docker_login(self) -> None:
+        """
+        Instead of using _build_mock_context_returning_ok(), set the return
+        values more explicitly.
+        """
+        stdout = "aws-cli/1.19.49 Python/3.7.6 Darwin/19.6.0 botocore/1.20.49\n"
+        ctx = invoke.MockContext(
+            run={
+                "aws --version": invoke.Result(stdout),
+                re.compile("^docker login"): invoke.Result(exited=0),
+                re.compile("^eval"): invoke.Result(exited=0),
+            }
+        )
+        ltasks.docker_login(ctx)
+        # Check the outcome.
+        self._check_calls(ctx)
+
+    # #########################################################################
+
+    # TODO(gp): Remove this and use the global one.
+    @staticmethod
+    def _build_mock_context_returning_ok() -> invoke.MockContext:
+        """
+        Build a MockContext catching any command and returning rc=0.
+        """
+        ctx = invoke.MockContext(
+            repeat=True, run={re.compile(".*"): invoke.Result(exited=0)}
+        )
+        return ctx
+
+    def _check_calls(self, ctx: invoke.MockContext) -> None:
+        """
+        check_string() the sequence of commands issued in the context.
+        """
+        act = "\n".join(map(str, ctx.run.mock_calls))
+        act = hprint.remove_non_printable_chars(act)
+        self.check_string(act)
+
+    def _check_output(self, target: str) -> None:
+        """
+        Dry run target checking that the sequence of commands issued is the
+        expected one.
+        """
+        ctx = self._build_mock_context_returning_ok()
+        func = eval(f"ltasks.{target}")
+        func(ctx)
+        # Check the outcome.
+        self._check_calls(ctx)
+
+
+# #############################################################################
 
 
 class TestLibTasks1(hut.TestCase):
@@ -62,6 +223,9 @@ class TestLibTasks1(hut.TestCase):
         hsinte.system(cmd)
 
 
+# #############################################################################
+
+
 class TestLibTasksRemoveSpaces1(hut.TestCase):
     def test1(self) -> None:
         txt = r"""
@@ -82,6 +246,9 @@ class TestLibTasksRemoveSpaces1(hut.TestCase):
             " run --rm -l user=$USER_NAME --entrypoint bash user_space"
         )
         self.assert_equal(act, exp, fuzzy_match=False)
+
+
+# #############################################################################
 
 
 class TestLibTasksGetDockerCmd1(hut.TestCase):
@@ -257,6 +424,7 @@ class TestLibTasksGetDockerCmd1(hut.TestCase):
         """
         self.assert_equal(act, exp, fuzzy_match=True)
 
+    # TODO(gp): Remove this.
     @staticmethod
     def _get_default_params() -> Dict[str, str]:
         """
@@ -270,6 +438,9 @@ class TestLibTasksGetDockerCmd1(hut.TestCase):
             "DEV_TOOLS_IMAGE_PROD": f"{ecr_base_path}/dev_tools:prod",
         }
         return default_params
+
+
+# #############################################################################
 
 
 class TestLibRunTests1(hut.TestCase):
@@ -397,6 +568,9 @@ class TestLibRunTests1(hut.TestCase):
         exp = ("pytest TestLibRunTests1.test_run_fast_tests4/tmp.scratch/"
                "test/test_that.py")
         self.assert_equal(act, exp)
+
+
+# #############################################################################
 
 
 class TestLibTasksRunTests1(hut.TestCase):
@@ -529,3 +703,59 @@ class TestLibTasksRunTests1(hut.TestCase):
         act = hut.purify_file_names(act)
         exp = ["test/test_tasks.py"]
         self.assert_equal(str(act), str(exp))
+
+
+# #############################################################################
+
+
+def _build_mock_context_returning_ok() -> invoke.MockContext:
+    """
+    Build a MockContext catching any command and returning rc=0.
+    """
+    ctx = invoke.MockContext(
+        repeat=True, run={re.compile(".*"): invoke.Result(exited=0)}
+    )
+    return ctx
+
+
+class TestLibTasksGitCreatePatch1(hut.TestCase):
+
+    def test_tar_modified1(self) -> None:
+        """
+        Exercise the code for:
+        > invoke git_create_patch --mode="tar" --branch
+        """
+        modified = True
+        branch = False
+        files = ""
+        self._helper(modified, branch, files)
+
+    def test_tar_branch1(self) -> None:
+        """
+        Exercise the code for:
+        > invoke git_create_patch --mode="tar" --modified
+        """
+        modified = False
+        branch = True
+        files = ""
+        self._helper(modified, branch, files)
+
+    def test_tar_files1(self) -> None:
+        """
+        Exercise the code for:
+        > invoke git_create_patch --mode="tar" --files "this file"
+        """
+        modified = False
+        branch = False
+        files = __file__
+        self._helper(modified, branch, files)
+
+    @staticmethod
+    def _helper(modified: bool, branch: bool, files: str) -> None:
+        ctx = _build_mock_context_returning_ok()
+        #
+        mode = "tar"
+        ltasks.git_create_patch(ctx, mode, modified, branch, files)
+        #
+        mode = "diff"
+        ltasks.git_create_patch(ctx, mode, modified, branch, files)
