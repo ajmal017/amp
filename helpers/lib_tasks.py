@@ -330,6 +330,7 @@ def git_delete_merged_branches(ctx, confirm_delete=True):  # type: ignore
     _run(ctx, cmd)
 
 
+# TODO(gp): Allow to create it from a issue number.
 @task
 def git_create_branch(  # type: ignore
         ctx, branch_name="", create_from_master=False):
@@ -1893,6 +1894,7 @@ def gh_issue_title(ctx, issue_id=0, repo="current"):  # type: ignore
     print(_get_gh_issue_title(issue_id, repo))
 
 
+# TODO(gp): Allow to pass also a body.
 @task
 def gh_create_pr(ctx):  # type: ignore
     """
@@ -1915,3 +1917,6 @@ def gh_create_pr(ctx):  # type: ignore
     # Warning: 3 uncommitted changes
     # https://github.com/alphamatic/amp/pull/1298
     # gh pr view https://github.com/alphamatic/amp/pull/1298 --repo alphamatic/amp --web
+
+
+# TODO(gp): Add gh_open_pr to jump to the PR from this branch.

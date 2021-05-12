@@ -60,8 +60,7 @@ def _build_mock_context_returning_ok() -> invoke.MockContext:
 #  with `@tasks`, instead of maintaining a (incomplete) list of tasks.
 class TestDryRunTasks1(hut.TestCase):
     """
-    - Run invoke in dry-run mode
-    - Capture its output
+    - Run invoke in dry-run mode from command line
     - Compare the output to the golden outcomes
     """
 
@@ -120,8 +119,8 @@ class TestDryRunTasks1(hut.TestCase):
 class TestDryRunTasks2(_TestClassHelper):
     """
     - Call the invoke task directly from Python
-    - `check_string()` the sequence of commands issued by the target is the expected
-      one using mocks to return ok for every system call.
+    - `check_string()` that the sequence of commands issued by the target is the
+      expected one using mocks to return ok for every system call.
     """
 
     def test_print_setup(self) -> None:
@@ -566,7 +565,7 @@ class TestLibRunTests1(hut.TestCase):
             collect_only,
             skipped_tests,
         )
-        exp = (r'pytest -m "not slow and not superslow" --cov=. --cov-branch' 
+        exp = (r'pytest -m "not slow and not superslow" --cov=. --cov-branch'
                r' --cov-report term-missing --cov-report html --collect-only')
         self.assert_equal(act, exp)
 
