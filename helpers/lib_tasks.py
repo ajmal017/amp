@@ -1057,7 +1057,7 @@ def docker_build_local_image(  # type: ignore
     dockerfile = "devops/docker_build/dev.Dockerfile"
     dockerfile = _to_abs_path(dockerfile)
     #
-    opts = "--no_cache" if not cache else ""
+    opts = "--no-cache" if not cache else ""
     # The container version is the version used from this code.
     container_version = hversi.get_code_version("./version.txt")
     build_tag = _get_build_tag(container_version)
@@ -1167,7 +1167,7 @@ def docker_build_prod_image(ctx, cache=False, base_image=""):  # type: ignore
     dockerfile = "devops/docker_build/prod.Dockerfile"
     dockerfile = _to_abs_path(dockerfile)
     #
-    opts = "--no_cache" if not cache else ""
+    opts = "--no-cache" if not cache else ""
     cmd = rf"""
     DOCKER_BUILDKIT={DOCKER_BUILDKIT} \
     time \
