@@ -369,9 +369,10 @@ def git_delete_merged_branches(ctx, confirm_delete=True):  # type: ignore
 # TODO(gp): Allow to create it from a issue number.
 @task
 def git_create_branch(  # type: ignore
-        ctx, branch_name="", create_from_master=False):
+        ctx, branch_name="", issue_id=0, repo="current", only_branch_from_master=True):
     """
-    Create and push upstream a branch called `branch_name`.
+    Create and push upstream branch `branch_name` or the branch corresponding to
+    `issue_id` in repo `repo`.
 
     E.g.,
     ```
@@ -381,18 +382,22 @@ def git_create_branch(  # type: ignore
 
     :param branch_name: name of the branch to create (e.g.,
         `LemTask169_Get_GH_actions`)
-    :param create_from_master: only branch from master
+    :param only_branch_from_master: only allow to branch from master
     """
     _report_task()
+    if issue_id > 0:
+        dbg.dassert_eq(branch_name, "", "You can't specify both issue and branch_name")
+        branch_name = _get_gh_issue_title(issue_id, repo)
+        _LOG.info("Issue %d in %s repo corresponds to '%s'", issue_id, repo, branch_name)
     dbg.dassert_ne(branch_name, "")
     # Make sure we are branching from `master`, unless that's what the
     # user wants.
     curr_branch = git.get_branch_name()
-    if curr_branch != "master" and create_from_master:
-        dbg.dassert_eq(
-            "master",
-            "Typically you should branch from `master`",
-        )
+    if curr_branch != "master":
+        if only_branch_from_master:
+            dbg.dfatal(
+                "You should branch from master and not from '%s'" % curr_branch
+            )
     # Fetch master.
     cmd = "git pull --autostash"
     _run(ctx, cmd)
@@ -1983,7 +1988,7 @@ def _get_gh_issue_title(issue_id: int, repo: str) -> str:
     title = dict_["title"]
     _LOG.debug("title=%s", title)
     # Remove some annoying chars.
-    for char in ": + ( ) /".split():
+    for char in ": + ( ) / `".split():
         title = title.replace(char, "")
     # Replace multiple spaces with one.
     title = re.sub(r"\s+", " ", title)
