@@ -1,18 +1,12 @@
 import io
-import json
 import logging
-import pprint
 from typing import Any, Callable, Dict, Tuple
 
 import matplotlib.pyplot as plt
-import networkx as nx
 import numpy as np
 import pandas as pd
-import pytest
 import scipy
 
-import core.config as cfg
-import core.dataflow as dtf
 import core.explore as exp
 import core.pandas_helpers as pde
 import core.residualizer as res
@@ -55,7 +49,7 @@ class TestPcaFactorComputer1(hut.TestCase):
         return prev_eigval_df, eigval_df, prev_eigvec_df, eigvec_df
 
     def _test_stabilize_eigenvec_helper(
-            self, data_func: Callable, eval_func: Callable
+        self, data_func: Callable, eval_func: Callable
     ) -> None:
         # Get data.
         prev_eigval_df, eigval_df, prev_eigvec_df, eigvec_df = data_func()
@@ -73,12 +67,12 @@ class TestPcaFactorComputer1(hut.TestCase):
         shuffled_eigval_df, shuffled_eigvec_df = obj
         # Check.
         txt = (
-                "prev_eigval_df=\n%s\n" % prev_eigval_df
-                + "prev_eigvec_df=\n%s\n" % prev_eigvec_df
-                + "eigval_df=\n%s\n" % eigval_df
-                + "eigvec_df=\n%s\n" % eigvec_df
-                + "shuffled_eigval_df=\n%s\n" % shuffled_eigval_df
-                + "shuffled_eigvec_df=\n%s\n" % shuffled_eigvec_df
+            "prev_eigval_df=\n%s\n" % prev_eigval_df
+            + "prev_eigvec_df=\n%s\n" % prev_eigvec_df
+            + "eigval_df=\n%s\n" % eigval_df
+            + "eigvec_df=\n%s\n" % eigvec_df
+            + "shuffled_eigval_df=\n%s\n" % shuffled_eigval_df
+            + "shuffled_eigvec_df=\n%s\n" % shuffled_eigvec_df
         )
         self.check_string(txt)
         # Check stability.
@@ -112,16 +106,16 @@ class TestPcaFactorComputer1(hut.TestCase):
         _LOG.debug("out=\n%s", out)
         # Check.
         txt = (
-                "eigval_df=\n%s\n" % eigval_df
-                + "eigvec_df=\n%s\n" % eigvec_df
-                + "out=\n%s" % out
+            "eigval_df=\n%s\n" % eigval_df
+            + "eigvec_df=\n%s\n" % eigvec_df
+            + "out=\n%s" % out
         )
         self.check_string(txt)
 
     # #########################################################################
 
     def _test_sort_eigval_helper(
-            self, eigval: np.ndarray, eigvec: np.ndarray, are_eigval_sorted_exp: bool
+        self, eigval: np.ndarray, eigvec: np.ndarray, are_eigval_sorted_exp: bool
     ) -> None:
         # pylint: disable=possibly-unused-variable
         obj = res.PcaFactorComputer.sort_eigval(eigval, eigvec)
@@ -223,11 +217,11 @@ class TestPcaFactorComputer2(hut.TestCase):
         return result
 
     def _helper(
-            self,
-            num_samples: int,
-            report_stats: bool,
-            stabilize_eig: bool,
-            window: int,
+        self,
+        num_samples: int,
+        report_stats: bool,
+        stabilize_eig: bool,
+        window: int,
     ) -> Tuple[res.PcaFactorComputer, pd.DataFrame]:
         result = self._get_data(num_samples, report_stats)
         _LOG.debug("result=%s", result.keys())

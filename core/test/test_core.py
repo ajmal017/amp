@@ -1,23 +1,10 @@
-import io
 import json
 import logging
-import pprint
-from typing import Any, Callable, Dict, Tuple
+from typing import Any, Dict
 
-import matplotlib.pyplot as plt
 import networkx as nx
-import numpy as np
-import pandas as pd
-import pytest
-import scipy
 
-import core.config as cfg
 import core.dataflow as dtf
-import core.explore as exp
-import core.pandas_helpers as pde
-import core.residualizer as res
-import helpers.dbg as dbg
-import helpers.printing as pri
 import helpers.unit_test as hut
 
 _LOG = logging.getLogger(__name__)
@@ -25,13 +12,15 @@ _LOG = logging.getLogger(__name__)
 
 # TODO(gp): Move to core/test/test_core.py
 
+
 class _Dataflow_helper(hut.TestCase):
     @staticmethod
     def _remove_stage_names(node_link_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Remove stages names from node_link_data dictionary.
 
-        The stage names refer to Node objects, which are not json serializable.
+        The stage names refer to Node objects, which are not json
+        serializable.
         """
         nld = node_link_data.copy()
         for data in nld["nodes"]:
