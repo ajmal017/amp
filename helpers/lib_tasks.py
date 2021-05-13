@@ -153,8 +153,8 @@ def _get_files_to_process(modified: bool, branch: bool, files: str) -> List[str]
     files_tmp: List[str] = []
     dirs_tmp: List[str] = []
     for file in files_as_list:
-        _LOG.debug("file='%s' is a dir: skipping", file)
         if os.path.isdir(file):
+            _LOG.debug("file='%s' is a dir: skipping", file)
             dirs_tmp.append(file)
         else:
             files_tmp.append(file)
@@ -441,30 +441,25 @@ def git_create_patch(  # type: ignore
     else:
         dbg.dfatal("Invalid code path")
     _LOG.debug("dst_file=%s", dst_file)
-    # Get the files.
-    files_as_list = _get_files_to_process(modified, branch, files)
-    _LOG.info("Files to save:\n%s", "\n".join(files_as_list))
-    if not files_as_list:
-        _LOG.warning("Nothing to patch: exiting")
-        return
-    files_as_str = " ".join(files_as_list)
-    #
+    # Prepare the patch command.
     cmd = ""
-    if modified or len(files) > 0:
-        if mode == "tar":
-            cmd = f"tar czvf {dst_file} {files_as_str}"
-            cmd_inv = "tar xvzf"
-        elif mode == "diff":
-            cmd = f"git diff HEAD {files_as_str} >{dst_file}"
-            cmd_inv = "git apply"
-    elif branch:
-        if mode == "tar":
-            cmd = f"tar czvf {dst_file} {files_as_str}"
-            cmd_inv = "tar xvzf"
-        elif mode == "diff":
-            cmd = f"git diff master... {files_as_str} >{dst_file}"
-            cmd_inv = "git apply "
-    # Create patch.
+    if mode == "tar":
+        # Get the files.
+        files_as_list = _get_files_to_process(modified, branch, files)
+        _LOG.info("Files to save:\n%s", "\n".join(files_as_list))
+        if not files_as_list:
+            _LOG.warning("Nothing to patch: exiting")
+            return
+        files_as_str = " ".join(files_as_list)
+        cmd = f"tar czvf {dst_file} {files_as_str}"
+        cmd_inv = "tar xvzf"
+    elif mode == "diff":
+        if modified:
+            cmd = f"git diff HEAD >{dst_file}"
+        elif branch:
+            cmd = f"git diff master... >{dst_file}"
+        cmd_inv = "git apply"
+    # Execute patch command.
     _LOG.info("Creating the patch into %s", dst_file)
     dbg.dassert_ne(cmd, "")
     _LOG.debug("cmd=%s", cmd)
@@ -1763,24 +1758,6 @@ def pytest_clean(ctx):  # type: ignore
 # Linter.
 # #############################################################################
 
-# SUBMODULE_SUPERPROJECT=$(git rev-parse --show-superproject-working-tree)
-#
-# if [ $SUBMODULE_SUPERPROJECT ]; then
-# # E.g., `amp`.
-# SUBMODULE_NAME=$(git config \
-#     --file $SUBMODULE_SUPERPROJECT/.gitmodules \
-#     --get-regexp path \
-#     | grep $(basename "$(pwd)")$ \
-#     | awk '{print $2}')
-# echo "Running pre-commit for the Git '$SUBMODULE_NAME' submodule."
-# # The working dir is the submodule.
-# WORK_DIR="/src/$SUBMODULE_NAME"
-# REPO_ROOT=$SUBMODULE_SUPERPROJECT
-# else
-# WORK_DIR="/src"
-# REPO_ROOT="$(pwd)"
-# fi
-
 
 def _get_lint_docker_cmd(precommit_cmd: str) -> str:
     superproject_path, submodule_path = git.get_path_from_supermodule()
@@ -1792,6 +1769,7 @@ def _get_lint_docker_cmd(precommit_cmd: str) -> str:
         work_dir = "/src"
         repo_root = os.getcwd()
     _LOG.debug("work_dir=%s repo_root=%s", work_dir, repo_root)
+    # TODO(gp): Do not hardwire the repo.
     #image = get_default_param("DEV_TOOLS_IMAGE_PROD")
     image="665840871993.dkr.ecr.us-east-1.amazonaws.com/dev_tools:prod"
     #image="665840871993.dkr.ecr.us-east-1.amazonaws.com/dev_tools:local"
@@ -1803,12 +1781,11 @@ def _get_lint_docker_cmd(precommit_cmd: str) -> str:
         {image} \
         "pre-commit {precommit_cmd}"
     """
-    # -v "{repo_root}/.pre-commit-config.yaml":/app/.pre-commit-config.yaml \
     return docker_cmd_
 
 
 @task
-def lint(ctx, modified=False, branch=False, files="", phases=""):  # type: ignore
+def lint(ctx, modified=False, branch=False, files="", phases="", only_format=False):  # type: ignore
     """
     Lint files.
 
@@ -1816,19 +1793,24 @@ def lint(ctx, modified=False, branch=False, files="", phases=""):  # type: ignor
     :param branch: select the files modified in the current branch
     :param files: specify a space-separated list of files
     :param phases: specify the lint phases to execute
+    :param only_format: run only the lint phases that format the code
     """
     _report_task()
-    # Get the files.
+    # Get the files to lint.
     files_as_list = _get_files_to_process(modified, branch, files)
     _LOG.info("Files to lint:\n%s", "\n".join(files_as_list))
     if not files_as_list:
         _LOG.warning("Nothing to lint: exiting")
         return
     files_as_str = " ".join(files_as_list)
-    #
+    # Prepare the command line.
+    if only_format:
+        _LOG.warning("Running only formatting phases")
+        phases = "isort black"
     if phases:
         phases = phases.rstrip() + " "
     precommit_cmd = f"run -c /app/.pre-commit-config.yaml {phases}--files {files_as_str}"
+    # Execute command line.
     cmd = _get_lint_docker_cmd(precommit_cmd)
     cmd = f"{cmd} 2>&1 | tee linter_warnings.txt"
     _run(ctx, cmd)
