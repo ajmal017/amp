@@ -10,11 +10,6 @@ import helpers.unit_test as hut
 _LOG = logging.getLogger(__name__)
 
 
-# #############################################################################
-# dataflow_core.py
-# #############################################################################
-
-
 class _Dataflow_helper(hut.TestCase):
     @staticmethod
     def _remove_stage_names(node_link_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -39,7 +34,7 @@ class _Dataflow_helper(hut.TestCase):
 class Test_dataflow_core_DAG1(_Dataflow_helper):
     def test_add_nodes1(self) -> None:
         """
-        Create a node and adds it to a DAG.
+        Create a node and add it to a DAG.
         """
         dag = dtf.DAG()
         n1 = dtf.Node("n1")
