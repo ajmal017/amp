@@ -14,7 +14,7 @@ AMP=$PWD
 # This needs to be in sync with dev_scripts/client_setup/build.sh
 VENV_DIR="$HOME/src/venv/amp.client_venv"
 
-echo "# Activate virtual env"
+echo "# Activate virtual env '$VENV_DIR'"
 source $VENV_DIR/bin/activate
 
 echo "which python="$(which python 2>&1)
