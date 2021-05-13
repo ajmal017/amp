@@ -1556,6 +1556,7 @@ def _run_test_cmd(
 """
         print(msg)
         if hsinte.is_running_on_macos():
+            # Create and run a script to show the coverage in the browser.
             script_txt = """(sleep 2; open http://localhost:33333) &
 (cd ./htmlcov; python -m http.server 33333)"""
             script_name = "./tmp.coverage.sh"
@@ -2041,3 +2042,5 @@ def gh_create_pr(ctx):  # type: ignore
 
 
 # TODO(gp): Add gh_open_pr to jump to the PR from this branch.
+
+# TODO(gp): Add ./dev_scripts/testing/pytest_count_files.sh
