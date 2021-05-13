@@ -190,6 +190,40 @@ def print_setup(ctx):  # type: ignore
         print("%s=%s" % (v, get_default_param(v)))
 
 
+@task
+def print_tasks(  # type: ignore
+        ctx, as_python_code=False):
+    """
+    Print all the available tasks in `lib_tasks.py`.
+
+    These tasks might be exposed or not by different
+
+    :param as_python_code: print as python code so that it can be embed in a
+        `from helpers.lib_tasks import ...`
+    """
+    _report_task()
+    _ = ctx
+    func_names = []
+    # TODO(gp): Use __file__ instead of hardwiring the file.
+    cmd = '\grep "^@task" -A 1 helpers/lib_tasks.py | grep def'
+    # def print_setup(ctx):  # type: ignore
+    # def git_pull(ctx):  # type: ignore
+    # def git_pull_master(ctx):  # type: ignore
+    _, txt = hsinte.system_to_string(cmd)
+    for line in txt.split("\n"):
+        _LOG.debug("line=%s", line)
+        m = re.match("^def\s+(\S+)\(", line)
+        if m:
+            func_name = m.group(1)
+            _LOG.debug("  -> %s", func_name)
+            func_names.append(func_name)
+    func_names = sorted(func_names)
+    if as_python_code:
+        print("\n".join([f"{fn}," for fn in func_names]))
+    else:
+        print("\n".join(func_names))
+
+
 # #############################################################################
 # Git.
 # #############################################################################
@@ -1039,7 +1073,7 @@ def _get_build_tag(code_ver: str) -> str:
 # DEV image flow:
 # - A "local" image (which is a release candidate for the DEV image) is built
 # - A qualification process (e.g., running all tests) is performed on the "local"
-#   image (typically through GitHub actions)
+#   image (e.g., through GitHub actions)
 # - If qualification is passed, it becomes "latest".
 
 
@@ -1050,10 +1084,10 @@ def docker_build_local_image(  # type: ignore
     ctx, cache=True, base_image="", update_poetry=False
 ):
     """
-    Build a local as a release candidate image.
+    Build a local image (i.e., a release candidate "dev" image).
 
-    :param update_poetry: run poetry lock to update the packages
     :param cache: use the cache
+    :param update_poetry: run poetry lock to update the packages
     """
     _report_task()
     # Update poetry.
@@ -1062,10 +1096,8 @@ def docker_build_local_image(  # type: ignore
         _run(ctx, cmd)
     #
     image_local = get_image("local", base_image)
-    image_hash = get_image("hash", base_image)
     #
     _check_image(image_local)
-    _check_image(image_hash)
     dockerfile = "devops/docker_build/dev.Dockerfile"
     dockerfile = _to_abs_path(dockerfile)
     #
@@ -1085,7 +1117,6 @@ def docker_build_local_image(  # type: ignore
         --file {dockerfile} \
         .
     """
-    # --tag {image_hash}
     _run(ctx, cmd)
     #
     cmd = f"docker image ls {image_local}"
@@ -1093,28 +1124,27 @@ def docker_build_local_image(  # type: ignore
 
 
 @task
-def docker_push_local_image_to_dev(ctx, base_image=""):  # type: ignore
+def docker_tag_local_image_as_dev(ctx, base_image=""):  # type: ignore
     """
-    (ONLY CI/CD) Mark the "local" image as "dev" and "latest" and push to ECR.
+    (ONLY CI/CD) Mark the "local" image as "dev".
+    """
+    _report_task()
+    #
+    image_local = get_image("local", base_image)
+    image_dev = get_image("dev", base_image)
+    cmd = f"docker tag {image_local} {image_dev}"
+    _run(ctx, cmd)
+
+
+@task
+def docker_push_dev_image(ctx, base_image=""):  # type: ignore
+    """
+    (ONLY CI/CD) Push the "dev" image to ECR.
     """
     _report_task()
     docker_login(ctx)
     #
-    image_local = get_image("local", base_image)
-    if False:
-        # No need to push the local image remotely.
-        cmd = f"docker push {image_local}"
-        _run(ctx, cmd, pty=True)
-        #
-        image_hash = get_image("hash", base_image)
-        cmd = f"docker tag {image_local} {image_hash}"
-        _run(ctx, cmd)
-        cmd = f"docker push {image_hash}"
-        _run(ctx, cmd, pty=True)
-    #
     image_dev = get_image("dev", base_image)
-    cmd = f"docker tag {image_local} {image_dev}"
-    _run(ctx, cmd)
     cmd = f"docker push {image_dev}"
     _run(ctx, cmd, pty=True)
 
@@ -1141,9 +1171,9 @@ def docker_release_dev_image(  # type: ignore
     :param update_poetry: update package dependencies using poetry
     """
     _report_task()
-    # Build image.
+    # 1) Build "local" image.
     docker_build_local_image(ctx, cache=cache, update_poetry=update_poetry)
-    # Run tests.
+    # 2) Run tests for the "local" image.
     if skip_tests:
         _LOG.warning("Skipping all tests and releasing")
         run_fast = run_slow = run_superslow = False
@@ -1154,17 +1184,19 @@ def docker_release_dev_image(  # type: ignore
         run_slow_tests(ctx, stage=stage)
     if run_superslow:
         run_superslow_tests(ctx, stage=stage)
-    # Push.
+    # 3) Promote the "local" image to "dev".
+    docker_tag_local_image_as_dev(ctx)
+    # 4) Push the "local" image to ECR.
     if push_to_repo:
-        docker_push_local_image_to_dev(ctx)
+        docker_push_dev_image(ctx)
     else:
-        _LOG.warning("Skipping pushing image to repo as requested")
+        _LOG.warning("Skipping pushing dev image to repo, as requested")
     _LOG.info("==> SUCCESS <==")
 
 
 # PROD image flow:
 # - PROD image has no release candidate
-# - The DEV image is qualified
+# - Start from a DEV image already built and qualified
 # - The PROD image is created from the DEV image by copying the code inside the
 #   image
 # - The PROD image is tagged as "prod"
@@ -1210,7 +1242,6 @@ def docker_release_prod_image(  # type: ignore
     run_superslow=False,
     base_image="",
     push_to_repo=True,
-    update_poetry=False,
 ):
     """
     (ONLY CI/CD) Build, test, and release to ECR the prod image.
@@ -1218,13 +1249,9 @@ def docker_release_prod_image(  # type: ignore
     Same options as `docker_release_dev_image`.
     """
     _report_task()
-    # Build dev image.
-    docker_build_local_image(ctx, cache=cache, push_to_repo=push_to_repo,
-                             update_poetry=update_poetry)
-    docker_push_local_image_to_dev(ctx)
-    # Build prod image.
+    # 1) Build prod image.
     docker_build_prod_image(ctx, cache=cache)
-    # Run tests.
+    # 2) Run tests.
     if skip_tests:
         _LOG.warning("Skipping all tests and releasing")
         run_fast = run_slow = run_superslow = False
@@ -1235,7 +1262,7 @@ def docker_release_prod_image(  # type: ignore
         run_slow_tests(ctx, stage=stage)
     if run_superslow:
         run_superslow_tests(ctx, stage=stage)
-    # Push prod image.
+    # 3) Push prod image.
     if push_to_repo:
         image_prod = get_image("prod", base_image)
         cmd = f"docker push {image_prod}"
@@ -1753,11 +1780,11 @@ def _get_lint_docker_cmd(precommit_cmd: str) -> str:
         --rm \
         -t \
         -v "{repo_root}":/src \
-        -v "{repo_root}/.pre-commit-config.yaml":/app/.pre-commit-config.yaml \
         --workdir={work_dir} \
         {image} \
         "pre-commit {precommit_cmd}"
     """
+    # -v "{repo_root}/.pre-commit-config.yaml":/app/.pre-commit-config.yaml \
     return docker_cmd_
 
 
@@ -1782,7 +1809,7 @@ def lint(ctx, modified=False, branch=False, files="", phases=""):  # type: ignor
     #
     if phases:
         phases = phases.rstrip() + " "
-    precommit_cmd = f"run {phases}--files {files_as_str}"
+    precommit_cmd = f"run -c /app/.pre-commit-config.yaml {phases}--files {files_as_str}"
     cmd = _get_lint_docker_cmd(precommit_cmd)
     cmd = f"{cmd} 2>&1 | tee linter_warnings.txt"
     _run(ctx, cmd)

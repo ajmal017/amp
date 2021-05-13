@@ -408,10 +408,7 @@ class TestLibTasksGetDockerCmd1(_TestClassHelper):
         cmd = "bash"
         print_docker_config = False
         act = ltasks._get_docker_cmd(
-            stage,
-            base_image,
-            cmd,
-            print_docker_config=print_docker_config,
+            stage, base_image, cmd, print_docker_config=print_docker_config
         )
         act = hut.purify_txt_from_client(act)
         exp = r"""
