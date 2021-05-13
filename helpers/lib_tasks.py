@@ -377,80 +377,8 @@ def git_create_patch(  # type: ignore
     :param branch: select the files modified in the current branch
     :param files: specify a space-separated list of files
     """
-    _report_task()
-    dbg.dassert_in(mode, ("tar", "diff"))
-    # For now we just create a patch for the current submodule.
-    super_module = False
-    git_client_root = git.get_client_root(super_module)
-    hash_ = git.get_head_hash(git_client_root, short_hash=True)
-    timestamp = _get_timestamp(utc=False)
-    #
-    tag = os.path.basename(git_client_root)
-    dst_file = f"patch.{tag}.{hash_}.{timestamp}"
-    if mode == "tar":
-        dst_file += ".tgz"
-    elif mode == "diff":
-        dst_file += ".txt"
-    else:
-        dbg.dfatal("Invalid code path")
-    _LOG.debug("dst_file=%s", dst_file)
-    # Get the files.
-    files_as_list = _get_files_to_process(modified, branch, files)
-    _LOG.info("Files to save:\n%s", "\n".join(files_as_list))
-    files_as_str = " ".join(files_as_list)
-    #
-    cmd = ""
-    if modified or len(files) > 0:
-        if mode == "tar":
-            cmd = f"tar czvf {dst_file} {files_as_str}"
-            cmd_inv = "tar xvzf"
-        elif mode == "diff":
-            cmd = f"git diff HEAD {files_as_str} >{dst_file}"
-            cmd_inv = "git apply"
-    elif branch:
-        if mode == "tar":
-            cmd = f"tar czvf {dst_file} {files_as_str}"
-            cmd_inv = "tar xvzf"
-        elif mode == "diff":
-            cmd = f"git diff master... {files_as_str} >{dst_file}"
-            cmd_inv = "git apply "
-    # Create patch.
-    _LOG.info("Creating the patch into %s", dst_file)
-    dbg.dassert_ne(cmd, "")
-    _LOG.debug("cmd=%s", cmd)
-    _run(ctx, cmd)
-    # Print message to apply the patch.
-    remote_file = os.path.basename(dst_file)
-    msg = f"""
-# To apply the patch and execute:
-> git checkout {hash_}
-> {cmd_inv} {dst_file}
-
-# To apply the patch to a remote client:
-> export FILE="{dst_file}"
-> export SERVER="server"
-> export CLIENT_PATH="~/src"
-> scp {dst_file} $SERVER:
-> ssh $SERVER 'cd $CLIENT_PATH && {cmd_inv} ~/{remote_file}'"
-    """
-    print(msg)
-
-
-@task
-def git_create_patch(  # type: ignore
-        ctx, mode="tar",
-        modified=False, branch=False, files=""):
-    """
-    Create a patch file for the entire repo client from the base revision.
-    This script accepts a list of files to package, if specified.
-
-    :param mode: "tar" creates a tar ball with all the files
-        "diff" creates a patch with the diff of the files
-    :param modified: select the files modified in the client
-    :param branch: select the files modified in the current branch
-    :param files: specify a space-separated list of files
-    """
     _report_task(hprint.to_str("mode modified branch files"))
+    _ = ctx
     dbg.dassert_in(mode, ("tar", "diff"))
     # For now we just create a patch for the current submodule.
     super_module = False
@@ -1762,6 +1690,50 @@ def pytest_clean(ctx):  # type: ignore
 # Linter.
 # #############################################################################
 
+# SUBMODULE_SUPERPROJECT=$(git rev-parse --show-superproject-working-tree)
+#
+# if [ $SUBMODULE_SUPERPROJECT ]; then
+# # E.g., `amp`.
+# SUBMODULE_NAME=$(git config \
+#     --file $SUBMODULE_SUPERPROJECT/.gitmodules \
+#     --get-regexp path \
+#     | grep $(basename "$(pwd)")$ \
+#     | awk '{print $2}')
+# echo "Running pre-commit for the Git '$SUBMODULE_NAME' submodule."
+# # The working dir is the submodule.
+# WORK_DIR="/src/$SUBMODULE_NAME"
+# REPO_ROOT=$SUBMODULE_SUPERPROJECT
+# else
+# WORK_DIR="/src"
+# REPO_ROOT="$(pwd)"
+# fi
+
+
+def _get_lint_docker_cmd(precommit_cmd: str) -> str:
+    superproject_path, submodule_path = git.get_path_from_supermodule()
+    if superproject_path:
+        # We are running in a Git submodule.
+        work_dir = f"/src/{submodule_path}"
+        repo_root = superproject_path
+    else:
+        work_dir = "/src"
+        repo_root = os.getcwd()
+    _LOG.debug("work_dir=%s repo_root=%s", work_dir, repo_root)
+    #image = get_default_param("DEV_TOOLS_IMAGE_PROD")
+    #image="665840871993.dkr.ecr.us-east-1.amazonaws.com/dev_tools:prod"
+    image="665840871993.dkr.ecr.us-east-1.amazonaws.com/dev_tools:local"
+    docker_cmd_ = f"""docker run \
+        --rm \
+        -t \
+        -v "{repo_root}":/src \
+        -v "{repo_root}/.pre-commit-config.yaml":/app/.pre-commit-config.yaml \
+        --workdir={work_dir} \
+        {image} \
+        "/usr/local/bin/pre-commit {precommit_cmd}"
+    """
+    return docker_cmd_
+
+
 @task
 def lint(ctx, modified=False, branch=False, files="", phases=""):  # type: ignore
     """
@@ -1781,10 +1753,9 @@ def lint(ctx, modified=False, branch=False, files="", phases=""):  # type: ignor
         return
     files_as_str = " ".join(files_as_list)
     #
-    cmd = (
-        f"pre-commit.sh run {phases} --files {files_as_str} 2>&1 "
-        + "| tee linter_warnings.txt"
-    )
+    precommit_cmd = f"run {phases} --files {files_as_str}"
+    cmd = _get_lint_docker_cmd(precommit_cmd)
+    cmd = f"{cmd} 2>&1 | tee linter_warnings.txt"
     _run(ctx, cmd)
 
 

@@ -37,7 +37,8 @@ if [ $SUBMODULE_SUPERPROJECT ]; then
     REPO_ROOT="$(pwd)"
 fi
 
-IMAGE="665840871993.dkr.ecr.us-east-1.amazonaws.com/dev_tools:prod"
+#IMAGE="665840871993.dkr.ecr.us-east-1.amazonaws.com/dev_tools:prod"
+IMAGE="665840871993.dkr.ecr.us-east-1.amazonaws.com/dev_tools:local"
 echo "IMAGE=$IMAGE"
 
 # Keep this in sync with devops/compose/docker-compose-user-space.yml.

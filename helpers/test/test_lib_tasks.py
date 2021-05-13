@@ -324,9 +324,6 @@ class TestLibTasks1(hut.TestCase):
 # #############################################################################
 
 
-# #############################################################################
-
-
 class TestLibTasksRemoveSpaces1(hut.TestCase):
     def test1(self) -> None:
         txt = r"""
