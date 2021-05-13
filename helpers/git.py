@@ -184,7 +184,7 @@ def get_path_from_supermodule() -> Tuple[str, str]:
     # > git rev-parse --show-superproject-working-tree
     # (No result)
     superproject_path: str = hsinte.system_to_one_line(cmd)[1]
-    _LOG.debug("superproject_path=%s", superproject_path)
+    _LOG.debug("superproject_path='%s'", superproject_path)
     #
     cmd = (
         f"git config --file {superproject_path}/.gitmodules --get-regexp path"
@@ -194,7 +194,7 @@ def get_path_from_supermodule() -> Tuple[str, str]:
     # > git config --file /Users/saggese/src/.../.gitmodules --get-regexp path
     # submodule.amp.path amp
     submodule_path: str = hsinte.system_to_one_line(cmd)[1]
-    _LOG.debug("submodule_path=%s", submodule_path)
+    _LOG.debug("submodule_path='%s'", submodule_path)
     return superproject_path, submodule_path
 
 

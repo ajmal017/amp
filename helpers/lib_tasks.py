@@ -630,6 +630,11 @@ def docker_login(ctx):  # type: ignore
         _LOG.warning("Running inside GitHub Action: skipping `docker_login`")
         return
     major_version = _get_aws_cli_version()
+    # docker login \
+    #   -u AWS \
+    #   -p eyJ... \
+    #   -e none \
+    #   https://665840871993.dkr.ecr.us-east-1.amazonaws.com
     # TODO(gp): We should get this programmatically from ~/aws/.credentials
     region = "us-east-1"
     if major_version == 1:
@@ -640,6 +645,8 @@ def docker_login(ctx):  # type: ignore
             f"docker login -u AWS -p $(aws ecr get-login --region {region}) "
             + f"https://{ecr_base_path}"
         )
+    #cmd = ("aws ecr get-login-password" +
+    #       " | docker login --username AWS --password-stdin "
     _run(ctx, cmd)
 
 
@@ -828,9 +835,14 @@ def _get_docker_cmd(
     # - Handle the docker compose files.
     docker_compose_files = []
     docker_compose_files.append(_get_base_docker_compose_path())
-    docker_compose_file_tmp = _get_amp_docker_compose_path()
-    if docker_compose_file_tmp:
-        docker_compose_files.append(docker_compose_file_tmp)
+    #
+    repo_short_name = git.get_repo_short_name(
+        git.get_repo_full_name_from_dirname("."))
+    _LOG.debug("repo_short_name=%s", repo_short_name)
+    if repo_short_name == "amp":
+        docker_compose_file_tmp = _get_amp_docker_compose_path()
+        if docker_compose_file_tmp:
+            docker_compose_files.append(docker_compose_file_tmp)
     # Add the compose files from command line.
     if extra_docker_compose_files:
         dbg.dassert_isinstance(extra_docker_compose_files, list)
@@ -1070,10 +1082,10 @@ def docker_build_local_image(  # type: ignore
         --build-arg CONTAINER_VERSION={container_version} \
         --build-arg BUILD_TAG={build_tag} \
         --tag {image_local} \
-        --tag {image_hash} \
         --file {dockerfile} \
         .
     """
+    # --tag {image_hash}
     _run(ctx, cmd)
     #
     cmd = f"docker image ls {image_local}"
@@ -1089,14 +1101,16 @@ def docker_push_local_image_to_dev(ctx, base_image=""):  # type: ignore
     docker_login(ctx)
     #
     image_local = get_image("local", base_image)
-    cmd = f"docker push {image_local}"
-    _run(ctx, cmd, pty=True)
-    #
-    image_hash = get_image("hash", base_image)
-    cmd = f"docker tag {image_local} {image_hash}"
-    _run(ctx, cmd)
-    cmd = f"docker push {image_hash}"
-    _run(ctx, cmd, pty=True)
+    if False:
+        # No need to push the local image remotely.
+        cmd = f"docker push {image_local}"
+        _run(ctx, cmd, pty=True)
+        #
+        image_hash = get_image("hash", base_image)
+        cmd = f"docker tag {image_local} {image_hash}"
+        _run(ctx, cmd)
+        cmd = f"docker push {image_hash}"
+        _run(ctx, cmd, pty=True)
     #
     image_dev = get_image("dev", base_image)
     cmd = f"docker tag {image_local} {image_dev}"
@@ -1123,14 +1137,16 @@ def docker_release_dev_image(  # type: ignore
     running the tests, but not necessarily pushing.
 
     :param skip_tests: skip all the tests and release the dev image
+    :param push_to_repo: push the image to the repo
+    :param update_poetry: update package dependencies using poetry
     """
     _report_task()
-    if skip_tests:
-        _LOG.warning("Skipping all tests and releasing")
-        run_fast = run_slow = run_superslow = False
     # Build image.
     docker_build_local_image(ctx, cache=cache, update_poetry=update_poetry)
     # Run tests.
+    if skip_tests:
+        _LOG.warning("Skipping all tests and releasing")
+        run_fast = run_slow = run_superslow = False
     stage = "local"
     if run_fast:
         run_fast_tests(ctx, stage=stage)
@@ -1156,7 +1172,7 @@ def docker_release_dev_image(  # type: ignore
 
 # TODO(gp): Remove redundancy with docker_build_local_image().
 @task
-def docker_build_prod_image(ctx, cache=False, base_image=""):  # type: ignore
+def docker_build_prod_image(ctx, cache=True, base_image=""):  # type: ignore
     """
     (ONLY CI/CD) Build a prod image.
     """
@@ -1174,8 +1190,8 @@ def docker_build_prod_image(ctx, cache=False, base_image=""):  # type: ignore
     docker build \
         --progress=plain \
         {opts} \
-        -t {image_prod} \
-        -f {dockerfile} \
+        --tag {image_prod} \
+        --file {dockerfile} \
         .
     """
     _run(ctx, cmd)
@@ -1187,23 +1203,31 @@ def docker_build_prod_image(ctx, cache=False, base_image=""):  # type: ignore
 @task
 def docker_release_prod_image(  # type: ignore
     ctx,
-    cache=False,
+    cache=True,
+    skip_tests=False,
     run_fast=True,
     run_slow=True,
     run_superslow=False,
     base_image="",
+    push_to_repo=True,
     update_poetry=False,
 ):
     """
     (ONLY CI/CD) Build, test, and release to ECR the prod image.
+
+    Same options as `docker_release_dev_image`.
     """
     _report_task()
     # Build dev image.
-    docker_build_local_image(ctx, cache=cache, update_poetry=update_poetry)
+    docker_build_local_image(ctx, cache=cache, push_to_repo=push_to_repo,
+                             update_poetry=update_poetry)
     docker_push_local_image_to_dev(ctx)
     # Build prod image.
     docker_build_prod_image(ctx, cache=cache)
     # Run tests.
+    if skip_tests:
+        _LOG.warning("Skipping all tests and releasing")
+        run_fast = run_slow = run_superslow = False
     stage = "prod"
     if run_fast:
         run_fast_tests(ctx, stage=stage)
@@ -1212,9 +1236,12 @@ def docker_release_prod_image(  # type: ignore
     if run_superslow:
         run_superslow_tests(ctx, stage=stage)
     # Push prod image.
-    image_prod = get_image("prod", base_image)
-    cmd = f"docker push {image_prod}"
-    _run(ctx, cmd, pty=True)
+    if push_to_repo:
+        image_prod = get_image("prod", base_image)
+        cmd = f"docker push {image_prod}"
+        _run(ctx, cmd, pty=True)
+    else:
+        _LOG.warning("Skipping pushing image to repo as requested")
     _LOG.info("==> SUCCESS <==")
 
 
@@ -1720,8 +1747,8 @@ def _get_lint_docker_cmd(precommit_cmd: str) -> str:
         repo_root = os.getcwd()
     _LOG.debug("work_dir=%s repo_root=%s", work_dir, repo_root)
     #image = get_default_param("DEV_TOOLS_IMAGE_PROD")
-    #image="665840871993.dkr.ecr.us-east-1.amazonaws.com/dev_tools:prod"
-    image="665840871993.dkr.ecr.us-east-1.amazonaws.com/dev_tools:local"
+    image="665840871993.dkr.ecr.us-east-1.amazonaws.com/dev_tools:prod"
+    #image="665840871993.dkr.ecr.us-east-1.amazonaws.com/dev_tools:local"
     docker_cmd_ = f"""docker run \
         --rm \
         -t \
@@ -1729,7 +1756,7 @@ def _get_lint_docker_cmd(precommit_cmd: str) -> str:
         -v "{repo_root}/.pre-commit-config.yaml":/app/.pre-commit-config.yaml \
         --workdir={work_dir} \
         {image} \
-        "/usr/local/bin/pre-commit {precommit_cmd}"
+        "pre-commit {precommit_cmd}"
     """
     return docker_cmd_
 
@@ -1753,7 +1780,9 @@ def lint(ctx, modified=False, branch=False, files="", phases=""):  # type: ignor
         return
     files_as_str = " ".join(files_as_list)
     #
-    precommit_cmd = f"run {phases} --files {files_as_str}"
+    if phases:
+        phases = phases.rstrip() + " "
+    precommit_cmd = f"run {phases}--files {files_as_str}"
     cmd = _get_lint_docker_cmd(precommit_cmd)
     cmd = f"{cmd} 2>&1 | tee linter_warnings.txt"
     _run(ctx, cmd)
