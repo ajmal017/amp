@@ -126,16 +126,33 @@ def _run(ctx: Any, cmd: str, *args: Any, **kwargs: Any) -> None:
     ctx.run(cmd, *args, **kwargs)
 
 
-def _get_files_to_process(modified: bool, branch: bool, files: str) -> List[str]:
+def _get_files_to_process(modified: bool, branch: bool, files: str,
+                          mutually_exclusive: bool) -> List[str]:
     """
     Get a list of files to process that have been changed in the branch,
     in the client, or passed by the user.
+
+    :param modified: return files modified in the client (i.e., changed with
+        respect to HEAD)
+    :param branch: return files modified with respect to the branch point
+    :param files: return files passed to this function
+    :param mutually_exclusive: ensure that all options are mutually exclusive
     """
-    dbg.dassert_lte(
-        int(modified) + int(branch) + int(files != ""),
-        1,
-        msg="You can specify only one option among --modified, --branch, or --files",
+    if mutually_exclusive:
+        # Only one option can be specified among --modified, --branch, and --files.
+        dbg.dassert_lte(
+            int(modified) + int(branch) + int(files != ""),
+            1,
+            msg="You can specify only one option among --modified, --branch, and "
+                "--files"
         )
+    else:
+        # Only one option can be specified among --modified and --branch.
+        dbg.dassert_lte(
+            int(modified) + int(branch),
+            1,
+            msg="You can specify only one option among --modified, --branch",
+            )
     if modified:
         files = git.get_modified_files()
         files = " ".join(files)
@@ -437,7 +454,7 @@ def git_create_patch(  # type: ignore
     if mode == "tar":
         dst_file += ".tgz"
     elif mode == "diff":
-        dst_file += ".txt"
+        dst_file += ".patch"
     else:
         dbg.dfatal("Invalid code path")
     _LOG.debug("dst_file=%s", dst_file)
@@ -445,7 +462,8 @@ def git_create_patch(  # type: ignore
     cmd = ""
     if mode == "tar":
         # Get the files.
-        files_as_list = _get_files_to_process(modified, branch, files)
+        files_as_list = _get_files_to_process(modified, branch, files,
+                                              mutually_exclusive=False)
         _LOG.info("Files to save:\n%s", "\n".join(files_as_list))
         if not files_as_list:
             _LOG.warning("Nothing to patch: exiting")
@@ -458,6 +476,8 @@ def git_create_patch(  # type: ignore
             cmd = f"git diff HEAD >{dst_file}"
         elif branch:
             cmd = f"git diff master... >{dst_file}"
+        else:
+            dbg.dfatal("You need to specify --modified or --branch")
         cmd_inv = "git apply"
     # Execute patch command.
     _LOG.info("Creating the patch into %s", dst_file)
@@ -1797,7 +1817,8 @@ def lint(ctx, modified=False, branch=False, files="", phases="", only_format=Fal
     """
     _report_task()
     # Get the files to lint.
-    files_as_list = _get_files_to_process(modified, branch, files)
+    files_as_list = _get_files_to_process(modified, branch, files,
+                                          mutually_exclusive=True)
     _LOG.info("Files to lint:\n%s", "\n".join(files_as_list))
     if not files_as_list:
         _LOG.warning("Nothing to lint: exiting")
@@ -1942,6 +1963,21 @@ def gh_workflow_run(ctx, branch="branch", workflows="all"):  # type: ignore
 # #############################################################################
 
 
+def _get_repo_full_name_from_cmd(repo: str) -> str:
+    """
+    Convert the `repo` from command line (e.g., "current", "amp", "lem") to the
+    repo full name.
+    """
+    if repo == "current":
+        repo_full_name = git.get_repo_full_name_from_dirname(".")
+    else:
+        repo_full_name = git.get_repo_name(repo, in_mode="short_name")
+    _LOG.debug(
+        "repo=%s -> repo_full_name=%s", repo, repo_full_name
+    )
+    return repo_full_name
+
+
 def _get_gh_issue_title(issue_id: int, repo: str) -> str:
     """
     Get the title of a GitHub issue.
@@ -1949,16 +1985,7 @@ def _get_gh_issue_title(issue_id: int, repo: str) -> str:
     :param repo: `current` refer to the repo where we are, otherwise a repo short
         name (e.g., "amp")
     """
-    # Handle the `repo`.
-    if repo == "current":
-        repo_full_name = git.get_repo_full_name_from_dirname(".")
-        repo_short_name = git.get_repo_name(repo_full_name, "full_name")
-    else:
-        repo_short_name = repo
-        repo_full_name = git.get_repo_name(repo_short_name, "short_name")
-    _LOG.debug(
-        "repo_short_name=%s repo_full_name=%s", repo_short_name, repo_full_name
-    )
+    repo_full_name = _get_repo_full_name_from_cmd(repo)
     # > (export NO_COLOR=1; gh issue view 1251 --json title )
     # {"title":"Update GH actions for amp"}
     dbg.dassert_lte(1, issue_id)
@@ -1978,6 +2005,7 @@ def _get_gh_issue_title(issue_id: int, repo: str) -> str:
     #
     title = title.replace(" ", "_")
     # Add the `AmpTaskXYZ_...`
+    repo_short_name = git.get_repo_name(repo_full_name, in_mode="full_name")
     task_prefix = git.get_task_prefix_from_repo_short_name(repo_short_name)
     _LOG.debug("task_prefix=%s", task_prefix)
     title = "%s%d_%s" % (task_prefix, issue_id, title)
@@ -1998,23 +2026,25 @@ def gh_issue_title(ctx, issue_id=0, repo="current"):  # type: ignore
     print(_get_gh_issue_title(issue_id, repo))
 
 
-# TODO(gp): Allow to pass also a body.
 @task
-def gh_create_pr(ctx):  # type: ignore
+def gh_create_pr(ctx, body="", draft=True, repo="current"):  # type: ignore
     """
     Create a draft PR for the current branch in the corresponding repo.
+
+    :param body: the body of the PR
+    :param draft: draft or ready-to-review PR
     """
     _report_task()
-    # TODO(gp): Check whether the PR already exists.
     branch_name = git.get_branch_name()
-    repo_full_name = git.get_repo_full_name_from_dirname(".")
+    repo_full_name = _get_repo_full_name_from_cmd(repo)
     _LOG.info("Creating PR for '%s' in %s", branch_name, repo_full_name)
+    # TODO(gp): Check whether the PR already exists.
     cmd = (
-        f"gh pr create"
-        f" --repo {repo_full_name}"
-        " --draft"
-        f' --title "{branch_name}"'
-        ' --body ""'
+        f"gh pr create" +
+        f" --repo {repo_full_name}" +
+        (" --draft" if draft else "") +
+        f' --title "{branch_name}"' +
+        f' --body {body}'
     )
     _run(ctx, cmd)
     # TODO(gp): Implement the rest of the flow.
