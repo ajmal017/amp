@@ -2027,7 +2027,8 @@ def gh_issue_title(ctx, issue_id=0, repo="current"):  # type: ignore
 
 
 @task
-def gh_create_pr(ctx, body="", draft=True, repo="current"):  # type: ignore
+def gh_create_pr(  # type: ignore
+        ctx, body="", draft=True, repo="current", title=""):
     """
     Create a draft PR for the current branch in the corresponding repo.
 
@@ -2036,14 +2037,18 @@ def gh_create_pr(ctx, body="", draft=True, repo="current"):  # type: ignore
     """
     _report_task()
     branch_name = git.get_branch_name()
+    if not title:
+        # Use the branch name as title.
+        title = branch_name
     repo_full_name = _get_repo_full_name_from_cmd(repo)
-    _LOG.info("Creating PR for '%s' in %s", branch_name, repo_full_name)
+    _LOG.info("Creating PR with title '%s' for '%s' in %s", title, branch_name,
+            repo_full_name)
     # TODO(gp): Check whether the PR already exists.
     cmd = (
         f"gh pr create" +
         f" --repo {repo_full_name}" +
         (" --draft" if draft else "") +
-        f' --title "{branch_name}"' +
+        f' --title "{title}"' +
         f' --body {body}'
     )
     _run(ctx, cmd)

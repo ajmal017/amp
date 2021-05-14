@@ -184,17 +184,18 @@ class TestDryRunTasks2(_TestClassHelper):
 
     def test_gh_create_pr1(self) -> None:
         _gh_login()
-        target = "gh_create_pr(ctx, repo='amp')"
+        target = "gh_create_pr(ctx, repo='amp', title='test')"
         self._check_output(target)
 
     def test_gh_create_pr2(self) -> None:
         _gh_login()
-        target = "gh_create_pr(ctx, body='hello_world', repo='amp')"
+        target = ("gh_create_pr(ctx, body='hello_world', repo='amp', "
+            "title='test')")
         self._check_output(target)
 
     def test_gh_create_pr3(self) -> None:
         _gh_login()
-        target = "gh_create_pr(ctx, draft=False, repo='amp')"
+        target = "gh_create_pr(ctx, draft=False, repo='amp', title='test')"
         self._check_output(target)
 
     def test_gh_issue_title(self) -> None:
