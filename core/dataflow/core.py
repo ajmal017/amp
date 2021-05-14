@@ -16,7 +16,7 @@ _LOG = logging.getLogger(__name__)
 # #############################################################################
 
 
-# TODO(gp): This seems private to this file.
+# TODO(gp): If this is private -> _NodeInterface.
 class NodeInterface(abc.ABC):
     """
     Abstract node class for creating DAGs of functions.
@@ -93,7 +93,7 @@ class Node(NodeInterface):
         Implement the same interface as `NodeInterface`.
         """
         super().__init__(nid=nid, inputs=inputs, outputs=outputs)
-        # Dictionary "method name -> output node name -> output".
+        # Dictionary method name -> output node name -> output.
         self._output_vals: Dict[str, Dict[str, Any]] = {}
 
     def get_output(self, method: str, name: str) -> Any:
@@ -163,10 +163,9 @@ class DAG:
         :param name: optional str identifier
         :param mode: determines how to handle an attempt to add a node that already
             belongs to the DAG:
-                - "strict": asserts
-                - "loose": deletes old node (also removes edges) and adds new
-                    node
-            mode = "loose" is useful for interactive notebooks and debugging.
+            - "strict": asserts
+            - "loose": deletes old node (also removes edges) and adds new
+                node. This is useful for interactive notebooks and debugging.
         """
         self._dag = networ.DiGraph()
         #
@@ -241,7 +240,7 @@ class DAG:
                 _LOG.warning("Removing nid=%s", node.nid)
                 self.remove_node(node.nid)
         else:
-            dbg.dfatal("mode=%s", self.mode)
+            dbg.dfatal("Invalid mode='%s'", self.mode)
         # Add node.
         self._dag.add_node(node.nid, stage=node)
 
@@ -278,29 +277,31 @@ class DAG:
         output/input pairs, the additional input/output pairs are simply added
         to the existing edge (the previous ones are not overwritten).
 
-        :param parent: tuple of the form (nid, output)
-        :param child: tuple of the form (nid, input)
+        :param parent: tuple of the form (nid, output) or nid if it has a single
+            output
+        :param child: tuple of the form (nid, input) or just nid if it has a single
+            input
         """
         # Automatically infer output name when the parent has only one output.
         # Ensure that parent node belongs to DAG (through `get_node` call).
         if isinstance(parent, tuple):
             parent_nid, parent_out = parent
-            dbg.dassert_in(parent_out, self.get_node(parent_nid).output_names)
         else:
             parent_nid = parent
             parent_out = hlist.assert_single_element_and_return(
                 self.get_node(parent_nid).output_names
             )
+        dbg.dassert_in(parent_out, self.get_node(parent_nid).output_names)
         # Automatically infer input name when the child has only one input.
         # Ensure that child node belongs to DAG (through `get_node` call).
         if isinstance(child, tuple):
             child_nid, child_in = child
-            dbg.dassert_in(child_in, self.get_node(child_nid).input_names)
         else:
             child_nid = child
             child_in = hlist.assert_single_element_and_return(
                 self.get_node(child_nid).input_names
             )
+        dbg.dassert_in(child_in, self.get_node(child_nid).input_names)
         # Ensure that `child_in` is not already hooked up to an output.
         for nid in self._dag.predecessors(child_nid):
             dbg.dassert_not_in(
@@ -319,9 +320,7 @@ class DAG:
         if not networ.is_directed_acyclic_graph(self._dag):
             self._dag.remove_edge(parent_nid, child_nid)
             dbg.dfatal(
-                "Creating edge {} -> {} introduces a cycle!".format(
-                    parent_nid, child_nid
-                )
+                f"Creating edge {parent_nid} -> {child_nid} introduces a cycle!"
             )
 
     def get_sources(self) -> List[str]:

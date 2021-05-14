@@ -1,33 +1,54 @@
 import json
 import logging
+import os
 from typing import Any, Dict
 
 import networkx as nx
 
 import core.dataflow as dtf
 import helpers.unit_test as hut
+import helpers.printing as hprint
 
 _LOG = logging.getLogger(__name__)
 
 
 class _Dataflow_helper(hut.TestCase):
     @staticmethod
-    def _remove_stage_names(node_link_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _remove_stage_names(node_link_data: Dict[str, Any]) -> Dict[str, str]:
         """
-        Remove stages names from node_link_data dictionary.
+        Remove stages names from `node_link_data` dictionary.
 
         The stage names refer to Node objects, which are not json serializable.
         """
+        _LOG.debug("nld=\n%s", hprint.to_pretty_str(node_link_data))
+        # `nld` looks like:
+        #   {'directed': True,
+        #    'graph': {},
+        #    'links': [],
+        #    'multigraph': False,
+        #    'nodes': [{'id': 'n1',
+        #               'stage': <core.dataflow.core.Node object at 0x...>}]}
         nld = node_link_data.copy()
         for data in nld["nodes"]:
             data["stage"] = data["stage"].__class__.__name__
         return nld
 
-    def _check(self, dag: nx.classes.digraph.DiGraph) -> None:
-        nld = nx.readwrite.json_graph.node_link_data(dag)
+    def _check(self, dag: dtf.DAG) -> None:
+        """
+        Compute and freeze with `check_string` the signature of a graph.
+        """
+        graph: nx.classes.digraph.DiGraph = dag.dag
+        nld = nx.readwrite.json_graph.node_link_data(graph)
         nld = self._remove_stage_names(nld)
-        _LOG.debug("stripped node_link_data=%s", nld)
+        _LOG.debug("stripped node_link_data=\n%s", hprint.to_pretty_str(nld))
         json_nld = json.dumps(nld, indent=4, sort_keys=True)
+        _LOG.debug("output=\n%s", json_nld)
+        # Visualize if needed.
+        dir_name = self.get_scratch_space()
+        file_name = os.path.join(dir_name, "graph.png")
+        dtf.save_plot(dag, file_name)
+        _LOG.debug("Saved plot to %s", file_name)
+        # Check output.
         self.check_string(json_nld)
 
 
@@ -39,7 +60,7 @@ class Test_dataflow_core_DAG1(_Dataflow_helper):
         dag = dtf.DAG()
         n1 = dtf.Node("n1")
         dag.add_node(n1)
-        self._check(dag.dag)
+        self._check(dag)
 
     def test_add_nodes2(self) -> None:
         """
@@ -48,18 +69,21 @@ class Test_dataflow_core_DAG1(_Dataflow_helper):
         dag_strict = dtf.DAG(mode="strict")
         m1 = dtf.Node("m1")
         dag_strict.add_node(m1)
+        # Assert when adding a node that already exists.
         with self.assertRaises(AssertionError):
             dag_strict.add_node(m1)
         #
         dag_loose = dtf.DAG(mode="loose")
         n1 = dtf.Node("n1")
+        # Add the same node twice.
         dag_loose.add_node(n1)
         dag_loose.add_node(n1)
-        self._check(dag_loose.dag)
+        self._check(dag_loose)
 
     def test_add_nodes3(self) -> None:
         """
-        Demonstrates "strict" and "loose" behavior on repeated add_node().
+        Demonstrate "strict" and "loose" behavior on repeated add_node().
+        Same as `test_add_nodes2()` but creating another node.
         """
         dag_strict = dtf.DAG(mode="strict")
         m1 = dtf.Node("m1")
@@ -73,16 +97,16 @@ class Test_dataflow_core_DAG1(_Dataflow_helper):
         dag_loose.add_node(n1)
         n1_prime = dtf.Node("n1")
         dag_loose.add_node(n1_prime)
-        self._check(dag_loose.dag)
+        self._check(dag_loose)
 
     def test_add_nodes4(self) -> None:
         """
-        Adds multiple nodes to a DAG.
+        Add multiple nodes to a DAG.
         """
         dag = dtf.DAG()
         for name in ["n1", "n2", "n3", "n4"]:
             dag.add_node(dtf.Node(name, inputs=["in1"], outputs=["out1"]))
-        self._check(dag.dag)
+        self._check(dag)
 
     def test_add_nodes5(self) -> None:
         """
@@ -98,62 +122,81 @@ class Test_dataflow_core_DAG1(_Dataflow_helper):
         dag.add_node(n3)
         dag.connect("n2", "n3")
         dag.add_node(n1)
-        self._check(dag.dag)
+        self._check(dag)
 
 
 class Test_dataflow_core_DAG2(_Dataflow_helper):
-    def test_connect_nodes1(self) -> None:
+
+    @staticmethod
+    def _get_two_nodes() -> dtf.DAG:
         """
-        Simplest case of connecting two nodes.
+        Return a DAG with two unconnected nodes.
         """
+
         dag = dtf.DAG()
         n1 = dtf.Node("n1", outputs=["out1"])
         dag.add_node(n1)
         n2 = dtf.Node("n2", inputs=["in1"])
         dag.add_node(n2)
+        return dag
+
+    def test_connect_nodes1(self) -> None:
+        """
+        Simplest case of connecting two nodes.
+        """
+        dag = self._get_two_nodes()
         dag.connect(("n1", "out1"), ("n2", "in1"))
-        self._check(dag.dag)
+        self._check(dag)
 
     def test_connect_nodes2(self) -> None:
         """
         Simplest case, but inferred input/output names.
         """
-        dag = dtf.DAG()
-        n1 = dtf.Node("n1", outputs=["out1"])
-        dag.add_node(n1)
-        n2 = dtf.Node("n2", inputs=["in1"])
-        dag.add_node(n2)
+        dag = self._get_two_nodes()
         dag.connect("n1", "n2")
-        self._check(dag.dag)
+        self._check(dag)
 
     def test_connect_nodes3(self) -> None:
         """
-        Ensures input/output names are valid.
+        Ensure input/output names are valid.
         """
-        dag = dtf.DAG()
-        n1 = dtf.Node("n1", outputs=["out1"])
-        dag.add_node(n1)
-        n2 = dtf.Node("n2", inputs=["in1"])
-        dag.add_node(n2)
-        with self.assertRaises(AssertionError):
+        dag = self._get_two_nodes()
+        with self.assertRaises(AssertionError) as cm:
             dag.connect(("n2", "out1"), ("n1", "in1"))
+        act = str(cm.exception)
+        exp = """
+################################################################################
+* Failed assertion *
+'out1' in '[]'
+################################################################################
+"""
+        self.assert_equal(act, exp, fuzzy_match=True)
 
     def test_connect_nodes4(self) -> None:
         """
-        Forbids creating cycles in DAG.
+        Forbid creating cycles in DAG.
         """
         dag = dtf.DAG()
         n1 = dtf.Node("n1", inputs=["in1"], outputs=["out1"])
         dag.add_node(n1)
         n2 = dtf.Node("n2", inputs=["in1"], outputs=["out1"])
         dag.add_node(n2)
+        # n1 -> n2
         dag.connect(("n1", "out1"), ("n2", "in1"))
-        with self.assertRaises(AssertionError):
+        # n2 -> n1 creates a cycle.
+        with self.assertRaises(AssertionError) as cm:
             dag.connect(("n2", "out1"), ("n1", "in1"))
+        act = str(cm.exception)
+        exp = """
+################################################################################
+Creating edge n2 -> n1 introduces a cycle!
+################################################################################
+"""
+        self.assert_equal(act, exp, fuzzy_match=True)
 
     def test_connect_nodes5(self) -> None:
         """
-        Forbids creating cycles in DAG (inferred input/output names).
+        Forbid creating cycles in DAG (inferred input/output names).
         """
         dag = dtf.DAG()
         n1 = dtf.Node("n1", inputs=["in1"], outputs=["out1"])
@@ -161,8 +204,15 @@ class Test_dataflow_core_DAG2(_Dataflow_helper):
         n2 = dtf.Node("n2", inputs=["in1"], outputs=["out1"])
         dag.add_node(n2)
         dag.connect("n1", "n2")
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(AssertionError) as cm:
             dag.connect("n2", "n1")
+        act = str(cm.exception)
+        exp = r"""
+################################################################################
+Creating edge n2 -> n1 introduces a cycle!
+################################################################################
+"""
+        self.assert_equal(act, exp, fuzzy_match=True)
 
     def test_connect_nodes6(self) -> None:
         """
@@ -184,17 +234,26 @@ class Test_dataflow_core_DAG2(_Dataflow_helper):
         dag.connect(("n2", "out2"), "n4")
         dag.connect("n3", ("n5", "in1"))
         dag.connect("n4", ("n5", "in2"))
-        self._check(dag.dag)
+        self._check(dag)
 
     def test_connect_nodes7(self) -> None:
         """
-        Forbids connecting a node that doesn't belong to the DAG.
+        Forbid connecting a node that doesn't belong to the DAG.
         """
         dag = dtf.DAG()
         n1 = dtf.Node("n1", outputs=["out1"])
         dag.add_node(n1)
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(AssertionError) as cm:
             dag.connect("n2", "n1")
+        act = str(cm.exception)
+        exp = r"""
+################################################################################
+* Failed assertion *
+cond=False
+Node `n2` is not in DAG!
+################################################################################
+"""
+        self.assert_equal(act, exp, fuzzy_match=True)
 
     def test_connect_nodes8(self) -> None:
         """
@@ -206,8 +265,17 @@ class Test_dataflow_core_DAG2(_Dataflow_helper):
         n2 = dtf.Node("n2", inputs=["in1"])
         dag.add_node(n2)
         dag.connect(("n1", "out1"), "n2")
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(AssertionError) as cm:
             dag.connect(("n1", "out2"), "n2")
+        act = str(cm.exception)
+        exp = r"""
+################################################################################
+* Failed assertion *
+'in1' not in '{'in1': 'out1'}'
+`in1` already receiving input from node n1
+################################################################################
+"""
+        self.assert_equal(act, exp, fuzzy_match=True)
 
     def test_connect_nodes9(self) -> None:
         """
@@ -220,7 +288,7 @@ class Test_dataflow_core_DAG2(_Dataflow_helper):
         dag.add_node(n2)
         dag.connect("n1", ("n2", "in1"))
         dag.connect("n1", ("n2", "in2"))
-        self._check(dag.dag)
+        self._check(dag)
 
     def test_connect_nodes10(self) -> None:
         """
@@ -232,8 +300,17 @@ class Test_dataflow_core_DAG2(_Dataflow_helper):
         n2 = dtf.Node("n2", inputs=["in1"])
         dag.add_node(n2)
         dag.connect("n1", "n2")
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(AssertionError) as cm:
             dag.connect("n1", "n2")
+        act = str(cm.exception)
+        exp = r"""
+################################################################################
+* Failed assertion *
+'in1' not in '{'in1': 'out1'}'
+`in1` already receiving input from node n1
+################################################################################
+"""
+        self.assert_equal(act, exp, fuzzy_match=True)
 
 
 class Test_dataflow_core_DAG3(_Dataflow_helper):

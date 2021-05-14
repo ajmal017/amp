@@ -28,7 +28,6 @@ import helpers.system_interaction as hsinte
 import helpers.table as htable
 import helpers.versioning as hversi
 
-
 _LOG = logging.getLogger(__name__)
 
 # #############################################################################
@@ -1443,21 +1442,41 @@ def _find_test_class(class_name: str, file_names: List[str]) -> List[str]:
     return res
 
 
+def _to_pbcopy(txt: str) -> None:
+    """
+    Save the content of txt in the system clipboard.
+    """
+    txt = txt.rstrip("\n")
+    if hsinte.is_running_on_macos():
+        # -n = no new line
+        cmd = f"echo -n '{txt}' | pbcopy"
+        hsinte.system(cmd)
+    else:
+        _LOG.warning("pbcopy works only on macOS")
+    print(txt)
+
+
+
 @task
-def find_test_class(ctx, class_name="", dir_name="."):  # type: ignore
+def find_test_class(ctx, class_name="", dir_name=".", pbcopy=False):  # type: ignore
     """
     Report test files containing `class_name` in a format compatible with
     pytest.
 
     :param class_name: the class to search
     :param dir_name: the dir from which to search (default: .)
+    :param pbcopy: save the result into the system clipboard (only on macOS)
     """
     _report_task()
     dbg.dassert(class_name != "", "You need to specify a class name")
     _ = ctx
     file_names = _find_test_files(dir_name)
     res = _find_test_class(class_name, file_names)
-    print(res)
+    res = " ".join(res)
+    if pbcopy:
+        _to_pbcopy(res)
+    else:
+        print(res)
 
 
 # #############################################################################
@@ -1510,6 +1529,7 @@ def find_test_decorator(ctx, decorator_name="", dir_name="."):  # type: ignore
     _ = ctx
     file_names = _find_test_files(dir_name)
     res = _find_test_class(decorator_name, file_names)
+    res = " ".join(res)
     print(res)
 
 
@@ -1843,7 +1863,7 @@ def _get_lint_docker_cmd(precommit_opts: str, run_bash: bool) -> str:
 
 
 @task
-def lint(ctx, modified=False, branch=False, files="", phases="", only_format=False,
+def lint(ctx, modified=False, branch=False, files="", phases="", only_black=False,
          stage="prod", run_bash=False):  # type: ignore
     """
     Lint files.
@@ -1852,7 +1872,7 @@ def lint(ctx, modified=False, branch=False, files="", phases="", only_format=Fal
     :param branch: select the files modified in the current branch
     :param files: specify a space-separated list of files
     :param phases: specify the lint phases to execute
-    :param only_format: run only the lint phases that format the code
+    :param only_black: run only the lint phases that format the code
     :param run_bash: instead of running pre-commit, run bash to debug
     """
     _report_task()
@@ -1867,9 +1887,9 @@ def lint(ctx, modified=False, branch=False, files="", phases="", only_format=Fal
         return
     files_as_str = " ".join(files_as_list)
     # Prepare the command line.
-    if only_format:
-        _LOG.warning("Running only formatting phases")
-        phases = "isort black"
+    if only_black:
+        _LOG.warning("Running only black")
+        phases = "run black"
     precommit_opts = [
         f"run {phases}",
         "-c /app/.pre-commit-config.yaml",
