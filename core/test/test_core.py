@@ -154,11 +154,9 @@ class Test_dataflow_core_DAG2(_Dataflow_helper):
             dag.connect(("n2", "out1"), ("n1", "in1"))
         act = str(cm.exception)
         exp = """
-# #############################################################################
-* Failed assertion *
-'out1' in '[]'
-# #############################################################################
-"""
+        * Failed assertion *
+        'out1' in '[]'
+        """
         self.assert_equal(act, exp, fuzzy_match=True)
 
     def test_connect_nodes4(self) -> None:
@@ -177,10 +175,8 @@ class Test_dataflow_core_DAG2(_Dataflow_helper):
             dag.connect(("n2", "out1"), ("n1", "in1"))
         act = str(cm.exception)
         exp = """
-# #############################################################################
-Creating edge n2 -> n1 introduces a cycle!
-# #############################################################################
-"""
+        Creating edge n2 -> n1 introduces a cycle!
+        """
         self.assert_equal(act, exp, fuzzy_match=True)
 
     def test_connect_nodes5(self) -> None:
@@ -197,10 +193,8 @@ Creating edge n2 -> n1 introduces a cycle!
             dag.connect("n2", "n1")
         act = str(cm.exception)
         exp = r"""
-# #############################################################################
-Creating edge n2 -> n1 introduces a cycle!
-# #############################################################################
-"""
+        Creating edge n2 -> n1 introduces a cycle!
+        """
         self.assert_equal(act, exp, fuzzy_match=True)
 
     def test_connect_nodes6(self) -> None:
@@ -236,12 +230,10 @@ Creating edge n2 -> n1 introduces a cycle!
             dag.connect("n2", "n1")
         act = str(cm.exception)
         exp = r"""
-# #############################################################################
-* Failed assertion *
-cond=False
-Node `n2` is not in DAG!
-# #############################################################################
-"""
+        * Failed assertion *
+        cond=False
+        Node `n2` is not in DAG!
+        """
         self.assert_equal(act, exp, fuzzy_match=True)
 
     def test_connect_nodes8(self) -> None:
@@ -258,12 +250,10 @@ Node `n2` is not in DAG!
             dag.connect(("n1", "out2"), "n2")
         act = str(cm.exception)
         exp = r"""
-# #############################################################################
-* Failed assertion *
-'in1' not in '{'in1': 'out1'}'
-`in1` already receiving input from node n1
-# #############################################################################
-"""
+        * Failed assertion *
+        'in1' not in '{'in1': 'out1'}'
+        `in1` already receiving input from node n1
+        """
         self.assert_equal(act, exp, fuzzy_match=True)
 
     def test_connect_nodes9(self) -> None:
@@ -293,13 +283,12 @@ Node `n2` is not in DAG!
             dag.connect("n1", "n2")
         act = str(cm.exception)
         exp = r"""
-# #############################################################################
-* Failed assertion *
-'in1' not in '{'in1': 'out1'}'
-`in1` already receiving input from node n1
-# #############################################################################
-"""
+        * Failed assertion *
+        'in1' not in '{'in1': 'out1'}'
+        `in1` already receiving input from node n1
+        """
         self.assert_equal(act, exp, fuzzy_match=True)
+
     @staticmethod
     def _get_two_nodes() -> dtf.DAG:
         """
