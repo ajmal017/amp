@@ -1458,14 +1458,14 @@ def _to_pbcopy(txt: str) -> None:
         # -n = no new line
         cmd = f"echo -n '{txt}' | pbcopy"
         hsinte.system(cmd)
+        print(f"'{txt}' copied to system clipboard")
     else:
         _LOG.warning("pbcopy works only on macOS")
-    print(txt)
 
 
 
 @task
-def find_test_class(ctx, class_name="", dir_name=".", pbcopy=False):  # type: ignore
+def find_test_class(ctx, class_name="", dir_name=".", pbcopy=True):  # type: ignore
     """
     Report test files containing `class_name` in a format compatible with
     pytest.
@@ -2066,17 +2066,22 @@ def _get_gh_issue_title(issue_id: int, repo: str) -> str:
 
 
 @task
-def gh_issue_title(ctx, issue_id=0, repo="current"):  # type: ignore
+def gh_issue_title(ctx, issue_id, repo="current", pbcopy=True):  # type: ignore
     """
     Print the title that corresponds to the given issue and repo.
-
     E.g., AmpTask1251_Update_GH_actions_for_amp
+
+    :param pbcopy: save the result into the system clipboard (only on macOS)
     """
     _report_task()
     _ = ctx
     issue_id = int(issue_id)
     dbg.dassert_lte(1, issue_id)
-    print(_get_gh_issue_title(issue_id, repo))
+    res = _get_gh_issue_title(issue_id, repo)
+    if pbcopy:
+        _to_pbcopy(res)
+    else:
+        print(res)
 
 
 @task
