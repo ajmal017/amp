@@ -282,7 +282,7 @@ def print_tasks(  # type: ignore
     """
     Print all the available tasks in `lib_tasks.py`.
 
-    These tasks might be exposed or not by different
+    These tasks might be exposed or not by different.
 
     :param as_python_code: print as python code so that it can be embed in a
         `from helpers.lib_tasks import ...`
@@ -386,8 +386,9 @@ def git_branch_files(ctx):  # type: ignore
     master.
     """
     _report_task()
-    cmd = "git diff --name-only master..."
-    _run(ctx, cmd)
+    _ = ctx
+    print("Difference between HEAD and master:\n" +
+          git.get_summary_files_in_branch("master", "."))
 
 
 @task
@@ -520,13 +521,16 @@ def git_create_patch(  # type: ignore
     else:
         dbg.dfatal("Invalid code path")
     _LOG.debug("dst_file=%s", dst_file)
+    # Summary of files.
+    _LOG.info("Difference between HEAD and master:\n%s",
+              git.get_summary_files_in_branch("master", "."))
     # Prepare the patch command.
     cmd = ""
     if mode == "tar":
         # Get the files.
         files_as_list = _get_files_to_process(modified, branch, files,
                                               mutually_exclusive=False)
-        _LOG.info("Files to save:\n%s", "\n".join(files_as_list))
+        _LOG.info("Files to save:\n%s", hprint.indent("\n".join(files_as_list)))
         if not files_as_list:
             _LOG.warning("Nothing to patch: exiting")
             return
