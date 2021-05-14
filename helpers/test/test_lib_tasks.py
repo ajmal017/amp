@@ -901,3 +901,6 @@ class TestLibTasksGitCreatePatch1(hut.TestCase):
         #
         mode = "diff"
         ltasks.git_create_patch(ctx, mode, modified, branch, files)
+
+
+# i gh_create_pr --no-draft --body="Misc changes while adding unit tests"

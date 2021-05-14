@@ -484,14 +484,17 @@ def git_create_branch(  # type: ignore
     # git checkout -b LemTask169_Get_GH_actions_working_on_lemonade
     cmd = f"git checkout -b {branch_name}"
     _run(ctx, cmd)
-    # git push --set-upstream origin LemTask169_Get_GH_actions_working_on_lemonade
+    # TODO(gp): If the branch already exists, increase the number.
+    #   git checkout -b AmpTask1329_Review_code_in_core_03
+    #   fatal: A branch named 'AmpTask1329_Review_code_in_core_03' already exists.
+    #   saggese@gpmaclocal.local ==> RC: 128 <==
     cmd = f"git push --set-upstream origin {branch_name}"
     _run(ctx, cmd)
 
 
 @task
 def git_create_patch(  # type: ignore
-        ctx, mode="tar",
+        ctx, mode="diff",
         modified=False, branch=False, files=""):
     """
     Create a patch file for the entire repo client from the base revision.
@@ -2103,10 +2106,11 @@ def gh_create_pr(  # type: ignore
         f' --body {body}'
     )
     _run(ctx, cmd)
-    # TODO(gp): Implement the rest of the flow.
-    # Warning: 3 uncommitted changes
-    # https://github.com/alphamatic/amp/pull/1298
-    # gh pr view https://github.com/alphamatic/amp/pull/1298 --repo alphamatic/amp --web
+    # TODO(gp): Capture the output of the command and save the info in a
+    #  github_current_pr_info:
+    # Warning: 22 uncommitted changes
+    # Creating pull request for AmpTask1329_Review_code_in_core_04 into master in alphamatic/amp
+    # https://github.com/alphamatic/amp/pull/1337
 
 
 # TODO(gp): Add gh_open_pr to jump to the PR from this branch.
