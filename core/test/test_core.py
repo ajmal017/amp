@@ -6,8 +6,8 @@ from typing import Any, Dict
 import networkx as nx
 
 import core.dataflow as dtf
-import helpers.unit_test as hut
 import helpers.printing as hprint
+import helpers.unit_test as hut
 
 _LOG = logging.getLogger(__name__)
 
@@ -18,7 +18,8 @@ class _Dataflow_helper(hut.TestCase):
         """
         Remove stages names from `node_link_data` dictionary.
 
-        The stage names refer to Node objects, which are not json serializable.
+        The stage names refer to Node objects, which are not json
+        serializable.
         """
         _LOG.debug("nld=\n%s", hprint.to_pretty_str(node_link_data))
         # `nld` looks like:
@@ -83,6 +84,7 @@ class Test_dataflow_core_DAG1(_Dataflow_helper):
     def test_add_nodes3(self) -> None:
         """
         Demonstrate "strict" and "loose" behavior on repeated add_node().
+
         Same as `test_add_nodes2()` but creating another node.
         """
         dag_strict = dtf.DAG(mode="strict")
@@ -127,19 +129,6 @@ class Test_dataflow_core_DAG1(_Dataflow_helper):
 
 class Test_dataflow_core_DAG2(_Dataflow_helper):
 
-    @staticmethod
-    def _get_two_nodes() -> dtf.DAG:
-        """
-        Return a DAG with two unconnected nodes.
-        """
-
-        dag = dtf.DAG()
-        n1 = dtf.Node("n1", outputs=["out1"])
-        dag.add_node(n1)
-        n2 = dtf.Node("n2", inputs=["in1"])
-        dag.add_node(n2)
-        return dag
-
     def test_connect_nodes1(self) -> None:
         """
         Simplest case of connecting two nodes.
@@ -165,10 +154,10 @@ class Test_dataflow_core_DAG2(_Dataflow_helper):
             dag.connect(("n2", "out1"), ("n1", "in1"))
         act = str(cm.exception)
         exp = """
-################################################################################
+# #############################################################################
 * Failed assertion *
 'out1' in '[]'
-################################################################################
+# #############################################################################
 """
         self.assert_equal(act, exp, fuzzy_match=True)
 
@@ -188,9 +177,9 @@ class Test_dataflow_core_DAG2(_Dataflow_helper):
             dag.connect(("n2", "out1"), ("n1", "in1"))
         act = str(cm.exception)
         exp = """
-################################################################################
+# #############################################################################
 Creating edge n2 -> n1 introduces a cycle!
-################################################################################
+# #############################################################################
 """
         self.assert_equal(act, exp, fuzzy_match=True)
 
@@ -208,9 +197,9 @@ Creating edge n2 -> n1 introduces a cycle!
             dag.connect("n2", "n1")
         act = str(cm.exception)
         exp = r"""
-################################################################################
+# #############################################################################
 Creating edge n2 -> n1 introduces a cycle!
-################################################################################
+# #############################################################################
 """
         self.assert_equal(act, exp, fuzzy_match=True)
 
@@ -247,11 +236,11 @@ Creating edge n2 -> n1 introduces a cycle!
             dag.connect("n2", "n1")
         act = str(cm.exception)
         exp = r"""
-################################################################################
+# #############################################################################
 * Failed assertion *
 cond=False
 Node `n2` is not in DAG!
-################################################################################
+# #############################################################################
 """
         self.assert_equal(act, exp, fuzzy_match=True)
 
@@ -269,11 +258,11 @@ Node `n2` is not in DAG!
             dag.connect(("n1", "out2"), "n2")
         act = str(cm.exception)
         exp = r"""
-################################################################################
+# #############################################################################
 * Failed assertion *
 'in1' not in '{'in1': 'out1'}'
 `in1` already receiving input from node n1
-################################################################################
+# #############################################################################
 """
         self.assert_equal(act, exp, fuzzy_match=True)
 
@@ -304,13 +293,25 @@ Node `n2` is not in DAG!
             dag.connect("n1", "n2")
         act = str(cm.exception)
         exp = r"""
-################################################################################
+# #############################################################################
 * Failed assertion *
 'in1' not in '{'in1': 'out1'}'
 `in1` already receiving input from node n1
-################################################################################
+# #############################################################################
 """
         self.assert_equal(act, exp, fuzzy_match=True)
+    @staticmethod
+    def _get_two_nodes() -> dtf.DAG:
+        """
+        Return a DAG with two unconnected nodes.
+        """
+
+        dag = dtf.DAG()
+        n1 = dtf.Node("n1", outputs=["out1"])
+        dag.add_node(n1)
+        n2 = dtf.Node("n2", inputs=["in1"])
+        dag.add_node(n2)
+        return dag
 
 
 class Test_dataflow_core_DAG3(_Dataflow_helper):
