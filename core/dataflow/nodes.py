@@ -9,6 +9,7 @@ import logging
 import os
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
+import numpy as np
 import pandas as pd
 
 import core.artificial_signal_generators as cartif
@@ -470,7 +471,8 @@ class ArmaGenerator(DataSource):
         # Cumulatively sum to generate a price series (implicitly assumes the
         # returns are log returns; at small enough scales and short enough
         # times this is practically interchangeable with percentage returns).
-        prices = rets.cumsum()
+        # TODO(*): Allow specification of annualized target volatility.
+        prices = np.exp(0.1 * rets.cumsum())
         prices.name = "close"
         # Convert to a df.
         self.df = prices.to_frame()
@@ -536,7 +538,10 @@ class MultivariateNormalGenerator(DataSource):
         # Cumulatively sum to generate a price series (implicitly assumes the
         # returns are log returns; at small enough scales and short enough
         # times this is practically interchangeable with percentage returns).
-        prices = rets.cumsum()
+        # TODO(*): We hard-code a scale factor to make these look more
+        #     realistic, but it would be better to allow the user to specify
+        #     a target annualized volatility.
+        prices = np.exp(0.1 * rets.cumsum())
         prices = prices.rename(columns=lambda x: "MN" + str(x))
         # Use constant volume (for now).
         volume = pd.DataFrame(
@@ -1003,7 +1008,8 @@ class MultiindexSeriesTransformer(Transformer):
         nan_mode: Optional[str] = None,
     ) -> None:
         """
-        For reference, let
+        For reference, let:
+
           - N = df.columns.nlevels
           - leaf_cols = df[in_col_group].columns
 
