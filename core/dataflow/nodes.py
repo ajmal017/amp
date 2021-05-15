@@ -133,8 +133,7 @@ class FitPredictNode(Node, abc.ABC):
         self._info[method] = copy.copy(values)
 
 
-# TODO(gp): Not sure if abc.ABC is needed, since there are still some abstract
-#  methods. It might be useful to communicate that it's abstract.
+# TODO(gp): Is this still abstract? What methods are still not over-written?
 class DataSource(FitPredictNode, abc.ABC):
     """
     A source node that can be configured for cross-validation.
@@ -149,6 +148,7 @@ class DataSource(FitPredictNode, abc.ABC):
         dbg.dassert(outputs)
         super().__init__(nid, inputs=[], outputs=outputs)
         #
+        # TODO(gp): I'd make it protected _df at least.
         self.df = None
         self._fit_intervals = None
         self._predict_intervals = None
@@ -162,6 +162,13 @@ class DataSource(FitPredictNode, abc.ABC):
         """
         self._validate_intervals(intervals)
         self._fit_intervals = intervals
+
+    def get_single_output_name(self):
+        # For now most of the data source nodes assume that there is a single
+        # output when they return `{"df_out": df}`.
+        # This makes the assumption explicit.
+        dbg.dassert_eq(len(self.output_names), 1)
+        return self.output_names[0]
 
     # `DataSource` does not have a `df_in` in either `fit` or `predict` as a
     # typical `FitPredictNode` does.
@@ -189,7 +196,7 @@ class DataSource(FitPredictNode, abc.ABC):
         info = collections.OrderedDict()
         info["fit_df_info"] = get_df_info_as_string(fit_df)
         self._set_info("fit", info)
-        return {self.output_names[0]: fit_df}
+        return {self.get_single_output_name(): fit_df}
 
     def set_predict_intervals(self, intervals: List[Tuple[Any, Any]]) -> None:
         """
@@ -217,13 +224,15 @@ class DataSource(FitPredictNode, abc.ABC):
             predict_df = self.df.loc[idx].copy()
         else:
             predict_df = self.df.copy()
+        dbg.dassert(not predict_df.empty)
+        #
         info = collections.OrderedDict()
         info["predict_df_info"] = get_df_info_as_string(predict_df)
         self._set_info("predict", info)
-        dbg.dassert(not predict_df.empty)
-        return {self.output_names[0]: predict_df}
+        #
+        return {self.get_single_output_name(): predict_df}
 
-    # TODO(gp): Make df private since there is an accessor. We can use
+    # TODO(gp): Make df protected since there is an accessor. We can use
     #  a property.
     def get_df(self) -> pd.DataFrame:
         dbg.dassert_is_not(self.df, None, "No DataFrame found!")
@@ -259,7 +268,7 @@ class Transformer(FitPredictNode, abc.ABC):
         self._set_info("fit", info)
         # TODO(gp): -> validate_df
         dbg.dassert_no_duplicates(df_out.columns)
-        return {"df_out": df_out}
+        return {self.get_single_output_name(): df_out}
 
     def predict(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
         # TODO(gp): -> validate_df
@@ -270,7 +279,7 @@ class Transformer(FitPredictNode, abc.ABC):
         self._set_info("predict", info)
         # TODO(gp): -> validate_df
         dbg.dassert_no_duplicates(df_out.columns)
-        return {"df_out": df_out}
+        return {self.get_single_output_name(): df_out}
 
     @abc.abstractmethod
     def _transform(
@@ -389,12 +398,13 @@ class ArmaGenerator(DataSource):
     def __init__(
         self,
         nid: str,
+        # Index parameters.
         frequency: str,
         start_date: _PANDAS_DATE_TYPE,
         end_date: _PANDAS_DATE_TYPE,
+        # ARMA parameters.
         ar_coeffs: Optional[List[float]] = None,
         ma_coeffs: Optional[List[float]] = None,
-        # TODO(gp): -> arma_scale, ... for clarity?
         scale: Optional[float] = None,
         burnin: Optional[float] = None,
         seed: Optional[float] = None,
@@ -405,6 +415,7 @@ class ArmaGenerator(DataSource):
         :param start_date, end_date, frequency: used to generate the datetime index
         """
         super().__init__(nid)
+        # Save parameters.
         self._frequency = frequency
         self._start_date = start_date
         self._end_date = end_date
@@ -413,10 +424,14 @@ class ArmaGenerator(DataSource):
         self._scale = scale or 1
         self._burnin = burnin or 0
         self._seed = seed
+        # Initialize process.
         self._arma_process = cartif.ArmaProcess(
             ar_coeffs=self._ar_coeffs, ma_coeffs=self._ma_coeffs
         )
 
+    # TODO(gp): There is a common idiom where fit and predict are the same
+    #  besides a few small difference. Maybe we can use a Mixin with an
+    #  abstract method with the common code?
     def fit(self) -> Optional[Dict[str, pd.DataFrame]]:
         """
         The fit/predict dataframe contain "close" and "vol" columns.
@@ -463,13 +478,16 @@ class MultivariateNormalGenerator(DataSource):
     def __init__(
         self,
         nid: str,
+        # Index parameters.
         frequency: str,
         start_date: _PANDAS_DATE_TYPE,
         end_date: _PANDAS_DATE_TYPE,
+        # Process parameters.
         dim: int,
         seed: Optional[float] = None,
     ) -> None:
         super().__init__(nid)
+        # Save parameters.
         self._frequency = frequency
         self._start_date = start_date
         self._end_date = end_date
@@ -582,6 +600,7 @@ class YConnector(FitPredictNode):
     ) -> Dict[str, pd.DataFrame]:
         df_out, info = self._apply_connector_func(df_in1, df_in2)
         self._set_info("fit", info)
+        # TODO(gp): -> get_single_output_name()
         return {"df_out": df_out}
 
     # pylint: disable=arguments-differ
@@ -595,10 +614,11 @@ class YConnector(FitPredictNode):
     def _apply_connector_func(
         self, df_in1: pd.DataFrame, df_in2: pd.DataFrame
     ) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+        # Apply the connector function.
         self._df_in1_col_names = df_in1.columns.tolist()
         self._df_in2_col_names = df_in2.columns.tolist()
-        # TODO(Paul): Add meaningful info.
         df_out = self._connector_func(df_in1, df_in2, **self._connector_kwargs)
+        # TODO(Paul): Add meaningful info.
         info = collections.OrderedDict()
         info["df_merged_info"] = get_df_info_as_string(df_out)
         return df_out, info
@@ -618,15 +638,18 @@ class YConnector(FitPredictNode):
 # #############################################################################
 
 
+# TODO(gp): IMO I'd make it a function rather than relying on the hidden
+#  self._transformed_col_names to plug it into a function.
 class ColModeMixin:
     """
-    Selects columns to propagate in output dataframe.
+    Select columns to propagate in output dataframe.
     """
 
     def _apply_col_mode(
         self,
         df_in: pd.DataFrame,
         df_out: pd.DataFrame,
+        # -> List[str] ?
         cols: Optional[List[Any]] = None,
         col_rename_func: Optional[Callable[[Any], Any]] = None,
         col_mode: Optional[str] = None,
@@ -635,28 +658,38 @@ class ColModeMixin:
         Merge transformed dataframe with original dataframe.
 
         :param df_in: original dataframe
-        :param df_out: transformed dataframe
+        :param df_out: transformed dataframe (not changed)
         :param cols: columns in `df_in` that were transformed to obtain
-            `df_out`. `None` defaults to all columns in `df_out`
-        :param col_mode: `None`, "merge_all", "replace_selected", or
-            "replace_all". Determines what columns are propagated. `None`
-            defaults to "merge all". If "merge_all", perform an outer merge
-        :param col_rename_func: function for naming transformed columns, e.g.,
-            lambda x: "zscore_" + x. `None` defaults to identity transform
+            `df_out`
+            - `None` defaults to all columns in `df_out`
+        :param col_mode: determines what columns are propagated.
+            - It defaults to "merge all".
+            - `None`: TODO(gp): ?
+            - "merge_all": perform an outer merge
+            - "replace_selected": TODO(gp): ?
+            - "replace_all": TODO(gp): ?
+        :param col_rename_func: function for naming transformed columns
+            - E.g., `lambda x: "zscore_" + x`
+            - `None` defaults to identity transform
         :return: dataframe with columns selected by `col_mode`
         """
+        # TODO(gp): -> validate_input_output_df?
         dbg.dassert_isinstance(df_in, pd.DataFrame)
         dbg.dassert_isinstance(df_out, pd.DataFrame)
+        #
         dbg.dassert(cols is None or isinstance(cols, list))
         cols = cols or df_out.columns.tolist()
+        #
         col_rename_func = col_rename_func or (lambda x: x)
         dbg.dassert_isinstance(col_rename_func, collections.Callable)
+        #
         col_mode = col_mode or "merge_all"
-        # Rename transformed columns.
+        # Rename transformed columns using the passed function.
         df_out = df_out.rename(columns=col_rename_func)
         self._transformed_col_names = df_out.columns.tolist()
         # Select columns to return.
         if col_mode == "merge_all":
+            # `df_in` and `df_out` must have common columns.
             shared_columns = df_out.columns.intersection(df_in.columns)
             dbg.dassert(
                 shared_columns.empty,
@@ -665,6 +698,7 @@ class ColModeMixin:
                 df_out.columns,
                 df_in.columns,
             )
+            # Outer merge.
             df_out = df_in.merge(
                 df_out, how="outer", left_index=True, right_index=True
             )
@@ -712,25 +746,22 @@ class ColumnTransformer(Transformer, ColModeMixin):
                 - The resulting (populated) dict is included in the node's
                   `_info`
         :param transformer_kwargs: transformer_func kwargs
-        :param cols: columns to transform; `None` defaults to all available.
-        :param col_rename_func: function for naming transformed columns, e.g.,
-            lambda x: "zscore_" + x
-        :param col_mode: `merge_all`, `replace_selected`, or `replace_all`.
-            Determines what columns are propagated by the node.
+        :param cols, col_rename_func, col_mode: same as `ColModeMixin`
         :param nan_mode: `leave_unchanged` or `drop`. If `drop`, applies to all
             columns simultaneously.
         """
         super().__init__(nid)
         if cols is not None:
             dbg.dassert_isinstance(cols, list)
+        # Save parameters.
+        self._transformer_func = transformer_func
+        self._transformer_kwargs = transformer_kwargs or {}
         self._cols = cols
         self._col_rename_func = col_rename_func
         self._col_mode = col_mode
-        self._transformer_func = transformer_func
-        self._transformer_kwargs = transformer_kwargs or {}
+        self._nan_mode = nan_mode or "leave_unchanged"
         # Store the list of columns after the transformation.
         self._transformed_col_names = None
-        self._nan_mode = nan_mode or "leave_unchanged"
         self._fit_cols = cols
 
     @property

@@ -44,6 +44,8 @@ class NodeInterface(abc.ABC):
         """
         dbg.dassert_isinstance(nid, str)
         dbg.dassert(nid, "Empty string chosen for unique nid!")
+        # TODO(gp): Maybe too C++ but we could make the following private __nid
+        # since the only access should happen through the accessors.
         self._nid = nid
         self._input_names = self._init_validation_helper(inputs)
         self._output_names = self._init_validation_helper(outputs)
