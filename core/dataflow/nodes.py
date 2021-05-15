@@ -20,9 +20,35 @@ from core.dataflow.core import Node
 _LOG = logging.getLogger(__name__)
 
 
-# TODO(*): Create a dataflow types file.
+# TODO(*): Create a dataflow types file in dataflow/core/types.py.
+# TODO(*): As a convention we don't need to add _TYPE.
+# TODO(*): _COL_TYPE -> COL_NAME
 _COL_TYPE = Union[int, str]
+# TODO(*): -> DATETIME
 _PANDAS_DATE_TYPE = Union[str, pd.Timestamp, datetime.datetime]
+
+# TODO(gp): Should we allow None to indicate beginning / end of time?
+#  This complicates the code to simplify the life of the client.
+#  Instead we can define constants START_DATETIME=..., END_DATETIME
+# Intervals are interpreted as closed [a, b].
+# TODO(gp): Should we stick to usual [a, b) interpretation everywhere for
+#  consistency? This might be a big change.
+# INTERVAL = List[Tuple[Optional[DATETIME], Optional[DATETIME]]]
+
+# INFO = collections.OrderedDict()
+
+# This seems common, but not sure if it is worth it to obscure the meaning
+#  for saving few chars.
+# NODE_OUTPUT = Dict[str, pd.DataFrame]
+
+# def validate_input_output_df(df):
+#     if single_index:
+#         dbg.dassert_no_duplicates(items)
+#     idx = df.index
+#     dbg.dassert_isindex(idx, datetime)
+#     dbg.dassert_is_monotonic(idx)
+#     dbg.dassert_strictly_increasing_index(self.df)
+
 
 
 # #############################################################################
@@ -130,13 +156,14 @@ class DataSource(FitPredictNode, abc.ABC):
 
     def set_fit_intervals(self, intervals: List[Tuple[Any, Any]]) -> None:
         """
+        Set the intervals to fir the
         :param intervals: closed time intervals like [start1, end1],
             [start2, end2]. `None` boundary is interpreted as data start/end
         """
         self._validate_intervals(intervals)
         self._fit_intervals = intervals
 
-    # DataSource does not have a `df_in` in either `fit` or `predict` as a
+    # `DataSource` does not have a `df_in` in either `fit` or `predict` as a
     # typical `FitPredictNode` does.
     # pylint: disable=arguments-differ
     def fit(self) -> Dict[str, pd.DataFrame]:
@@ -144,19 +171,24 @@ class DataSource(FitPredictNode, abc.ABC):
         :return: training set as df
         """
         if self._fit_intervals is not None:
+            # Compute the union of all the indices.
+            # TODO(gp): What if there are None in the interval?
             idx_slices = [
                 self.df.loc[interval[0] : interval[1]].index
                 for interval in self._fit_intervals
             ]
             idx = functools.reduce(lambda x, y: x.union(y), idx_slices)
+            # TODO(gp): Add a
+            #dbg.dassert_issubset(idx, self.dx.index) ?
             fit_df = self.df.loc[idx]
         else:
             fit_df = self.df
+        dbg.dassert(not fit_df.empty)
         fit_df = fit_df.copy()
+        # Compute the info for `fit_df`.
         info = collections.OrderedDict()
         info["fit_df_info"] = get_df_info_as_string(fit_df)
         self._set_info("fit", info)
-        dbg.dassert(not fit_df.empty)
         return {self.output_names[0]: fit_df}
 
     def set_predict_intervals(self, intervals: List[Tuple[Any, Any]]) -> None:
@@ -175,6 +207,7 @@ class DataSource(FitPredictNode, abc.ABC):
         """
         :return: test set as df
         """
+        # TODO(gp): Factor it out since this is similar enough to `fit`.
         if self._predict_intervals is not None:
             idx_slices = [
                 self.df.loc[interval[0] : interval[1]].index
@@ -190,10 +223,13 @@ class DataSource(FitPredictNode, abc.ABC):
         dbg.dassert(not predict_df.empty)
         return {self.output_names[0]: predict_df}
 
+    # TODO(gp): Make df private since there is an accessor. We can use
+    #  a property.
     def get_df(self) -> pd.DataFrame:
         dbg.dassert_is_not(self.df, None, "No DataFrame found!")
         return self.df
 
+    # TODO(gp): I'd make free standing in dataflow/core/intervals.py
     @staticmethod
     def _validate_intervals(intervals: List[Tuple[Any, Any]]) -> None:
         dbg.dassert_isinstance(intervals, list)
@@ -201,31 +237,38 @@ class DataSource(FitPredictNode, abc.ABC):
             dbg.dassert_eq(len(interval), 2)
             if interval[0] is not None and interval[1] is not None:
                 dbg.dassert_lte(interval[0], interval[1])
+        # TODO(gp): Should we enforce that intervals are not overlapping?
 
 
 class Transformer(FitPredictNode, abc.ABC):
     """
-    Stateless Single-Input Single-Output node.
+    Stateless single-input single-output node with an abstract `transform`.
     """
 
     # TODO(Paul): Consider giving users the option of renaming the single
-    # input and single output (but verify there is only one of each).
+    #  input and single output (but verify there is only one of each).
     def __init__(self, nid: str) -> None:
         super().__init__(nid)
 
     def fit(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+        # TODO(gp): -> validate_df
         dbg.dassert_no_duplicates(df_in.columns)
         # Transform the input df.
         df_out, info = self._transform(df_in)
+        # Compute info.
         self._set_info("fit", info)
+        # TODO(gp): -> validate_df
         dbg.dassert_no_duplicates(df_out.columns)
         return {"df_out": df_out}
 
     def predict(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+        # TODO(gp): -> validate_df
         dbg.dassert_no_duplicates(df_in.columns)
         # Transform the input df.
         df_out, info = self._transform(df_in)
+        # Compute info.
         self._set_info("predict", info)
+        # TODO(gp): -> validate_df
         dbg.dassert_no_duplicates(df_out.columns)
         return {"df_out": df_out}
 
@@ -234,7 +277,7 @@ class Transformer(FitPredictNode, abc.ABC):
         self, df: pd.DataFrame
     ) -> Tuple[pd.DataFrame, collections.OrderedDict]:
         """
-        :return: df, info
+        :return: transformed df, info
         """
 
 
@@ -242,20 +285,31 @@ class Transformer(FitPredictNode, abc.ABC):
 # Data source nodes
 # #############################################################################
 
+# TODO(gp): Move all DataSource nodes in nodes_data_source.py?
 
 class ReadDataFromDf(DataSource):
+    """
+    Data source node that feed data from the given `df`.
+    """
     def __init__(self, nid: str, df: pd.DataFrame) -> None:
         super().__init__(nid)
+        # TODO(gp): -> validate_input_output_df or is it done by the superclass?
         dbg.dassert_isinstance(df, pd.DataFrame)
         self.df = df
 
 
+# TODO(gp): -> FileDataSource? The file can be on S3.
 class DiskDataSource(DataSource):
+    """
+    Data source node that reads data from a file.
+    """
+
     def __init__(
         self,
         nid: str,
         file_path: str,
         timestamp_col: Optional[str] = None,
+        # TODO(gp): -> start_dt, end_dt?
         start_date: Optional[_PANDAS_DATE_TYPE] = None,
         end_date: Optional[_PANDAS_DATE_TYPE] = None,
         reader_kwargs: Optional[Dict[str, Any]] = None,
@@ -264,7 +318,7 @@ class DiskDataSource(DataSource):
         Create data source node reading CSV or parquet data from disk.
 
         :param nid: node identifier
-        :param file_path: path to the file
+        :param file_path: path to the file (CSV or Parquet file)
         # TODO(*): Don't the readers support this already?
         :param timestamp_col: name of the timestamp column. If `None`, assume
             that index contains timestamps
@@ -279,6 +333,7 @@ class DiskDataSource(DataSource):
         self._end_date = end_date
         self._reader_kwargs = reader_kwargs or {}
 
+    # TODO(gp): How can it be Optional? A SourceNode should always read.
     def fit(self) -> Optional[Dict[str, pd.DataFrame]]:
         """
         :return: training set as df
@@ -286,8 +341,15 @@ class DiskDataSource(DataSource):
         self._lazy_load()
         return super().fit()
 
+    # TODO(gp): What about predict?
+
     def _read_data(self) -> None:
+        """
+        Read the data from the passed `file_path`.
+        """
+        # Get the extension.
         ext = os.path.splitext(self._file_path)[-1]
+        # Pick the function to use.
         if ext == ".csv":
             if "index_col" not in self._reader_kwargs:
                 self._reader_kwargs["index_col"] = 0
@@ -296,16 +358,22 @@ class DiskDataSource(DataSource):
             read_data = pd.read_parquet
         else:
             raise ValueError("Invalid file extension='%s'" % ext)
+        # Read the data.
         self.df = read_data(self._file_path, **self._reader_kwargs)
 
     def _process_data(self) -> None:
+        # Ensure that the index is valid.
         if self._timestamp_col is not None:
+            # TODO(gp): Do we need a drop=True?
             self.df.set_index(self._timestamp_col, inplace=True)
         self.df.index = pd.to_datetime(self.df.index)
         dbg.dassert_strictly_increasing_index(self.df)
+        # Trim the data.
         self.df = self.df.loc[self._start_date : self._end_date]
         dbg.dassert(not self.df.empty, "Dataframe is empty")
 
+    # TODO(gp): A little thin and used only once: I would inline to not
+    #  introduce another symbol?
     def _lazy_load(self) -> None:
         if self.df is not None:
             return
@@ -326,10 +394,16 @@ class ArmaGenerator(DataSource):
         end_date: _PANDAS_DATE_TYPE,
         ar_coeffs: Optional[List[float]] = None,
         ma_coeffs: Optional[List[float]] = None,
+        # TODO(gp): -> arma_scale, ... for clarity?
         scale: Optional[float] = None,
         burnin: Optional[float] = None,
         seed: Optional[float] = None,
     ) -> None:
+        """
+        The ARMA parameters are the same as `cartif.ArmaProcess`.
+
+        :param start_date, end_date, frequency: used to generate the datetime index
+        """
         super().__init__(nid)
         self._frequency = frequency
         self._start_date = start_date
@@ -345,7 +419,7 @@ class ArmaGenerator(DataSource):
 
     def fit(self) -> Optional[Dict[str, pd.DataFrame]]:
         """
-        :return: training set as df
+        The fit/predict dataframe contain "close" and "vol" columns.
         """
         self._lazy_load()
         return super().fit()
@@ -372,9 +446,12 @@ class ArmaGenerator(DataSource):
         # times this is practically interchangeable with percentage returns).
         prices = rets.cumsum()
         prices.name = "close"
+        # Convert to a df.
         self.df = prices.to_frame()
+        # Trim to [start_date, end_date].
         self.df = self.df.loc[self._start_date : self._end_date]
         # Use constant volume (for now).
+        # TODO(gp): Call it "Volume".
         self.df["vol"] = 100
 
 
@@ -404,9 +481,10 @@ class MultivariateNormalGenerator(DataSource):
             dim=self._dim, seed=self._seed
         )
 
+    # TODO(gp): Can it be Optional?
     def fit(self) -> Optional[Dict[str, pd.DataFrame]]:
         """
-        :return: training set as df
+        The fit/predict dataframe contain "close" and "vol" columns.
         """
         self._lazy_load()
         return super().fit()
@@ -459,22 +537,23 @@ class YConnector(FitPredictNode):
     ) -> None:
         """
         :param nid: unique node id
-        :param connector_func:
-            * Merge
-            ```
-            connector_func = lambda df_in1, df_in2, **connector_kwargs:
-                df_in1.merge(df_in2, **connector_kwargs)
-            ```
-            * Reindexing
-            ```
-            connector_func = lambda df_in1, df_in2, connector_kwargs:
-                df_in1.reindex(index=df_in2.index, **connector_kwargs)
-            ```
-            * User-defined functions
-            ```
-            # my_func(df_in1, df_in2, **connector_kwargs)
-            connector_func = my_func
-            ```
+        :param connector_func: function used to connect the input dataframes
+            into a single one. E.g.,
+            - Merge
+              ```
+              connector_func = lambda df_in1, df_in2, connector_kwargs:
+                  df_in1.merge(df_in2, **connector_kwargs)
+              ```
+            - Reindexing
+              ```
+              connector_func = lambda df_in1, df_in2, connector_kwargs:
+                  df_in1.reindex(index=df_in2.index, **connector_kwargs)
+              ```
+            - User-defined functions
+              ```
+              # my_func(df_in1, df_in2, **connector_kwargs)
+              connector_func = my_func
+              ```
         :param connector_kwargs: kwargs associated with `connector_func`
         """
         super().__init__(nid, inputs=["df_in1", "df_in2"])
@@ -487,13 +566,15 @@ class YConnector(FitPredictNode):
         """
         Allow introspection on column names of input dataframe #1.
         """
-        return self._get_col_names(self._df_in1_col_names)
+        _check_col_names(self._df_in1_col_names)
+        return self._df_in1_col_names
 
     def get_df_in2_col_names(self) -> List[str]:
         """
         Allow introspection on column names of input dataframe #2.
         """
-        return self._get_col_names(self._df_in2_col_names)
+        _check_col_names(self._df_in2_col_names)
+        return self._df_in2_col_names
 
     # pylint: disable=arguments-differ
     def fit(
@@ -523,14 +604,13 @@ class YConnector(FitPredictNode):
         return df_out, info
 
     @staticmethod
-    def _get_col_names(col_names: List[str]) -> List[str]:
+    def _check_col_names(col_names: List[str]) -> None:
         dbg.dassert_is_not(
             col_names,
             None,
-            "No column names. This may indicate "
-            "an invocation prior to graph execution.",
+            "No column names. This may indicate an invocation prior to "
+            "graph execution.",
         )
-        return col_names
 
 
 # #############################################################################

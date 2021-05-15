@@ -72,6 +72,7 @@ class NodeInterface(abc.ABC):
         # TODO(gp): Should we check for empty strings.
         for item in items:
             dbg.dassert_isinstance(item, str)
+        dbg.dassert_no_duplicates(items)
         return items
 
 
