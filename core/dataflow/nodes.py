@@ -58,7 +58,6 @@ _PANDAS_DATE_TYPE = Union[str, pd.Timestamp, datetime.datetime]
 #     dbg.dassert_strictly_increasing_index(self.df)
 
 
-
 # #############################################################################
 # Abstract Node classes with sklearn-style interfaces
 # #############################################################################
@@ -85,7 +84,7 @@ class FitPredictNode(Node, abc.ABC):
             outputs = ["df_out"]
         super().__init__(nid=nid, inputs=inputs, outputs=outputs)
         # Dict 'method name -> various info'.
-        self._info : Dict[str, Any] = collections.OrderedDict()
+        self._info: Dict[str, Any] = collections.OrderedDict()
 
     @abc.abstractmethod
     def fit(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
@@ -196,7 +195,7 @@ class DataSource(FitPredictNode, abc.ABC):
             ]
             idx = functools.reduce(lambda x, y: x.union(y), idx_slices)
             # TODO(gp): Add a
-            #dbg.dassert_issubset(idx, self.dx.index) ?
+            # dbg.dassert_issubset(idx, self.dx.index) ?
             fit_df = self.df.loc[idx]
         else:
             fit_df = self.df
@@ -306,10 +305,12 @@ class Transformer(FitPredictNode, abc.ABC):
 
 # TODO(gp): Move all DataSource nodes in nodes_data_source.py?
 
+
 class ReadDataFromDf(DataSource):
     """
     Data source node that feed data from the given `df`.
     """
+
     def __init__(self, nid: str, df: pd.DataFrame) -> None:
         super().__init__(nid)
         # TODO(gp): -> validate_input_output_df or is it done by the superclass?
@@ -1142,6 +1143,7 @@ class Resample(Transformer):
     """
     Node that applies `core.signal_processing.resample()` to a df.
     """
+
     def __init__(
         self,
         nid: str,
@@ -1295,12 +1297,9 @@ class VolatilityNormalizer(FitPredictNode, ColModeMixin):
         self._target_volatility = target_volatility
         dbg.dassert_is_proportion(self._target_volatility)
         self._col_mode = col_mode or "merge_all"
-        dbg.dassert_in(
-            self._col_mode,
-            ["merge_all", "replace_all"]
-        )
+        dbg.dassert_in(self._col_mode, ["merge_all", "replace_all"])
         # TODO(gp): Can it be None? I'd do
-        #self._scale_factor: float
+        # self._scale_factor: float
         self._scale_factor: Optional[float] = None
 
     def fit(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:

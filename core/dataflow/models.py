@@ -37,9 +37,11 @@ _COL_TYPE = Union[int, str]
 _PANDAS_DATE_TYPE = Union[str, pd.Timestamp, datetime.datetime]
 
 #
-_TO_LIST_MIXIN_TYPE = Union[List[_COL_TYPE],
-                            #
-                            Callable[[], List[_COL_TYPE]]]
+_TO_LIST_MIXIN_TYPE = Union[
+    List[_COL_TYPE],
+    #
+    Callable[[], List[_COL_TYPE]],
+]
 
 
 # #############################################################################

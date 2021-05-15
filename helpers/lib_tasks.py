@@ -189,7 +189,8 @@ def _run(ctx: Any, cmd: str, *args: Any, **kwargs: Any) -> None:
 
 
 def _get_files_to_process(modified: bool, branch: bool, files: str,
-                          mutually_exclusive: bool) -> List[str]:
+                          mutually_exclusive: bool,
+                          remove_dirs: bool) -> List[str]:
     """
     Get a list of files to process that have been changed in the branch,
     in the client, or passed by the user.
@@ -228,23 +229,25 @@ def _get_files_to_process(modified: bool, branch: bool, files: str,
     # Convert into a list.
     files_as_list = files.split(" ")
     files_as_list = [f for f in files_as_list if f != ""]
-    # Remove dirs.
-    files_tmp: List[str] = []
-    dirs_tmp: List[str] = []
-    for file in files_as_list:
-        if os.path.isdir(file):
-            _LOG.debug("file='%s' is a dir: skipping", file)
-            dirs_tmp.append(file)
-        else:
-            files_tmp.append(file)
-    if dirs_tmp:
-        _LOG.warning("Removing dirs: %s", ", ".join(dirs_tmp))
-    files_as_list = files_tmp
+    # Remove dirs, if needed.
+    if remove_dirs:
+        files_tmp: List[str] = []
+        dirs_tmp: List[str] = []
+        for file in files_as_list:
+            if os.path.isdir(file):
+                _LOG.debug("file='%s' is a dir: skipping", file)
+                dirs_tmp.append(file)
+            else:
+                files_tmp.append(file)
+        if dirs_tmp:
+            _LOG.warning("Removed dirs: %s", ", ".join(dirs_tmp))
+        files_as_list = files_tmp
     _LOG.debug("files='%s'", str(files))
     # Ensure that there are files to process.
     if not files_as_list:
         _LOG.warning("No files were selected")
     return files_as_list
+
 
 # Copied from helpers.datetime_ to avoid dependency from pandas.
 
@@ -449,9 +452,9 @@ def git_delete_merged_branches(ctx, confirm_delete=True):  # type: ignore
 # TODO(gp): Allow to create it from a issue number.
 @task
 def git_create_branch(  # type: ignore
-        ctx, branch_name="", issue_id=0, repo="current", only_branch_from_master=True):
+        ctx, branch_name="", issue_id=0, repo="current", suffix="", only_branch_from_master=True):
     """
-    Create and push upstream branch `branch_name` or the branch corresponding to
+    Create and push upstream branch `branch_name` or the one corresponding to
     `issue_id` in repo `repo`.
 
     E.g.,
@@ -462,6 +465,11 @@ def git_create_branch(  # type: ignore
 
     :param branch_name: name of the branch to create (e.g.,
         `LemTask169_Get_GH_actions`)
+    :param issue_id: use the canonical name for the branch corresponding to that issue
+    :param repo: name of the GitHub repo that the `issue_id` belongs to
+        - "current" (default): the current repo
+        - short name (e.g., "amp", "lem") of the branch
+    :param suffix:
     :param only_branch_from_master: only allow to branch from master
     """
     _report_task()
@@ -531,8 +539,13 @@ def git_create_patch(  # type: ignore
     cmd = ""
     if mode == "tar":
         # Get the files.
+        # We allow to specify files as a subset of files modified in the branch or
+        # in the client.
+        mutually_exclusive = False
+        # We don't allow to specify directories.
+        remove_dirs = True
         files_as_list = _get_files_to_process(modified, branch, files,
-                                              mutually_exclusive=False)
+                                              mutually_exclusive, remove_dirs)
         _LOG.info("Files to save:\n%s", hprint.indent("\n".join(files_as_list)))
         if not files_as_list:
             _LOG.warning("Nothing to patch: exiting")
@@ -1885,8 +1898,13 @@ def lint(ctx, modified=False, branch=False, files="", phases="", only_black=Fals
     #
     docker_pull(ctx, stage=stage, images="dev_tools")
     # Get the files to lint.
+    # For linting we can use only files modified in the client, in the branch, or
+    # specified.
+    mutually_exclusive = True
+    # pre-commit doesn't handle directories, but only files.
+    remove_dirs = True
     files_as_list = _get_files_to_process(modified, branch, files,
-                                          mutually_exclusive=True)
+                                          mutually_exclusive, remove_dirs)
     _LOG.info("Files to lint:\n%s", "\n".join(files_as_list))
     if not files_as_list:
         _LOG.warning("Nothing to lint: exiting")
@@ -1895,7 +1913,7 @@ def lint(ctx, modified=False, branch=False, files="", phases="", only_black=Fals
     # Prepare the command line.
     if only_black:
         _LOG.warning("Running only black")
-        phases = "run black"
+        phases = "black"
     precommit_opts = [
         f"run {phases}",
         "-c /app/.pre-commit-config.yaml",
@@ -2107,7 +2125,7 @@ def gh_create_pr(  # type: ignore
         f" --repo {repo_full_name}" +
         (" --draft" if draft else "") +
         f' --title "{title}"' +
-        f' --body {body}'
+        f' --body "{body}"'
     )
     _run(ctx, cmd)
     # TODO(gp): Capture the output of the command and save the info in a

@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 import core.config as cconfi
 import core.config_builders as cfgb
 import core.finance as fin
+
 # TODO(gp): Use `import core.dataflow` if possible
 from core.dataflow.core import DAG, Node
 from core.dataflow.models import VolatilityModel
@@ -53,7 +54,8 @@ class DagBuilder(abc.ABC):
         if self._nid_prefix and not self._nid_prefix.endswith("/"):
             _LOG.warning(
                 "Appended '/' to nid_prefix '%s'. To avoid this warning, "
-                "only pass nid prefixes ending in '/'.", self._nid_prefix
+                "only pass nid prefixes ending in '/'.",
+                self._nid_prefix,
             )
             self._nid_prefix += "/"
 
