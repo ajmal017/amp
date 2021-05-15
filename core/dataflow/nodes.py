@@ -34,8 +34,8 @@ class FitPredictNode(Node, abc.ABC):
     """
     Define an abstract class with sklearn-style `fit` and `predict` functions.
 
-    Nodes may store a dictionary of information for each method
-    following the method's invocation.
+    Nodes may store a dictionary of information for each method following
+    the method's invocation.
     """
 
     def __init__(
@@ -44,30 +44,51 @@ class FitPredictNode(Node, abc.ABC):
         inputs: Optional[List[str]] = None,
         outputs: Optional[List[str]] = None,
     ) -> None:
+        # TODO(gp): I'd force the clients to be explicit here?
         if inputs is None:
             inputs = ["df_in"]
         if outputs is None:
             outputs = ["df_out"]
         super().__init__(nid=nid, inputs=inputs, outputs=outputs)
-        self._info = collections.OrderedDict()
+        # Dict 'method name -> various info'.
+        self._info : Dict[str, Any] = collections.OrderedDict()
 
     @abc.abstractmethod
     def fit(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+        """
+        Fit this node's model using the input data stored in `df_in`.
+
+        :return: TODO(gp)
+        """
         pass
 
     @abc.abstractmethod
     def predict(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+        """
+        Use this node's model to predict on the input data stored in `df_in`.
+
+        :return: TODO(gp)
+        """
         pass
 
     def get_fit_state(self) -> Dict[str, Any]:
+        """
+        TODO(gp): ?
+        """
         return {}
 
     def set_fit_state(self, fit_state: Dict[str, Any]) -> None:
+        """
+        TODO(gp): ?
+        """
         pass
 
     def get_info(
         self, method: str
     ) -> Optional[Union[str, collections.OrderedDict]]:
+        """
+        Return the information stored in this node for the given `method`.
+        """
         # TODO(Paul): Add a dassert_getattr function to use here and in core.
         dbg.dassert_isinstance(method, str)
         dbg.dassert(getattr(self, method))
@@ -77,6 +98,7 @@ class FitPredictNode(Node, abc.ABC):
         _LOG.warning("No info found for nid=%s, method=%s", self.nid, method)
         return None
 
+    # TODO(gp): values -> info
     def _set_info(self, method: str, values: collections.OrderedDict) -> None:
         dbg.dassert_isinstance(method, str)
         dbg.dassert(getattr(self, method))
@@ -85,9 +107,13 @@ class FitPredictNode(Node, abc.ABC):
         self._info[method] = copy.copy(values)
 
 
+# TODO(gp): Not sure if abc.ABC is needed, since there are still some abstract
+#  methods. It might be useful to communicate that it's abstract.
 class DataSource(FitPredictNode, abc.ABC):
     """
     A source node that can be configured for cross-validation.
+
+    Being a source, this node doesn't have any input but only outputs.
     """
 
     def __init__(self, nid: str, outputs: Optional[List[str]] = None) -> None:
@@ -123,9 +149,10 @@ class DataSource(FitPredictNode, abc.ABC):
                 for interval in self._fit_intervals
             ]
             idx = functools.reduce(lambda x, y: x.union(y), idx_slices)
-            fit_df = self.df.loc[idx].copy()
+            fit_df = self.df.loc[idx]
         else:
-            fit_df = self.df.copy()
+            fit_df = self.df
+        fit_df = fit_df.copy()
         info = collections.OrderedDict()
         info["fit_df_info"] = get_df_info_as_string(fit_df)
         self._set_info("fit", info)

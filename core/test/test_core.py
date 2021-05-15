@@ -238,7 +238,7 @@ class Test_dataflow_core_DAG2(_Dataflow_helper):
 
     def test_connect_nodes8(self) -> None:
         """
-        Ensures at most one output connects to any input.
+        Ensure at most one output connects to any input.
         """
         dag = dtf.DAG()
         n1 = dtf.Node("n1", outputs=["out1", "out2"])
@@ -258,7 +258,7 @@ class Test_dataflow_core_DAG2(_Dataflow_helper):
 
     def test_connect_nodes9(self) -> None:
         """
-        Allows multi-attribute edges if each input has at most one source.
+        Allow multi-attribute edges if each input has at most one source.
         """
         dag = dtf.DAG()
         n1 = dtf.Node("n1", outputs=["out1"])
@@ -271,7 +271,7 @@ class Test_dataflow_core_DAG2(_Dataflow_helper):
 
     def test_connect_nodes10(self) -> None:
         """
-        Demonstrates adding edges is not idempotent.
+        Demonstrate adding edges is not idempotent.
         """
         dag = dtf.DAG()
         n1 = dtf.Node("n1", outputs=["out1"])
@@ -294,7 +294,6 @@ class Test_dataflow_core_DAG2(_Dataflow_helper):
         """
         Return a DAG with two unconnected nodes.
         """
-
         dag = dtf.DAG()
         n1 = dtf.Node("n1", outputs=["out1"])
         dag.add_node(n1)
@@ -304,17 +303,34 @@ class Test_dataflow_core_DAG2(_Dataflow_helper):
 
 
 class Test_dataflow_core_DAG3(_Dataflow_helper):
+
     def test_sources_sinks1(self) -> None:
+        """
+        Check sources and sinks of a single node linear DAG.
+        """
+        dag = dtf.DAG()
+        n1 = dtf.Node("n1")
+        dag.add_node(n1)
+        #
+        self.assertEqual(dag.get_sources(), ["n1"])
+        self.assertEqual(dag.get_sinks(), ["n1"])
+
+    def test_sources_sinks2(self) -> None:
+        """
+        Check sources and sinks of a two node linear DAG.
+        """
+        # Build a DAG n1 -> n2
         dag = dtf.DAG()
         n1 = dtf.Node("n1", outputs=["out1"])
         dag.add_node(n1)
         n2 = dtf.Node("n2", inputs=["in1"])
         dag.add_node(n2)
         dag.connect("n1", "n2")
+        # Check.
         self.assertEqual(dag.get_sources(), ["n1"])
         self.assertEqual(dag.get_sinks(), ["n2"])
 
-    def test_sources_sinks2(self) -> None:
+    def test_sources_sinks3(self) -> None:
         dag = dtf.DAG()
         src1 = dtf.Node("src1", outputs=["out1"])
         dag.add_node(src1)
@@ -330,16 +346,11 @@ class Test_dataflow_core_DAG3(_Dataflow_helper):
         snk2 = dtf.Node("snk2", inputs=["in1"])
         dag.add_node(snk2)
         dag.connect("m1", "snk2")
+        #
         sources = dag.get_sources()
         sources.sort()
         self.assertListEqual(sources, ["src1", "src2"])
+        #
         sinks = dag.get_sinks()
         sinks.sort()
         self.assertListEqual(sinks, ["snk1", "snk2"])
-
-    def test_sources_sinks3(self) -> None:
-        dag = dtf.DAG()
-        n1 = dtf.Node("n1")
-        dag.add_node(n1)
-        self.assertEqual(dag.get_sources(), ["n1"])
-        self.assertEqual(dag.get_sinks(), ["n1"])

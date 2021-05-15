@@ -1463,7 +1463,6 @@ def _to_pbcopy(txt: str) -> None:
         _LOG.warning("pbcopy works only on macOS")
 
 
-
 @task
 def find_test_class(ctx, class_name="", dir_name=".", pbcopy=True):  # type: ignore
     """
