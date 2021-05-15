@@ -71,6 +71,7 @@ class Test_dassert1(hut.TestCase):
             dbg.dassert(y, ["hello"])
         self.check_string(str(cm.exception))
 
+
 # #############################################################################
 
 
@@ -207,23 +208,31 @@ class Test_dassert_misc1(hut.TestCase):
 
 
 class Test_dassert_lgt1(hut.TestCase):
-
     def test1(self) -> None:
         dbg.dassert_lgt(0, 0, 3, lower_bound_closed=True, upper_bound_closed=True)
 
     def test2(self) -> None:
         with self.assertRaises(AssertionError) as cm:
-            dbg.dassert_lgt(0, 0, 3, lower_bound_closed=False, upper_bound_closed=True)
+            dbg.dassert_lgt(
+                0, 0, 3, lower_bound_closed=False, upper_bound_closed=True
+            )
         act = str(cm.exception)
         exp = ""
         self.assert_equal(act, exp)
 
     def test3(self) -> None:
         with self.assertRaises(AssertionError) as cm:
-            lower_bound_closed=False
-            upper_bound_closed=True
-            dbg.dassert_lgt(0, 100, 3, lower_bound_closed, upper_bound_closed,
-                            "hello %s", "world")
+            lower_bound_closed = False
+            upper_bound_closed = True
+            dbg.dassert_lgt(
+                0,
+                100,
+                3,
+                lower_bound_closed,
+                upper_bound_closed,
+                "hello %s",
+                "world",
+            )
         act = str(cm.exception)
         exp = ""
         self.assert_equal(act, exp)
@@ -233,7 +242,6 @@ class Test_dassert_lgt1(hut.TestCase):
 
 
 class Test_dassert_is_proportion1(hut.TestCase):
-
     def test1(self) -> None:
         dbg.dassert_is_proportion(0.1, "hello %s", "world")
 
@@ -270,6 +278,7 @@ class Test_dassert_is_proportion1(hut.TestCase):
         act = str(cm.exception)
         exp = ""
         self.assert_equal(act, exp)
+
 
 # #############################################################################
 

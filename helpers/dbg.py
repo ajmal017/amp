@@ -11,8 +11,8 @@ import pprint
 import sys
 from typing import Any, Iterable, List, Optional, Tuple, Type, Union
 
-#import helpers.versioning as hversi
-#hversi.check_version()
+# import helpers.versioning as hversi
+# hversi.check_version()
 
 # This module should not depend on anything else than Python standard modules.
 
@@ -78,7 +78,8 @@ def dfatal(message: str, assertion_type: Optional[Any] = None) -> None:
 
 def _to_msg(msg: Optional[str], *args: Any) -> str:
     """
-    Format the error message `msg` using the params in `args`, like `msg % args`.
+    Format the error message `msg` using the params in `args`, like `msg %
+    args`.
     """
     if msg is None:
         # If there is no message, we should have no arguments to format.
@@ -118,8 +119,9 @@ def dassert(cond: Any, msg: Optional[str] = None, *args: Any) -> None:
     # Handle the somehow frequent case of using `dassert` instead of another
     # one, e.g., `dassert(y, list)`
     if msg is not None:
-        assert isinstance(msg, str), (f"You passed '{msg}' or type '{type(msg)}'"
-            "instead of str")
+        assert isinstance(msg, str), (
+            f"You passed '{msg}' or type '{type(msg)}'" "instead of str"
+        )
     if not cond:
         txt = "cond=%s" % cond
         _dfatal(txt, msg, *args)
@@ -144,7 +146,7 @@ def dassert_ne(
 
 
 def dassert_imply(
-        val1: Any, val2: Any, msg: Optional[str] = None, *args: Any
+    val1: Any, val2: Any, msg: Optional[str] = None, *args: Any
 ) -> None:
     cond = not val1 or val2
     if not cond:
@@ -179,7 +181,8 @@ def dassert_lgt(
     upper_bound: float,
     lower_bound_closed: bool,
     upper_bound_closed: bool,
-    msg: Optional[str] = None, *args: Any,
+    msg: Optional[str] = None,
+    *args: Any,
 ) -> None:
     """
     Assert that `lower_bound <= x <= upper_bound`.
@@ -200,16 +203,14 @@ def dassert_lgt(
 
 
 def dassert_is_proportion(
-    x: float,
-    msg: Optional[str] = None, *args: Any
+    x: float, msg: Optional[str] = None, *args: Any
 ) -> None:
     """
     Assert that `0 <= x <= 1`.
     """
     lower_bound_closed = True
     upper_bound_closed = True
-    dassert_lgt(0, x, 1, lower_bound_closed, upper_bound_closed,
-                msg, args)
+    dassert_lgt(0, x, 1, lower_bound_closed, upper_bound_closed, msg, args)
 
 
 # Membership.
@@ -395,11 +396,11 @@ def _get_first_type(obj: Iterable, tag: str) -> Type:
 
 
 def dassert_array_has_same_type_element(
-        obj1: Any,
-        obj2: Any,
-        only_first_elem: bool,
-        msg: Optional[str] = None,
-        *args: Any,
+    obj1: Any,
+    obj2: Any,
+    only_first_elem: bool,
+    msg: Optional[str] = None,
+    *args: Any,
 ) -> None:
     """
     Check that two objects iterables like arrays (e.g., pd.Index) have elements
