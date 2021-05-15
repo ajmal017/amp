@@ -133,6 +133,8 @@ class FitPredictNode(Node, abc.ABC):
         return None
 
     # TODO(gp): values -> info
+    # TODO(gp): We should merge the dicts instead of overwrite, to keep
+    #  classes composable. Otherwise a derived class overrides the values.
     def _set_info(self, method: str, values: collections.OrderedDict) -> None:
         dbg.dassert_isinstance(method, str)
         dbg.dassert(getattr(self, method))
@@ -1291,13 +1293,14 @@ class VolatilityNormalizer(FitPredictNode, ColModeMixin):
         super().__init__(nid)
         self._col = col
         self._target_volatility = target_volatility
+        dbg.dassert_is_proportion(self._target_volatility)
         self._col_mode = col_mode or "merge_all"
         dbg.dassert_in(
             self._col_mode,
-            ["merge_all", "replace_all"],
-            "Invalid `col_mode`='%s'",
-            self._col_mode,
+            ["merge_all", "replace_all"]
         )
+        # TODO(gp): Can it be None? I'd do
+        #self._scale_factor: float
         self._scale_factor: Optional[float] = None
 
     def fit(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
@@ -1305,6 +1308,7 @@ class VolatilityNormalizer(FitPredictNode, ColModeMixin):
         self._scale_factor = cfinan.compute_volatility_normalization_factor(
             df_in[self._col], self._target_volatility
         )
+        # TODO(gp): Factor out?
         rescaled_y_hat = self._scale_factor * df_in[self._col]
         df_out = self._apply_col_mode(
             df_in,

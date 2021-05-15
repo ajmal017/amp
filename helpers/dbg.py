@@ -128,7 +128,8 @@ def dassert(cond: Any, msg: Optional[str] = None, *args: Any) -> None:
 def dassert_eq(
     val1: Any, val2: Any, msg: Optional[str] = None, *args: Any
 ) -> None:
-    if not val1 == val2:
+    cond = val1 == val2
+    if not cond:
         txt = "'%s'\n==\n'%s'" % (val1, val2)
         _dfatal(txt, msg, *args)
 
@@ -136,17 +137,29 @@ def dassert_eq(
 def dassert_ne(
     val1: Any, val2: Any, msg: Optional[str] = None, *args: Any
 ) -> None:
-    # pylint: disable=superfluous-parens
-    if not (val1 != val2):
+    cond = val1 != val2
+    if not cond:
         txt = "'%s'\n!=\n'%s'" % (val1, val2)
         _dfatal(txt, msg, *args)
+
+
+def dassert_imply(
+        val1: Any, val2: Any, msg: Optional[str] = None, *args: Any
+) -> None:
+    cond = not val1 or val2
+    if not cond:
+        txt = "'%s' implies '%s'" % (val1, val2)
+        _dfatal(txt, msg, *args)
+
+
+# Comparison related.
 
 
 def dassert_lt(
     val1: Any, val2: Any, msg: Optional[str] = None, *args: Any
 ) -> None:
-    # pylint: disable=superfluous-parens
-    if not (val1 < val2):
+    cond = val1 < val2
+    if not cond:
         txt = "%s < %s" % (val1, val2)
         _dfatal(txt, msg, *args)
 
@@ -154,8 +167,8 @@ def dassert_lt(
 def dassert_lte(
     val1: Any, val2: Any, msg: Optional[str] = None, *args: Any
 ) -> None:
-    # pylint: disable=superfluous-parens
-    if not (val1 <= val2):
+    cond = val1 <= val2
+    if not cond:
         txt = "%s <= %s" % (val1, val2)
         _dfatal(txt, msg, *args)
 
@@ -199,11 +212,14 @@ def dassert_is_proportion(
                 msg, args)
 
 
+# Membership.
+
+
 def dassert_in(
     value: Any, valid_values: Any, msg: Optional[str] = None, *args: Any
 ) -> None:
-    # pylint: disable=superfluous-parens
-    if not (value in valid_values):
+    cond = value in valid_values
+    if not cond:
         txt = "'%s' in '%s'" % (value, valid_values)
         _dfatal(txt, msg, *args)
 
@@ -211,9 +227,13 @@ def dassert_in(
 def dassert_not_in(
     value: Any, valid_values: Iterable[Any], msg: Optional[str] = None, *args: Any
 ) -> None:
-    if value in valid_values:
+    cond = value not in valid_values
+    if not cond:
         txt = "'%s' not in '%s'" % (value, valid_values)
         _dfatal(txt, msg, *args)
+
+
+# Type related.
 
 
 def dassert_is(
@@ -222,8 +242,8 @@ def dassert_is(
     msg: Optional[str] = None,
     *args: Any,
 ) -> None:
-    # pylint: disable=superfluous-parens
-    if not (val1 is val2):
+    cond = val1 is val2
+    if not cond:
         txt = "'%s' is '%s'" % (val1, val2)
         _dfatal(txt, msg, *args)
 
@@ -231,8 +251,8 @@ def dassert_is(
 def dassert_is_not(
     val1: Any, val2: Optional[Any], msg: Optional[str] = None, *args: Any
 ) -> None:
-    # pylint: disable=superfluous-parens
-    if not (val1 is not val2):
+    cond = val1 is not val2
+    if not cond:
         txt = "'%s' is not '%s'" % (val1, val2)
         _dfatal(txt, msg, *args)
 
@@ -240,8 +260,9 @@ def dassert_is_not(
 def dassert_type_is(
     val1: Any, val2: Any, msg: Optional[str] = None, *args: Any
 ) -> None:
-    # pylint: disable=superfluous-parens,unidiomatic-typecheck
-    if not (type(val1) is val2):
+    # pylint: disable=unidiomatic-typecheck
+    cond = type(val1) is val2
+    if not cond:
         txt = "type of '%s' is '%s' instead of '%s'" % (val1, type(val1), val2)
         _dfatal(txt, msg, *args)
 
@@ -249,8 +270,9 @@ def dassert_type_is(
 def dassert_type_in(
     val1: Any, val2: Any, msg: Optional[str] = None, *args: Any
 ) -> None:
-    # pylint: disable=superfluous-parens,unidiomatic-typecheck
-    if not (type(val1) in val2):
+    # pylint: disable=unidiomatic-typecheck
+    cond = type(val1) in val2
+    if not cond:
         txt = "type of '%s' is '%s' not in '%s'" % (val1, type(val1), val2)
         _dfatal(txt, msg, *args)
 
@@ -258,7 +280,8 @@ def dassert_type_in(
 def dassert_isinstance(
     val1: Any, val2: type, msg: Optional[str] = None, *args: Any
 ) -> None:
-    if not isinstance(val1, val2):
+    cond = isinstance(val1, val2)
+    if not cond:
         txt = "instance of '%s' is '%s' instead of '%s'" % (
             val1,
             type(val1),
@@ -267,13 +290,7 @@ def dassert_isinstance(
         _dfatal(txt, msg, *args)
 
 
-def dassert_imply(
-    val1: Any, val2: Any, msg: Optional[str] = None, *args: Any
-) -> None:
-    # pylint: disable=superfluous-parens
-    if not (not val1 or val2):
-        txt = "'%s' implies '%s'" % (val1, val2)
-        _dfatal(txt, msg, *args)
+# Set related.
 
 
 def dassert_set_eq(
@@ -294,7 +311,7 @@ def dassert_set_eq(
         _dfatal(txt, msg, *args)
 
 
-# TODO(gp): -> dassert_issubset
+# TODO(gp): -> dassert_issubset to match Python set function.
 def dassert_is_subset(
     val1: Any, val2: Any, msg: Optional[str] = None, *args: Any
 ) -> None:
@@ -329,11 +346,14 @@ def dassert_not_intersection(
         _dfatal(txt, msg, *args)
 
 
+# Array related.
+
+
 def dassert_no_duplicates(
     val1: Any, msg: Optional[str] = None, *args: Any
 ) -> None:
-    # pylint: disable=superfluous-parens
-    if not (len(set(val1)) == len(val1)):
+    cond = len(set(val1)) == len(val1)
+    if not cond:
         # Count the occurrences of each element of the seq.
         v_to_num = [(v, val1.count(v)) for v in set(val1)]
         # Build list of elems with duplicates.
@@ -350,8 +370,8 @@ def dassert_eq_all(
 ) -> None:
     val1 = list(val1)
     val2 = list(val2)
-    is_equal = val1 == val2
-    if not is_equal:
+    cond = val1 == val2
+    if not cond:
         # mask = val1 != val2
         txt = []
         txt.append("val1=%s\n%s" % (len(val1), val1))
@@ -360,6 +380,61 @@ def dassert_eq_all(
         # txt += "\n%s" % val1[mask]
         # txt += "\n%s" % val2[mask]
         _dfatal(txt, msg, *args)
+
+
+def _get_first_type(obj: Iterable, tag: str) -> Type:
+    obj_types = set(type(v) for v in obj)
+    dassert_eq(
+        len(obj_types),
+        1,
+        "More than one type for elem of " "%s=%s",
+        tag,
+        map(str, obj_types),
+    )
+    return list(obj_types)[0]
+
+
+def dassert_array_has_same_type_element(
+        obj1: Any,
+        obj2: Any,
+        only_first_elem: bool,
+        msg: Optional[str] = None,
+        *args: Any,
+) -> None:
+    """
+    Check that two objects iterables like arrays (e.g., pd.Index) have elements
+    of the same type.
+
+    :param only_first_elem: whether to check only the first element or all the
+        elements of the iterable.
+    """
+    # Get the types to compare.
+    if only_first_elem:
+        obj1_first_type = type(obj1[0])
+        obj2_first_type = type(obj2[0])
+    else:
+        obj1_first_type = _get_first_type(obj1, "obj1")
+        obj2_first_type = _get_first_type(obj2, "obj2")
+    #
+    if obj1_first_type != obj2_first_type:
+        txt = []
+        num_elems = 5
+        txt.append("obj1=\n%s" % obj1[:num_elems])
+        txt.append("obj2=\n%s" % obj2[:num_elems])
+        txt.append(
+            "type(obj1)='%s' is different from "
+            "type(obj2)='%s'" % (obj1_first_type, obj2_first_type)
+        )
+        _dfatal(txt, msg, *args)
+
+
+def dassert_list_of_strings(output: List[str], *args: Any) -> None:
+    dassert_isinstance(output, list, *args)
+    for line in output:
+        dassert_isinstance(line, str, *args)
+
+
+# File related
 
 
 # TODO(*): -> _file_exists
@@ -392,7 +467,7 @@ def dassert_not_exists(
     file_name: str, msg: Optional[str] = None, *args: Any
 ) -> None:
     """
-    Ensure that a file or a dir `file_name` doesn't exist, otherwise raises.
+    Ensure that a file or a dir `file_name` doesn't exist, raise otherwise.
     """
     file_name = os.path.abspath(file_name)
     # pylint: disable=superfluous-parens,unneeded-not
@@ -415,6 +490,9 @@ def dassert_file_extension(
     dassert_in(
         act_ext, exp_exts, "Invalid extension %s for %s", act_ext, file_name
     )
+
+
+# Pandas related.
 
 
 def dassert_strictly_increasing_index(
@@ -450,58 +528,6 @@ def dassert_monotonic_index(
     cond = index.is_monotonic_increasing or index.is_monotonic_decreasing
     dassert(cond, msg=msg, *args)  # type: ignore
     dassert(index.is_unique, msg=msg, *args)  # type: ignore
-
-
-def _get_first_type(obj: Iterable, tag: str) -> Type:
-    obj_types = set(type(v) for v in obj)
-    dassert_eq(
-        len(obj_types),
-        1,
-        "More than one type for elem of " "%s=%s",
-        tag,
-        map(str, obj_types),
-    )
-    return list(obj_types)[0]
-
-
-def dassert_array_has_same_type_element(
-    obj1: Any,
-    obj2: Any,
-    only_first_elem: bool,
-    msg: Optional[str] = None,
-    *args: Any,
-) -> None:
-    """
-    Check that two objects iterables like arrays (e.g., pd.Index) have elements
-    of the same type.
-
-    :param only_first_elem: whether to check only the first element or all the
-        elements of the iterable.
-    """
-    # Get the types to compare.
-    if only_first_elem:
-        obj1_first_type = type(obj1[0])
-        obj2_first_type = type(obj2[0])
-    else:
-        obj1_first_type = _get_first_type(obj1, "obj1")
-        obj2_first_type = _get_first_type(obj2, "obj2")
-    #
-    if obj1_first_type != obj2_first_type:
-        txt = []
-        num_elems = 5
-        txt.append("obj1=\n%s" % obj1[:num_elems])
-        txt.append("obj2=\n%s" % obj2[:num_elems])
-        txt.append(
-            "type(obj1)='%s' is different from "
-            "type(obj2)='%s'" % (obj1_first_type, obj2_first_type)
-        )
-        _dfatal(txt, msg, *args)
-
-
-def dassert_list_of_strings(output: List[str], *args: Any) -> None:
-    dassert_isinstance(output, list, *args)
-    for line in output:
-        dassert_isinstance(line, str, *args)
 
 
 # #############################################################################

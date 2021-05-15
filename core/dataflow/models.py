@@ -32,10 +32,14 @@ from core.dataflow.visitors import extract_info
 
 _LOG = logging.getLogger(__name__)
 
-
+# TODO(gp): Common factor this out.
 _COL_TYPE = Union[int, str]
 _PANDAS_DATE_TYPE = Union[str, pd.Timestamp, datetime.datetime]
-_TO_LIST_MIXIN_TYPE = Union[List[_COL_TYPE], Callable[[], List[_COL_TYPE]]]
+
+#
+_TO_LIST_MIXIN_TYPE = Union[List[_COL_TYPE],
+                            #
+                            Callable[[], List[_COL_TYPE]]]
 
 
 # #############################################################################
@@ -78,13 +82,13 @@ class ToListMixin:
           the function is returned.
 
         How this might arise in practice:
-          - A ColumnTransformer returns a number of x variables, with the
-            number dependent upon a hyperparameter expressed in config
-          - The column names of the x variables may be derived from the input
-            dataframe column names, not necessarily known until graph execution
-            (and not at construction)
-          - The ColumnTransformer output columns are merged with its input
-            columns (e.g., x vars and y vars are in the same DataFrame)
+        - A ColumnTransformer returns a number of x variables, with the
+          number dependent upon a hyper-parameter expressed in config
+        - The column names of the x variables may be derived from the input
+          dataframe column names, not necessarily known until graph execution
+          (and not at construction)
+        - The ColumnTransformer output columns are merged with its input
+          columns (e.g., x vars and y vars are in the same DataFrame)
         Post-merge, we need a way to distinguish the x vars and y vars.
         Allowing a callable here allows us to pass in the ColumnTransformer's
         method `transformed_col_names` and defer the call until graph
@@ -125,26 +129,24 @@ class ContinuousSkLearnModel(
         """
         Specify the data and sklearn modeling parameters.
 
-        :param nid: unique node id
         :param model_func: an sklearn model
         :param x_vars: indexed by knowledge datetimes
             - `x_vars` may contain lags of `y_vars`
         :param y_vars: indexed by knowledge datetimes
             - e.g., in the case of returns, this would correspond to `ret_0`
-        :param steps_ahead: number of steps ahead for which a prediction is
-            to be generated. E.g.,
+        :param steps_ahead: number of steps ahead for which a prediction is to be
+            generated. E.g.,
             - if `steps_ahead == 0`, then the predictions are
-              are contemporaneous with the observed response (and hence
-              inactionable)
-            - if `steps_ahead == 1`, then the model attempts to predict
-              `y_vars` for the next time step
-            - The model is only trained to predict the target
-              `steps_ahead` steps ahead (and not all intermediate steps)
-        :param model_kwargs: parameters to forward to the sklearn model
-            (e.g., regularization constants)
-        :param col_mode: "merge_all" or "replace_all", as in
-            ColumnTransformer()
-        :param nan_mode: "drop" or "raise"
+              contemporaneous with the observed response (and hence inactionable)
+            - if `steps_ahead == 1`, then the model attempts to predict `y_vars`
+              for the next time step
+            - the model is only trained to predict the target `steps_ahead` steps
+              ahead (and not all intermediate steps)
+        :param model_kwargs: parameters to forward to the sklearn model (e.g.,
+            regularization constants)
+        :param col_mode: "merge_all" or "replace_all" (default)
+            - Same meaning as in `ColumnTransformer()`
+        :param nan_mode: "drop" or "raise" (default)
         """
         super().__init__(nid)
         self._model_func = model_func
@@ -156,6 +158,7 @@ class ContinuousSkLearnModel(
         dbg.dassert_lte(
             0, self._steps_ahead, "Non-causal prediction attempted! Aborting..."
         )
+        # TODO(gp): Should we reduce the default values?
         # NOTE: Set to "replace_all" for backward compatibility.
         self._col_mode = col_mode or "replace_all"
         dbg.dassert_in(self._col_mode, ["replace_all", "merge_all"])
@@ -179,16 +182,16 @@ class ContinuousSkLearnModel(
         fwd_y_df = fwd_y_df.loc[non_nan_idx]
         # Handle presence of NaNs according to `nan_mode`.
         self._handle_nans(idx, non_nan_idx)
-        # Prepare x_vars in sklearn format.
+        # Prepare `x_vars` in sklearn format.
         x_fit = cdataa.transform_to_sklearn(df.loc[non_nan_idx], x_vars)
-        # Prepare forward y_vars in sklearn format.
+        # Prepare forward `y_vars` in sklearn format.
         fwd_y_fit = cdataa.transform_to_sklearn(
             fwd_y_df, fwd_y_df.columns.tolist()
         )
         # Define and fit model.
         self._model = self._model_func(**self._model_kwargs)
         self._model = self._model.fit(x_fit, fwd_y_fit)
-        # Generate insample predictions and put in dataflow dataframe format.
+        # Generate in-sample predictions and put in dataflow dataframe format.
         fwd_y_hat = self._model.predict(x_fit)
         #
         fwd_y_hat_vars = [f"{y}_hat" for y in fwd_y_df.columns]

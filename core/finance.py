@@ -507,15 +507,13 @@ def compute_volatility_normalization_factor(
     :param srs: returns series. Index must have `freq`.
     :param target_volatility: target volatility as a proportion (e.g., `0.1`
         corresponds to 10% annual volatility)
-    :return: scale factorj
+    :return: scale factor
     """
     dbg.dassert_isinstance(srs, pd.Series)
-    dbg.dassert_
     ppy = hdataf.infer_sampling_points_per_year(srs)
     srs = hdataf.apply_nan_mode(srs, mode="fill_with_zero")
-    scale_factor = target_volatility / (np.sqrt(ppy) * srs.std())
-    _LOG.debug("`scale_factor`=%f", scale_factor)
-    scale_factor = cast(float, scale_factor)
+    scale_factor: float = target_volatility / (np.sqrt(ppy) * srs.std())
+    _LOG.debug("scale_factor=%f", scale_factor)
     return scale_factor
 
 
