@@ -78,7 +78,7 @@ def dfatal(message: str, assertion_type: Optional[Any] = None) -> None:
 
 def _to_msg(msg: Optional[str], *args: Any) -> str:
     """
-    Format the error message with the params.
+    Format the error message `msg` using the params in `args`, like `msg % args`.
     """
     if msg is None:
         # If there is no message, we should have no arguments to format.
@@ -101,6 +101,7 @@ def _dfatal(
     txt: Union[str, Iterable[str]], msg: Optional[str], *args: Any
 ) -> None:
     dfatal_txt = "* Failed assertion *\n"
+    # TODO(gp): This should be an iterable.
     if isinstance(txt, list):
         dfatal_txt += "\n".join(txt)
     else:
@@ -117,7 +118,8 @@ def dassert(cond: Any, msg: Optional[str] = None, *args: Any) -> None:
     # Handle the somehow frequent case of using `dassert` instead of another
     # one, e.g., `dassert(y, list)`
     if msg is not None:
-        assert isinstance(msg, str), f"You passed '{msg}' instead of str"
+        assert isinstance(msg, str), (f"You passed '{msg}' or type '{type(msg}}'" +
+            "instead of str")
     if not cond:
         txt = "cond=%s" % cond
         _dfatal(txt, msg, *args)
@@ -164,15 +166,37 @@ def dassert_lgt(
     upper_bound: float,
     lower_bound_closed: bool,
     upper_bound_closed: bool,
+    msg: Optional[str] = None, *args: Any,
 ) -> None:
+    """
+    Assert that `lower_bound <= x <= upper_bound`.
+
+    - param: lower_bound_closed, upper_bound_closed controls
+        the open-ness/close-ness of the interval extremes.
+    """
+    # lower_bound {<=,<} x.
     if lower_bound_closed:
-        dassert_lte(lower_bound, x)
+        dassert_lte(lower_bound, x, msg, args)
     else:
-        dassert_lt(lower_bound, x)
+        dassert_lt(lower_bound, x, msg, args)
+    # x {<=,<} upper_bound.
     if upper_bound_closed:
-        dassert_lte(x, upper_bound)
+        dassert_lte(x, upper_bound, msg, args)
     else:
-        dassert_lt(x, upper_bound)
+        dassert_lt(x, upper_bound, msg, args)
+
+
+def dassert_is_proportion(
+    x: float,
+    msg: Optional[str] = None, *args: Any
+) -> None:
+    """
+    Assert that `0 <= x <= 1`.
+    """
+    lower_bound_closed = True
+    upper_bound_closed = True
+    dassert_lgt(0, x, 1, lower_bound_closed, upper_bound_closed,
+                msg, args)
 
 
 def dassert_in(

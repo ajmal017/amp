@@ -21,14 +21,19 @@ def remove_dates_with_no_data(
     Given a df indexed with timestamps, scan the data by date and filter out
     all the data when it's all nans.
 
+    :param report_stats: if True report information about the
     :return: filtered df
     """
-    # This is not strictly necessary.
+    # We rely on `groupby` to process dates in increasing days, which relies on `df`
+    # being strictly increasing.
     dbg.dassert_strictly_increasing_index(df)
-    #
+    # Store the dates of the days removed because of all NaNs.
     removed_days = []
+    # Accumulate the df for all the days that are not discarded.
     df_out = []
+    # Store the days processed.
     num_days = 0
+    # Scan the df by date.
     for date, df_tmp in df.groupby(df.index.date):
         if np.isnan(df_tmp).all(axis=1).all():
             _LOG.debug("No data on %s", date)
@@ -38,12 +43,14 @@ def remove_dates_with_no_data(
         num_days += 1
     df_out = pd.concat(df_out)
     dbg.dassert_strictly_increasing_index(df_out)
-    #
+    # TODO(gp): If report_stats (or verbose) I'd return a string and then client
+    #  can decide what to do (e.g., inject in info, _LOG.debug, _LOG.info).
     if report_stats:
+        # Stats for rows.
         _LOG.info("df.index in [%s, %s]", df.index.min(), df.index.max())
         removed_perc = hprint.perc(df.shape[0] - df_out.shape[0], df.shape[0])
         _LOG.info("Rows removed: %s", removed_perc)
-        #
+        # Stats for all days.
         removed_perc = hprint.perc(len(removed_days), num_days)
         _LOG.info("Number of removed days: %s", removed_perc)
         # Find week days.
@@ -51,13 +58,11 @@ def remove_dates_with_no_data(
         removed_perc = hprint.perc(len(removed_weekdays), len(removed_days))
         _LOG.info("Number of removed weekdays: %s", removed_perc)
         _LOG.info("Weekdays removed: %s", ", ".join(map(str, removed_weekdays)))
-        #
+        # Stats for weekend days.
         removed_perc = hprint.perc(
             len(removed_days) - len(removed_weekdays), len(removed_days)
         )
         _LOG.info("Number of removed weekend days: %s", removed_perc)
-        #
-
     return df_out
 
 
@@ -502,9 +507,10 @@ def compute_volatility_normalization_factor(
     :param srs: returns series. Index must have `freq`.
     :param target_volatility: target volatility as a proportion (e.g., `0.1`
         corresponds to 10% annual volatility)
-    :return: scale factor
+    :return: scale factorj
     """
     dbg.dassert_isinstance(srs, pd.Series)
+    dbg.dassert_
     ppy = hdataf.infer_sampling_points_per_year(srs)
     srs = hdataf.apply_nan_mode(srs, mode="fill_with_zero")
     scale_factor = target_volatility / (np.sqrt(ppy) * srs.std())

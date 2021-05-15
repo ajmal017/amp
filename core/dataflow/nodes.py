@@ -27,6 +27,8 @@ _COL_TYPE = Union[int, str]
 # TODO(*): -> DATETIME
 _PANDAS_DATE_TYPE = Union[str, pd.Timestamp, datetime.datetime]
 
+# TIMEDELTA = Union[pd.DateOffset, pd.Timedelta, str]
+
 # TODO(gp): Should we allow None to indicate beginning / end of time?
 #  This complicates the code to simplify the life of the client.
 #  Instead we can define constants START_DATETIME=..., END_DATETIME
@@ -35,11 +37,17 @@ _PANDAS_DATE_TYPE = Union[str, pd.Timestamp, datetime.datetime]
 #  consistency? This might be a big change.
 # INTERVAL = List[Tuple[Optional[DATETIME], Optional[DATETIME]]]
 
-# INFO = collections.OrderedDict()
+# INFO = collections.OrderedDict[str, Any]
 
 # This seems common, but not sure if it is worth it to obscure the meaning
 #  for saving few chars.
 # NODE_OUTPUT = Dict[str, pd.DataFrame]
+
+# Defining types
+# Pros:
+# - consistency and easy to read
+# Cons:
+# - a new symbol to look up (but PyCharm is your BFF here)
 
 # def validate_input_output_df(df):
 #     if single_index:
@@ -762,6 +770,7 @@ class ColumnTransformer(Transformer, ColModeMixin):
         self._nan_mode = nan_mode or "leave_unchanged"
         # Store the list of columns after the transformation.
         self._transformed_col_names = None
+        # TODO(gp): What does it mean?
         self._fit_cols = cols
 
     @property
@@ -769,22 +778,25 @@ class ColumnTransformer(Transformer, ColModeMixin):
         dbg.dassert_is_not(
             self._transformed_col_names,
             None,
-            "No transformed column names. This may indicate "
-            "an invocation prior to graph execution.",
+            "No transformed column names. This may indicate an invocation prior "
+            "to graph execution.",
         )
         return self._transformed_col_names
 
     def _transform(
         self, df: pd.DataFrame
     ) -> Tuple[pd.DataFrame, collections.OrderedDict]:
+        # TODO(gp): Why two copies?
         df_in = df.copy()
         df = df.copy()
         if self._fit_cols is None:
+            # TODO(gp): Can df has no columns?
             self._fit_cols = df.columns.tolist() or self._cols
         if self._cols is None:
             dbg.dassert_set_eq(self._fit_cols, df.columns)
         df = df[self._fit_cols]
         idx = df.index
+        # Handle the nan mode.
         if self._nan_mode == "leave_unchanged":
             pass
         elif self._nan_mode == "drop":
@@ -809,7 +821,7 @@ class ColumnTransformer(Transformer, ColModeMixin):
             df = self._transformer_func(df, **self._transformer_kwargs)
         df = df.reindex(index=idx)
         # TODO(Paul): Consider supporting the option of relaxing or
-        # foregoing this check.
+        #  foregoing this check.
         dbg.dassert(
             df.index.equals(df_in.index),
             "Input/output indices differ but are expected to be the same!",
@@ -827,6 +839,8 @@ class ColumnTransformer(Transformer, ColModeMixin):
         return df, info
 
 
+# TODO(gp): Lots of same code. Can we just wrap ColumnTransformer and check
+#  that has one column and then transform into a series?
 class SeriesTransformer(Transformer, ColModeMixin):
     """
     Perform non-index modifying changes of columns.
@@ -844,20 +858,7 @@ class SeriesTransformer(Transformer, ColModeMixin):
         nan_mode: Optional[str] = None,
     ) -> None:
         """
-        :param nid: unique node id
-        :param transformer_func: srs -> df. The keyword `info` (if present) is
-            assumed to have a specific semantic meaning. If present,
-                - An empty dict is passed in to this `info`
-                - The resulting (populated) dict is included in the node's
-                  `_info`
-        :param transformer_kwargs: transformer_func kwargs
-        :param cols: columns to transform; `None` defaults to all available.
-        :param col_rename_func: function for naming transformed columns, e.g.,
-            lambda x: "zscore_" + x
-        :param col_mode: `merge_all`, `replace_selected`, or `replace_all`.
-            Determines what columns are propagated by the node.
-        :param nan_mode: `leave_unchanged` or `drop`. If `drop`, applies to
-            columns individually.
+        Same interface as ColumnTransformer but transformer_func is srs -> df.
         """
         super().__init__(nid)
         if cols is not None:
@@ -948,6 +949,9 @@ class SeriesTransformer(Transformer, ColModeMixin):
         return df, info
 
 
+# TODO(gp): I understand that it was better to branch and modify the code,
+#  but now there is lots of copy/paste code. I would factor out the code to
+#  work on series and then invoke it from all the transformers.
 class MultiindexSeriesTransformer(Transformer):
     """
     Perform non-index modifying changes of columns.
@@ -957,6 +961,7 @@ class MultiindexSeriesTransformer(Transformer):
     (one series at a time, without regard to NaNs in other columns).
 
     Example: df like
+    ```
                           close                     vol
                           MN0   MN1    MN2   MN3    MN0    MN1    MN2    MN3
     2010-01-04 10:30:00 -2.62  8.81  14.93 -0.88  100.0  100.0  100.0  100.0
@@ -964,16 +969,17 @@ class MultiindexSeriesTransformer(Transformer):
     2010-01-04 11:30:00 -2.52  6.97  12.56 -1.52  100.0  100.0  100.0  100.0
     2010-01-04 12:00:00 -2.54  5.30   8.90 -1.54  100.0  100.0  100.0  100.0
     2010-01-04 12:30:00 -1.91  2.02   4.65 -1.77  100.0  100.0  100.0  100.0
+    ```
 
-    Then, e.g., to calculate, returns, we could take
-      - `in_col_group = "close",`
-      - `out_col_group = "ret_0",`
-    Notice that the trailing comma makes these tuples.
+    Then, e.g., to calculate, returns, we could take:
+      - `in_col_group = ("close", )`
+      - `out_col_group = ("ret_0", )`
 
     The transformer_func and `nan_mode` would operate on the price columns
     individually and return one return column per price column, e.g.,
     generating
 
+    ```
                           ret_0                   close                     vol
                           MN0   MN1   MN2   MN3   MN0   MN1    MN2   MN3    MN0    MN1    MN2    MN3
     2010-01-04 10:30:00 -0.02  0.11  0.16 -0.35 -2.62  8.81  14.93 -0.88  100.0  100.0  100.0  100.0
@@ -981,6 +987,7 @@ class MultiindexSeriesTransformer(Transformer):
     2010-01-04 11:30:00  0.20 -0.16 -0.25  0.66 -2.52  6.97  12.56 -1.52  100.0  100.0  100.0  100.0
     2010-01-04 12:00:00  0.01 -0.24 -0.29  0.01 -2.54  5.30   8.90 -1.54  100.0  100.0  100.0  100.0
     2010-01-04 12:30:00 -0.25 -0.62 -0.48  0.15 -1.91  2.02   4.65 -1.77  100.0  100.0  100.0  100.0
+    ```
     """
 
     def __init__(
@@ -1097,6 +1104,12 @@ class MultiindexSeriesTransformer(Transformer):
 
 
 class DataframeMethodRunner(Transformer):
+    """
+    Node that applies a method of data frame (e.g., `dropna`) to an input df.
+
+    It is assumed that the method doesn't change the df in place.
+    """
+
     def __init__(
         self,
         nid: str,
@@ -1105,25 +1118,28 @@ class DataframeMethodRunner(Transformer):
     ) -> None:
         super().__init__(nid)
         dbg.dassert(method)
-        # TODO(Paul): Ensure that this is a valid method.
         self._method = method
         self._method_kwargs = method_kwargs or {}
 
     def _transform(
         self, df: pd.DataFrame
     ) -> Tuple[pd.DataFrame, collections.OrderedDict]:
+        # Make a copy to protect against a method modifying the df in place.
         df = df.copy()
-        df = getattr(df, self._method)(**self._method_kwargs)
-        # Not all methods return DataFrames. We want to restrict to those that
-        # do.
+        func = getattr(df, self._method)
+        df = func(**self._method_kwargs)
+        # Ensure that the method returns a dataframe.
         dbg.dassert_isinstance(df, pd.DataFrame)
-        #
+        # Prepare info.
         info = collections.OrderedDict()
         info["df_transformed_info"] = get_df_info_as_string(df)
         return df, info
 
 
 class Resample(Transformer):
+    """
+    Node that applies `core.signal_processing.resample()` to a df.
+    """
     def __init__(
         self,
         nid: str,
@@ -1133,7 +1149,6 @@ class Resample(Transformer):
         agg_func_kwargs: Optional[Dict[str, Any]] = None,
     ) -> None:
         """
-        :param nid: node identifier
         :param rule: resampling frequency
         :param agg_func: a function that is applied to the resampler
         :param resample_kwargs: kwargs for `resample`. Should not include
@@ -1149,10 +1164,12 @@ class Resample(Transformer):
     def _transform(
         self, df: pd.DataFrame
     ) -> Tuple[pd.DataFrame, collections.OrderedDict]:
+        # Apply resampling function.
         df = df.copy()
         resampler = csigna.resample(df, rule=self._rule, **self._resample_kwargs)
-        df = getattr(resampler, self._agg_func)(**self._agg_func_kwargs)
-        #
+        func = getattr(resampler, self._agg_func)
+        df = func(**self._agg_func_kwargs)
+        # Package info.
         info: collections.OrderedDict[str, Any] = collections.OrderedDict()
         info["df_transformed_info"] = get_df_info_as_string(df)
         return df, info
@@ -1177,8 +1194,6 @@ class TimeBarResampler(Transformer):
         Resample time bars with returns, price, volume.
 
         This function wraps `resample_time_bars()`. Params as in that function.
-
-        :param nid: node identifier
         """
         super().__init__(nid)
         self._rule = rule
@@ -1209,7 +1224,7 @@ class TimeBarResampler(Transformer):
             volume_agg_func=self._volume_agg_func,
             volume_agg_func_kwargs=self._volume_agg_func_kwargs,
         )
-        #
+        # Package info.
         info: collections.OrderedDict[str, Any] = collections.OrderedDict()
         info["df_transformed_info"] = get_df_info_as_string(df)
         return df, info
@@ -1219,7 +1234,9 @@ class TwapVwapComputer(Transformer):
     def __init__(
         self,
         nid: str,
+        # TODO(gp): -> TIMEDELTA
         rule: Union[pd.DateOffset, pd.Timedelta, str],
+        # TODO(gp): -> str
         price_col: Any,
         volume_col: Any,
     ) -> None:
@@ -1227,8 +1244,6 @@ class TwapVwapComputer(Transformer):
         Calculate TWAP and VWAP prices from price and volume columns.
 
         This function wraps `compute_twap_vwap()`. Params as in that function.
-
-        :param nid: node identifier
         """
         super().__init__(nid)
         self._rule = rule
@@ -1245,7 +1260,7 @@ class TwapVwapComputer(Transformer):
             price_col=self._price_col,
             volume_col=self._volume_col,
         )
-        #
+        # Package info.
         info: collections.OrderedDict[str, Any] = collections.OrderedDict()
         info["df_transformed_info"] = get_df_info_as_string(df)
         return df, info
@@ -1267,12 +1282,11 @@ class VolatilityNormalizer(FitPredictNode, ColModeMixin):
         """
         Normalize series to target annual volatility.
 
-        :param nid: node identifier
         :param col: name of column to rescale
         :param target_volatility: target volatility as a proportion
-        :param col_mode: `merge_all` or `replace_all`. If `replace_all`, return
-            only the rescaled column, if `merge_all`, append the rescaled
-            column to input dataframe
+        :param col_mode: `merge_all` (default) or `replace_all`
+            - `replace_all`: return only the rescaled column
+            - `merge_all`: append the rescaled column to input dataframe
         """
         super().__init__(nid)
         self._col = col
@@ -1323,6 +1337,7 @@ class VolatilityNormalizer(FitPredictNode, ColModeMixin):
 # #############################################################################
 
 
+# TODO(gp): It is general enough to go to `helpers.printing`.
 def get_df_info_as_string(
     df: pd.DataFrame, exclude_memory_usage: bool = True
 ) -> str:

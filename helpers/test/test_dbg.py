@@ -5,31 +5,51 @@ import helpers.unit_test as hut
 
 _LOG = logging.getLogger(__name__)
 
+# TODO(gp): Make sure the coverage is 100%.
+
 # #############################################################################
 
 
+# TODO(gp): Use a self.assert_equal() instead of a check_string() since this
+#  code needs to be stable.
 class Test_dassert1(hut.TestCase):
+    """
+    Test `dassert()`.
+    """
+
     def test1(self) -> None:
+        """
+        An assertion that is verified.
+        """
         dbg.dassert(True)
 
     def test2(self) -> None:
+        """
+        An assertion that is not verified.
+        """
         with self.assertRaises(AssertionError) as cm:
             dbg.dassert(False)
         self.check_string(str(cm.exception))
 
     def test3(self) -> None:
+        """
+        An assertion with a message.
+        """
         with self.assertRaises(AssertionError) as cm:
             dbg.dassert(False, msg="hello")
         self.check_string(str(cm.exception))
 
     def test4(self) -> None:
+        """
+        An assertion with a message to format.
+        """
         with self.assertRaises(AssertionError) as cm:
             dbg.dassert(False, "hello %s", "world")
         self.check_string(str(cm.exception))
 
     def test5(self) -> None:
         """
-        Too many params.
+        Too many parameters.
         """
         with self.assertRaises(AssertionError) as cm:
             dbg.dassert(False, "hello %s", "world", "too_many")
@@ -37,12 +57,19 @@ class Test_dassert1(hut.TestCase):
 
     def test6(self) -> None:
         """
-        Not enough params.
+        Not enough parameters.
         """
         with self.assertRaises(AssertionError) as cm:
             dbg.dassert(False, "hello %s")
         self.check_string(str(cm.exception))
 
+    def test7(self) -> None:
+        """
+        Common error of calling `dassert` instead of `dassert_eq`.
+        """
+        with self.assertRaises(AssertionError) as cm:
+            dbg.dassert(y, ["hello"])
+        self.check_string(str(cm.exception))
 
 # #############################################################################
 
@@ -76,6 +103,7 @@ class Test_dassert_eq1(hut.TestCase):
 # #############################################################################
 
 
+# TODO(gp): Break it in piece.
 class Test_dassert_misc1(hut.TestCase):
     def test1(self) -> None:
         dbg.dassert_in("a", "abc")
@@ -174,6 +202,74 @@ class Test_dassert_misc1(hut.TestCase):
             dbg.dassert_eq_all(a, b)
         self.check_string(str(cm.exception))
 
+
+# #############################################################################
+
+
+class Test_dassert_lgt1(hut.TestCase):
+
+    def test1(self) -> None:
+        dbg.dassert_lgt(0, 0, 3, lower_bound_closed=True, upper_bound_closed=True)
+
+    def test2(self) -> None:
+        with self.assertRaises(AssertionError) as cm:
+            dbg.dassert_lgt(0, 0, 3, lower_bound_closed=False, upper_bound_closed=True)
+        act = str(cm.exception)
+        exp = ""
+        self.assert_equal(act, exp)
+
+    def test3(self) -> None:
+        with self.assertRaises(AssertionError) as cm:
+            lower_bound_closed=False
+            upper_bound_closed=True
+            dbg.dassert_lgt(0, 100, 3, lower_bound_closed, upper_bound_closed,
+                            "hello %s", "world")
+        act = str(cm.exception)
+        exp = ""
+        self.assert_equal(act, exp)
+
+
+# #############################################################################
+
+
+class Test_dassert_is_proportion1(hut.TestCase):
+
+    def test1(self) -> None:
+        dbg.dassert_is_proportion(0.1, "hello %s", "world")
+
+    def test2(self) -> None:
+        dbg.dassert_is_proportion(0.0, "hello %s", "world")
+
+    def test3(self) -> None:
+        dbg.dassert_is_proportion(1.0, "hello %s", "world")
+
+    def test_assert1(self) -> None:
+        with self.assertRaises(AssertionError) as cm:
+            dbg.dassert_is_proportion(1.01, "hello %s", "world")
+        act = str(cm.exception)
+        exp = ""
+        self.assert_equal(act, exp)
+
+    def test_assert2(self) -> None:
+        with self.assertRaises(AssertionError) as cm:
+            dbg.dassert_is_proportion(1.01, "hello world")
+        act = str(cm.exception)
+        exp = ""
+        self.assert_equal(act, exp)
+
+    def test_assert3(self) -> None:
+        with self.assertRaises(AssertionError) as cm:
+            dbg.dassert_is_proportion(1.01, "hello", "world")
+        act = str(cm.exception)
+        exp = ""
+        self.assert_equal(act, exp)
+
+    def test_assert4(self) -> None:
+        with self.assertRaises(AssertionError) as cm:
+            dbg.dassert_is_proportion(1.01, "hello %s %s", "world")
+        act = str(cm.exception)
+        exp = ""
+        self.assert_equal(act, exp)
 
 # #############################################################################
 

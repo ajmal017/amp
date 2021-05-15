@@ -43,9 +43,14 @@ _TO_LIST_MIXIN_TYPE = Union[List[_COL_TYPE], Callable[[], List[_COL_TYPE]]]
 # #############################################################################
 
 
+# TODO(gp): I have no problem with mixins when they have state.
+#  Given that there is no state, why is a mixin better than just a static
+#  function?
+#  Instead of having an explicit call, one needs to know that inheriting from a
+#  a particular mixin means injecting a particular function.
 class RegFreqMixin:
     """
-    Requires input dataframe to have a well-defined frequency and unique cols.
+    Require input dataframe to have a well-defined frequency and unique cols.
     """
 
     @staticmethod
@@ -60,7 +65,7 @@ class RegFreqMixin:
 
 class ToListMixin:
     """
-    Supports callables that return lists.
+    Support callables that return lists.
     """
 
     @staticmethod
