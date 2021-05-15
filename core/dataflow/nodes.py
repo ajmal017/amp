@@ -68,8 +68,8 @@ class FitPredictNode(Node, abc.ABC):
     """
     Define an abstract class with sklearn-style `fit` and `predict` functions.
 
-    Nodes may store a dictionary of information for each method following
-    the method's invocation.
+    Nodes may store a dictionary of information for each method
+    following the method's invocation.
     """
 
     def __init__(
@@ -94,7 +94,6 @@ class FitPredictNode(Node, abc.ABC):
 
         :return: TODO(gp)
         """
-        pass
 
     @abc.abstractmethod
     def predict(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
@@ -103,7 +102,6 @@ class FitPredictNode(Node, abc.ABC):
 
         :return: TODO(gp)
         """
-        pass
 
     def get_fit_state(self) -> Dict[str, Any]:
         """
@@ -115,7 +113,6 @@ class FitPredictNode(Node, abc.ABC):
         """
         TODO(gp): ?
         """
-        pass
 
     def get_info(
         self, method: str
@@ -166,7 +163,8 @@ class DataSource(FitPredictNode, abc.ABC):
 
     def set_fit_intervals(self, intervals: List[Tuple[Any, Any]]) -> None:
         """
-        Set the intervals to fir the
+        Set the intervals to be used when fitting the model.
+
         :param intervals: closed time intervals like [start1, end1],
             [start2, end2]. `None` boundary is interpreted as data start/end
         """
@@ -1203,7 +1201,8 @@ class TimeBarResampler(Transformer):
         """
         Resample time bars with returns, price, volume.
 
-        This function wraps `resample_time_bars()`. Params as in that function.
+        This function wraps `resample_time_bars()`. Params as in that
+        function.
         """
         super().__init__(nid)
         self._rule = rule
@@ -1253,7 +1252,8 @@ class TwapVwapComputer(Transformer):
         """
         Calculate TWAP and VWAP prices from price and volume columns.
 
-        This function wraps `compute_twap_vwap()`. Params as in that function.
+        This function wraps `compute_twap_vwap()`. Params as in that
+        function.
         """
         super().__init__(nid)
         self._rule = rule

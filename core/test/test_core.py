@@ -128,7 +128,6 @@ class Test_dataflow_core_DAG1(_Dataflow_helper):
 
 
 class Test_dataflow_core_DAG2(_Dataflow_helper):
-
     def test_connect_nodes1(self) -> None:
         """
         Simplest case of connecting two nodes.
@@ -303,7 +302,6 @@ class Test_dataflow_core_DAG2(_Dataflow_helper):
 
 
 class Test_dataflow_core_DAG3(_Dataflow_helper):
-
     def test_sources_sinks1(self) -> None:
         """
         Check sources and sinks of a single node linear DAG.

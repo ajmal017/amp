@@ -449,7 +449,6 @@ def git_delete_merged_branches(ctx, confirm_delete=True):  # type: ignore
     _run(ctx, cmd)
 
 
-# TODO(gp): Allow to create it from a issue number.
 @task
 def git_create_branch(  # type: ignore
         ctx, branch_name="", issue_id=0, repo="current", suffix="", only_branch_from_master=True):
