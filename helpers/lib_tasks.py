@@ -201,7 +201,8 @@ def _run(ctx: Any, cmd: str, *args: Any, **kwargs: Any) -> None:
 def _get_files_to_process(
     modified: bool,
     branch: bool,
-    files: str,
+    last_commit: bool,
+    files_from_user: str,
     mutually_exclusive: bool,
     remove_dirs: bool,
 ) -> List[str]:
@@ -218,55 +219,42 @@ def _get_files_to_process(
         respect to HEAD)
     :param branch: return files modified with respect to the branch point
     :param last_commit: return files part of the previous commit
-    :param files: return files passed to this function
+    :param files_from_user: return files passed to this function
     :param mutually_exclusive: ensure that all options are mutually exclusive
     """
-    if mutually_exclusive:
-        # Only one option can be specified among --modified, --branch, and --files.
-        dbg.dassert_lte(
-            int(modified) + int(branch) + int(files != ""),
-            1,
-            msg="You can specify only one option among --modified, --branch, and "
-            "--files",
+    dbg.dassert_lte(
+        int(modified) + int(branch) + int(last_commit),
+        1,
+        msg="You can specify only one among --modified, --branch, --last_commit"
         )
-    else:
-        # Only one option can be specified among --modified and --branch.
+    if mutually_exclusive:
         dbg.dassert_lte(
-            int(modified) + int(branch),
+            int(modified) + int(branch) + int(last_commit) + int(len(files_from_user) > 0),
             1,
-            msg="You can specify only one option among --modified, --branch",
+            msg="You can specify only one option among --modified, --branch, "
+                "--last_commit, and --files"
         )
     if modified:
-        files = git.get_modified_files()
-        files = " ".join(files)
+        files = git.get_modified_files(".")
     elif branch:
-        cmd = "git diff --name-only master..."
-        files = hsinte.system_to_string(cmd)[1]
-        files = " ".join(files.split("\n"))
-    #
-    dbg.dassert_isinstance(files, str)
-    _LOG.debug("files='%s'", str(files))
+        files = git.get_modified_files_in_branch("master", ".")
+    elif last_commit:
+        files = git.get_previous_committed_files(".")
+    if files_from_user:
+        # If files were passed, overwrite the previous decision.
+        files = files_from_user.split(" ")
     # Convert into a list.
-    files_as_list = files.split(" ")
-    files_as_list = [f for f in files_as_list if f != ""]
+    dbg.dassert_isinstance(files, list)
+    files = [f for f in files if f != ""]
+    _LOG.debug("files='%s'", str(files))
     # Remove dirs, if needed.
     if remove_dirs:
-        files_tmp: List[str] = []
-        dirs_tmp: List[str] = []
-        for file in files_as_list:
-            if os.path.isdir(file):
-                _LOG.debug("file='%s' is a dir: skipping", file)
-                dirs_tmp.append(file)
-            else:
-                files_tmp.append(file)
-        if dirs_tmp:
-            _LOG.warning("Removed dirs: %s", ", ".join(dirs_tmp))
-        files_as_list = files_tmp
+        git.remove_dirs(files)
     _LOG.debug("files='%s'", str(files))
     # Ensure that there are files to process.
-    if not files_as_list:
+    if not files:
         _LOG.warning("No files were selected")
-    return files_as_list
+    return files
 
 
 # Copied from helpers.datetime_ to avoid dependency from pandas.
@@ -402,20 +390,6 @@ def git_clean(ctx):  # type: ignore
 
 
 @task
-def git_branch_files(ctx):  # type: ignore
-    """
-    Report which files are changed in the current branch with respect to
-    master.
-    """
-    _report_task()
-    _ = ctx
-    print(
-        "Difference between HEAD and master:\n"
-        + git.get_summary_files_in_branch("master", ".")
-    )
-
-
-@task
 def git_delete_merged_branches(ctx, confirm_delete=True):  # type: ignore
     """
     Remove (both local and remote) branches that have been merged into master.
@@ -546,19 +520,21 @@ def git_create_branch(  # type: ignore
 
 @task
 def git_create_patch(  # type: ignore
-    ctx, mode="diff", modified=False, branch=False, files=""
+    ctx, mode="diff", modified=False, branch=False, last_commit=False, files=""
 ):
     """
     Create a patch file for the entire repo client from the base revision. This
     script accepts a list of files to package, if specified.
 
-    :param mode: "tar" creates a tar ball with all the files
-        "diff" creates a patch with the diff of the files
+    :param mode: what kind of patch to create
+        - "diff": (default) creates a patch with the diff of the files
+        - "tar": creates a tar ball with all the files
     :param modified: select the files modified in the client
     :param branch: select the files modified in the current branch
+    :param last_commit: select the files modified in the previous commit
     :param files: specify a space-separated list of files
     """
-    _report_task(hprint.to_str("mode modified branch files"))
+    _report_task(hprint.to_str("mode modified branch last_commit files"))
     _ = ctx
     dbg.dassert_in(mode, ("tar", "diff"))
     # For now we just create a patch for the current submodule.
@@ -591,7 +567,7 @@ def git_create_patch(  # type: ignore
         # We don't allow to specify directories.
         remove_dirs = True
         files_as_list = _get_files_to_process(
-            modified, branch, files, mutually_exclusive, remove_dirs
+            modified, branch, last_commit, files, mutually_exclusive, remove_dirs
         )
         _LOG.info("Files to save:\n%s", hprint.indent("\n".join(files_as_list)))
         if not files_as_list:
@@ -633,7 +609,21 @@ def git_create_patch(  # type: ignore
 
 
 @task
-def git_last_commit(ctx, pbcopy=True):  # type: ignore
+def git_branch_files(ctx):  # type: ignore
+    """
+    Report which files are changed in the current branch with respect to
+    master.
+    """
+    _report_task()
+    _ = ctx
+    print(
+        "Difference between HEAD and master:\n"
+        + git.get_summary_files_in_branch("master", ".")
+    )
+
+
+@task
+def git_last_commit_files(ctx, pbcopy=True):  # type: ignore
     """
     Print the status of the files in the previous commit.
 
@@ -650,13 +640,12 @@ def git_last_commit(ctx, pbcopy=True):  # type: ignore
     _to_pbcopy(res, pbcopy)
 
 
-# TODO(gp): Add dev_scripts/git/git_create_patch*.sh
+# TODO(gp): Add the following scripts:
 # dev_scripts/git/git_backup.sh
 # dev_scripts/git/gcl
 # dev_scripts/git/git_branch.sh
 # dev_scripts/git/git_branch_point.sh
-
-# amp/dev_scripts/create_class_diagram.sh
+# dev_scripts/create_class_diagram.sh
 
 # #############################################################################
 # Docker.
@@ -2070,6 +2059,7 @@ def lint(
     ctx,
     modified=False,
     branch=False,
+    last_commit=False,
     files="",
     phases="",
     stage="prod",
@@ -2082,6 +2072,7 @@ def lint(
 
     :param modified: select the files modified in the client
     :param branch: select the files modified in the current branch
+    :param last_commit: select the files modified in the previous commit
     :param files: specify a space-separated list of files
     :param phases: specify the lint phases to execute
     :param run_bash: instead of running pre-commit, run bash to debug
@@ -2099,7 +2090,7 @@ def lint(
         # pre-commit doesn't handle directories, but only files.
         remove_dirs = True
         files_as_list = _get_files_to_process(
-            modified, branch, files, mutually_exclusive, remove_dirs
+            modified, branch, last_commit, files, mutually_exclusive, remove_dirs
         )
         _LOG.info("Files to lint:\n%s", "\n".join(files_as_list))
         if not files_as_list:
