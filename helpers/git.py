@@ -626,7 +626,7 @@ def system_to_files(
     """
     cd_cmd = "cd %s && " % dir_name
     _, output = hsinte.system_to_string(cd_cmd + cmd)
-    # Parse output in terms of files relative to
+    #
     files = output.split()
     files = [os.path.join(dir_name, f) for f in files]
     # Remove non-existent files, if needed.

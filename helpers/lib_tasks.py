@@ -1704,6 +1704,64 @@ def find_check_string_output(  # type: ignore
 # #############################################################################
 
 
+@task
+def find_check_string_output(  # type: ignore
+    ctx, class_name, method_name, as_python=True, pbcopy=True
+):
+    """
+    Find output of `check_string()` in the test running
+    class_name::method_name.
+
+    E.g., for `TestResultBundle::test_from_config1` return the content of the file
+        `./core/dataflow/test/TestResultBundle.test_from_config1/output/test.txt`
+
+    :param as_python: if True return the snippet of code that replaces the
+        `check_string()` with a `assert_equal`
+    :param pbcopy: save the result into the system clipboard (only on macOS)
+    """
+    _report_task()
+    _ = ctx
+    dbg.dassert_ne(class_name, "", "You need to specify a class name")
+    dbg.dassert_ne(method_name, "", "You need to specify a method name")
+    # Look for the directory named `class_name.method_name`.
+    cmd = f"find . -name '{class_name}.{method_name}' -type d"
+    # > find . -name "TestResultBundle.test_from_config1" -type d
+    # ./core/dataflow/test/TestResultBundle.test_from_config1
+    _, txt = hsinte.system_to_string(cmd, abort_on_error=False)
+    file_names = txt.split("\n")
+    if not txt:
+        dbg.dfatal(f"Can't find the requested dir with '{cmd}'")
+    if len(file_names) > 1:
+        dbg.dfatal(f"Found more than one dir with '{cmd}':\n{txt}")
+    dir_name = file_names[0]
+    # Find the only file underneath that dir.
+    dbg.dassert_dir_exists(dir_name)
+    cmd = f"find {dir_name} -name '*.txt' -type f"
+    _, file_name = hsinte.system_to_one_line(cmd)
+    dbg.dassert_file_exists(file_name)
+    # Read the content of the file.
+    _LOG.info("Found file '%s' for %s::%s", file_name, class_name, method_name)
+    txt = hio.from_file(file_name)
+    if as_python:
+        # Package the code snippet.
+        output = f"""
+        act = ""
+        exp = r\"\"\"
+{txt}
+        \"\"\".lstrip().rstrip()
+        self.assert_equal(act, exp)
+        """
+        output = output.lstrip().rstrip()
+    else:
+        output = txt
+    # Print or copy to clipboard.
+    _to_pbcopy(output, pbcopy)
+    return output
+
+
+# #############################################################################
+
+
 def _build_run_command_line(
     pytest_opts: str,
     pytest_mark: str,
