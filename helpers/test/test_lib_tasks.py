@@ -920,7 +920,7 @@ class TestLibTasksGitCreatePatch1(hut.TestCase):
 # #############################################################################
 
 
-class TestParseLinterOutput1(hut.TestCase):
+class Test_parse_linter_output11(hut.TestCase):
     """
     Test `_parse_linter_output()`.
     """
@@ -976,4 +976,37 @@ helpers/test/test_dbg.py:71:25:[flake8] F821 undefined name 'y'
 core/finance.py:250:5:[flake8] E301 expected 1 blank line, found 0
 helpers/test/test_lib_tasks.py:225:5:[flake8] F811 redefinition of unused 'test_git_clean' from line 158
 """
+        self.assert_equal(act, exp, fuzzy_match=True)
+
+
+# #############################################################################
+
+
+class Test_find_check_string_output1(hut.TestCase):
+
+    def test1(self) -> None:
+        """
+        Test `find_check_string_output()` by searching the `check_string` of this
+        test.
+        """
+        # Force to generate a `check_string` file so we can search for it.
+        act = "A fake check_string output to use as a test"
+        self.check_string(act, act)
+        # Look for the `check_string()` corresponding to this test.
+        ctx = _build_mock_context_returning_ok()
+        class_name = self.__class__.__name__
+        method_name = self._testMethodName
+        as_python = True
+        # We don't want to copy but just print.
+        pbcopy = False
+        act = ltasks.find_check_string_output(ctx, class_name, method_name,
+                                                 as_python, pbcopy)
+        # Check.
+        exp = '''
+act = ""
+exp = r"""
+A fake check_string output to use as a test
+        """.lstrip().rstrip()
+self.assert_equal(act, exp)
+        '''
         self.assert_equal(act, exp, fuzzy_match=True)

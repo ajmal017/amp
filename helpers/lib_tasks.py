@@ -1638,7 +1638,7 @@ def find_test_decorator(ctx, decorator_name="", dir_name="."):  # type: ignore
 
 @task
 def find_check_string_output(  # type: ignore
-        ctx, class_name, method_name, as_python=True):
+        ctx, class_name, method_name, as_python=True, pbcopy=True):
     """
     Find output of `check_string()` in the test running class_name::method_name.
 
@@ -1671,15 +1671,22 @@ def find_check_string_output(  # type: ignore
     # Read the content of the file.
     _LOG.info("Found file %s for %s:%s", file_name, class_name, method_name)
     txt = hio.from_file(file_name)
-    # Package the code snippet.
-    output = f"""
+    if as_python:
+        # Package the code snippet.
+        output = f"""
         act = ""
         exp = r\"\"\"
 {txt}
         \"\"\".lstrip().rstrip()
         self.assert_equal(act, exp)
-    """
-    print(output)
+        """
+        output = output.lstrip().rstrip()
+    else:
+        output = txt
+    # Print or copy to clipboard.
+    _to_pbcopy(output, pbcopy)
+    return output
+
 
 # #############################################################################
 
