@@ -263,16 +263,19 @@ class TestDryRunTasks2(_TestClassHelper):
         target = "git_merge_master(ctx)"
         self._check_output(target)
 
+    @pytest.mark.skip(reason="AmpTask1347")
     def test_lint1(self) -> None:
         target = "lint(ctx, modified=True)"
         # The output depends on the client, so don't check it.
         self._check_output(target, check=False)
 
+    @pytest.mark.skip(reason="AmpTask1347")
     def test_lint2(self) -> None:
         target = "lint(ctx, branch=True)"
         # The output depends on the client, so don't check it.
         self._check_output(target, check=False)
 
+    @pytest.mark.skip(reason="AmpTask1347")
     def test_lint3(self) -> None:
         file = __file__
         target = f"lint(ctx, files='{file}')"
