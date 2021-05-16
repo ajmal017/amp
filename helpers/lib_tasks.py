@@ -98,6 +98,7 @@ def _report_task(txt: str = "") -> None:
     if _IS_FIRST_CALL:
         _IS_FIRST_CALL = True
         hversi.check_version()
+    # Print the name of the function.
     func_name = hintros.get_function_name(count=1)
     msg = "## %s: %s" % (func_name, txt)
     print(hprint.color_highlight(msg, color="purple"))
@@ -632,7 +633,7 @@ def docker_images_ls_repo(ctx):  # type: ignore
 def docker_ps(ctx):  # type: ignore
     # pylint: disable=line-too-long
     """
-    List all running containers.
+    List all the running containers.
 
     ```
     > docker_ps
@@ -640,6 +641,7 @@ def docker_ps(ctx):  # type: ignore
     2ece37303ec9  gp    083233266530....:latest  "./docker_build/entry.sh"  5 seconds ago  Up 4 seconds         user_space
     ```
     """
+    _report_task()
     # pylint: enable=line-too-long
     fmt = (
         r"""table {{.ID}}\t{{.Label "user"}}\t{{.Image}}\t{{.Command}}"""
@@ -651,46 +653,81 @@ def docker_ps(ctx):  # type: ignore
     _run(ctx, cmd)
 
 
+def _get_last_container_id() -> str:
+    # Get the last started container.
+    cmd = "docker ps -l | grep -v 'CONTAINER ID'"
+    # CONTAINER ID   IMAGE          COMMAND                  CREATED
+    # 90897241b31a   eeb33fe1880a   "/bin/sh -c '/bin/ba…"   34 hours ago ...
+    _, txt = hsinte.system_to_one_line(cmd)
+    # Parse the output: there should be at least one line.
+    dbg.dassert_lte(1, len(txt.split(" ")), "Invalid output='%s'", txt)
+    container_id = txt.split(" ")[0]
+    return container_id
+
+
 @task
-def docker_stats(ctx):  # type: ignore
+def docker_stats(ctx, all=False):  # type: ignore
     # pylint: disable=line-too-long
     """
-    Report container stats, e.g., CPU, RAM.
+    Report last started Docker container stats, e.g., CPU, RAM.
 
     ```
     > docker_stats
     CONTAINER ID  NAME                   CPU %  MEM USAGE / LIMIT     MEM %  NET I/O         BLOCK I/O        PIDS
     2ece37303ec9  ..._user_space_run_30  0.00%  15.74MiB / 31.07GiB   0.05%  351kB / 6.27kB  34.2MB / 12.3kB  4
     ```
+
+    :param all: report stats for all the containers
     """
     # pylint: enable=line-too-long
-    _report_task()
+    _report_task(hprint.to_str("all"))
+    _ = ctx
     fmt = (
         r"table {{.ID}}\t{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}"
         + r"\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}\t{{.PIDs}}"
     )
     cmd = f"docker stats --no-stream --format='{fmt}'"
-    _run(ctx, cmd)
+    _, txt = hsinte.system_to_string(cmd)
+    if all:
+        output = txt
+    else:
+        # Get the id of the last started container.
+        container_id = _get_last_container_id()
+        print(f"Last container id={container_id}")
+        # Parse the output looking for the given container.
+        txt = txt.split("\n")
+        output = []
+        # Save the header.
+        output.append(txt[0])
+        for line in txt[1:]:
+            if line.startswith(container_id):
+                output.append(line)
+        # There should be at most two rows: the header and the one corresponding to
+        # the container.
+        dbg.dassert_lte(
+            len(output), 2, "Invalid output='%s' for '%s'", output, txt
+        )
+        output = "\n".join(output)
+    print(output)
 
 
 @task
-def docker_kill_last(ctx):  # type: ignore
+def docker_kill(ctx, all=False):  # type: ignore
     """
     Kill the last Docker container started.
-    """
-    _report_task()
-    _run(ctx, "docker ps -l")
-    _run(ctx, "docker rm -f $(docker ps -l -q)")
 
-
-@task
-def docker_kill_all(ctx):  # type: ignore
+    :param all: kill all the containers (be careful!)
     """
-    Kill all the Docker containers.
-    """
-    _report_task()
-    _run(ctx, "docker ps -a")
-    _run(ctx, "docker rm -f $(docker ps -a -q)")
+    _report_task(hprint.to_str(all))
+    # TODO(gp): Ask if we are sure and add a --just-do-it option.
+    # Last container.
+    opts = "-l"
+    if all:
+        opts = "-a"
+    # Print the containers that will be terminated.
+    _run(ctx, f"docker ps {opts}")
+    # Kill.
+    _run(ctx, f"docker rm -f $(docker ps {opts} -q)")
 
 
 # docker system prune
@@ -1496,7 +1533,7 @@ def _to_pbcopy(txt: str) -> None:
 
 
 @task
-def find_test_class(ctx, class_name="", dir_name=".", pbcopy=True):  # type: ignore
+def find_test_class(ctx, class_name, dir_name=".", pbcopy=True):  # type: ignore
     """
     Report test files containing `class_name` in a format compatible with
     pytest.
@@ -1891,6 +1928,34 @@ def _get_lint_docker_cmd(precommit_opts: str, run_bash: bool) -> str:
     return docker_cmd_
 
 
+def _parse_linter_output(txt: str) -> str:
+    """
+    Parse the output of the linter and return a file suitable for vim quickfix.
+    """
+    stage : Optional[str] = None
+    output : List[str] = []
+    for i, line in enumerate(txt.split("\n")):
+        _LOG.debug("%d:line='%s'", i, line)
+        # Tabs remover...............................................Passed
+        # isort......................................................Failed
+        m = re.search("^(\S.*?)\.{10,}(\S.*)+$", line)
+        if m:
+            stage = m.group(1)
+            _LOG.debug("  -> stage='%s'", stage)
+            continue
+        # core/dataflow/nodes.py:601:9: F821 undefined name '_check_col_names'
+        m = re.search("^(\S.*):(\d+)[:\d+:]\s+(.*)$", line)
+        if m:
+            dbg.dassert_is_not(stage, None)
+            file_name = m.group(1)
+            line = int(m.group(2))
+            msg = m.group(3)
+            _LOG.debug("  -> file_name='%s' line=%d msg='%s'", file_name, line, msg)
+            output.append(f"{file_name}:{line}:[{stage}] {msg}")
+    output = "\n".join(output)
+    return output
+
+
 @task
 def lint(
     ctx,
@@ -1941,10 +2006,15 @@ def lint(
     precommit_opts = _to_single_line_cmd(precommit_opts)
     # Execute command line.
     cmd = _get_lint_docker_cmd(precommit_opts, run_bash)
-    cmd = f"({cmd}) 2>&1 | tee linter_warnings.txt"
+    lint_file_name = "linter_warnings.txt"
+    cmd = f"({cmd}) 2>&1 | tee {lint_file_name}"
     # For bash we need a TTY.
     pty = run_bash
     _run(ctx, cmd, pty=pty)
+    if not run_bash:
+        # Parse the output.
+        txt = hio.from_file(lint_file_name)
+
 
 
 # #############################################################################
@@ -2117,6 +2187,10 @@ def gh_issue_title(ctx, issue_id, repo="current", pbcopy=True):  # type: ignore
         _to_pbcopy(res)
     else:
         print(res)
+
+
+# TODO(gp): Add unit test for
+# i gh_create_pr --no-draft --body="Misc changes while adding unit tests"
 
 
 @task

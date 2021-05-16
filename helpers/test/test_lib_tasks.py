@@ -113,11 +113,11 @@ class TestDryRunTasks1(hut.TestCase):
         self._dry_run(target)
 
     def test_docker_kill_last(self) -> None:
-        target = "docker_kill_last"
+        target = "docker_kill"
         self._dry_run(target)
 
     def test_docker_kill_all(self) -> None:
-        target = "docker_kill_all"
+        target = "docker_kill --all"
         self._dry_run(target)
 
     def _dry_run(self, target: str) -> None:
@@ -164,11 +164,11 @@ class TestDryRunTasks2(_TestClassHelper):
         self._check_output(target, check=False)
 
     def test_docker_kill_all(self) -> None:
-        target = "docker_kill_all(ctx)"
+        target = "docker_kill(ctx, all=True)"
         self._check_output(target)
 
     def test_docker_kill_last(self) -> None:
-        target = "docker_kill_last(ctx)"
+        target = "docker_kill(ctx)"
         self._check_output(target)
 
     def test_docker_ps(self) -> None:
@@ -917,4 +917,63 @@ class TestLibTasksGitCreatePatch1(hut.TestCase):
         ltasks.git_create_patch(ctx, mode, modified, branch, files)
 
 
-# i gh_create_pr --no-draft --body="Misc changes while adding unit tests"
+# #############################################################################
+
+
+class TestParseLinterOutput1(hut.TestCase):
+    """
+    Test `_parse_linter_output()`.
+    """
+
+    def test1(self) -> None:
+        txt = """
+Tabs remover.............................................................Passed
+autoflake................................................................Passed
+isort....................................................................Failed
+- hook id: isort
+- files were modified by this hook
+
+INFO: > cmd='/app/linters/amp_isort.py core/dataflow/builders.py core/test/test_core.py core/dataflow/nodes.py helpers/printing.py helpers/lib_tasks.py core/data_adapters.py helpers/test/test_dbg.py helpers/unit_test.py core/dataflow/core.py core/finance.py core/dataflow/models.py core/dataflow/visualization.py helpers/dbg.py helpers/test/test_git.py core/dataflow/runners.py core/dataflow/test/test_visualization.py helpers/test/test_lib_tasks.py'
+Fixing /src/amp/core/dataflow/builders.py
+Fixing /src/amp/core/data_adapters.py
+Fixing /src/amp/core/dataflow/models.py
+
+black....................................................................Passed
+flake8...................................................................Failed
+- hook id: flake8
+- exit code: 6
+
+INFO: > cmd='/app/linters/amp_flake8.py core/dataflow/builders.py core/test/test_core.py core/dataflow/nodes.py helpers/printing.py'
+core/dataflow/nodes.py:601:9: F821 undefined name '_check_col_names'
+core/dataflow/nodes.py:608:9: F821 undefined name '_check_col_names'
+INFO: > cmd='/app/linters/amp_flake8.py helpers/lib_tasks.py core/data_adapters.py helpers/test/test_dbg.py helpers/unit_test.py'
+helpers/lib_tasks.py:302:12: W605 invalid escape sequence '\g'
+helpers/lib_tasks.py:309:27: W605 invalid escape sequence '\s'
+helpers/lib_tasks.py:309:31: W605 invalid escape sequence '\S'
+helpers/lib_tasks.py:309:35: W605 invalid escape sequence '\('
+helpers/lib_tasks.py:2184:9: F541 f-string is missing placeholders
+helpers/test/test_dbg.py:71:25: F821 undefined name 'y'
+INFO: > cmd='/app/linters/amp_flake8.py core/dataflow/core.py core/finance.py core/dataflow/models.py core/dataflow/visualization.py'
+core/finance.py:250:5: E301 expected 1 blank line, found 0
+INFO: > cmd='/app/linters/amp_flake8.py helpers/dbg.py helpers/test/test_git.py core/dataflow/runners.py core/dataflow/test/test_visualization.py'
+
+INFO: > cmd='/app/linters/amp_flake8.py helpers/test/test_lib_tasks.py'
+helpers/test/test_lib_tasks.py:225:5: F811 redefinition of unused 'test_git_clean' from line 158
+
+doc_formatter............................................................Passed
+pylint...................................................................
+"""
+        act = ltasks._parse_linter_output(txt)
+        exp = r"""
+core/dataflow/nodes.py:601:9:[flake8] F821 undefined name '_check_col_names'
+core/dataflow/nodes.py:608:9:[flake8] F821 undefined name '_check_col_names'
+helpers/lib_tasks.py:302:12:[flake8] W605 invalid escape sequence '\g'
+helpers/lib_tasks.py:309:27:[flake8] W605 invalid escape sequence '\s'
+helpers/lib_tasks.py:309:31:[flake8] W605 invalid escape sequence '\S'
+helpers/lib_tasks.py:309:35:[flake8] W605 invalid escape sequence '\('
+helpers/lib_tasks.py:2184:9:[flake8] F541 f-string is missing placeholders
+helpers/test/test_dbg.py:71:25:[flake8] F821 undefined name 'y'
+core/finance.py:250:5:[flake8] E301 expected 1 blank line, found 0
+helpers/test/test_lib_tasks.py:225:5:[flake8] F811 redefinition of unused 'test_git_clean' from line 158
+"""
+        self.assert_equal(act, exp, fuzzy_match=True)
