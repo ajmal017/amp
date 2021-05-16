@@ -88,6 +88,14 @@ else:
 # We prefer not to cache functions running `git` to avoid stale values if we
 # call git (e.g., if we cache Git hash and then we do a `git pull`).
 
+# pyinvoke `ctx.run()` is useful for unit testing, since it allows to:
+# - mock the result of a system call
+# - register the issued command line (to create the expected outcome of a test)
+# On the other side `system_interaction.py` contains many utilities that make
+# it easy to interact with the system.
+# Once AmpPart1347 is implemented we can replace all the `ctx.run()` with calls
+# to `system_interaction.py`.
+
 
 _IS_FIRST_CALL = False
 
@@ -102,10 +110,6 @@ def _report_task(txt: str = "") -> None:
     func_name = hintros.get_function_name(count=1)
     msg = "## %s: %s" % (func_name, txt)
     print(hprint.color_highlight(msg, color="purple"))
-
-
-# TODO(gp): Pass through command line using a global switch or an env var.
-use_one_line_cmd = False
 
 
 # TODO(gp): Move this to helpers.system_interaction and allow to add the switch
@@ -180,6 +184,10 @@ def _to_multi_line_cmd(docker_cmd_: List[str]) -> str:
     docker_cmd_ = docker_cmd_.rstrip("\\")
     _LOG.debug("docker_cmd=%s", docker_cmd_)
     return docker_cmd_
+
+
+# TODO(gp): Pass through command line using a global switch or an env var.
+use_one_line_cmd = False
 
 
 def _run(ctx: Any, cmd: str, *args: Any, **kwargs: Any) -> None:
@@ -2105,7 +2113,7 @@ def lint(
         if run_bash:
             # We don't execute this command since pty=True corrupts the terminal
             # session.
-            print("To get a bash session inside the command run:")
+            print("To get a bash session inside Docker run:")
             print(cmd)
             return
         # Run.

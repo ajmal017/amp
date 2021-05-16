@@ -108,14 +108,17 @@ class TestDryRunTasks1(hut.TestCase):
         target = "docker_ps"
         self._dry_run(target)
 
+    @pytest.mark.skip(reason="AmpTask1347")
     def test_docker_stats(self) -> None:
         target = "docker_stats"
         self._dry_run(target)
 
+    @pytest.mark.skip(reason="AmpTask1347")
     def test_docker_kill_last(self) -> None:
         target = "docker_kill"
         self._dry_run(target)
 
+    @pytest.mark.skip(reason="AmpTask1347")
     def test_docker_kill_all(self) -> None:
         target = "docker_kill --all"
         self._dry_run(target)
@@ -163,10 +166,12 @@ class TestDryRunTasks2(_TestClassHelper):
         target = "docker_images_ls_repo(ctx)"
         self._check_output(target, check=False)
 
+    @pytest.mark.skip(reason="AmpTask1347")
     def test_docker_kill_all(self) -> None:
         target = "docker_kill(ctx, all=True)"
         self._check_output(target)
 
+    @pytest.mark.skip(reason="AmpTask1347")
     def test_docker_kill_last(self) -> None:
         target = "docker_kill(ctx)"
         self._check_output(target)
@@ -179,6 +184,7 @@ class TestDryRunTasks2(_TestClassHelper):
         target = "docker_pull(ctx)"
         self._check_output(target, check=False)
 
+    @pytest.mark.skip(reason="AmpTask1347")
     def test_docker_stats(self) -> None:
         target = "docker_stats(ctx)"
         self._check_output(target)

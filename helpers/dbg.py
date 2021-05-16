@@ -120,7 +120,7 @@ def dassert(cond: Any, msg: Optional[str] = None, *args: Any) -> None:
     # one, e.g., `dassert(y, list)`
     if msg is not None:
         assert isinstance(msg, str), (
-            f"You passed '{msg}' or type '{type(msg)}'" "instead of str"
+            f"You passed '{msg}' or type '{type(msg)}' instead of str"
         )
     if not cond:
         txt = "cond=%s" % cond
@@ -190,16 +190,16 @@ def dassert_lgt(
     - param: lower_bound_closed, upper_bound_closed controls
         the open-ness/close-ness of the interval extremes.
     """
-    # lower_bound {<=,<} x.
+    # `lower_bound <= or < x`.
     if lower_bound_closed:
-        dassert_lte(lower_bound, x, msg, args)
+        dassert_lte(lower_bound, x, msg, *args)
     else:
-        dassert_lt(lower_bound, x, msg, args)
-    # x {<=,<} upper_bound.
+        dassert_lt(lower_bound, x, msg, *args)
+    # `x <= or < upper_bound`.
     if upper_bound_closed:
-        dassert_lte(x, upper_bound, msg, args)
+        dassert_lte(x, upper_bound, msg, *args)
     else:
-        dassert_lt(x, upper_bound, msg, args)
+        dassert_lt(x, upper_bound, msg, *args)
 
 
 def dassert_is_proportion(
@@ -210,7 +210,7 @@ def dassert_is_proportion(
     """
     lower_bound_closed = True
     upper_bound_closed = True
-    dassert_lgt(0, x, 1, lower_bound_closed, upper_bound_closed, msg, args)
+    dassert_lgt(0, x, 1, lower_bound_closed, upper_bound_closed, msg, *args)
 
 
 # Membership.
