@@ -38,7 +38,7 @@
   - Can specify if a block is present or not in a DAG
   - Should only include DAG node configuration parameters, and not information
     about DAG connectivity, which is specified in the DAG builder
-    
+
 - Template configs:
   - Are incomplete configs, with some "mandatory" parameters unspecified but
     identified, e.g., with `_DUMMY_`
@@ -52,8 +52,8 @@
 
 ## Config builders
 
-- `Config`s are built through functions that can complete a "template" config with
-  some parameters passed from the command line
+- `Config`s are built through functions that can complete a "template" config
+  with some parameters passed from the command line
 - E.g.,
   ```python
   def get_kibot_returns_config(symbol: str) -> cfg.Config:

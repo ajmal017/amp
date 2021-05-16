@@ -447,7 +447,6 @@ def dassert_exists(file_name: str, msg: Optional[str] = None, *args: Any) -> Non
         _dfatal(txt, msg, *args)
 
 
-
 def dassert_file_exists(
     file_name: str, msg: Optional[str] = None, *args: Any
 ) -> None:

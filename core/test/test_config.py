@@ -8,6 +8,7 @@ _LOG = logging.getLogger(__name__)
 
 # TODO(gp): Use `self.assert_equal()` instead of `self.check_string()`.
 
+
 class Test_config1(hut.TestCase):
     def test_config1(self) -> None:
         """
@@ -285,7 +286,6 @@ class Test_config1(hut.TestCase):
     def _get_flat_config1() -> cfg.Config:
         """
         Build a (non-hierarchical) config like:
-
         """
         config = cfg.Config()
         config["hello"] = "world"

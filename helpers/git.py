@@ -603,7 +603,8 @@ def system_to_files(
     dir_name: str, cmd: str, remove_files_non_present: bool
 ) -> List[str]:
     """
-    Execute command `cmd` in `dir_name` and return the output as a list of strings.
+    Execute command `cmd` in `dir_name` and return the output as a list of
+    strings.
     """
     cd_cmd = "cd %s && " % dir_name
     _, output = hsinte.system_to_string(cd_cmd + cmd)

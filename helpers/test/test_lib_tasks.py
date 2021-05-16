@@ -983,11 +983,10 @@ helpers/test/test_lib_tasks.py:225:5:[flake8] F811 redefinition of unused 'test_
 
 
 class Test_find_check_string_output1(hut.TestCase):
-
     def test1(self) -> None:
         """
-        Test `find_check_string_output()` by searching the `check_string` of this
-        test.
+        Test `find_check_string_output()` by searching the `check_string` of
+        this test.
         """
         # Force to generate a `check_string` file so we can search for it.
         act = "A fake check_string output to use as a test"
@@ -999,8 +998,9 @@ class Test_find_check_string_output1(hut.TestCase):
         as_python = True
         # We don't want to copy but just print.
         pbcopy = False
-        act = ltasks.find_check_string_output(ctx, class_name, method_name,
-                                                 as_python, pbcopy)
+        act = ltasks.find_check_string_output(
+            ctx, class_name, method_name, as_python, pbcopy
+        )
         # Check.
         exp = '''
 act = ""

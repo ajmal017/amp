@@ -499,8 +499,11 @@ def git_create_branch(  # type: ignore
             # Add the the suffix.
             _LOG.debug("Adding suffix '%s' to '%s'", suffix, branch_name)
             if suffix[0] in ("-", "_"):
-                _LOG.warning("Suffix '%s' should not start with '%s': removing",
-                             suffix, suffix[0])
+                _LOG.warning(
+                    "Suffix '%s' should not start with '%s': removing",
+                    suffix,
+                    suffix[0],
+                )
                 suffix = suffix.rstrip("-_")
             branch_name += "_" + suffix
     #
@@ -742,7 +745,7 @@ def docker_kill(ctx, all=False):  # type: ignore
 
     :param all: kill all the containers (be careful!)
     """
-    _report_task(hprint.to_str(all))
+    _report_task(hprint.to_str("all"))
     # TODO(gp): Ask if we are sure and add a --just-do-it option.
     # Last container.
     opts = "-l"
@@ -1638,9 +1641,11 @@ def find_test_decorator(ctx, decorator_name="", dir_name="."):  # type: ignore
 
 @task
 def find_check_string_output(  # type: ignore
-        ctx, class_name, method_name, as_python=True, pbcopy=True):
+    ctx, class_name, method_name, as_python=True, pbcopy=True
+):
     """
-    Find output of `check_string()` in the test running class_name::method_name.
+    Find output of `check_string()` in the test running
+    class_name::method_name.
 
     E.g., for `TestResultBundle::test_from_config1` return the content of the file
         `./core/dataflow/test/TestResultBundle.test_from_config1/output/test.txt`
@@ -1669,7 +1674,7 @@ def find_check_string_output(  # type: ignore
     _, file_name = hsinte.system_to_one_line(cmd)
     dbg.dassert_file_exists(file_name)
     # Read the content of the file.
-    _LOG.info("Found file %s for %s:%s", file_name, class_name, method_name)
+    _LOG.info("Found file '%s' for %s::%s", file_name, class_name, method_name)
     txt = hio.from_file(file_name)
     if as_python:
         # Package the code snippet.
@@ -2034,8 +2039,8 @@ def _parse_linter_output(txt: str) -> str:
                 "  -> file_name='%s' line=%d msg='%s'", file_name, line, msg
             )
             output.append(f"{file_name}:{line}:[{stage}] {msg}")
-    output = "\n".join(output)
-    return output
+    output_as_str = "\n".join(output)
+    return output_as_str
 
 
 @task
@@ -2088,14 +2093,23 @@ def lint(
     precommit_opts = _to_single_line_cmd(precommit_opts)
     # Execute command line.
     cmd = _get_lint_docker_cmd(precommit_opts, run_bash)
-    lint_file_name = "linter_warnings.txt"
+    lint_file_name = "linter_output.txt"
     cmd = f"({cmd}) 2>&1 | tee {lint_file_name}"
-    # For bash we need a TTY.
-    pty = run_bash
-    _run(ctx, cmd, pty=pty)
-    if not run_bash:
-        # Parse the output.
-        hio.from_file(lint_file_name)
+    if run_bash:
+        # We don't execute this command since pty=True corrupts the terminal
+        # session.
+        print("To get a bash session inside the command run:")
+        print(cmd)
+        return
+    # Run.
+    _run(ctx, cmd)
+    # Parse the linter output into a cfile.
+    _LOG.info("Parsing %s", lint_file_name)
+    hio.from_file(lint_file_name)
+    cfile = _parse_linter_output(lint_file_name)
+    cfile_name = "./linter_warnings.txt"
+    hio.to_file(cfile_name, cfile)
+    _LOG.info("Saved cfile in '%s'", cfile_name)
 
 
 # #############################################################################
