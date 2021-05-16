@@ -19,6 +19,9 @@ _LOG = logging.getLogger(__name__)
 
 
 class TestDiskDataSource(hut.TestCase):
+
+    # TODO(gp): We could factor out all the code in a single function to
+    #  focus the attention on what exactly changes in a test.
     def test_datetime_index_csv1(self) -> None:
         """
         Test CSV file using timestamps in the index.
@@ -26,8 +29,8 @@ class TestDiskDataSource(hut.TestCase):
         df = TestDiskDataSource._generate_df()
         file_path = self._save_df(df, ".csv")
         timestamp_col = None
-        rdfd = dtf.DiskDataSource("read_data", file_path, timestamp_col)
-        loaded_df = rdfd.fit()["df_out"]
+        dds = dtf.DiskDataSource("read_data", file_path, timestamp_col)
+        loaded_df = dds.fit()["df_out"]
         self.check_string(loaded_df.to_string())
 
     def test_datetime_col_csv1(self) -> None:
@@ -38,8 +41,8 @@ class TestDiskDataSource(hut.TestCase):
         df = df.reset_index()
         file_path = self._save_df(df, ".csv")
         timestamp_col = "timestamp"
-        rdfd = dtf.DiskDataSource("read_data", file_path, timestamp_col)
-        loaded_df = rdfd.fit()["df_out"]
+        dds = dtf.DiskDataSource("read_data", file_path, timestamp_col)
+        loaded_df = dds.fit()["df_out"]
         self.check_string(loaded_df.to_string())
 
     def test_datetime_index_parquet1(self) -> None:
@@ -49,8 +52,8 @@ class TestDiskDataSource(hut.TestCase):
         df = TestDiskDataSource._generate_df()
         file_path = self._save_df(df, ".pq")
         timestamp_col = None
-        rdfd = dtf.DiskDataSource("read_data", file_path, timestamp_col)
-        loaded_df = rdfd.fit()["df_out"]
+        dds = dtf.DiskDataSource("read_data", file_path, timestamp_col)
+        loaded_df = dds.fit()["df_out"]
         self.check_string(loaded_df.to_string())
 
     def test_datetime_col_parquet1(self) -> None:
@@ -61,8 +64,8 @@ class TestDiskDataSource(hut.TestCase):
         df = df.reset_index()
         file_path = self._save_df(df, ".pq")
         timestamp_col = "timestamp"
-        rdfd = dtf.DiskDataSource("read_data", file_path, timestamp_col)
-        loaded_df = rdfd.fit()["df_out"]
+        dds = dtf.DiskDataSource("read_data", file_path, timestamp_col)
+        loaded_df = dds.fit()["df_out"]
         self.check_string(loaded_df.to_string())
 
     def test_filter_dates1(self) -> None:
@@ -73,14 +76,14 @@ class TestDiskDataSource(hut.TestCase):
         df = TestDiskDataSource._generate_df()
         file_path = self._save_df(df, ".csv")
         timestamp_col = None
-        rdfd = dtf.DiskDataSource(
+        dds = dtf.DiskDataSource(
             "read_data",
             file_path,
             timestamp_col,
             start_date="2010-01-02",
             end_date="2010-01-05",
         )
-        loaded_df = rdfd.fit()["df_out"]
+        loaded_df = dds.fit()["df_out"]
         self.check_string(loaded_df.to_string())
 
     def test_filter_dates_open_boundary1(self) -> None:
@@ -91,17 +94,28 @@ class TestDiskDataSource(hut.TestCase):
         df = TestDiskDataSource._generate_df()
         file_path = self._save_df(df, ".csv")
         timestamp_col = None
-        rdfd = dtf.DiskDataSource(
+        dds = dtf.DiskDataSource(
             "read_data",
             file_path,
             timestamp_col,
             start_date="2010-01-02",
         )
-        loaded_df = rdfd.fit()["df_out"]
+        loaded_df = dds.fit()["df_out"]
         self.check_string(loaded_df.to_string())
 
     @staticmethod
     def _generate_df(num_periods: int = 10) -> pd.DataFrame:
+        """
+        Generate a df with a format like:
+        ```
+                    0
+        timestamp
+        2010-01-02  1
+        2010-01-03  2
+        2010-01-04  3
+        2010-01-05  4
+        ```
+        """
         idx = pd.date_range("2010-01-01", periods=num_periods, name="timestamp")
         df = pd.DataFrame(range(num_periods), index=idx, columns=["0"])
         return df
@@ -132,8 +146,8 @@ class TestArmaGenerator(hut.TestCase):
             seed=0,
         )
         df = node.fit()["df_out"]
-        str = hut.convert_df_to_string(df, index=True, decimals=2)
-        self.check_string(str)
+        act = hut.convert_df_to_string(df, index=True, decimals=2)
+        self.check_string(act)
 
 
 class TestMultivariateNormalGenerator(hut.TestCase):
@@ -147,8 +161,8 @@ class TestMultivariateNormalGenerator(hut.TestCase):
             seed=1,
         )
         df = node.fit()["df_out"]
-        str = hut.convert_df_to_string(df, index=True, decimals=2)
-        self.check_string(str)
+        act = hut.convert_df_to_string(df, index=True, decimals=2)
+        self.check_string(act)
 
 
 # #############################################################################

@@ -632,7 +632,6 @@ def git_last_commits(ctx, pbcopy=True):  # type: ignore
 # TODO(gp): Add dev_scripts/git/git_create_patch*.sh
 # dev_scripts/git/git_backup.sh
 # dev_scripts/git/gcl
-# dev_scripts/git/gd_master.sh
 # dev_scripts/git/git_branch.sh
 # dev_scripts/git/git_branch_point.sh
 
@@ -1040,6 +1039,7 @@ def _get_docker_cmd(
         dbg.dassert_exists(docker_compose)
     file_opts = " ".join([f"--file {dcf}" for dcf in docker_compose_files])
     _LOG.debug(hprint.to_str("file_opts"))
+    # TODO(gp): Use something like `.append(rf"{space}{...}")`
     docker_cmd_.append(
         rf"""
         {file_opts}"""

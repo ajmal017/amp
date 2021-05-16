@@ -32,7 +32,8 @@ _LOG = logging.getLogger(__name__)
 # Test sklearn - supervised prediction models
 # #############################################################################
 
-
+# TODO(gp): It seems that the test_fit_dag{1,2,3} have the same code besides
+#  `model_func`. If so refactor.
 class TestContinuousSkLearnModel(hut.TestCase):
     def test_fit_dag1(self) -> None:
         pred_lag = 1

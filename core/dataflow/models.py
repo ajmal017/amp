@@ -37,7 +37,7 @@ _LOG = logging.getLogger(__name__)
 _COL_TYPE = Union[int, str]
 _PANDAS_DATE_TYPE = Union[str, pd.Timestamp, datetime.datetime]
 
-#
+# List of columns or list of functions operating on list of columns.
 _TO_LIST_MIXIN_TYPE = Union[
     List[_COL_TYPE],
     #
@@ -85,19 +85,20 @@ class ToListMixin:
           the function is returned.
 
         How this might arise in practice:
-        - A ColumnTransformer returns a number of x variables, with the
+        - A `ColumnTransformer` returns a number of x variables, with the
           number dependent upon a hyper-parameter expressed in config
         - The column names of the x variables may be derived from the input
           dataframe column names, not necessarily known until graph execution
           (and not at construction)
-        - The ColumnTransformer output columns are merged with its input
-          columns (e.g., x vars and y vars are in the same DataFrame)
+        - The `ColumnTransformer` output columns are merged with its input
+          columns (e.g., x vars and y vars are in the same dataframe)
         Post-merge, we need a way to distinguish the x vars and y vars.
-        Allowing a callable here allows us to pass in the ColumnTransformer's
-        method `transformed_col_names` and defer the call until graph
+        Allowing a callable here allows us to pass in the `ColumnTransformer`'s
+        method `transformed_col_names()` and defer the call until graph
         execution.
         """
         if callable(to_list):
+            # Call the function.
             to_list = to_list()
         if isinstance(to_list, list):
             return to_list
@@ -109,6 +110,8 @@ class ToListMixin:
 # #############################################################################
 
 
+# TODO(gp): Explain the difference between ContinuousSkLearnModel and SkLearnModel.
+#  It seems "No NaN-handling or uniform sampling frequency requirement." ?
 class ContinuousSkLearnModel(
     FitPredictNode, RegFreqMixin, ToListMixin, ColModeMixin
 ):
@@ -161,7 +164,7 @@ class ContinuousSkLearnModel(
         dbg.dassert_lte(
             0, self._steps_ahead, "Non-causal prediction attempted! Aborting..."
         )
-        # TODO(gp): Should we reduce the default values?
+        # TODO(gp): Should we reduce the number of default values?
         # NOTE: Set to "replace_all" for backward compatibility.
         self._col_mode = col_mode or "replace_all"
         dbg.dassert_in(self._col_mode, ["replace_all", "merge_all"])
@@ -173,7 +176,7 @@ class ContinuousSkLearnModel(
         # Obtain index slice for which forward targets exist.
         dbg.dassert_lt(self._steps_ahead, df.index.size)
         idx = df.index[: -self._steps_ahead]
-        # Determine index where no x_vars are NaN.
+        # Determine index where no `x_vars` are NaN.
         x_vars = self._to_list(self._x_vars)
         non_nan_idx_x = df.loc[idx][x_vars].dropna().index
         # Determine index where target is not NaN.
@@ -228,12 +231,12 @@ class ContinuousSkLearnModel(
         self._validate_input_df(df_in)
         df = df_in.copy()
         idx = df.index
-        # Restrict to times where x_vars have no NaNs.
+        # Restrict to times where `x_vars` have no NaNs.
         x_vars = self._to_list(self._x_vars)
         non_nan_idx = df.loc[idx][x_vars].dropna().index
         # Handle presence of NaNs according to `nan_mode`.
         self._handle_nans(idx, non_nan_idx)
-        # Transform x_vars to sklearn format.
+        # Transform `x_vars` to sklearn format.
         x_predict = cdataa.transform_to_sklearn(df.loc[non_nan_idx], x_vars)
         # Use trained model to generate predictions.
         dbg.dassert_is_not(
@@ -247,7 +250,7 @@ class ContinuousSkLearnModel(
         fwd_y_hat = cdataa.transform_from_sklearn(
             non_nan_idx, fwd_y_hat_vars, fwd_y_hat
         )
-        # Generate basic perf cstati.
+        # Generate basic perf statistics.
         info = collections.OrderedDict()
         info["model_params"] = self._model.get_params()
         info["model_perf"] = self._model_perf(fwd_y_df, fwd_y_hat)
@@ -361,38 +364,42 @@ class SkLearnModel(FitPredictNode, ToListMixin, ColModeMixin):
         dbg.dassert_in(self._col_mode, ["replace_all", "merge_all"])
 
     def fit(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
-        SkLearnModel._validate_input_df(df_in)
+        self._validate_input_df(df_in)
         dbg.dassert(
             df_in[df_in.isna().any(axis=1)].index.empty,
             "NaNs detected at index `%s`",
             str(df_in[df_in.isna().any(axis=1)].head().index),
         )
         df = df_in.copy()
-        idx = df.index
+        # Transform the data into sklearn format.
         x_vars, x_fit, y_vars, y_fit = self._to_sklearn_format(df)
+        # Instantiate and fit the model.
         self._model = self._model_func(**self._model_kwargs)
         self._model = self._model.fit(x_fit, y_fit)
+        # Predict.
         y_hat = self._model.predict(x_fit)
-        #
+        # Convert data back to sklearn format.
+        idx = df.index
         x_fit, y_fit, y_hat = self._from_sklearn_format(
             idx, x_vars, x_fit, y_vars, y_fit, y_hat
+        )
+        # Return targets and predictions.
+        y_hat = y_hat.reindex(idx)
+        df_out = self._apply_col_mode(
+            df, y_hat, cols=y_vars, col_mode=self._col_mode
         )
         # TODO(Paul): Summarize model perf or make configurable.
         # TODO(Paul): Consider separating model eval from fit/predict.
         info = collections.OrderedDict()
         info["model_x_vars"] = x_vars
         info["model_params"] = self._model.get_params()
-        # Return targets and predictions.
-        y_hat = y_hat.reindex(idx)
-        df_out = self._apply_col_mode(
-            df, y_hat, cols=y_vars, col_mode=self._col_mode
-        )
         info["df_out_info"] = get_df_info_as_string(df_out)
         self._set_info("fit", info)
         return {"df_out": df_out}
 
+    # TODO(gp): Try to share common code in fit/predict.
     def predict(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
-        SkLearnModel._validate_input_df(df_in)
+        self._validate_input_df(df_in)
         df = df_in.copy()
         idx = df.index
         x_vars, x_predict, y_vars, y_predict = self._to_sklearn_format(df)
@@ -403,14 +410,15 @@ class SkLearnModel(FitPredictNode, ToListMixin, ColModeMixin):
         x_predict, y_predict, y_hat = self._from_sklearn_format(
             idx, x_vars, x_predict, y_vars, y_predict, y_hat
         )
-        info = collections.OrderedDict()
-        info["model_params"] = self._model.get_params()
-        info["model_perf"] = self._model_perf(x_predict, y_predict, y_hat)
         # Return predictions.
         y_hat = y_hat.reindex(idx)
         df_out = self._apply_col_mode(
             df, y_hat, cols=y_vars, col_mode=self._col_mode
         )
+        # Compute stats.
+        info = collections.OrderedDict()
+        info["model_params"] = self._model.get_params()
+        info["model_perf"] = self._model_perf(x_predict, y_predict, y_hat)
         info["df_out_info"] = get_df_info_as_string(df_out)
         self._set_info("predict", info)
         return {"df_out": df_out}
@@ -439,7 +447,7 @@ class SkLearnModel(FitPredictNode, ToListMixin, ColModeMixin):
         _ = x
         info = collections.OrderedDict()
         # info["hitrate"] = pip._compute_model_hitrate(self.model, x, y)
-        pnl_rets = y.multiply(y_hat.rename(columns=lambda x: x.strip("_hat")))
+        pnl_rets = y.multiply(y_hat.rename(columns=lambda c: c.strip("_hat")))
         info["pnl_rets"] = pnl_rets
         info["sr"] = cstati.compute_sharpe_ratio(
             csigna.resample(pnl_rets, rule="1B").sum(), time_scaling=252
@@ -449,6 +457,9 @@ class SkLearnModel(FitPredictNode, ToListMixin, ColModeMixin):
     def _to_sklearn_format(
         self, df: pd.DataFrame
     ) -> Tuple[List[_COL_TYPE], np.array, List[_COL_TYPE], np.array]:
+        """
+        Transform data to sklearn format.
+        """
         x_vars = self._to_list(self._x_vars)
         y_vars = self._to_list(self._y_vars)
         x_vals, y_vals = cdataa.transform_to_sklearn_old(df, x_vars, y_vars)
@@ -463,11 +474,13 @@ class SkLearnModel(FitPredictNode, ToListMixin, ColModeMixin):
         y_vals: np.array,
         y_hat: np.array,
     ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        """
+        Transform data from sklearn format.
+        """
         x = cdataa.transform_from_sklearn(idx, x_vars, x_vals)
         y = cdataa.transform_from_sklearn(idx, y_vars, y_vals)
-        y_h = cdataa.transform_from_sklearn(
-            idx, [f"{y}_hat" for y in y_vars], y_hat
-        )
+        y_hat_vars = [f"{y}_hat" for y in y_vars]
+        y_h = cdataa.transform_from_sklearn(idx, y_hat_vars, y_hat)
         return x, y, y_h
 
 
@@ -497,11 +510,12 @@ class UnsupervisedSkLearnModel(
         """
         Specify the data and sklearn modeling parameters.
 
-        :param nid: unique node id
         :param model_func: an sklearn model
         :param x_vars: indexed by knowledge datetimes
         :param model_kwargs: parameters to forward to the sklearn model
             (e.g., regularization constants)
+        :param col_mode: "replace_all" (default) or "merge_all"
+        :param nan_mode: "raise" (default) or "drop"
         """
         super().__init__(nid)
         self._model_func = model_func
@@ -538,7 +552,7 @@ class UnsupervisedSkLearnModel(
         """
         self._validate_input_df(df_in)
         df = df_in.copy()
-        # Determine index where no x_vars are NaN.
+        # Determine index where no `x_vars` are NaN.
         if self._x_vars is None:
             x_vars = df_in.columns.tolist()
         else:
@@ -547,13 +561,13 @@ class UnsupervisedSkLearnModel(
         dbg.dassert(not non_nan_idx.empty)
         # Handle presence of NaNs according to `nan_mode`.
         self._handle_nans(df.index, non_nan_idx)
-        # Prepare x_vars in sklearn format.
+        # Prepare `x_vars` in sklearn format.
         x_fit = cdataa.transform_to_sklearn(df.loc[non_nan_idx], x_vars)
         if fit:
             # Define and fit model.
             self._model = self._model_func(**self._model_kwargs)
             self._model = self._model.fit(x_fit)
-        # Generate insample transformations and put in dataflow dataframe format.
+        # Generate in-sample transformations and put in dataflow dataframe format.
         x_transform = self._model.transform(x_fit)
         #
         num_cols = x_transform.shape[1]
@@ -580,6 +594,7 @@ class UnsupervisedSkLearnModel(
         dbg.dassert_no_duplicates(df_out.columns)
         return {"df_out": df_out}
 
+    # TODO(gp): Make it free-standing.
     def _handle_nans(
         self, idx: pd.DataFrame.index, non_nan_idx: pd.DataFrame.index
     ) -> None:
@@ -725,6 +740,7 @@ class MultiindexUnsupervisedSkLearnModel(
         dbg.dassert_no_duplicates(df_out.columns)
         return {"df_out": df_out}
 
+    # TODO(gp): Make it free-standing.
     def _handle_nans(
         self, idx: pd.DataFrame.index, non_nan_idx: pd.DataFrame.index
     ) -> None:
@@ -1056,7 +1072,7 @@ class SmaModel(FitPredictNode, RegFreqMixin, ColModeMixin, ToListMixin):
         info = collections.OrderedDict()
         info["tau"] = self._tau
         info["min_periods"] = min_periods
-        # Generate insample predictions and put in dataflow dataframe format.
+        # Generate in-sample predictions and put in dataflow dataframe format.
         fwd_y_hat = self._predict(x_fit)
         fwd_y_hat_vars = [f"{y}_hat" for y in fwd_y_df.columns]
         fwd_y_hat = cdataa.transform_from_sklearn(
@@ -2399,6 +2415,7 @@ class ContinuousSarimaxModel(
         preds = pd.concat(preds)
         return preds
 
+    # TODO(gp): -> backward
     def _get_bkwd_x_df(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Return dataframe of `steps_ahead - 1` backward x values.
@@ -2414,6 +2431,7 @@ class ContinuousSarimaxModel(
         mapper = lambda y: str(y) + "_bkwd_%i" % shift
         return bkwd_x_df.rename(columns=mapper)
 
+    # TODO(gp): -> forward
     def _get_fwd_y_df(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Return dataframe of `steps_ahead` forward y values.
@@ -2439,6 +2457,7 @@ class ContinuousSarimaxModel(
         _LOG.warning("`add_constant=True` but no exog is provided.")
         return x
 
+    # TODO(gp): Factor this out.
     def _handle_nans(
         self, idx: pd.DataFrame.index, non_nan_idx: pd.DataFrame.index
     ) -> None:
