@@ -1513,8 +1513,7 @@ def _find_test_files(
 
 def _find_test_class(class_name: str, file_names: List[str]) -> List[str]:
     """
-    Find test file containing the class `class_name` and report it in a format
-    compatible with pytest.
+    Find test file containing `class_name` and report it in pytest format.
 
     E.g., for "TestLibTasksRunTests1" return
     "test/test_lib_tasks.py::TestLibTasksRunTests1"
@@ -1620,20 +1619,67 @@ def _find_test_decorator(decorator_name: str, file_names: List[str]) -> List[str
 @task
 def find_test_decorator(ctx, decorator_name="", dir_name="."):  # type: ignore
     """
-    Report test files containing `class_name` in a format compatible with
-    pytest.
+    Report test files containing `class_name` in pytest format.
 
     :param class_name: the class to search
     :param dir_name: the dir from which to search
     """
     _report_task()
-    dbg.dassert(decorator_name != "", "You need to specify a decorator name")
     _ = ctx
+    dbg.dassert_ne(decorator_name, "", "You need to specify a decorator name")
     file_names = _find_test_files(dir_name)
     res = _find_test_class(decorator_name, file_names)
     res = " ".join(res)
     print(res)
 
+
+# #############################################################################
+
+
+@task
+def find_check_string_output(  # type: ignore
+        ctx, class_name, method_name, as_python=True):
+    """
+    Find output of `check_string()` in the test running class_name::method_name.
+
+    E.g., for `TestResultBundle::test_from_config1` return the content of the file
+        `./core/dataflow/test/TestResultBundle.test_from_config1/output/test.txt`
+
+    :param as_python: if True return the snippet of code that replaces the
+        `check_string()` with a `assert_equal`
+    """
+    _report_task()
+    _ = ctx
+    dbg.dassert_ne(class_name, "", "You need to specify a class name")
+    dbg.dassert_ne(method_name, "", "You need to specify a method name")
+    # Look for the directory named `class_name.method_name`.
+    cmd = f"find . -name '{class_name}.{method_name}' -type d"
+    # > find . -name "TestResultBundle.test_from_config1" -type d
+    # ./core/dataflow/test/TestResultBundle.test_from_config1
+    _, txt = hsinte.system_to_string(cmd, abort_on_error=False)
+    file_names = txt.split("\n")
+    if not txt:
+        dbg.dfatal(f"Can't find the requested dir with '{cmd}'")
+    if len(file_names) > 1:
+        dbg.dfatal(f"Found more than one dir with '{cmd}':\n{txt}")
+    dir_name = file_names[0]
+    # Find the only file underneath that dir.
+    dbg.dassert_dir_exists(dir_name)
+    cmd = f"find {dir_name} -name '*.txt' -type f"
+    _, file_name = hsinte.system_to_one_line(cmd)
+    dbg.dassert_file_exists(file_name)
+    # Read the content of the file.
+    _LOG.info("Found file %s for %s:%s", file_name, class_name, method_name)
+    txt = hio.from_file(file_name)
+    # Package the code snippet.
+    output = f"""
+        act = ""
+        exp = r\"\"\"
+{txt}
+        \"\"\".lstrip().rstrip()
+        self.assert_equal(act, exp)
+    """
+    print(output)
 
 # #############################################################################
 

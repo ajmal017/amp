@@ -24,13 +24,16 @@ _LOG = logging.getLogger(__name__)
 class Config:
     """
     A hierarchical ordered dictionary storing configuration information.
+
+    Keys can only be strings. Values can be strings, ints, or another `Config`.
     """
 
     def __init__(
         self,
+        # TODO(gp): Difficult to read and loose: try to improve.
         array: Union[
-            List[Tuple[str, Union[List[int], str]]],
             List[Tuple[str, Union[int, str]]],
+            List[Tuple[str, Union[List[int], str]]],
             None,
         ] = None,
     ) -> None:
@@ -39,6 +42,7 @@ class Config:
             type or a Config in case of nested config.
         """
         # pylint: disable=unsubscriptable-object
+        # TODO(gp): MutableMapping instead of disabling the lint?
         self._config: collections.OrderedDict[
             str, Any
         ] = collections.OrderedDict()
@@ -48,11 +52,10 @@ class Config:
 
     def __setitem__(self, key: Union[str, Iterable[str]], val: Any) -> None:
         """
-        Set / update `key` to `val`.
+        Set/update `key` to `val`.
 
-        If `key` is an iterable of keys, then the key hierarchy is
-        navigated / created and the leaf value added / updated with
-        `val`.
+        If `key` is an iterable of keys, then the key hierarchy is navigated/created
+        and the leaf value added/updated with `val`.
         """
         if intr.is_iterable(key):
             head_key, tail_key = key[0], key[1:]  # type: ignore
@@ -63,7 +66,7 @@ class Config:
             if not tail_key:
                 # Tuple of a single element, then set the value.
                 # Note that the following call is not equivalent to
-                # self._config[head_key].
+                # `self._config[head_key]`.
                 self.__setitem__(head_key, val)
             else:
                 # Recurse.
@@ -121,18 +124,18 @@ class Config:
                 txt.append("%s: %s" % (k, v))
         ret = "\n".join(txt)
         # Remove memory locations of functions, if config contains them, e.g.,
-        # `<function _filter_relevance at 0x7fe4e35b1a70>`.
+        #   `<function _filter_relevance at 0x7fe4e35b1a70>`.
         memory_loc_pattern = r"(<function \w+.+) at \dx\w+"
         ret = re.sub(memory_loc_pattern, r"\1", ret)
         # Remove memory locations of objects, if config contains them, e.g.,
-        # "<dataflow.task2538_pipeline.ArPredictorBuilder object at 0x7f7c7991d390>"
+        #   `<dataflow.task2538_pipeline.ArPredictor object at 0x7f7c7991d390>`
         memory_loc_pattern = r"(<\w+.+ object) at \dx\w+"
         ret = re.sub(memory_loc_pattern, r"\1", ret)
         return ret
 
     def __repr__(self) -> str:
         """
-        Return as unambiguous representation the same as str().
+        Return an unambiguous representation the same as str().
 
         This is used by Jupyter notebook when printing.
         """
@@ -142,8 +145,8 @@ class Config:
         """
         Return len of underlying dict.
 
-        This enables calculating `len` as with a dict and also enables
-        bool evaluation of a Config() object for truth value testing.
+        This enables calculating `len()` as with a dict and also enables bool
+        evaluation of a `Config` object for truth value testing.
         """
         return len(self._config)
 
@@ -168,12 +171,16 @@ class Config:
 
     def get(self, key: str, val: Any) -> Any:
         """
-        Implement the same functionality as `__getitem__` but returning `val`
-        if the value corresponding to key doesn't exist.
+        Equivalent to `dict.get(key, default_val)`.
+
+        It has the same functionality as `__getitem__` but returning `val` if the
+        value corresponding to `key` doesn't exist.
         """
         try:
             ret = self.__getitem__(key)
         except AssertionError:
+            # TODO(gp): We should throw/catch a KeyError exception, instead of a
+            #  generic AssertionError.
             ret = val
         return ret
 
@@ -200,9 +207,25 @@ class Config:
         dbg.dassert_isinstance(val, Config)
         return val  # type: ignore
 
+    def to_python(self, check: bool = True) -> str:
+        """
+        Return python code that builds, when executed, the current object.
+        """
+        config_as_str = str(self.to_dict())
+        # We don't need `cfg.` since we are inside the config module.
+        config_as_str = config_as_str.replace("OrderedDict", "Config")
+        if check:
+            # Check that the object can be reconstructed.
+            config_tmp = Config.from_python(config_as_str)
+            # Compare.
+            dbg.dassert_eq(str(self), str(config_tmp))
+        return config_as_str
+
     def to_dict(self) -> Dict[str, Any]:
         """
-        Convert to an ordered dict of ordered dicts, removing the class.
+        Convert the Config to nested ordered dicts.
+
+        In other words, it replaces the `Config` class with simple ordered dicts.
         """
         # pylint: disable=unsubscriptable-object
         dict_: collections.OrderedDict[str, Any] = collections.OrderedDict()
@@ -221,21 +244,9 @@ class Config:
         iter_ = dct.get_nested_dict_iterator(dict_)
         return collections.OrderedDict(iter_)
 
-    def to_python(self, check: bool = True) -> str:
-        config_as_str = str(self.to_dict())
-        # We don't need 'cfg.' since we are inside the config module.
-        config_as_str = config_as_str.replace("OrderedDict", "Config")
-        if check:
-            # Check that the object can be reconstructed.
-            config_tmp = Config.from_python(config_as_str)
-            # Compare.
-            dbg.dassert_eq(str(self), str(config_tmp))
-        return config_as_str
-
     def check_params(self, keys: Iterable[str]) -> None:
         """
-        Check whether all the `keys` are present in the object, otherwise
-        raise.
+        Check whether all the `keys` are present in the object, otherwise raise.
         """
         missing_keys = []
         for key in keys:
@@ -301,7 +312,7 @@ def make_hashable(obj: Any) -> collections.abc.Hashable:
         return obj
     if isinstance(obj, collections.abc.Iterable):
         return tuple(map(make_hashable, obj))
-    return tuple((obj))
+    return tuple(obj)
 
 
 def intersect_configs(configs: Iterable[Config]) -> Config:
@@ -336,10 +347,11 @@ def intersect_configs(configs: Iterable[Config]) -> Config:
 
 
 def subtract_config(minuend: Config, subtrahend: Config) -> Config:
-    """Return a Config() defined via minuend - subtrahend.
+    """
+    Return a `Config` defined via minuend - subtrahend.
 
-    :return: return a Config() with path, val pairs in `minuend` that are not in
-        `subtrahend` (like a set difference). Equivalently, return a Config like
+    :return: return a `Config` with path, val pairs in `minuend` that are not in
+        `subtrahend` (like a set difference). Equivalently, return a `Config`-like
         `minuend` but with the intersection of `minuend` and `subtrahend`
         removed.
     """
@@ -355,11 +367,10 @@ def subtract_config(minuend: Config, subtrahend: Config) -> Config:
 
 def diff_configs(configs: Iterable[Config]) -> List[Config]:
     """
-    Diff configs with respect to their common intersection.
+    Diff `Config`s with respect to their common intersection.
 
-    :return: for each config `config` in `configs`, return a new Config()
-        consisting of the part of `config` not in the intersection of the
-        configs in `configs`
+    :return: for each config `config` in `configs`, return a new `Config` consisting
+        of the part of `config` not in the intersection of the configs in `configs`
     """
     # Convert `configs` to a list for convenience.
     configs = list(configs)

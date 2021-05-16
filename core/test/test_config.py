@@ -6,11 +6,12 @@ import helpers.unit_test as hut
 
 _LOG = logging.getLogger(__name__)
 
+# TODO(gp): Use `self.assert_equal()` instead of `self.check_string()`.
 
 class Test_config1(hut.TestCase):
     def test_config1(self) -> None:
         """
-        Test print flatten config.
+        Test printing a non-hierarchical config.
         """
         config = cfg.Config()
         config["hello"] = "world"
@@ -18,7 +19,7 @@ class Test_config1(hut.TestCase):
 
     def test_config2(self) -> None:
         """
-        Test serialization / deserialization for flat config.
+        Test serialization/deserialization for flat config.
         """
         config = self._get_flat_config1()
         #
@@ -278,8 +279,14 @@ class Test_config1(hut.TestCase):
         self.assertEqual(str(config), str(config2))
         return act
 
+    # TODO(gp): We use hierarchical/nested vs flat. Use only
+    #  hierarchical/non-hierarchical.
     @staticmethod
     def _get_flat_config1() -> cfg.Config:
+        """
+        Build a (non-hierarchical) config like:
+
+        """
         config = cfg.Config()
         config["hello"] = "world"
         config["foo"] = [1, 2, 3]
@@ -347,3 +354,6 @@ class Test_subtract_config1(hut.TestCase):
         #
         diff = cfg.subtract_config(config1, config2)
         self.check_string(str(diff))
+
+
+# TODO(gp): Unit tests all the functions.

@@ -39,7 +39,7 @@ class ResultBundle(abc.ABC):
         :param column_to_tags: mapping of column names to list of tags. E.g.,
             `{"y_0": ["target_col", "step_0"], ...}`
         :param info: DAG execution info
-        :param payload: config with additional information, for example, meta config
+        :param payload: config with additional information, e.g., meta config
         """
         self._config = config
         self._result_nid = result_nid
@@ -63,6 +63,8 @@ class ResultBundle(abc.ABC):
 
     @property
     def result_df(self) -> pd.DataFrame:
+        # TODO(gp): Ok to copy but we will make a copy at every access. Maybe we
+        #  can make a single copy and use only that.
         return self._result_df.copy()
 
     @property
@@ -72,6 +74,7 @@ class ResultBundle(abc.ABC):
     @property
     def tag_to_columns(self) -> Optional[Dict[Any, List[Any]]]:
         if self._column_to_tags is not None:
+            # TODO(gp): Cache it or compute it the first time.
             tag_to_columns: Dict[Any, List[Any]] = {}
             for column, tags in self._column_to_tags.items():
                 for tag in tags:

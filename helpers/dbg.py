@@ -435,15 +435,35 @@ def dassert_list_of_strings(output: List[str], *args: Any) -> None:
         dassert_isinstance(line, str, *args)
 
 
-# File related
+# File related.
 
 
-# TODO(*): -> _file_exists
+# TODO(*): Deprecate this and use only `dassert_{file,dir}_exists()`.
 def dassert_exists(file_name: str, msg: Optional[str] = None, *args: Any) -> None:
     file_name = os.path.abspath(file_name)
     if not os.path.exists(file_name):
         txt = []
-        txt.append("file='%s' doesn't exist" % file_name)
+        txt.append("File '%s' doesn't exist" % file_name)
+        _dfatal(txt, msg, *args)
+
+
+
+def dassert_file_exists(
+    file_name: str, msg: Optional[str] = None, *args: Any
+) -> None:
+    """
+    Assert unless `file_name` exists and it's a file and not a directory.
+    """
+    file_name = os.path.abspath(file_name)
+    # `file_name` exists.
+    exists = os.path.exists(file_name)
+    if not exists:
+        txt = f"File '{file_name}' doesn't exist"
+        _dfatal(txt, msg, *args)
+    # `file_name` is a file.
+    is_file = os.path.isfile(file_name)
+    if not is_file:
+        txt = f"'{file_name}' is not a file"
         _dfatal(txt, msg, *args)
 
 
@@ -454,13 +474,15 @@ def dassert_dir_exists(
     Assert unless `dir_name` exists and it's a directory.
     """
     dir_name = os.path.abspath(dir_name)
+    # `dir_name` exists.
     exists = os.path.exists(dir_name)
     if not exists:
-        txt = "dir='%s' doesn't exist" % dir_name
+        txt = f"Dir '{dir_name}' doesn't exist"
         _dfatal(txt, msg, *args)
+    # `dir_name` is a directory.
     is_dir = os.path.isdir(dir_name)
     if not is_dir:
-        txt = "dir='%s' is not a dir" % dir_name
+        txt = f"'{dir_name}' is not a dir"
         _dfatal(txt, msg, *args)
 
 
