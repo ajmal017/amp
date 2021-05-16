@@ -206,12 +206,18 @@ def _get_files_to_process(
     remove_dirs: bool,
 ) -> List[str]:
     """
-    Get a list of files to process that have been changed in the branch, in the
-    client, or passed by the user.
+    Get a list of files to process.
+
+    The files are the ones that are:
+    - changed in the branch
+    - changed in the client (both staged and modified)
+    - part of the previous commit
+    - passed by the user
 
     :param modified: return files modified in the client (i.e., changed with
         respect to HEAD)
     :param branch: return files modified with respect to the branch point
+    :param last_commit: return files part of the previous commit
     :param files: return files passed to this function
     :param mutually_exclusive: ensure that all options are mutually exclusive
     """
