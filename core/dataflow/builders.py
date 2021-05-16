@@ -20,7 +20,7 @@ from core.dataflow.nodes import (
 _LOG = logging.getLogger(__name__)
 
 
-# TODO(Paul): Consider moving this to `core.py`.
+# TODO(Paul): Consider moving this to `core.py` or `dag_builder.py`
 class DagBuilder(abc.ABC):
     """
     Abstract class for creating DAGs.
@@ -263,11 +263,5 @@ class ArmaReturnsBuilder(DagBuilder):
             **config[nid].to_dict(),
         )
         tail_nid = self._append(dag, tail_nid, node)
+        _ = tail_nid
         return dag
-
-    @staticmethod
-    def _append(dag: DAG, tail_nid: Optional[str], node: Node) -> str:
-        dag.add_node(node)
-        if tail_nid is not None:
-            dag.connect(tail_nid, node.nid)
-        return node.nid

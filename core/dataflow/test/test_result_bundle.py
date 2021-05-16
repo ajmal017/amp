@@ -40,6 +40,7 @@ class TestResultBundle(hut.TestCase):
 
     @staticmethod
     def _get_init_config() -> cfg.Config:
+        # TODO(gp): Factor out common part.
         init_config = cfg.Config()
         init_config["config"] = cfgb.get_config_from_nested_dict({"key": "val"})
         init_config["result_nid"] = "leaf_node"
