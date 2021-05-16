@@ -619,14 +619,18 @@ def git_create_patch(  # type: ignore
 
 
 @task
-def git_last_commits(ctx, pbcopy=True):  # type: ignore
-    # Print the status of the files in the previous commit.
+def git_last_commit(ctx, pbcopy=True):  # type: ignore
+    """
+    Print the status of the files in the previous commit.
+
+    :param pbcopy: save the result into the system clipboard (only on macOS)
+    """
     cmd = 'git log -1 --name-status --pretty=""'
     _run(ctx, cmd)
     # Get the list of existing files.
     files = git.get_previous_committed_files(".")
     txt = "\n".join(files)
-    print("The files modified are:\n%s", txt)
+    print(f"\n# The files modified are:\n{txt}")
     # Save to clipboard.
     res = " ".join(files)
     _to_pbcopy(res, pbcopy)
@@ -1558,7 +1562,7 @@ def _to_pbcopy(txt: str, pbcopy: bool) -> None:
         # -n = no new line
         cmd = f"echo -n '{txt}' | pbcopy"
         hsinte.system(cmd)
-        print(f"'{txt}' copied to system clipboard")
+        print(f"\n# Copied to system clipboard:\n{txt}")
     else:
         _LOG.warning("pbcopy works only on macOS")
 
@@ -1652,6 +1656,7 @@ def find_check_string_output(  # type: ignore
 
     :param as_python: if True return the snippet of code that replaces the
         `check_string()` with a `assert_equal`
+    :param pbcopy: save the result into the system clipboard (only on macOS)
     """
     _report_task()
     _ = ctx
@@ -2020,17 +2025,20 @@ def _parse_linter_output(txt: str) -> str:
     stage: Optional[str] = None
     output: List[str] = []
     for i, line in enumerate(txt.split("\n")):
-        _LOG.debug("%d:line='%s'", i, line)
+        _LOG.debug("%d:line='%s'", i + 1, line)
         # Tabs remover...............................................Passed
         # isort......................................................Failed
-        m = re.search("^(\S.*?)\.{10,}(\S.*)+$", line)
+        # Don't commit to branch...............................^[[42mPassed^[[m
+        m = re.search("^(\S.*?)\.{10,}\S+?(Passed|Failed)\S*?$", line)
         if m:
             stage = m.group(1)
-            _LOG.debug("  -> stage='%s'", stage)
+            result = m.group(2)
+            _LOG.debug("  -> stage='%s' (%s)", stage, result)
             continue
         # core/dataflow/nodes.py:601:9: F821 undefined name '_check_col_names'
-        m = re.search("^(\S.*):(\d+)[:\d+:]\s+(.*)$", line)
+        m = re.search("^(\S+):(\d+)[:\d+:]\s+(.*)$", line)
         if m:
+            _LOG.debug("  -> Found a lint to parse: '%s'", line)
             dbg.dassert_is_not(stage, None)
             file_name = m.group(1)
             line = int(m.group(2))
@@ -2050,9 +2058,10 @@ def lint(
     branch=False,
     files="",
     phases="",
-    only_black=False,
     stage="prod",
     run_bash=False,
+    run_lint=True,
+    parse_lint=True,
 ):  # type: ignore
     """
     Lint files.
@@ -2061,55 +2070,60 @@ def lint(
     :param branch: select the files modified in the current branch
     :param files: specify a space-separated list of files
     :param phases: specify the lint phases to execute
-    :param only_black: run only the lint phases that format the code
     :param run_bash: instead of running pre-commit, run bash to debug
+    :param run_lint: run linter step
+    :param parse_lint: parse linter output and generate vim cfile
     """
     _report_task()
-    #
-    docker_pull(ctx, stage=stage, images="dev_tools")
-    # Get the files to lint.
-    # For linting we can use only files modified in the client, in the branch, or
-    # specified.
-    mutually_exclusive = True
-    # pre-commit doesn't handle directories, but only files.
-    remove_dirs = True
-    files_as_list = _get_files_to_process(
-        modified, branch, files, mutually_exclusive, remove_dirs
-    )
-    _LOG.info("Files to lint:\n%s", "\n".join(files_as_list))
-    if not files_as_list:
-        _LOG.warning("Nothing to lint: exiting")
-        return
-    files_as_str = " ".join(files_as_list)
-    # Prepare the command line.
-    if only_black:
-        _LOG.warning("Running only black")
-        phases = "black"
-    precommit_opts = [
-        f"run {phases}",
-        "-c /app/.pre-commit-config.yaml",
-        f"--files {files_as_str}",
-    ]
-    precommit_opts = _to_single_line_cmd(precommit_opts)
-    # Execute command line.
-    cmd = _get_lint_docker_cmd(precommit_opts, run_bash)
     lint_file_name = "linter_output.txt"
-    cmd = f"({cmd}) 2>&1 | tee {lint_file_name}"
-    if run_bash:
-        # We don't execute this command since pty=True corrupts the terminal
-        # session.
-        print("To get a bash session inside the command run:")
-        print(cmd)
-        return
-    # Run.
-    _run(ctx, cmd)
-    # Parse the linter output into a cfile.
-    _LOG.info("Parsing %s", lint_file_name)
-    hio.from_file(lint_file_name)
-    cfile = _parse_linter_output(lint_file_name)
-    cfile_name = "./linter_warnings.txt"
-    hio.to_file(cfile_name, cfile)
-    _LOG.info("Saved cfile in '%s'", cfile_name)
+    if run_lint:
+        docker_pull(ctx, stage=stage, images="dev_tools")
+        # Get the files to lint.
+        # For linting we can use only files modified in the client, in the branch, or
+        # specified.
+        mutually_exclusive = True
+        # pre-commit doesn't handle directories, but only files.
+        remove_dirs = True
+        files_as_list = _get_files_to_process(
+            modified, branch, files, mutually_exclusive, remove_dirs
+        )
+        _LOG.info("Files to lint:\n%s", "\n".join(files_as_list))
+        if not files_as_list:
+            _LOG.warning("Nothing to lint: exiting")
+            return
+        files_as_str = " ".join(files_as_list)
+        # Prepare the command line.
+        precommit_opts = [
+            f"run {phases}",
+            "-c /app/.pre-commit-config.yaml",
+            f"--files {files_as_str}",
+        ]
+        precommit_opts = _to_single_line_cmd(precommit_opts)
+        # Execute command line.
+        cmd = _get_lint_docker_cmd(precommit_opts, run_bash)
+        cmd = f"({cmd}) 2>&1 | tee {lint_file_name}"
+        if run_bash:
+            # We don't execute this command since pty=True corrupts the terminal
+            # session.
+            print("To get a bash session inside the command run:")
+            print(cmd)
+            return
+        # Run.
+        _run(ctx, cmd)
+    else:
+        _LOG.warning("Skipping linter step, as per user request")
+    #
+    if parse_lint:
+        # Parse the linter output into a cfile.
+        _LOG.info("Parsing '%s'", lint_file_name)
+        txt = hio.from_file(lint_file_name)
+        cfile = _parse_linter_output(txt)
+        cfile_name = "./linter_warnings.txt"
+        hio.to_file(cfile_name, cfile)
+        _LOG.info("Saved cfile in '%s'", cfile_name)
+        print(cfile)
+    else:
+        _LOG.warning("Skipping lint parsing, as per user request")
 
 
 # #############################################################################
