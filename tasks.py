@@ -1,9 +1,10 @@
 import logging
 
+import helpers.versioning as hversi
+
 # Expose the pytest targets.
-# TODO(gp): Write a script to extract the targets programmatically, for now
-#  they are extracted with:
-# > \grep "^@task" -A 1 helpers/lib_tasks.py | grep def
+# Extract with:
+# > i print_tasks --as-code
 from helpers.lib_tasks import (
     docker_bash,
     docker_build_local_image,
@@ -32,6 +33,7 @@ from helpers.lib_tasks import (
     git_create_branch,
     git_create_patch,
     git_delete_merged_branches,
+    git_last_commits,
     git_merge_master,
     git_pull,
     git_pull_master,
@@ -46,10 +48,8 @@ from helpers.lib_tasks import (
     run_slow_tests,
     run_superslow_tests,
     #
-    set_default_params
-    )
-import helpers.versioning as hversi
-
+    set_default_params,
+)
 
 _LOG = logging.getLogger(__name__)
 
@@ -71,7 +71,7 @@ default_params = {
     # image, e.g., `XYZ_tmp` to not interfere with the prod system.
     # "BASE_IMAGE": "amp_tmp",
     "BASE_IMAGE": "amp",
-    "DEV_TOOLS_IMAGE_PROD": f"{ECR_BASE_PATH}/dev_tools:prod"
+    "DEV_TOOLS_IMAGE_PROD": f"{ECR_BASE_PATH}/dev_tools:prod",
 }
 
 

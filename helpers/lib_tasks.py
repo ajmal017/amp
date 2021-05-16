@@ -286,7 +286,7 @@ def print_setup(ctx):  # type: ignore
 
 
 @task
-def print_tasks(ctx, as_python_code=False):  # type: ignore
+def print_tasks(ctx, as_code=False):  # type: ignore
     """
     Print all the available tasks in `lib_tasks.py`.
 
@@ -306,13 +306,13 @@ def print_tasks(ctx, as_python_code=False):  # type: ignore
     _, txt = hsinte.system_to_string(cmd)
     for line in txt.split("\n"):
         _LOG.debug("line=%s", line)
-        m = re.match("^def\s+(\S+)\(", line)
+        m = re.match(r"^def\s+(\S+)\(", line)
         if m:
             func_name = m.group(1)
             _LOG.debug("  -> %s", func_name)
             func_names.append(func_name)
     func_names = sorted(func_names)
-    if as_python_code:
+    if as_code:
         print("\n".join([f"{fn}," for fn in func_names]))
     else:
         print("\n".join(func_names))
@@ -477,25 +477,36 @@ def git_create_branch(  # type: ignore
 
     :param branch_name: name of the branch to create (e.g.,
         `LemTask169_Get_GH_actions`)
-    :param issue_id: use the canonical name for the branch corresponding to that issue
+    :param issue_id: use the canonical name for the branch corresponding to that
+        issue
     :param repo: name of the GitHub repo that the `issue_id` belongs to
         - "current" (default): the current repo
         - short name (e.g., "amp", "lem") of the branch
-    :param suffix:
+    :param suffix: suffix (e.g., "02") to add to the branch name when using issue_id
     :param only_branch_from_master: only allow to branch from master
     """
     _report_task()
     if issue_id > 0:
+        # User specified an issue id on GitHub.
         dbg.dassert_eq(
-            branch_name, "", "You can't specify both issue and branch_name"
+            branch_name, "", "You can't specify both --issue and --branch_name"
         )
         branch_name = _get_gh_issue_title(issue_id, repo)
         _LOG.info(
             "Issue %d in %s repo corresponds to '%s'", issue_id, repo, branch_name
         )
+        if suffix != "":
+            # Add the the suffix.
+            _LOG.debug("Adding suffix '%s' to '%s'", suffix, branch_name)
+            if suffix[0] in ("-", "_"):
+                _LOG.warning("Suffix '%s' should not start with '%s': removing",
+                             suffix, suffix[0])
+                suffix = suffix.rstrip("-_")
+            branch_name += "_" + suffix
+    #
+    _LOG.info("branch_name='%s'", branch_name)
     dbg.dassert_ne(branch_name, "")
-    # Make sure we are branching from `master`, unless that's what the
-    # user wants.
+    # Make sure we are branching from `master`, unless that's what the user wants.
     curr_branch = git.get_branch_name()
     if curr_branch != "master":
         if only_branch_from_master:
@@ -602,6 +613,20 @@ def git_create_patch(  # type: ignore
 > ssh $SERVER 'cd $CLIENT_PATH && {cmd_inv} ~/{remote_file}'"
     """
     print(msg)
+
+
+@task
+def git_last_commits(ctx, pbcopy=True):  # type: ignore
+    # Print the status of the files in the previous commit.
+    cmd = 'git log -1 --name-status --pretty=""'
+    _run(ctx, cmd)
+    # Get the list of existing files.
+    files = git.get_previous_committed_files(".")
+    txt = "\n".join(files)
+    print("The files modified are:\n%s", txt)
+    # Save to clipboard.
+    res = " ".join(files)
+    _to_pbcopy(res, pbcopy)
 
 
 # TODO(gp): Add dev_scripts/git/git_create_patch*.sh
@@ -1518,11 +1543,15 @@ def _find_test_class(class_name: str, file_names: List[str]) -> List[str]:
     return res
 
 
-def _to_pbcopy(txt: str) -> None:
+# TODO(gp): -> system_interaction.py ?
+def _to_pbcopy(txt: str, pbcopy: bool) -> None:
     """
     Save the content of txt in the system clipboard.
     """
     txt = txt.rstrip("\n")
+    if not pbcopy:
+        print(txt)
+        return
     if hsinte.is_running_on_macos():
         # -n = no new line
         cmd = f"echo -n '{txt}' | pbcopy"
@@ -1548,10 +1577,8 @@ def find_test_class(ctx, class_name, dir_name=".", pbcopy=True):  # type: ignore
     file_names = _find_test_files(dir_name)
     res = _find_test_class(class_name, file_names)
     res = " ".join(res)
-    if pbcopy:
-        _to_pbcopy(res)
-    else:
-        print(res)
+    # Print or copy to clipboard.
+    _to_pbcopy(res, pbcopy)
 
 
 # #############################################################################
@@ -1932,8 +1959,8 @@ def _parse_linter_output(txt: str) -> str:
     """
     Parse the output of the linter and return a file suitable for vim quickfix.
     """
-    stage : Optional[str] = None
-    output : List[str] = []
+    stage: Optional[str] = None
+    output: List[str] = []
     for i, line in enumerate(txt.split("\n")):
         _LOG.debug("%d:line='%s'", i, line)
         # Tabs remover...............................................Passed
@@ -1950,7 +1977,9 @@ def _parse_linter_output(txt: str) -> str:
             file_name = m.group(1)
             line = int(m.group(2))
             msg = m.group(3)
-            _LOG.debug("  -> file_name='%s' line=%d msg='%s'", file_name, line, msg)
+            _LOG.debug(
+                "  -> file_name='%s' line=%d msg='%s'", file_name, line, msg
+            )
             output.append(f"{file_name}:{line}:[{stage}] {msg}")
     output = "\n".join(output)
     return output
@@ -2013,8 +2042,7 @@ def lint(
     _run(ctx, cmd, pty=pty)
     if not run_bash:
         # Parse the output.
-        txt = hio.from_file(lint_file_name)
-
+        hio.from_file(lint_file_name)
 
 
 # #############################################################################
@@ -2183,10 +2211,8 @@ def gh_issue_title(ctx, issue_id, repo="current", pbcopy=True):  # type: ignore
     issue_id = int(issue_id)
     dbg.dassert_lte(1, issue_id)
     res = _get_gh_issue_title(issue_id, repo)
-    if pbcopy:
-        _to_pbcopy(res)
-    else:
-        print(res)
+    # Print or copy to clipboard.
+    _to_pbcopy(res, pbcopy)
 
 
 # TODO(gp): Add unit test for
