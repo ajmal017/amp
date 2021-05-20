@@ -91,7 +91,7 @@ def set_non_ath_to_nan(
     - left closed, right open `[a, b)`
     - labeled right
 
-    Row is kept (i.e., not set to `np.nan`) iff its `time` satisfies:
+    Row is not set to `np.nan` iff its `time` satisfies:
       - `start_time <= time`, and
       - `time <= end_time`
     """
