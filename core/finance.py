@@ -77,6 +77,8 @@ def resample(
     return rets
 
 
+# TODO(gp): Active trading hours and days are specific of different futures.
+#  Consider explicitly passing this information instead of using defaults.
 def set_non_ath_to_nan(
     df: pd.DataFrame,
     start_time: Optional[datetime.time] = None,
@@ -89,8 +91,8 @@ def set_non_ath_to_nan(
     - left closed, right open `[a, b)`
     - labeled right
 
-    Row is not set to `np.nan` iff its `time` satisfies:
-      - `start_time < time`, and
+    Row is kept (i.e., not set to `np.nan`) iff its `time` satisfies:
+      - `start_time <= time`, and
       - `time <= end_time`
     """
     dbg.dassert_isinstance(df.index, pd.DatetimeIndex)
@@ -100,12 +102,12 @@ def set_non_ath_to_nan(
     if end_time is None:
         end_time = datetime.time(16, 0)
     dbg.dassert_lte(start_time, end_time)
-    #
+    # Compute the indices to keep.
     times = df.index.time
-    mask = (start_time < times) & (times <= end_time)
-    #
+    to_remove_mask = (times < start_time) | (end_time < times)
+    # Make a copy and filter.
     df = df.copy()
-    df[~mask] = np.nan
+    df[to_remove_mask] = np.nan
     return df
 
 
@@ -115,9 +117,9 @@ def set_weekends_to_nan(df: pd.DataFrame) -> pd.DataFrame:
     """
     dbg.dassert_isinstance(df.index, pd.DatetimeIndex)
     # 5 = Saturday, 6 = Sunday.
-    mask = df.index.dayofweek.isin([5, 6])
+    to_remove_mask = df.index.dayofweek.isin([5, 6])
     df = df.copy()
-    df[mask] = np.nan
+    df[to_remove_mask] = np.nan
     return df
 
 
