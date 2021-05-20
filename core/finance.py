@@ -21,7 +21,8 @@ def remove_dates_with_no_data(
     Given a df indexed with timestamps, scan the data by date and filter out
     all the data when it's all nans.
 
-    :param report_stats: if True report information about the
+    :param report_stats: if True report information about the performed
+        operation
     :return: filtered df
     """
     # We rely on `groupby` to process dates in increasing days, which relies on `df`
@@ -86,7 +87,7 @@ def set_non_ath_to_nan(
     """
     Filter according to active trading hours.
 
-    We assume time intervals are
+    We assume time intervals are:
     - left closed, right open `[a, b)`
     - labeled right
 
