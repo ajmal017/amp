@@ -8,12 +8,12 @@ import core.event_study as cevent
 import core.signal_processing as csigna
 from core.dataflow.builders import DagBuilder
 from core.dataflow.core import DAG
-from core.dataflow.models import SkLearnModel
-from core.dataflow.nodes import (
+from core.dataflow.nodes.base import YConnector
+from core.dataflow.nodes.sklearn_models import SkLearnModel
+from core.dataflow.nodes.transformers import (
     ColumnTransformer,
     DataframeMethodRunner,
     Resample,
-    YConnector,
 )
 
 _LOG = logging.getLogger(__name__)
@@ -260,136 +260,5 @@ class EventStudyBuilder(DagBuilder):
         dag.connect(
             (self._get_nid("grid_data_input_socket"), "df_out"),
             (self._get_nid(stage), "df_in2"),
-        )
-        return dag
-
-
-class ContinuousSignalModelBuilder(DagBuilder):
-    """
-    Configurable pipeline for predicting market data using a continuous signal.
-
-    Market data may also include x-vars and be processed.
-    """
-
-    def get_config_template(self) -> cconfi.Config:
-        """
-        Return a reference configuration.
-        """
-        config = cconfi.Config()
-        return config
-
-    def get_dag(self, config: cconfi.Config, dag: Optional[DAG] = None) -> DAG:
-        """
-        Pipeline interface nodes:
-
-        - "signal_input_socket"
-            - continuous input signal should feed into this node
-        - "market_data_input_socket"
-            - market data should feed into this node
-        - "model_input_socket"
-            - modeling node should receive data from this node
-        - "model_output_socket"
-            - modeling node should send output data to this node
-        - "output_socket"
-            - pipeline output available from this node
-
-        It is assumed that the input signal and market data have already been
-        preprocessed, e.g., put on the same time scales, filtered, etc.
-        """
-        dag = dag or DAG()
-        _LOG.debug("%s", config)
-        stage = "signal_input_socket"
-        node = ColumnTransformer(
-            self._get_nid(stage),
-            transformer_func=lambda x: x,
-            col_mode="replace_all",
-        )
-        dag.add_node(node)
-        stage = "market_data_input_socket"
-        node = ColumnTransformer(
-            self._get_nid(stage),
-            transformer_func=lambda x: x,
-            col_mode="replace_all",
-        )
-        dag.add_node(node)
-        stage = "merge_signal_with_market_data"
-        node = YConnector(
-            self._get_nid(stage),
-            connector_func=lambda x, y, **kwargs: x.merge(y, **kwargs),
-            connector_kwargs={
-                "how": "right",
-                "left_index": True,
-                "right_index": True,
-            },
-        )
-        dag.add_node(node)
-        dag.connect(
-            (self._get_nid("signal_input_socket"), "df_out"),
-            (self._get_nid(stage), "df_in1"),
-        )
-        dag.connect(
-            (self._get_nid("market_data_input_socket"), "df_out"),
-            (self._get_nid(stage), "df_in2"),
-        )
-        # Fill NaNs.
-        stage = "fillna"
-        node = ColumnTransformer(
-            self._get_nid(stage),
-            transformer_func=lambda x: x.fillna(method="ffill"),
-            col_mode="replace_all",
-        )
-        dag.add_node(node)
-        dag.connect(
-            self._get_nid("merge_signal_with_market_data"), self._get_nid(stage)
-        )
-        # Drop NaNs.
-        stage = "dropna"
-        node = DataframeMethodRunner(
-            self._get_nid(stage), method="dropna", method_kwargs={"how": "any"}
-        )
-        dag.add_node(node)
-        dag.connect(self._get_nid("fillna"), self._get_nid(stage))
-        # Leave sockets for hooking up a model.
-        stage = "model_input_socket"
-        node = ColumnTransformer(
-            self._get_nid(stage),
-            transformer_func=lambda x: x,
-            col_mode="replace_all",
-        )
-        dag.add_node(node)
-        dag.connect(self._get_nid("dropna"), self._get_nid(stage))
-        stage = "model_output_socket"
-        node = ColumnTransformer(
-            self._get_nid(stage),
-            transformer_func=lambda x: x,
-            col_mode="replace_all",
-        )
-        dag.add_node(node)
-        # Merge predictions of model with xvars, yvars.
-        stage = "merge_predictions"
-        node = YConnector(
-            self._get_nid(stage),
-            connector_func=lambda x, y, **kwargs: x.merge(y, **kwargs),
-            connector_kwargs={"left_index": True, "right_index": True},
-        )
-        dag.add_node(node)
-        dag.connect(
-            (self._get_nid("model_input_socket"), "df_out"),
-            (self._get_nid(stage), "df_in1"),
-        )
-        dag.connect(
-            (self._get_nid("model_output_socket"), "df_out"),
-            (self._get_nid(stage), "df_in2"),
-        )
-        stage = "output_socket"
-        node = ColumnTransformer(
-            self._get_nid(stage),
-            transformer_func=lambda x: x,
-            col_mode="replace_all",
-        )
-        dag.add_node(node)
-        dag.connect(
-            self._get_nid("merge_predictions"),
-            self._get_nid("output_socket"),
         )
         return dag
