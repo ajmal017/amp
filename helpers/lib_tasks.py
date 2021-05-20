@@ -557,32 +557,36 @@ def git_create_patch(  # type: ignore
         "Difference between HEAD and master:\n%s",
         git.get_summary_files_in_branch("master", "."),
     )
+    # Get the files.
+    # We allow to specify files as a subset of files modified in the branch or
+    # in the client.
+    mutually_exclusive = False
+    # We don't allow to specify directories.
+    remove_dirs = True
+    files_as_list = _get_files_to_process(
+        modified, branch, last_commit, files, mutually_exclusive, remove_dirs
+    )
+    _LOG.info("Files to save:\n%s", hprint.indent("\n".join(files_as_list)))
+    if not files_as_list:
+        _LOG.warning("Nothing to patch: exiting")
+        return
+    files_as_str = " ".join(files_as_list)
+
     # Prepare the patch command.
     cmd = ""
     if mode == "tar":
-        # Get the files.
-        # We allow to specify files as a subset of files modified in the branch or
-        # in the client.
-        mutually_exclusive = False
-        # We don't allow to specify directories.
-        remove_dirs = True
-        files_as_list = _get_files_to_process(
-            modified, branch, last_commit, files, mutually_exclusive, remove_dirs
-        )
-        _LOG.info("Files to save:\n%s", hprint.indent("\n".join(files_as_list)))
-        if not files_as_list:
-            _LOG.warning("Nothing to patch: exiting")
-            return
-        files_as_str = " ".join(files_as_list)
         cmd = f"tar czvf {dst_file} {files_as_str}"
         cmd_inv = "tar xvzf"
     elif mode == "diff":
         if modified:
-            cmd = f"git diff HEAD >{dst_file}"
+            cmd = f"git diff HEAD {files_as_str} >{dst_file}"
         elif branch:
-            cmd = f"git diff master... >{dst_file}"
+            cmd = f"git diff master... {files_as_str} >{dst_file}"
+        elif last_commit:
+            cmd = f"git diff HEAD^ {files_as_str} >{dst_file}"
         else:
-            dbg.dfatal("You need to specify --modified or --branch")
+            dbg.dfatal("You need to specify one among -modified, --branch, "
+                       "--last-commit")
         cmd_inv = "git apply"
     # Execute patch command.
     _LOG.info("Creating the patch into %s", dst_file)

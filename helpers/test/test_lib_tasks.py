@@ -859,32 +859,49 @@ class TestLibTasksGitCreatePatch1(hut.TestCase):
         """
         Exercise the code for:
 
-        > invoke git_create_patch --mode="tar" --branch
+        > invoke git_create_patch ... --branch
         """
         # This test needs a reference to Git master branch.
         git.fetch_origin_master_if_needed()
         #
         modified = True
         branch = False
+        last_commit = False
         files = ""
-        self._helper(modified, branch, files)
+        self._helper(modified, branch, last_commit, files)
 
     def test_tar_branch1(self) -> None:
         """
         Exercise the code for:
 
-        > invoke git_create_patch --mode="tar" --modified
+        > invoke git_create_patch ... --modified
         """
         modified = False
         branch = True
+        last_commit = False
         files = ""
-        self._helper(modified, branch, files)
+        self._helper(modified, branch, last_commit, files)
+
+    def test_tar_last_commit1(self) -> None:
+        """
+        Exercise the code for:
+
+        > invoke git_create_patch ... --last_commit
+        """
+        # This test needs a reference to Git master branch.
+        git.fetch_origin_master_if_needed()
+        #
+        modified = False
+        branch = False
+        last_commit = True
+        files = ""
+        self._helper(modified, branch, last_commit, files)
 
     def test_tar_files1(self) -> None:
         """
         Exercise the code for:
 
-        > invoke git_create_patch --mode="tar" --files "this file"
+        > invoke git_create_patch ... --files "this file"
         """
         # This test needs a reference to Git master branch.
         git.fetch_origin_master_if_needed()
@@ -893,16 +910,18 @@ class TestLibTasksGitCreatePatch1(hut.TestCase):
         mode = "tar"
         modified = False
         branch = False
+        last_commit = False
         files = __file__
-        ltasks.git_create_patch(ctx, mode, modified, branch, files)
+        ltasks.git_create_patch(ctx, mode, modified, branch, last_commit, files)
 
-    def test_tar_files2(self) -> None:
+    def test_diff_files_abort1(self) -> None:
         """
         Exercise the code for:
 
         > invoke git_create_patch --mode="diff" --files "this file"
 
-        In this case one needs to specify --branch or --modified.
+        In this case one needs to specify at least one --branch, --modified,
+        --last_commit option.
         """
         # This test needs a reference to Git master branch.
         git.fetch_origin_master_if_needed()
@@ -911,19 +930,25 @@ class TestLibTasksGitCreatePatch1(hut.TestCase):
         mode = "diff"
         modified = False
         branch = False
+        last_commit = False
         files = __file__
-        with self.assertRaises(AssertionError):
-            ltasks.git_create_patch(ctx, mode, modified, branch, files)
+        with self.assertRaises(AssertionError) as cm:
+            ltasks.git_create_patch(ctx, mode, modified, branch, last_commit, files)
+        act = str(cm.exception)
+        exp = r"""
+        You need to specify one among -modified, --branch, --last-commit
+        """
+        self.assert_equal(act, exp, fuzzy_match=True)
 
     @staticmethod
-    def _helper(modified: bool, branch: bool, files: str) -> None:
+    def _helper(modified: bool, branch: bool, last_commit: bool, files: str) -> None:
         ctx = _build_mock_context_returning_ok()
         #
         mode = "tar"
-        ltasks.git_create_patch(ctx, mode, modified, branch, files)
+        ltasks.git_create_patch(ctx, mode, modified, branch, last_commit, files)
         #
         mode = "diff"
-        ltasks.git_create_patch(ctx, mode, modified, branch, files)
+        ltasks.git_create_patch(ctx, mode, modified, branch, last_commit, files)
 
 
 # #############################################################################
