@@ -4,20 +4,28 @@
 
 - Kibot documentation (from http://www.kibot.com/Support.aspx#data_format)
   states the following timing semantic:
-
-  - "A time stamp of 10:00 AM is for a period between 10:00:00 AM and 10:00:59
-    AM"
+  
+  - "Aggregated data records have a time value indicating the time when the bar opened"
+  - "For instance, a time stamp of 10:00 AM is for a period between 10:00:00 AM and
+    10:00:59 AM"
   - "All records with a time stamp between 9:30:00 AM and 3:59:59 PM represent
     the regular US stock market trading session."
+    
+- The implication of this is that Kibot intervals are `[a, b)` and they are labeled
+  with `dt=a`
 
-- Thus the open price at time "ts" corresponds to the instantaneous price at
-  time "ts", which by our conventions corresponds to the "end" of an interval in
-  the form [a, b) interval
+- Thus, the open price at time "ts" corresponds to the instantaneous price at
+  time "ts"
+  - By our convention this corresponds to the "end" of an interval in the form
+    `[a, b)` interval
+  - TODO(gp): Unclear?
 
-- As a consequence our usual "ret_0" # (price entering instantaneously at time t
-    - 1 and exiting at time t) is implemented in terms of Kibot data as:
-
-    ret_0(t) = open_price(t) - open_price(t - 1)
+- As a consequence, our usual `ret_0` (i.e., price entering instantaneously at time
+  `t - 1` and exiting at time `t`) is implemented in terms of Kibot data as:
+  
+  ```text
+    ret_0(t) = open(t) - open(t - 1)
+  ```
 
   ```text
                datetime     open     high      low    close   vol      time  ret_0
@@ -25,10 +33,10 @@
   1 2009-09-27 18:01:00  1043.25  1043.50  1042.75  1042.75   778  18:01:00   1.00
   ```
 
-- E.g., ret_0(18:01) is the return realized entering (instantaneously) at 18:00
+- E.g., `ret_0(18:01)` is the return realized entering (instantaneously) at 18:00
   and exiting at 18:01
 
-- In reality we need time to:
+- In reality, we need time to:
     - Compute the forecast
     - Enter the position
 - We can't use open at time t - 1 since this would imply instantaneous forecast

@@ -12,6 +12,35 @@ import helpers.unit_test as hut
 _LOG = logging.getLogger(__name__)
 
 
+from io import StringIO
+
+
+class Test_set_non_ath_to_nan(hut.TestCase):
+    def get_df(self) -> str:
+        # From `s3://alphamatic-data/data/kibot/all_stocks_1min/AAPL.csv.gz`.
+        txt = """
+datetime,open,high,low,close,vol
+2016-01-05 09:28:00,98.0,98.05,97.99,98.05,2241
+2016-01-05 09:29:00,98.04,98.13,97.97,98.13,14174
+2016-01-05 09:30:00,98.14,98.24,97.79,98.01,751857
+2016-01-05 09:31:00,98.01,98.19,98.0,98.0,172584
+2016-01-05 09:32:00,97.99,98.04,97.77,97.77,189058
+2016-01-05 15:58:00,95.31,95.32,95.22,95.27,456235
+2016-01-05 15:59:00,95.28,95.36,95.22,95.32,729315
+2016-01-05 16:00:00,95.32,95.4,95.32,95.4,3255752
+2016-01-05 16:01:00,95.4,95.42,95.4,95.42,4635
+2016-01-05 16:02:00,95.41,95.41,95.37,95.4,3926
+"""
+        df = pd.read_csv(StringIO(txt), index_col=0
+
+    def test1(self) -> None:
+        """
+        Test for a daily frequency input.
+        """
+        start_time = datetime.time(9, 30)
+        end_time = datetime.time(16, 0)
+
+
 class Test_set_weekends_to_nan(hut.TestCase):
     def test1(self) -> None:
         """

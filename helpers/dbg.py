@@ -517,6 +517,12 @@ def dassert_file_extension(
 # Pandas related.
 
 
+def dassert_index_datetime():
+
+isinstance(dict_["df_out"].index, pd.DatetimeIndex)
+
+
+
 def dassert_strictly_increasing_index(
     obj: Any, msg: Optional[str] = None, *args: Any
 ) -> None:

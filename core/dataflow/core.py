@@ -11,6 +11,17 @@ import helpers.list as hlist
 _LOG = logging.getLogger(__name__)
 
 
+# TODO(gp): Move to utils.py?
+
+def validate_df(df: pd.DataFrame):
+    dbg.dassert_isinstance(df.index, pd.DatetimeIndex)
+    dbg.dassert_strictly_increasing_index(df)
+    dbg.dassert_no_duplicates(items)
+    dbg.dassert_isindex(idx, datetime)
+#     dbg.dassert_is_monotonic(idx)
+#     dbg.dassert_strictly_increasing_index(self.df)
+
+
 # #############################################################################
 # Core node classes
 # #############################################################################

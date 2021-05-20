@@ -16,7 +16,11 @@ class Test_config1(hut.TestCase):
         """
         config = cfg.Config()
         config["hello"] = "world"
-        self.check_string(str(config))
+        act = str(config)
+        exp = r"""
+
+"""
+        self.assert_equal(act, exp)
 
     def test_config2(self) -> None:
         """
