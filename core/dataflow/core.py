@@ -11,15 +11,21 @@ import helpers.list as hlist
 _LOG = logging.getLogger(__name__)
 
 
-# TODO(gp): Move to utils.py?
+# TODO(gp): Move to dataflow/utils.py?
 
-def validate_df(df: pd.DataFrame):
-    dbg.dassert_isinstance(df.index, pd.DatetimeIndex)
+# TODO(gp): Extend it to multi-index.
+def validate_df(df: pd.DataFrame) -> None:
+    """
+    Check basic properties of dataframes we work with.
+
+    A typical df:
+    - is indexed with time
+    - has a strictly increasing index
+    - has no repeated columns
+    """
+    dbg.dassert_index_is_datetime(df)
     dbg.dassert_strictly_increasing_index(df)
-    dbg.dassert_no_duplicates(items)
-    dbg.dassert_isindex(idx, datetime)
-#     dbg.dassert_is_monotonic(idx)
-#     dbg.dassert_strictly_increasing_index(self.df)
+    dbg.dassert_no_duplicates(df.columns)
 
 
 # #############################################################################
