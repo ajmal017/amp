@@ -18,9 +18,9 @@ class Test_config1(hut.TestCase):
         config["hello"] = "world"
         act = str(config)
         exp = r"""
-
-"""
-        self.assert_equal(act, exp)
+        hello: world
+        """
+        self.assert_equal(act, exp, fuzzy_match=True)
 
     def test_config2(self) -> None:
         """

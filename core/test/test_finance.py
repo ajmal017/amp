@@ -1,3 +1,4 @@
+import datetime
 import logging
 
 import numpy as np
@@ -15,8 +16,10 @@ _LOG = logging.getLogger(__name__)
 from io import StringIO
 
 
-class Test_set_non_ath_to_nan(hut.TestCase):
-    def get_df(self) -> str:
+class Test_set_non_ath_to_nan1(hut.TestCase):
+
+    @staticmethod
+    def _get_df() -> str:
         # From `s3://alphamatic-data/data/kibot/all_stocks_1min/AAPL.csv.gz`.
         txt = """
 datetime,open,high,low,close,vol
@@ -31,14 +34,32 @@ datetime,open,high,low,close,vol
 2016-01-05 16:01:00,95.4,95.42,95.4,95.42,4635
 2016-01-05 16:02:00,95.41,95.41,95.37,95.4,3926
 """
-        df = pd.read_csv(StringIO(txt), index_col=0
+        df = pd.read_csv(StringIO(txt), index_col=0, parse_dates=True)
+        return df
 
     def test1(self) -> None:
         """
-        Test for a daily frequency input.
+        Test for active trading hours in [9:30, 16:00].
         """
+        df = self._get_df()
         start_time = datetime.time(9, 30)
         end_time = datetime.time(16, 0)
+        act = fin.set_non_ath_to_nan(df, start_time, end_time)
+        exp = """
+                              open   high    low  close        vol
+        datetime
+        2016-01-05 09:28:00    NaN    NaN    NaN    NaN        NaN
+        2016-01-05 09:29:00    NaN    NaN    NaN    NaN        NaN
+        2016-01-05 09:30:00  98.14  98.24  97.79  98.01   751857.0
+        2016-01-05 09:31:00  98.01  98.19  98.00  98.00   172584.0
+        2016-01-05 09:32:00  97.99  98.04  97.77  97.77   189058.0
+        2016-01-05 15:58:00  95.31  95.32  95.22  95.27   456235.0
+        2016-01-05 15:59:00  95.28  95.36  95.22  95.32   729315.0
+        2016-01-05 16:00:00  95.32  95.40  95.32  95.40  3255752.0
+        2016-01-05 16:01:00    NaN    NaN    NaN    NaN        NaN
+        2016-01-05 16:02:00    NaN    NaN    NaN    NaN        NaN
+        """
+        self.assert_equal(str(act), exp, fuzzy_match=True)
 
 
 class Test_set_weekends_to_nan(hut.TestCase):

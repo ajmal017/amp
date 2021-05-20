@@ -47,7 +47,7 @@ class _Dataflow_helper(hut.TestCase):
         # Visualize if needed.
         dir_name = self.get_scratch_space()
         file_name = os.path.join(dir_name, "graph.png")
-        dtf.save_plot(dag, file_name)
+        dtf.draw_to_file(dag, file_name)
         _LOG.debug("Saved plot to %s", file_name)
         # Check output.
         self.check_string(json_nld)

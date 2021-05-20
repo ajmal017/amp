@@ -21,8 +21,7 @@ class TestResultBundle(hut.TestCase):
         act = f"config without 'commit_hash' field:\n{actual_config}"
         exp = r"""
 config without 'commit_hash' field:
-config:
-  key: val
+config: OrderedDict([('key', 'val')])
 result_nid: leaf_node
 method: fit
 result_df:    col0  col1  col2  col3  col4
