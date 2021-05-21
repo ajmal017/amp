@@ -187,8 +187,13 @@ def resample_time_bars(
     # TODO(gp): the linter is unhappy that this function shadows the external
     #  params, with the risk of forgetting some params. Either move it out or add an
     #  underscore to the params.
-    def _resample_financial(df: pd.DataFrame, rule: str , cols: List[str],
-                            agg_func: str, agg_func_kwargs: KWARGS) -> pd.DataFrame:
+    def _resample_financial(
+        df: pd.DataFrame,
+        rule: str,
+        cols: List[str],
+        agg_func: str,
+        agg_func_kwargs: KWARGS,
+    ) -> pd.DataFrame:
         """
         Resample columns `cols` of `df` using the passed parameters.
         """
@@ -256,15 +261,15 @@ def resample_time_bars(
 
 
 def resample_ohlcv_bars(
-        df: pd.DataFrame,
-        rule: str,
-        *,
-        open_col: Optional[str] = "open",
-        high_col: Optional[str] = "high",
-        low_col: Optional[str] = "low",
-        close_col: Optional[str] = "close",
-        volume_col: Optional[str] = "volume",
-        add_twap_vwap: bool = False,
+    df: pd.DataFrame,
+    rule: str,
+    *,
+    open_col: Optional[str] = "open",
+    high_col: Optional[str] = "high",
+    low_col: Optional[str] = "low",
+    close_col: Optional[str] = "close",
+    volume_col: Optional[str] = "volume",
+    add_twap_vwap: bool = False,
 ) -> pd.DataFrame:
     """
     Resample OHLCV bars and optionally add TWAP, VWAP prices based on "close".

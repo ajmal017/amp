@@ -430,7 +430,9 @@ def dassert_array_has_same_type_element(
 
 
 # TODO(gp): -> is_list_of_strings
-def dassert_list_of_strings(list_: List[str], msg: Optional[str] = None, *args: Any) -> None:
+def dassert_list_of_strings(
+    list_: List[str], msg: Optional[str] = None, *args: Any
+) -> None:
     # TODO(gp): Allow iterable?
     dassert_isinstance(list_, list, msg=msg, *args)
     for elem in list_:
@@ -520,7 +522,8 @@ def dassert_file_extension(
     dassert_in(
         act_ext,
         extensions,
-        "Invalid extension '%s' for file '%s'", act_ext,
+        "Invalid extension '%s' for file '%s'",
+        act_ext,
         file_name,
     )
 

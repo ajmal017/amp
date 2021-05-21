@@ -14,7 +14,7 @@ _LOG = logging.getLogger(__name__)
 # TODO(gp): Move to dataflow/utils.py?
 
 ## TODO(gp): Extend it to multi-index.
-#def validate_df(df: pd.DataFrame) -> None:
+# def validate_df(df: pd.DataFrame) -> None:
 #    """
 #    Check basic properties of dataframes we work with.
 #

@@ -238,7 +238,7 @@ class DataSource(FitPredictNode, abc.ABC):
         info["predict_df_info"] = get_df_info_as_string(predict_df)
         self._set_info("predict", info)
         #
-        #return {self.get_single_output_name(): predict_df}
+        # return {self.get_single_output_name(): predict_df}
         return {"df_out": df_out}
 
     # TODO(gp): Make df protected since there is an accessor. We can use
@@ -277,7 +277,7 @@ class Transformer(FitPredictNode, abc.ABC):
         self._set_info("fit", info)
         # TODO(gp): -> validate_df
         dbg.dassert_no_duplicates(df_out.columns)
-        #return {self.get_single_output_name(): df_out}
+        # return {self.get_single_output_name(): df_out}
         return {"df_out": df_out}
 
     def predict(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
@@ -289,7 +289,7 @@ class Transformer(FitPredictNode, abc.ABC):
         self._set_info("predict", info)
         # TODO(gp): -> validate_df
         dbg.dassert_no_duplicates(df_out.columns)
-        #return {self.get_single_output_name(): df_out}
+        # return {self.get_single_output_name(): df_out}
         return {"df_out": df_out}
 
     @abc.abstractmethod

@@ -34,9 +34,10 @@ def _get_default_params() -> Dict[str, str]:
 
 class _TestClassHandlingLibTasksSingleton(hut.TestCase):
     """
-    Test class injecting default parameters in the `lib_tasks` singleton on `setUp`
-    and cleaning up the singleton on `tearDown`.
+    Test class injecting default parameters in the `lib_tasks` singleton on
+    `setUp` and cleaning up the singleton on `tearDown`.
     """
+
     def setUp(self) -> None:
         super().setUp()
         params = _get_default_params()
