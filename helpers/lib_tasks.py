@@ -2332,7 +2332,7 @@ def _get_gh_issue_title(issue_id: int, repo: str) -> str:
     title = dict_["title"]
     _LOG.debug("title=%s", title)
     # Remove some annoying chars.
-    for char in ": + ( ) / `".split():
+    for char in ": + ( ) / ` *".split():
         title = title.replace(char, "")
     # Replace multiple spaces with one.
     title = re.sub(r"\s+", " ", title)
