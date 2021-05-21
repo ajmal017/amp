@@ -239,7 +239,7 @@ class DataSource(FitPredictNode, abc.ABC):
         self._set_info("predict", info)
         #
         # return {self.get_single_output_name(): predict_df}
-        return {"df_out": df_out}
+        return {"df_out": predict_df}
 
     # TODO(gp): Make df protected since there is an accessor. We can use
     #  a property.

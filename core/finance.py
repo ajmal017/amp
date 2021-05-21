@@ -89,8 +89,8 @@ def set_non_ath_to_nan(
     - left closed, right open `[a, b)`
     - labeled right
 
-    Row is kept (i.e., not set to `np.nan`) iff its `time` satisfies:
-      - `start_time <= time`, and
+    Row is not set to `np.nan` iff its `time` satisfies:
+      - `start_time < time`, and
       - `time <= end_time`
     """
     dbg.dassert_isinstance(df.index, pd.DatetimeIndex)
@@ -102,7 +102,7 @@ def set_non_ath_to_nan(
     dbg.dassert_lte(start_time, end_time)
     # Compute the indices to keep.
     times = df.index.time
-    to_remove_mask = (times < start_time) | (end_time < times)
+    to_remove_mask = (times <= start_time) | (end_time < times)
     # Make a copy and filter.
     df = df.copy()
     df[to_remove_mask] = np.nan
@@ -168,18 +168,18 @@ def _merge(df1: pd.DataFrame, df2: pd.DataFrame) -> pd.DataFrame:
 
 
 def resample_time_bars(
-        df: pd.DataFrame,
-        rule: str,
+    df: pd.DataFrame,
+    rule: str,
     *,
     return_cols: Optional[List[str]] = None,
     return_agg_func: Optional[str] = None,
     return_agg_func_kwargs: Optional[KWARGS] = None,
     price_cols: Optional[List[str]] = None,
     price_agg_func: Optional[str] = None,
-    price_agg_func_kwargs: Optional[List[KWARGS]] = None,
+    price_agg_func_kwargs: Optional[KWARGS] = None,
     volume_cols: Optional[List[str]] = None,
     volume_agg_func: Optional[str] = None,
-    volume_agg_func_kwargs: Optional[List[KWARGS]] = None,
+    volume_agg_func_kwargs: Optional[KWARGS] = None,
 ) -> pd.DataFrame:
     """
     Convenience resampler for time bars.
@@ -215,27 +215,12 @@ def resample_time_bars(
     #  or merge the common code in _resample_with_aggregate_function().
     #  The only differences between the 3 resampling of returns, prices, and volume
     #  is the default value and _kwargs.
-    #
-    # ```
-    # def _resample_and_merge(df, rule, cols, return_agg_func, return_agg_func_kwargs)
-    #   df_tmp = _resample_with_aggregate_function(...)
-    #   df_tmp = ...
-    #
-    # if return_cols:
-    #   return_agg_func = return_agg_func or "sum"
-    #   return_agg_func_kwargs = return_agg_func_kwargs or {"min_count": 1}
-    #   result_df = _resample_and_merge(...)
-    # ```
     if return_cols:
         return_agg_func = return_agg_func or "sum"
         return_agg_func_kwargs = return_agg_func_kwargs or {"min_count": 1}
         return_df = _resample_with_aggregate_function(
             df, rule, return_cols, return_agg_func, return_agg_func_kwargs
         )
-        # result_df = result_df.merge(
-        #     return_df, how="outer", left_index=True, right_index=True
-        # )
-        #dbg.dassert(result_df.index.freq)
         result_df = _merge(result_df, return_df)
     # Maybe resample prices.
     if price_cols:
@@ -245,10 +230,6 @@ def resample_time_bars(
         price_df = _resample_with_aggregate_function(
             df, rule, price_cols, price_agg_func, price_agg_func_kwargs
         )
-        # result_df = result_df.merge(
-        #     price_df, how="outer", left_index=True, right_index=True
-        # )
-        #dbg.dassert(result_df.index.freq)
         result_df = _merge(result_df, price_df)
     # Maybe resample volume.
     if volume_cols:
@@ -257,13 +238,7 @@ def resample_time_bars(
         volume_df = _resample_with_aggregate_function(
             df, rule, volume_cols, volume_agg_func, volume_agg_func_kwargs
         )
-        # result_df = result_df.merge(
-        #     volume_df, how="outer", left_index=True, right_index=True
-        # )
-        # dbg.dassert(result_df.index.freq)
         result_df = _merge(result_df, volume_df)
-    # TODO(*): Consider returning the columns in the same order implied by the
-    #   interface, i.e., `return_cols + price_cols + volume_cols`.
     return result_df
 
 
@@ -328,11 +303,14 @@ def resample_ohlcv_bars(
     if volume_col:
         # We rely on the default behavior of accumulating the volume.
         volume_df = resample_time_bars(
-            df[[volume_col]], rule=rule, volume_cols=[volume_col],
+            df[[volume_col]],
+            rule=rule,
+            volume_cols=[volume_col],
         )
         result_df = _merge(result_df, volume_df)
     # Add TWAP / VWAP prices, if needed.
     if add_twap_vwap:
+        price_col, volume_col: str
         twap_vwap_df = compute_twap_vwap(
             df, rule=rule, price_col=close_col, volume_col=volume_col
         )

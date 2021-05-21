@@ -15,7 +15,6 @@ _LOG = logging.getLogger(__name__)
 
 
 class Test_set_non_ath_to_nan1(hut.TestCase):
-
     def test1(self) -> None:
         """
         Test for active trading hours in [9:30, 16:00].
@@ -41,7 +40,7 @@ class Test_set_non_ath_to_nan1(hut.TestCase):
         self.assert_equal(str(act), exp, fuzzy_match=True)
 
     @staticmethod
-    def _get_df() -> str:
+    def _get_df() -> pd.DataFrame:
         # From `s3://alphamatic-data/data/kibot/all_stocks_1min/AAPL.csv.gz`.
         txt = """
 datetime,open,high,low,close,vol
@@ -89,7 +88,6 @@ class Test_set_weekends_to_nan(hut.TestCase):
 
 
 class Test_resample_time_bars1(hut.TestCase):
-
     def test1(self) -> None:
         """
         Resampling with the same frequency of the data should not change
@@ -214,7 +212,7 @@ class Test_resample_time_bars1(hut.TestCase):
         )
 
     @staticmethod
-    def _get_df() -> str:
+    def _get_df() -> pd.DataFrame:
         # From `s3://alphamatic-data/data/kibot/all_stocks_1min/AAPL.csv.gz`.
         txt = """
 datetime,close,vol,ret_0
@@ -270,10 +268,10 @@ datetime,close,vol,ret_0
 
 
 class Test_resample_ohlcv_bars1(hut.TestCase):
-
     def test1(self) -> None:
         """
-        Compute OHLCV bars at the frequency of the data should not change the data.
+        Compute OHLCV bars at the frequency of the data should not change the
+        data.
         """
         df = self._get_df()
         rule = "1T"
@@ -312,23 +310,19 @@ class Test_resample_ohlcv_bars1(hut.TestCase):
         # The second interval corresponds to (9:30, 9:30] and is timestamped with
         # 9:30am. The values are the same as the first row of the input.
         timestamp = "2016-01-04 09:35:00"
-        np.testing.assert_almost_equal(
-            df_out.loc[timestamp, "open"], 94.72
-        )
+        np.testing.assert_almost_equal(df_out.loc[timestamp, "open"], 94.72)
         np.testing.assert_almost_equal(
             df_out.loc[timestamp, "high"],
-            np.max([95.05, 95.43, 95.39, 95.04, 95.21])
+            np.max([95.05, 95.43, 95.39, 95.04, 95.21]),
         )
         np.testing.assert_almost_equal(
             df_out.loc[timestamp, "low"],
-            np.min([94.67, 94.95, 95.01, 94.75, 94.88])
+            np.min([94.67, 94.95, 95.01, 94.75, 94.88]),
         )
-        np.testing.assert_almost_equal(
-            df_out.loc[timestamp, "close"], 94.97
-        )
+        np.testing.assert_almost_equal(df_out.loc[timestamp, "close"], 94.97)
         np.testing.assert_almost_equal(
             df_out.loc[timestamp, "vol"],
-            np.sum([349119, 419479, 307383, 342218, 358280])
+            np.sum([349119, 419479, 307383, 342218, 358280]),
         )
 
     def test3(self) -> None:
@@ -351,30 +345,24 @@ class Test_resample_ohlcv_bars1(hut.TestCase):
         # 10:00am.
         timestamp = "2016-01-04 10:00:00"
         np.testing.assert_almost_equal(
-            df_out.loc[timestamp, "open"],
-            df.loc["2016-01-04 09:30:00", "open"]
+            df_out.loc[timestamp, "open"], df.loc["2016-01-04 09:30:00", "open"]
         )
         df_values = df.drop("vol", axis="columns").values
         np.testing.assert_almost_equal(
-            df_out.loc[timestamp, "high"],
-            np.max(np.max(df_values, axis=1))
+            df_out.loc[timestamp, "high"], np.max(np.max(df_values, axis=1))
         )
         np.testing.assert_almost_equal(
-            df_out.loc[timestamp, "low"],
-            np.min(np.min(df_values, axis=1))
+            df_out.loc[timestamp, "low"], np.min(np.min(df_values, axis=1))
         )
         np.testing.assert_almost_equal(
-            df_out.loc[timestamp, "close"],
-            df.loc["2016-01-04 09:49:00", "close"]
+            df_out.loc[timestamp, "close"], df.loc["2016-01-04 09:49:00", "close"]
         )
         np.testing.assert_almost_equal(
-            df_out.loc[timestamp, "vol"],
-            np.sum(df[["vol"]].values)
+            df_out.loc[timestamp, "vol"], np.sum(df[["vol"]].values)
         )
-
 
     @staticmethod
-    def _get_df() -> str:
+    def _get_df() -> pd.DataFrame:
         """
         Return a df without NaNs.
         """
@@ -415,7 +403,8 @@ datetime,open,high,low,close,vol
             low_col="low",
             close_col="close",
             volume_col="vol",
-            add_twap_vwap = False)
+            add_twap_vwap=False,
+        )
         return df_out
 
     @staticmethod
@@ -427,10 +416,10 @@ datetime,open,high,low,close,vol
 
 
 class Test_compute_twap_vwap1(hut.TestCase):
-
     def test_with_no_nans1(self) -> None:
         """
-        Compute VWAP/TWAP at the frequency of the data should not change the data.
+        Compute VWAP/TWAP at the frequency of the data should not change the
+        data.
         """
         df = self._get_df_with_no_nans()
         rule = "1T"
@@ -491,32 +480,39 @@ class Test_compute_twap_vwap1(hut.TestCase):
         self.assert_equal(act, exp, fuzzy_match=True)
         # The first interval is (9:25, 9:30] so VWAP/TWAP matches the original data.
         timestamp = "2016-01-04 09:30:00"
-        np.testing.assert_almost_equal(df_out.loc[timestamp, "vwap"],
-                                       df.loc[timestamp, "close"])
-        np.testing.assert_almost_equal(df_out.loc[timestamp, "twap"],
-                                       df.loc[timestamp, "close"])
+        np.testing.assert_almost_equal(
+            df_out.loc[timestamp, "vwap"], df.loc[timestamp, "close"]
+        )
+        np.testing.assert_almost_equal(
+            df_out.loc[timestamp, "twap"], df.loc[timestamp, "close"]
+        )
         # The second interval is (9:30, 9:35].
         timestamp = "2016-01-04 09:35:00"
-        np.testing.assert_almost_equal(df_out.loc[timestamp, "vwap"],
-                                       (94.98 * 349119 +
-                                       95.33 * 419479 +
-                                       95.03 * 307383 +
-                                       94.89 * 342218 +
-                                       94.97 * 358280) /
-                                       (349119 + 419479 + 307383 + 342218 + 358280))
-        np.testing.assert_almost_equal(df_out.loc[timestamp, "twap"],
-                                       np.mean([94.98,
-                                        95.33,
-                                        95.03,
-                                        94.89,
-                                        94.97]))
+        np.testing.assert_almost_equal(
+            df_out.loc[timestamp, "vwap"],
+            (
+                94.98 * 349119
+                + 95.33 * 419479
+                + 95.03 * 307383
+                + 94.89 * 342218
+                + 94.97 * 358280
+            )
+            / (349119 + 419479 + 307383 + 342218 + 358280),
+        )
+        np.testing.assert_almost_equal(
+            df_out.loc[timestamp, "twap"],
+            np.mean([94.98, 95.33, 95.03, 94.89, 94.97]),
+        )
         # The last interval is (9:45, 9:50].
         timestamp = "2016-01-04 09:50:00"
-        np.testing.assert_almost_equal(df_out.loc[timestamp, "vwap"],
-                                       (95.41 * 225975 + 95.66 * 262623 + 95.57 * 179722 + 95.61 * 173244) /
-                                       (225975 + 262623 + 179722 + 173244))
-        np.testing.assert_almost_equal(df_out.loc[timestamp, "twap"],
-                                       np.mean([ 95.41 , 95.66 , 95.57 , 95.61 ]))
+        np.testing.assert_almost_equal(
+            df_out.loc[timestamp, "vwap"],
+            (95.41 * 225975 + 95.66 * 262623 + 95.57 * 179722 + 95.61 * 173244)
+            / (225975 + 262623 + 179722 + 173244),
+        )
+        np.testing.assert_almost_equal(
+            df_out.loc[timestamp, "twap"], np.mean([95.41, 95.66, 95.57, 95.61])
+        )
 
     def test_with_nans1(self) -> None:
         """
@@ -576,7 +572,7 @@ class Test_compute_twap_vwap1(hut.TestCase):
         self.assert_equal(act, exp, fuzzy_match=True)
 
     @staticmethod
-    def _get_df_with_no_nans() -> str:
+    def _get_df_with_no_nans() -> pd.DataFrame:
         """
         Return a df without NaNs.
         """
@@ -608,7 +604,7 @@ datetime,close,vol
         return df
 
     @staticmethod
-    def _get_df_with_nans() -> str:
+    def _get_df_with_nans() -> pd.DataFrame:
         """
         Compute a df with NaNs.
         """
@@ -643,7 +639,9 @@ datetime,close,vol
     def _helper(df: pd.DataFrame, rule: str) -> pd.DataFrame:
         price_col = "close"
         volume_col = "vol"
-        df_out = fin.compute_twap_vwap(df, rule, price_col=price_col, volume_col=volume_col)
+        df_out = fin.compute_twap_vwap(
+            df, rule, price_col=price_col, volume_col=volume_col
+        )
         return df_out
 
     @staticmethod
