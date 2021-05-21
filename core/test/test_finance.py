@@ -116,7 +116,7 @@ class Test_resample_time_bars1(hut.TestCase):
         2016-01-04 09:38:00  95.95   581584  0.004922
         2016-01-04 09:39:00  96.07   554872  0.001251
         df_out
-                                        ret_0  close      vol
+                                ret_0  close      vol
         datetime
         2016-01-04 09:30:00       NaN  94.70  1867590
         2016-01-04 09:31:00  0.002957  94.98   349119
@@ -160,7 +160,8 @@ class Test_resample_time_bars1(hut.TestCase):
         datetime
         2016-01-04 09:30:00       NaN  94.7000  1867590
         2016-01-04 09:35:00  0.002865  95.0400  1776479
-        2016-01-04 09:40:00  0.011536  95.6775  1695729"""
+        2016-01-04 09:40:00  0.011536  95.6775  1695729
+        """
         self.assert_equal(act, exp, fuzzy_match=True)
         # Check manually certain values for the returns.
         self.assertTrue(np.isnan(df.loc["2016-01-04 09:30:00", "ret_0"]))
@@ -211,6 +212,7 @@ class Test_resample_time_bars1(hut.TestCase):
             df_out.loc[timestamp, "ret_0"],
             np.sum([0.002527, 0.002836, 0.004922, 0.001251]),
         )
+
     @staticmethod
     def _get_df() -> str:
         # From `s3://alphamatic-data/data/kibot/all_stocks_1min/AAPL.csv.gz`.
@@ -262,6 +264,240 @@ datetime,close,vol,ret_0
     def _compute_actual_output(df: pd.DataFrame, df_out: pd.DataFrame) -> str:
         act = []
         act.append(hut.convert_df_to_string(df, index=True, title="df"))
+        act.append(hut.convert_df_to_string(df_out, index=True, title="df_out"))
+        act = "\n".join(act)
+        return act
+
+
+class Test_resample_ohlcv_bars1(hut.TestCase):
+
+    def test1(self) -> None:
+        """
+        """
+        df = self._get_df()
+
+
+class Test_compute_twap_vwap1(hut.TestCase):
+
+    def test_with_no_nans1(self) -> None:
+        """
+        Compute VWAP/TWAP at the frequency of the data should not change the data.
+        """
+        df = self._get_df_with_no_nans()
+        rule = "1T"
+        df_out = self._helper(df, rule)
+        # Compute output.
+        act = self._compute_actual_output(df_out)
+        exp = """
+        df_out
+                              vwap   twap
+        datetime
+        2016-01-04 09:30:00  94.70  94.70
+        2016-01-04 09:31:00  94.98  94.98
+        2016-01-04 09:32:00  95.33  95.33
+        2016-01-04 09:33:00  95.03  95.03
+        2016-01-04 09:34:00  94.89  94.89
+        2016-01-04 09:35:00  94.97  94.97
+        2016-01-04 09:36:00  95.21  95.21
+        2016-01-04 09:37:00  95.48  95.48
+        2016-01-04 09:38:00  95.95  95.95
+        2016-01-04 09:39:00  96.07  96.07
+        2016-01-04 09:40:00  95.93  95.93
+        2016-01-04 09:41:00  95.78  95.78
+        2016-01-04 09:42:00  95.59  95.59
+        2016-01-04 09:43:00  95.29  95.29
+        2016-01-04 09:44:00  95.26  95.26
+        2016-01-04 09:45:00  95.31  95.31
+        2016-01-04 09:46:00  95.41  95.41
+        2016-01-04 09:47:00  95.66  95.66
+        2016-01-04 09:48:00  95.57  95.57
+        2016-01-04 09:49:00  95.61  95.61
+        """
+        self.assert_equal(act, exp, fuzzy_match=True)
+        # TWAP is the same as VWAP aggregating on 1 sample.
+        np.testing.assert_array_almost_equal(df_out["vwap"], df_out["twap"])
+        # TWAP and VWAP are the same value as the original price aggregating on 1
+        # sample.
+        np.testing.assert_array_almost_equal(df_out["vwap"], df["close"])
+
+    def test_with_no_nans2(self) -> None:
+        """
+        Compute VWAP/TWAP at 5 min frequency on 1 min data.
+        """
+        df = self._get_df_with_no_nans()
+        rule = "5T"
+        df_out = self._helper(df, rule)
+        # Compute output.
+        act = self._compute_actual_output(df_out)
+        exp = r"""
+        df_out
+                                  vwap     twap
+        datetime
+        2016-01-04 09:30:00  94.700000  94.7000
+        2016-01-04 09:35:00  95.051943  95.0400
+        2016-01-04 09:40:00  95.822669  95.7280
+        2016-01-04 09:45:00  95.469633  95.4460
+        2016-01-04 09:50:00  95.563357  95.5625
+        """
+        self.assert_equal(act, exp, fuzzy_match=True)
+        # The first interval is (9:25, 9:30] so VWAP/TWAP matches the original data.
+        timestamp = "2016-01-04 09:30:00"
+        np.testing.assert_almost_equal(df_out.loc[timestamp, "vwap"],
+                                       df.loc[timestamp, "close"])
+        np.testing.assert_almost_equal(df_out.loc[timestamp, "twap"],
+                                       df.loc[timestamp, "close"])
+        # The second interval is (9:30, 9:35].
+        timestamp = "2016-01-04 09:35:00"
+        np.testing.assert_almost_equal(df_out.loc[timestamp, "vwap"],
+                                       (94.98 * 349119 +
+                                       95.33 * 419479 +
+                                       95.03 * 307383 +
+                                       94.89 * 342218 +
+                                       94.97 * 358280) /
+                                       (349119 + 419479 + 307383 + 342218 + 358280))
+        np.testing.assert_almost_equal(df_out.loc[timestamp, "twap"],
+                                       np.mean([94.98,
+                                        95.33,
+                                        95.03,
+                                        94.89,
+                                        94.97]))
+        # The last interval is (9:45, 9:50].
+        timestamp = "2016-01-04 09:50:00"
+        np.testing.assert_almost_equal(df_out.loc[timestamp, "vwap"],
+                                       (95.41 * 225975 + 95.66 * 262623 + 95.57 * 179722 + 95.61 * 173244) /
+                                       (225975 + 262623 + 179722 + 173244))
+        np.testing.assert_almost_equal(df_out.loc[timestamp, "twap"],
+                                       np.mean([ 95.41 , 95.66 , 95.57 , 95.61 ]))
+
+    # def test_with_no_nans1(self) -> None:
+    #     """
+    #     Compute VWAP/TWAP at the frequency of the data should not change the data.
+    #     """
+    #     df = self._get_df_with_no_nans()
+    #     rule = "1T"
+    #     df_out = self._helper(df, rule)
+    #     # Compute output.
+    #     act = self._compute_actual_output(df_out)
+    #     exp = """
+    #     df_out
+    #                           vwap   twap
+    #     datetime
+    #     2016-01-04 09:30:00  94.70  94.70
+    #     2016-01-04 09:31:00  94.98  94.98
+    #     2016-01-04 09:32:00  95.33  95.33
+    #     2016-01-04 09:33:00  95.03  95.03
+    #     2016-01-04 09:34:00  94.89  94.89
+    #     2016-01-04 09:35:00  94.97  94.97
+    #     2016-01-04 09:36:00  95.21  95.21
+    #     2016-01-04 09:37:00  95.48  95.48
+    #     2016-01-04 09:38:00  95.95  95.95
+    #     2016-01-04 09:39:00  96.07  96.07
+    #     2016-01-04 09:40:00  95.93  95.93
+    #     2016-01-04 09:41:00  95.78  95.78
+    #     2016-01-04 09:42:00  95.59  95.59
+    #     2016-01-04 09:43:00  95.29  95.29
+    #     2016-01-04 09:44:00  95.26  95.26
+    #     2016-01-04 09:45:00  95.31  95.31
+    #     2016-01-04 09:46:00  95.41  95.41
+    #     2016-01-04 09:47:00  95.66  95.66
+    #     2016-01-04 09:48:00  95.57  95.57
+    #     2016-01-04 09:49:00  95.61  95.61
+    #     """
+    #     self.assert_equal(act, exp, fuzzy_match=True)
+    #     # TWAP is the same as VWAP aggregating on 1 sample.
+    #     np.testing.assert_array_almost_equal(df_out["vwap"], df_out["twap"])
+    #     # TWAP and VWAP are the same value as the original price aggregating on 1
+    #     # sample.
+    #     np.testing.assert_array_almost_equal(df_out["vwap"], df["close"])
+    #
+    # def test_with_no_nans2(self) -> None:
+    #     """
+    #     Compute VWAP/TWAP at 5 min frequency on 1 min data.
+    #     """
+    #     df = self._get_df_with_no_nans()
+    #     rule = "5T"
+    #     df_out = self._helper(df, rule)
+    #     # Compute output.
+    #     act = self._compute_actual_output(df_out)
+    #     exp = r"""
+    #     df_out
+    #                               vwap     twap
+    #     datetime
+    #     2016-01-04 09:30:00  94.700000  94.7000
+    #     2016-01-04 09:35:00  95.051943  95.0400
+    #     2016-01-04 09:40:00  95.822669  95.7280
+    #     2016-01-04 09:45:00  95.469633  95.4460
+    #     2016-01-04 09:50:00  95.563357  95.5625
+    #     """
+    #     self.assert_equal(act, exp, fuzzy_match=True)
+    #     # The first interval is (9:25, 9:30] so VWAP/TWAP matches the original data.
+    #     timestamp = "2016-01-04 09:30:00"
+    #     np.testing.assert_almost_equal(df_out.loc[timestamp, "vwap"],
+    #                                    df.loc[timestamp, "close"])
+    #     np.testing.assert_almost_equal(df_out.loc[timestamp, "twap"],
+    #                                    df.loc[timestamp, "close"])
+    #     # The second interval is (9:30, 9:35].
+    #     timestamp = "2016-01-04 09:35:00"
+    #     np.testing.assert_almost_equal(df_out.loc[timestamp, "vwap"],
+    #                                    (94.98 * 349119 +
+    #                                     95.33 * 419479 +
+    #                                     95.03 * 307383 +
+    #                                     94.89 * 342218 +
+    #                                     94.97 * 358280) /
+    #                                    (349119 + 419479 + 307383 + 342218 + 358280))
+    #     np.testing.assert_almost_equal(df_out.loc[timestamp, "twap"],
+    #                                    np.mean([94.98,
+    #                                             95.33,
+    #                                             95.03,
+    #                                             94.89,
+    #                                             94.97]))
+    #     # The last interval is (9:45, 9:50].
+    #     timestamp = "2016-01-04 09:50:00"
+    #     np.testing.assert_almost_equal(df_out.loc[timestamp, "vwap"],
+    #                                    (95.41 * 225975 + 95.66 * 262623 + 95.57 * 179722 + 95.61 * 173244) /
+    #                                    (225975 + 262623 + 179722 + 173244))
+    #     np.testing.assert_almost_equal(df_out.loc[timestamp, "twap"],
+    #                                    np.mean([ 95.41 , 95.66 , 95.57 , 95.61 ]))
+
+
+    @staticmethod
+    def _get_df_with_no_nans() -> str:
+        # From `s3://alphamatic-data/data/kibot/all_stocks_1min/AAPL.csv.gz`.
+        txt = """
+datetime,close,vol
+2016-01-04 09:30:00,94.7,1867590
+2016-01-04 09:31:00,94.98,349119
+2016-01-04 09:32:00,95.33,419479
+2016-01-04 09:33:00,95.03,307383
+2016-01-04 09:34:00,94.89,342218
+2016-01-04 09:35:00,94.97,358280
+2016-01-04 09:36:00,95.21,266199
+2016-01-04 09:37:00,95.48,293074
+2016-01-04 09:38:00,95.95,581584
+2016-01-04 09:39:00,96.07,554872
+2016-01-04 09:40:00,95.93,486602
+2016-01-04 09:41:00,95.78,451518
+2016-01-04 09:42:00,95.59,315207
+2016-01-04 09:43:00,95.29,429025
+2016-01-04 09:44:00,95.26,262630
+2016-01-04 09:45:00,95.31,287873
+2016-01-04 09:46:00,95.41,225975
+2016-01-04 09:47:00,95.66,262623
+2016-01-04 09:48:00,95.57,179722
+2016-01-04 09:49:00,95.61,173244
+"""
+        df = pd.read_csv(io.StringIO(txt), index_col=0, parse_dates=True)
+        return df
+
+    def _helper(self, df: pd.DataFrame, rule: str) -> pd.DataFrame:
+        price_col = "close"
+        volume_col = "vol"
+        df_out = fin.compute_twap_vwap(df, rule, price_col=price_col, volume_col=volume_col)
+        return df_out
+
+    @staticmethod
+    def _compute_actual_output(df_out: pd.DataFrame) -> str:
+        act = []
         act.append(hut.convert_df_to_string(df_out, index=True, title="df_out"))
         act = "\n".join(act)
         return act

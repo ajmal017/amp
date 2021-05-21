@@ -548,8 +548,6 @@ def dassert_index_is_datetime(
 
 
 def dassert_strictly_increasing_index(
-    # TODO(gp): Tighten the type hint for
-    #  `obj: Union[pd.Index, pd.DataFrame, pd.Series]`.
     obj: Union["pandas.Index", "pandas.DataFrame", "pandas.Series"],
     msg: Optional[str] = None,
     *args: Any,
@@ -573,8 +571,6 @@ def dassert_strictly_increasing_index(
 #  pandas data structures.
 # TODO(gp): Not sure it's used or useful?
 def dassert_monotonic_index(
-    # TODO(gp): Tighten the type hint for
-    #  `obj: Union[pd.Index, pd.DataFrame, pd.Series]`.
     obj: Union["pandas.Index", "pandas.DataFrame", "pandas.Series"],
     msg: Optional[str] = None,
     *args: Any,

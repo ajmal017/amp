@@ -385,7 +385,7 @@ def compute_twap_vwap(
     twap = csigna.resample(price, rule=rule).mean()
     twap.loc[resampled_volume_weighted_price.isna()] = np.nan
     twap.name = "twap"
-    # Merge with the rest making sure the columns are not overwritten.
+    # Make sure columns are not overwritten by the new ones.
     dbg.dassert_not_in(vwap.name, df.columns)
     dbg.dassert_not_in(twap.name, df.columns)
     return pd.concat([vwap, twap], axis=1)
