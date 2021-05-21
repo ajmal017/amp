@@ -119,9 +119,9 @@ def dassert(cond: Any, msg: Optional[str] = None, *args: Any) -> None:
     # Handle the somehow frequent case of using `dassert` instead of another
     # one, e.g., `dassert(y, list)`
     if msg is not None:
-        assert isinstance(msg, str), (
-            f"You passed '{msg}' or type '{type(msg)}' instead of str"
-        )
+        assert isinstance(
+            msg, str
+        ), f"You passed '{msg}' or type '{type(msg)}' instead of str"
     if not cond:
         txt = "cond=%s" % cond
         _dfatal(txt, msg, *args)
@@ -518,34 +518,38 @@ def dassert_file_extension(
     # Check.
     act_ext = os.path.splitext(file_name)[-1].lower()
     dassert_in(
-        act_ext, extensions, "Invalid extension '%s' for file '%s'", act_ext,
-        file_name
+        act_ext,
+        extensions,
+        "Invalid extension '%s' for file '%s'", act_ext,
+        file_name,
     )
 
 
 # Pandas related.
 
 # TODO(gp): Consider moving these to `dbg_pandas.py` and avoid the implicit
-#  dependency. Also for some reason importing pandas is slow and we don't want to
-#  pay this start-up cost unless we have to.
+#  dependency from pandas.
 
 
-def dassert_index_is_datetime(obj: "pd.DataFrame",
-    msg: Optional[str] = None, *args: Any) -> None:
+def dassert_index_is_datetime(
+    df: "pandas.DataFrame", msg: Optional[str] = None, *args: Any
+) -> None:
     """
     Ensure that the dataframe has an index containing datetimes.
     """
     import pandas as pd
 
     # TODO(gp): Add support also for series.
-    dassert_isinstance(obj, pd.DataFrame, msg=msg, *args)
+    dassert_isinstance(df, pd.DataFrame, msg=msg, *args)
     dassert_isinstance(df.index, pd.DatetimeIndex, msg=msg, *args)
 
 
 def dassert_strictly_increasing_index(
     # TODO(gp): Tighten the type hint for
     #  `obj: Union[pd.Index, pd.DataFrame, pd.Series]`.
-    obj: Any, msg: Optional[str] = None, *args: Any
+    obj: Union["pandas.Index", "pandas.DataFrame", "pandas.Series"],
+    msg: Optional[str] = None,
+    *args: Any,
 ) -> None:
     """
     Ensure that the dataframe has a strictly increasing index.
@@ -568,7 +572,9 @@ def dassert_strictly_increasing_index(
 def dassert_monotonic_index(
     # TODO(gp): Tighten the type hint for
     #  `obj: Union[pd.Index, pd.DataFrame, pd.Series]`.
-    obj: Any, msg: Optional[str] = None, *args: Any
+    obj: Union["pandas.Index", "pandas.DataFrame", "pandas.Series"],
+    msg: Optional[str] = None,
+    *args: Any,
 ) -> None:
     """
     Ensure that the dataframe has a strictly increasing or decreasing index.

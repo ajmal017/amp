@@ -197,11 +197,11 @@ class Test_git_path1(hut.TestCase):
 
 
 class Test_git_modified_files1(hut.TestCase):
-
     def setUp(self) -> None:
         """
         All these tests need a reference to Git master branch.
         """
+        super().setUp()
         git.fetch_origin_master_if_needed()
 
     def test_get_modified_files1(self) -> None:

@@ -200,9 +200,7 @@ class TestDryRunTasks2(_TestClassHandlingLibTasksSingleton):
 
     def test_gh_create_pr2(self) -> None:
         _gh_login()
-        target = (
-            "gh_create_pr(ctx, body='hello_world', repo='amp', " "title='test')"
-        )
+        target = "gh_create_pr(ctx, body='hello_world', repo='amp', title='test')"
         self._check_output(target)
 
     def test_gh_create_pr3(self) -> None:
@@ -230,10 +228,6 @@ class TestDryRunTasks2(_TestClassHandlingLibTasksSingleton):
         git.fetch_origin_master_if_needed()
         #
         target = "git_branch_files(ctx)"
-        self._check_output(target)
-
-    def test_git_clean(self) -> None:
-        target = "git_clean(ctx)"
         self._check_output(target)
 
     def test_git_create_branch1(self) -> None:
@@ -329,7 +323,9 @@ class TestDryRunTasks2(_TestClassHandlingLibTasksSingleton):
         expected one.
         """
         ctx = _build_mock_context_returning_ok()
+        # pylint: disable=exec-used
         exec(f"ltasks.{target}")
+        # pylint: enable=exec-used
         # Check the outcome.
         if check:
             self._check_calls(ctx)
@@ -937,7 +933,9 @@ class TestLibTasksGitCreatePatch1(hut.TestCase):
         last_commit = False
         files = __file__
         with self.assertRaises(AssertionError) as cm:
-            ltasks.git_create_patch(ctx, mode, modified, branch, last_commit, files)
+            ltasks.git_create_patch(
+                ctx, mode, modified, branch, last_commit, files
+            )
         act = str(cm.exception)
         exp = r"""
         You need to specify one among -modified, --branch, --last-commit
@@ -945,7 +943,9 @@ class TestLibTasksGitCreatePatch1(hut.TestCase):
         self.assert_equal(act, exp, fuzzy_match=True)
 
     @staticmethod
-    def _helper(modified: bool, branch: bool, last_commit: bool, files: str) -> None:
+    def _helper(
+        modified: bool, branch: bool, last_commit: bool, files: str
+    ) -> None:
         ctx = _build_mock_context_returning_ok()
         #
         mode = "tar"
@@ -965,7 +965,7 @@ class Test_parse_linter_output1(hut.TestCase):
 
     def test1(self) -> None:
         # pylint: disable=line-too-long
-        txt = """
+        txt = r"""
 Tabs remover.............................................................Passed
 autoflake................................................................Passed
 isort....................................................................Failed
@@ -1069,7 +1069,7 @@ mypy.....................................................................^[[41mF
 ^[[0m^[[36mINFO^[[0m: > cmd='/app/linters/amp_mypy.py core/dataflow/builders.py'
 core/dataflow/builders.py:125: error: Returning Any from function declared to return "str"  [no-any-return]
 core/dataflow/builders.py:195: error: Argument 2 of "get_dag" is incompatible with supertype "DagBuilder"; supertype defines the argument type as "Optional[Any]"  [override]
-core/dataflow/builders.py:195: note: This violates the Liskov substitution principle 
+core/dataflow/builders.py:195: note: This violates the Liskov substitution principle
         """
         # pylint: enable=line-too-long
         act = ltasks._parse_linter_output(txt)
@@ -1142,10 +1142,13 @@ class Test_get_files_to_process1(hut.TestCase):
             last_commit,
             files_from_user,
             mutually_exclusive,
-            remove_dirs)
+            remove_dirs,
+        )
 
-    @pytest.mark.skipif(git.get_branch_name() != "master",
-                        reason="This test makes sense for a branch")
+    @pytest.mark.skipif(
+        git.get_branch_name() != "master",
+        reason="This test makes sense for a branch",
+    )
     def test_branch1(self) -> None:
         """
         Retrieved files modified in this client.
@@ -1165,7 +1168,8 @@ class Test_get_files_to_process1(hut.TestCase):
             last_commit,
             files_from_user,
             mutually_exclusive,
-            remove_dirs)
+            remove_dirs,
+        )
 
     def test_last_commit1(self) -> None:
         """
@@ -1183,9 +1187,10 @@ class Test_get_files_to_process1(hut.TestCase):
             last_commit,
             files_from_user,
             mutually_exclusive,
-            remove_dirs)
+            remove_dirs,
+        )
 
-    def test_last_commit1(self) -> None:
+    def test_files1(self) -> None:
         """
         Pass through files from user.
         """
@@ -1201,7 +1206,8 @@ class Test_get_files_to_process1(hut.TestCase):
             last_commit,
             files_from_user,
             mutually_exclusive,
-            remove_dirs)
+            remove_dirs,
+        )
         self.assertEqual(files, [__file__])
 
     def test_assert1(self) -> None:
@@ -1221,7 +1227,8 @@ class Test_get_files_to_process1(hut.TestCase):
                 last_commit,
                 files_from_user,
                 mutually_exclusive,
-                remove_dirs)
+                remove_dirs,
+            )
         act = str(cm.exception)
         exp = """
         * Failed assertion *
@@ -1232,7 +1239,8 @@ class Test_get_files_to_process1(hut.TestCase):
 
     def test_assert2(self) -> None:
         """
-        Test that --modified and --files together cause an assertion if `mutually_exclusive=True`.
+        Test that --modified and --files together cause an assertion if
+        `mutually_exclusive=True`.
         """
         modified = True
         branch = False
@@ -1247,7 +1255,8 @@ class Test_get_files_to_process1(hut.TestCase):
                 last_commit,
                 files_from_user,
                 mutually_exclusive,
-                remove_dirs)
+                remove_dirs,
+            )
         act = str(cm.exception)
         exp = r"""
         * Failed assertion *
@@ -1273,5 +1282,6 @@ class Test_get_files_to_process1(hut.TestCase):
             last_commit,
             files_from_user,
             mutually_exclusive,
-            remove_dirs)
+            remove_dirs,
+        )
         self.assertEqual(files, [__file__])
