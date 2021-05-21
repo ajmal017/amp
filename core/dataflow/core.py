@@ -87,10 +87,10 @@ class NodeInterface(abc.ABC):
         """
         if items is None:
             return []
-        # Make sure the items are all strings.
-        # TODO(gp): Should we check for empty strings.
+        # Make sure the items are all non-empty strings.
         for item in items:
             dbg.dassert_isinstance(item, str)
+            dbg.dassert_ne(item, "")
         dbg.dassert_no_duplicates(items)
         return items
 
