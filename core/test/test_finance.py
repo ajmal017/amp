@@ -112,11 +112,8 @@ datetime,close,vol
         df["ret_0"] = df["close"].pct_change()
         return df
 
-    def test1(self) -> None:
-        df = self._get_df()
-        #
-        rule = "5T"
-        #
+    @staticmethod
+    def _resample_helper(df: pd.DataFrame, rule: str) -> pd.DataFrame:
         return_cols = ["ret_0"]
         return_agg_func = None
         return_agg_func_kwargs = None
@@ -129,16 +126,59 @@ datetime,close,vol
         volume_agg_func = None
         volume_agg_func_kwargs = None
         df_out = fin.resample_time_bars(df, rule,
-            return_cols=return_cols,
-            return_agg_func=return_agg_func,
-            return_agg_func_kwargs=return_agg_func_kwargs,
-            price_cols=price_cols,
-            price_agg_func=price_agg_func,
-            price_agg_func_kwargs=price_agg_func_kwargs,
-            volume_cols=volume_cols,
-            volume_agg_func=volume_agg_func,
-            volume_agg_func_kwargs=volume_agg_func_kwargs)
+                                        return_cols=return_cols,
+                                        return_agg_func=return_agg_func,
+                                        return_agg_func_kwargs=return_agg_func_kwargs,
+                                        price_cols=price_cols,
+                                        price_agg_func=price_agg_func,
+                                        price_agg_func_kwargs=price_agg_func_kwargs,
+                                        volume_cols=volume_cols,
+                                        volume_agg_func=volume_agg_func,
+                                        volume_agg_func_kwargs=volume_agg_func_kwargs)
+        return df_out
+
+    def test1(self) -> None:
+        """
+        Resampling with the same frequency of the data should not change anything.
+        """
+        df = self._get_df()
         #
+        rule = "1T"
+        df_out = self._resample_helper(df, rule)
+        # Check output.
+        act = []
+        act.append(hut.convert_df_to_string(df, index=True, title="df"))
+        act.append(hut.convert_df_to_string(df_out, index=True, title="df_out"))
+        act = "\n".join(act)
+        exp = """
+        df
+                             close      vol     ret_0
+        datetime
+        2016-01-04 09:30:00  94.70  1867590       NaN
+        2016-01-04 09:31:00  94.98   349119  0.002957
+        2016-01-04 09:32:00  95.33   419479  0.003685
+        2016-01-04 09:33:00  95.03   307383 -0.003147
+        2016-01-04 09:34:00  94.89   342218 -0.001473
+        2016-01-04 09:35:00  94.97   358280  0.000843
+        2016-01-04 09:36:00  95.21   266199  0.002527
+        2016-01-04 09:37:00  95.48   293074  0.002836
+        2016-01-04 09:38:00  95.95   581584  0.004922
+        2016-01-04 09:39:00  96.07   554872  0.001251
+        df_out
+                                ret_0    close      vol
+        datetime
+        """
+        self.assert_equal(act, exp, fuzzy_match=True)
+
+    def test2(self) -> None:
+        """
+        Resample data with 1 min resolution with 5 mins intervals.
+        """
+        df = self._get_df()
+        #
+        rule = "5T"
+        df_out = self._resample_helper(df, rule)
+        # Check output.
         act = []
         act.append(hut.convert_df_to_string(df, index=True, title="df"))
         act.append(hut.convert_df_to_string(df_out, index=True, title="df_out"))
@@ -164,16 +204,36 @@ datetime,close,vol
         2016-01-04 09:35:00  0.002865  95.0400  1776479
         2016-01-04 09:40:00  0.011536  95.6775  1695729"""
         self.assert_equal(act, exp, fuzzy_match=True)
-        #
-        self.assertIs(df["2016-01-04 09:30:00"]["ret_0"], (94.98 - 94.70) / 94.70))
-        self.assertEqual(df["2016-01-04 09:31:00"]["ret_0"], (94.98 - 94.70) / 94.70))
-        self.assertEqual(df["2016-01-04 09:39:00"]["ret_0"], (96.07 - 95.95) / 95.95))
+        # Check manually certain values.
+        self.assertTrue(np.isnan(df["2016-01-04 09:30:00"]["ret_0"]))
+        self.assertEqual(df["2016-01-04 09:31:00"]["ret_0"], (94.98 - 94.70) / 94.70)
+        self.assertEqual(df["2016-01-04 09:39:00"]["ret_0"], (96.07 - 95.95) / 95.95)
         # The resampling is (a, b] with the label on b.
-        # The first interval is (9:30, 9:30] and timestamped as 9:30.
-        self.assertEqual(df_out
-
-        # The second interval is (9:30, 9:35)
-
+        # The first interval corresponds to (9:30, 9:30] and is timestamped with
+        # 9:30am. The values are the same as the first row of the input.
+        timestamp = "2016-01-04 09:30:00"
+        for col in df.columns:
+            self.assertEqual(df_out[timestamp][col],
+                             df[timestamp][col])
+        # The second interval corresponds to (9:30, 9:35] and is timestamped with
+        # 9:35am.
+        timestamp = "2016-01-04 09:35:00"
+        self.assertEqual(df_out[timestamp]["close"],
+                         np.mean([94.98, 95.33, 95.03, 94.89, 94.97]))
+        self.assertEqual(df_out[timestamp]["vol"],
+                         np.sum([349119, 419479, 307383, 342218, 358280]))
+        self.assertEqual(df_out[timestamp]["ret_0"],
+                         np.mean([0.002957, 0.003685, -0.003147, -0.001473, 0.000843]))
+        # The last interval corresponds to (9:35, 9:40] and is timestamped with 9:40am.
+        # Note that the last timestamp (i.e., 9:40am) is missing so the average is
+        # on 4 values and not 1.
+        timestamp = "2016-01-04 09:40:00"
+        self.assertEqual(df_out[timestamp]["close"],
+                         np.mean([95.21, 95.48, 95.95, 96.07]))
+        self.assertEqual(df_out[timestamp]["vol"],
+                         np.sum([266199, 293074, 581584, 554872]))
+        self.assertEqual(df_out[timestamp]["ret_0"],
+                         np.mean([0.002527, 0.002836, 0.004922, 0.001251]))
 
 
 class Test_compute_inverse_volatility_weights(hut.TestCase):
