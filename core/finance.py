@@ -100,7 +100,7 @@ def set_non_ath_to_nan(
     if end_time is None:
         end_time = datetime.time(16, 0)
     dbg.dassert_lte(start_time, end_time)
-    # Compute the indices to keep.
+    # Compute the indices to remove.
     times = df.index.time
     to_remove_mask = (times <= start_time) | (end_time < times)
     # Make a copy and filter.

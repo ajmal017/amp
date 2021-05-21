@@ -31,7 +31,7 @@ class Config:
 
     def __init__(
         self,
-        # TODO(gp): Difficult to read and loose: try to improve.
+        # TODO(gp): Difficult to read and type hints are loose: try to improve.
         array: Union[
             List[Tuple[str, Union[int, str]]],
             List[Tuple[str, Union[List[int], str]]],
