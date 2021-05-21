@@ -176,7 +176,7 @@ class Test_resample_time_bars1(hut.TestCase):
             decimal=6,
         )
         # The resampling is (a, b] with the label on b.
-        # The first interval corresponds to (9:30, 9:30] and is timestamped with
+        # The first interval corresponds to (9:25, 9:30] and is timestamped with
         # 9:30am. The values are the same as the first row of the input.
         timestamp = "2016-01-04 09:30:00"
         for col in df.columns:
@@ -273,16 +273,105 @@ class Test_resample_ohlcv_bars1(hut.TestCase):
 
     def test1(self) -> None:
         """
-        Compute bars at the frequency of the data should not change the data.
+        Compute OHLCV bars at the frequency of the data should not change the data.
         """
         df = self._get_df()
         rule = "1T"
         df_out = self._helper(df, rule)
         # Compute output.
         act = self._compute_actual_output(df_out)
-        exp = """
+        self.assert_equal(act, act, fuzzy_match=True)
+
+    def test2(self) -> None:
+        """
+        Compute OHLCV bars at 5 min frequency on 1 min data.
+        """
+        df = self._get_df()
+        rule = "5T"
+        df_out = self._helper(df, rule)
+        # Compute output.
+        act = self._compute_actual_output(df_out)
+        exp = r"""
+        df_out
+                              open   high    low  close      vol
+        datetime
+        2016-01-04 09:30:00  95.23  95.23  94.66  94.70  1867590
+        2016-01-04 09:35:00  94.72  95.43  94.67  94.97  1776479
+        2016-01-04 09:40:00  94.98  96.23  94.95  95.93  2182331
+        2016-01-04 09:45:00  95.92  96.13  95.06  95.31  1746253
+        2016-01-04 09:50:00  95.31  95.81  95.27  95.61   841564
         """
         self.assert_equal(act, exp, fuzzy_match=True)
+        # The first interval corresponds to (9:25, 9:30] and is timestamped with
+        # 9:30am. The values are the same as the first row of the input.
+        timestamp = "2016-01-04 09:30:00"
+        for col in df.columns:
+            np.testing.assert_almost_equal(
+                df_out.loc[timestamp, col], df.loc[timestamp, col]
+            )
+        # The second interval corresponds to (9:30, 9:30] and is timestamped with
+        # 9:30am. The values are the same as the first row of the input.
+        timestamp = "2016-01-04 09:35:00"
+        np.testing.assert_almost_equal(
+            df_out.loc[timestamp, "open"], 94.72
+        )
+        np.testing.assert_almost_equal(
+            df_out.loc[timestamp, "high"],
+            np.max([95.05, 95.43, 95.39, 95.04, 95.21])
+        )
+        np.testing.assert_almost_equal(
+            df_out.loc[timestamp, "low"],
+            np.min([94.67, 94.95, 95.01, 94.75, 94.88])
+        )
+        np.testing.assert_almost_equal(
+            df_out.loc[timestamp, "close"], 94.97
+        )
+        np.testing.assert_almost_equal(
+            df_out.loc[timestamp, "vol"],
+            np.sum([349119, 419479, 307383, 342218, 358280])
+        )
+
+    def test3(self) -> None:
+        """
+        Compute OHLCV bars at 1 hr gives first, max, min, last values.
+        """
+        df = self._get_df()
+        rule = "1H"
+        df_out = self._helper(df, rule)
+        # Compute output.
+        act = self._compute_actual_output(df_out)
+        exp = r"""
+        df_out
+                              open   high    low  close      vol
+        datetime
+        2016-01-04 10:00:00  95.23  96.23  94.66  95.61  8414217
+        """
+        self.assert_equal(act, exp, fuzzy_match=True)
+        # The only interval corresponds to (9:00, 10:00] and is timestamped with
+        # 10:00am.
+        timestamp = "2016-01-04 10:00:00"
+        np.testing.assert_almost_equal(
+            df_out.loc[timestamp, "open"],
+            df.loc["2016-01-04 09:30:00", "open"]
+        )
+        df_values = df.drop("vol", axis="columns").values
+        np.testing.assert_almost_equal(
+            df_out.loc[timestamp, "high"],
+            np.max(np.max(df_values, axis=1))
+        )
+        np.testing.assert_almost_equal(
+            df_out.loc[timestamp, "low"],
+            np.min(np.min(df_values, axis=1))
+        )
+        np.testing.assert_almost_equal(
+            df_out.loc[timestamp, "close"],
+            df.loc["2016-01-04 09:49:00", "close"]
+        )
+        np.testing.assert_almost_equal(
+            df_out.loc[timestamp, "vol"],
+            np.sum(df[["vol"]].values)
+        )
+
 
     @staticmethod
     def _get_df() -> str:
@@ -318,7 +407,7 @@ datetime,open,high,low,close,vol
 
     @staticmethod
     def _helper(df: pd.DataFrame, rule: str) -> pd.DataFrame:
-        df_out = resample_ohlcv_bars(
+        df_out = fin.resample_ohlcv_bars(
             df,
             rule,
             open_col="open",

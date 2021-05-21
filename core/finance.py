@@ -142,9 +142,34 @@ def resample(
 KWARGS = Dict[str, Any]
 
 
-def resample_time_bars(
+def _resample_with_aggregate_function(
     df: pd.DataFrame,
     rule: str,
+    cols: List[str],
+    agg_func: str,
+    agg_func_kwargs: KWARGS,
+) -> pd.DataFrame:
+    """
+    Resample columns `cols` of `df` using the passed parameters.
+    """
+    dbg.dassert(not df.empty)
+    dbg.dassert_isinstance(cols, list)
+    dbg.dassert(cols, msg="`cols` must be nonempty.")
+    dbg.dassert_is_subset(cols, df.columns)
+    resampler = csigna.resample(df[cols], rule=rule)
+    resampled = resampler.agg(agg_func, **agg_func_kwargs)
+    return resampled
+
+
+def _merge(df1: pd.DataFrame, df2: pd.DataFrame) -> pd.DataFrame:
+    result_df = df1.merge(df2, how="outer", left_index=True, right_index=True)
+    dbg.dassert(result_df.index.freq)
+    return result_df
+
+
+def resample_time_bars(
+        df: pd.DataFrame,
+        rule: str,
     *,
     return_cols: Optional[List[str]] = None,
     return_agg_func: Optional[str] = None,
@@ -184,37 +209,16 @@ def resample_time_bars(
         although not in the same order as passed
     """
     dbg.dassert_isinstance(df, pd.DataFrame)
-    # TODO(gp): the linter is unhappy that this function shadows the external
-    #  params, with the risk of forgetting some params. Either move it out or add an
-    #  underscore to the params.
-    def _resample_financial(
-        df: pd.DataFrame,
-        rule: str,
-        cols: List[str],
-        agg_func: str,
-        agg_func_kwargs: KWARGS,
-    ) -> pd.DataFrame:
-        """
-        Resample columns `cols` of `df` using the passed parameters.
-        """
-        dbg.dassert(not df.empty)
-        dbg.dassert_isinstance(cols, list)
-        dbg.dassert(cols, msg="`cols` must be nonempty.")
-        dbg.dassert_is_subset(cols, df.columns)
-        resampler = csigna.resample(df[cols], rule=rule)
-        resampled = resampler.agg(agg_func, **agg_func_kwargs)
-        return resampled
-
     result_df = pd.DataFrame()
     # Maybe resample returns.
     # TODO(gp): Consider refactoring this chunk of code in a separate helper
-    #  or merge the common code in _resample_financial().
+    #  or merge the common code in _resample_with_aggregate_function().
     #  The only differences between the 3 resampling of returns, prices, and volume
     #  is the default value and _kwargs.
     #
     # ```
     # def _resample_and_merge(df, rule, cols, return_agg_func, return_agg_func_kwargs)
-    #   df_tmp = _resample_financial(...)
+    #   df_tmp = _resample_with_aggregate_function(...)
     #   df_tmp = ...
     #
     # if return_cols:
@@ -225,36 +229,39 @@ def resample_time_bars(
     if return_cols:
         return_agg_func = return_agg_func or "sum"
         return_agg_func_kwargs = return_agg_func_kwargs or {"min_count": 1}
-        return_df = _resample_financial(
+        return_df = _resample_with_aggregate_function(
             df, rule, return_cols, return_agg_func, return_agg_func_kwargs
         )
-        result_df = result_df.merge(
-            return_df, how="outer", left_index=True, right_index=True
-        )
-        dbg.dassert(result_df.index.freq)
+        # result_df = result_df.merge(
+        #     return_df, how="outer", left_index=True, right_index=True
+        # )
+        #dbg.dassert(result_df.index.freq)
+        result_df = _merge(result_df, return_df)
     # Maybe resample prices.
     if price_cols:
         price_agg_func = price_agg_func or "mean"
         # TODO(*): Explain the rationale of not using `min_count` for `mean`.
         price_agg_func_kwargs = price_agg_func_kwargs or {}
-        price_df = _resample_financial(
+        price_df = _resample_with_aggregate_function(
             df, rule, price_cols, price_agg_func, price_agg_func_kwargs
         )
-        result_df = result_df.merge(
-            price_df, how="outer", left_index=True, right_index=True
-        )
-        dbg.dassert(result_df.index.freq)
+        # result_df = result_df.merge(
+        #     price_df, how="outer", left_index=True, right_index=True
+        # )
+        #dbg.dassert(result_df.index.freq)
+        result_df = _merge(result_df, price_df)
     # Maybe resample volume.
     if volume_cols:
         volume_agg_func = volume_agg_func or "sum"
         volume_agg_func_kwargs = volume_agg_func_kwargs or {"min_count": 1}
-        volume_df = _resample_financial(
+        volume_df = _resample_with_aggregate_function(
             df, rule, volume_cols, volume_agg_func, volume_agg_func_kwargs
         )
-        result_df = result_df.merge(
-            volume_df, how="outer", left_index=True, right_index=True
-        )
-        dbg.dassert(result_df.index.freq)
+        # result_df = result_df.merge(
+        #     volume_df, how="outer", left_index=True, right_index=True
+        # )
+        # dbg.dassert(result_df.index.freq)
+        result_df = _merge(result_df, volume_df)
     # TODO(*): Consider returning the columns in the same order implied by the
     #   interface, i.e., `return_cols + price_cols + volume_cols`.
     return result_df
@@ -285,13 +292,6 @@ def resample_ohlcv_bars(
     :return: resampled OHLCV dataframe with same column names; if
         `add_twap_vwap`, then also includes "twap" and "vwap" columns.
     """
-
-    def _merge(df1, df2):
-        result_df = df1.merge(df2, how="outer", left_index=True, right_index=True)
-        dbg.dassert(result_df.index.freq)
-        return result_df
-
-    #
     dbg.dassert_isinstance(df, pd.DataFrame)
     # Make sure that requested OHLCV columns are present in the dataframe.
     for col in [open_col, high_col, low_col, close_col, volume_col]:
@@ -326,8 +326,9 @@ def resample_ohlcv_bars(
         )
         result_df = _merge(result_df, close_df)
     if volume_col:
+        # We rely on the default behavior of accumulating the volume.
         volume_df = resample_time_bars(
-            df[[volume_col]], rule=rule, volume_cols=[volume_col]
+            df[[volume_col]], rule=rule, volume_cols=[volume_col],
         )
         result_df = _merge(result_df, volume_df)
     # Add TWAP / VWAP prices, if needed.
