@@ -90,6 +90,92 @@ class Test_set_weekends_to_nan(hut.TestCase):
         self.check_string(actual_string)
 
 
+class Test_resample_time_bars1(hut.TestCase):
+
+    @staticmethod
+    def _get_df() -> str:
+        # From `s3://alphamatic-data/data/kibot/all_stocks_1min/AAPL.csv.gz`.
+        txt = """
+datetime,close,vol
+2016-01-04 09:30:00,94.7,1867590
+2016-01-04 09:31:00,94.98,349119
+2016-01-04 09:32:00,95.33,419479
+2016-01-04 09:33:00,95.03,307383
+2016-01-04 09:34:00,94.89,342218
+2016-01-04 09:35:00,94.97,358280
+2016-01-04 09:36:00,95.21,266199
+2016-01-04 09:37:00,95.48,293074
+2016-01-04 09:38:00,95.95,581584
+2016-01-04 09:39:00,96.07,554872
+"""
+        df = pd.read_csv(StringIO(txt), index_col=0, parse_dates=True)
+        df["ret_0"] = df["close"].pct_change()
+        return df
+
+    def test1(self) -> None:
+        df = self._get_df()
+        #
+        rule = "5T"
+        #
+        return_cols = ["ret_0"]
+        return_agg_func = None
+        return_agg_func_kwargs = None
+        #
+        price_cols = ["close"]
+        price_agg_func = None
+        price_agg_func_kwargs = None
+        #
+        volume_cols = ["vol"]
+        volume_agg_func = None
+        volume_agg_func_kwargs = None
+        df_out = fin.resample_time_bars(df, rule,
+            return_cols=return_cols,
+            return_agg_func=return_agg_func,
+            return_agg_func_kwargs=return_agg_func_kwargs,
+            price_cols=price_cols,
+            price_agg_func=price_agg_func,
+            price_agg_func_kwargs=price_agg_func_kwargs,
+            volume_cols=volume_cols,
+            volume_agg_func=volume_agg_func,
+            volume_agg_func_kwargs=volume_agg_func_kwargs)
+        #
+        act = []
+        act.append(hut.convert_df_to_string(df, index=True, title="df"))
+        act.append(hut.convert_df_to_string(df_out, index=True, title="df_out"))
+        act = "\n".join(act)
+        exp = """
+        df
+                             close      vol     ret_0
+        datetime
+        2016-01-04 09:30:00  94.70  1867590       NaN
+        2016-01-04 09:31:00  94.98   349119  0.002957
+        2016-01-04 09:32:00  95.33   419479  0.003685
+        2016-01-04 09:33:00  95.03   307383 -0.003147
+        2016-01-04 09:34:00  94.89   342218 -0.001473
+        2016-01-04 09:35:00  94.97   358280  0.000843
+        2016-01-04 09:36:00  95.21   266199  0.002527
+        2016-01-04 09:37:00  95.48   293074  0.002836
+        2016-01-04 09:38:00  95.95   581584  0.004922
+        2016-01-04 09:39:00  96.07   554872  0.001251
+        df_out
+                                ret_0    close      vol
+        datetime
+        2016-01-04 09:30:00       NaN  94.7000  1867590
+        2016-01-04 09:35:00  0.002865  95.0400  1776479
+        2016-01-04 09:40:00  0.011536  95.6775  1695729"""
+        self.assert_equal(act, exp, fuzzy_match=True)
+        #
+        self.assertIs(df["2016-01-04 09:30:00"]["ret_0"], (94.98 - 94.70) / 94.70))
+        self.assertEqual(df["2016-01-04 09:31:00"]["ret_0"], (94.98 - 94.70) / 94.70))
+        self.assertEqual(df["2016-01-04 09:39:00"]["ret_0"], (96.07 - 95.95) / 95.95))
+        # The resampling is (a, b] with the label on b.
+        # The first interval is (9:30, 9:30] and timestamped as 9:30.
+        self.assertEqual(df_out
+
+        # The second interval is (9:30, 9:35)
+
+
+
 class Test_compute_inverse_volatility_weights(hut.TestCase):
     def test1(self) -> None:
         """
@@ -1004,3 +1090,4 @@ class Test_compute_returns_per_bet(hut.TestCase):
             date_range_kwargs=date_range, seed=seed
         )
         return series
+
