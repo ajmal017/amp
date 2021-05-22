@@ -112,7 +112,7 @@ class ContinuousSkLearnModel(
         # Define and fit model.
         self._model = self._model_func(**self._model_kwargs)
         self._model = self._model.fit(x_fit, fwd_y_fit)
-        # Generate insample predictions and put in dataflow dataframe format.
+        # Generate in-sample predictions and put in dataflow dataframe format.
         fwd_y_hat = self._model.predict(x_fit)
         #
         fwd_y_hat_vars = [f"{y}_hat" for y in fwd_y_df.columns]
@@ -138,6 +138,7 @@ class ContinuousSkLearnModel(
         df_out = self._apply_col_mode(
             df, df_out, cols=self._to_list(self._y_vars), col_mode=self._col_mode
         )
+        # Update `info`.
         info["df_out_info"] = get_df_info_as_string(df_out)
         self._set_info("fit", info)
         return {"df_out": df_out}

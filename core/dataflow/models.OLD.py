@@ -50,61 +50,6 @@ _TO_LIST_MIXIN_TYPE = Union[
 # #############################################################################
 
 
-# TODO(gp): I have no problem with mixins when they have state.
-#  Given that there is no state, why is a mixin better than just a static
-#  function?
-#  Instead of having an explicit call, one needs to know that inheriting from a
-#  a particular mixin means injecting a particular function.
-class RegFreqMixin:
-    """
-    Require input dataframe to have a well-defined frequency and unique cols.
-    """
-
-    @staticmethod
-    def _validate_input_df(df: pd.DataFrame) -> None:
-        """
-        Assert if df violates constraints, otherwise return `None`.
-        """
-        dbg.dassert_isinstance(df, pd.DataFrame)
-        dbg.dassert_no_duplicates(df.columns.tolist())
-        dbg.dassert(df.index.freq)
-
-
-class ToListMixin:
-    """
-    Support callables that return lists.
-    """
-
-    @staticmethod
-    def _to_list(to_list: _TO_LIST_MIXIN_TYPE) -> List[_COL_TYPE]:
-        """
-        Return a list given its input.
-
-        - If the input is a list, the output is the same list.
-        - If the input is a function that returns a list, then the output of
-          the function is returned.
-
-        How this might arise in practice:
-        - A `ColumnTransformer` returns a number of x variables, with the
-          number dependent upon a hyper-parameter expressed in config
-        - The column names of the x variables may be derived from the input
-          dataframe column names, not necessarily known until graph execution
-          (and not at construction)
-        - The `ColumnTransformer` output columns are merged with its input
-          columns (e.g., x vars and y vars are in the same dataframe)
-        Post-merge, we need a way to distinguish the x vars and y vars.
-        Allowing a callable here allows us to pass in the `ColumnTransformer`'s
-        method `transformed_col_names()` and defer the call until graph
-        execution.
-        """
-        if callable(to_list):
-            # Call the function.
-            to_list = to_list()
-        if isinstance(to_list, list):
-            return to_list
-        raise TypeError("Data type=`%s`" % type(to_list))
-
-
 # #############################################################################
 # sklearn - supervised prediction models
 # #############################################################################

@@ -36,14 +36,9 @@ _PANDAS_DATE_TYPE = Union[str, pd.Timestamp, datetime.datetime]
 _TO_LIST_MIXIN_TYPE = Union[List[_COL_TYPE], Callable[[], List[_COL_TYPE]]]
 
 
-# #############################################################################
-# Volatility modeling
-# #############################################################################
-
-
 class SmaModel(FitPredictNode, RegFreqMixin, ColModeMixin, ToListMixin):
     """
-    Fit and predict a smooth moving average model.
+    Fit and predict a smooth moving average (SMA) model.
     """
 
     def __init__(
@@ -57,19 +52,18 @@ class SmaModel(FitPredictNode, RegFreqMixin, ColModeMixin, ToListMixin):
         nan_mode: Optional[str] = None,
     ) -> None:
         """
-        Specify the data and sma modeling parameters.
+        Specify the data and SMA modeling parameters.
 
         :param nid: unique node id
         :param col: name of column to model
-        :param steps_ahead: as in ContinuousSkLearnModel
+        :param steps_ahead: as in `ContinuousSkLearnModel`
         :param tau: as in `csigna.compute_smooth_moving_average`. If `None`,
             learn this parameter. Will be re-learned on each `fit` call.
         :param min_tau_periods: similar to `min_periods` as in
             `csigna.compute_smooth_moving_average`, but expressed in units of
             tau
-        :param col_mode: `merge_all` or `replace_all`, as in
-            ColumnTransformer()
-        :param nan_mode: as in ContinuousSkLearnModel
+        :param col_mode: `merge_all` or `replace_all`, as in `ColumnTransformer()`
+        :param nan_mode: as in `ContinuousSkLearnModel`
         """
         super().__init__(nid)
         self._col = self._to_list(col)
@@ -95,10 +89,12 @@ class SmaModel(FitPredictNode, RegFreqMixin, ColModeMixin, ToListMixin):
     def fit(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
         self._validate_input_df(df_in)
         df = df_in.copy()
+        # TODO(gp): Same code as `ContinuousSkLearnModel.fit()`. Create a
+        #  free-standing function `_prepare_data_for_fit()`.
         # Obtain index slice for which forward targets exist.
         dbg.dassert_lt(self._steps_ahead, df.index.size)
         idx = df.index[: -self._steps_ahead]
-        # Determine index where no x_vars are NaN.
+        # Determine index where no `x_vars` are NaN.
         non_nan_idx_x = df.loc[idx][self._col].dropna().index
         # Determine index where target is not NaN.
         fwd_y_df = self._get_fwd_y_df(df).loc[idx].dropna()
@@ -115,15 +111,20 @@ class SmaModel(FitPredictNode, RegFreqMixin, ColModeMixin, ToListMixin):
         fwd_y_fit = cdataa.transform_to_sklearn(
             fwd_y_df, fwd_y_df.columns.tolist()
         )
+        # TODO(gp): End of duplicated section.
         # Define and fit model.
         if self._must_learn_tau:
             self._tau = self._learn_tau(x_fit, fwd_y_fit)
         min_periods = self._get_min_periods(self._tau)
         _LOG.debug("tau=", self._tau)
+        # Update `info`.
         info = collections.OrderedDict()
         info["tau"] = self._tau
         info["min_periods"] = min_periods
-        # Generate insample predictions and put in dataflow dataframe format.
+        # TODO(gp): Same code as `ContinuousSkLearnModel.fit()`. Create a
+        #  free-standing function `_process_in_sample_predictions()` or
+        #  `_process_predictions_for_fit()`.
+        # Generate in-sample predictions and put in dataflow dataframe format.
         fwd_y_hat = self._predict(x_fit)
         fwd_y_hat_vars = [f"{y}_hat" for y in fwd_y_df.columns]
         fwd_y_hat = cdataa.transform_from_sklearn(
@@ -137,6 +138,7 @@ class SmaModel(FitPredictNode, RegFreqMixin, ColModeMixin, ToListMixin):
         df_out = self._apply_col_mode(
             df, df_out, cols=self._col, col_mode=self._col_mode
         )
+        # Update `info`.
         info["df_out_info"] = get_df_info_as_string(df_out)
         self._set_info("fit", info)
         return {"df_out": df_out}
@@ -144,13 +146,16 @@ class SmaModel(FitPredictNode, RegFreqMixin, ColModeMixin, ToListMixin):
     def predict(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
         self._validate_input_df(df_in)
         df = df_in.copy()
+        # TODO(gp): Same code as `ContinuousSkLearnModel.predict()`. Create a
+        #  free-standing function `_prepare_data_for_predict()`.
         idx = df.index
         # Restrict to times where col has no NaNs.
         non_nan_idx = df.loc[idx][self._col].dropna().index
         # Handle presence of NaNs according to `nan_mode`.
         self._handle_nans(idx, non_nan_idx)
-        # Transform x_vars to sklearn format.
+        # Transform `x_vars` to sklearn format.
         x_predict = cdataa.transform_to_sklearn(df.loc[non_nan_idx], self._col)
+        # TODO(gp): End of duplicated section.
         # Use trained model to generate predictions.
         dbg.dassert_is_not(
             self._tau,
@@ -158,6 +163,8 @@ class SmaModel(FitPredictNode, RegFreqMixin, ColModeMixin, ToListMixin):
             "Parameter tau not found! Check if `fit` has been run.",
         )
         fwd_y_hat = self._predict(x_predict)
+        # TODO(gp): Same code as `ContinuousSkLearnModel.predict()`. Create a
+        #  free-standing function `_process_predictions_for_predict()`.
         # Put predictions in dataflow dataframe format.
         fwd_y_df = self._get_fwd_y_df(df).loc[non_nan_idx]
         fwd_y_hat_vars = [f"{y}_hat" for y in fwd_y_df.columns]
@@ -169,10 +176,13 @@ class SmaModel(FitPredictNode, RegFreqMixin, ColModeMixin, ToListMixin):
             fwd_y_hat.reindex(idx), left_index=True, right_index=True
         )
         dbg.dassert_no_duplicates(df_out.columns)
-        info = collections.OrderedDict()
+        # Select columns for output.
         df_out = self._apply_col_mode(
             df, df_out, cols=self._col, col_mode=self._col_mode
         )
+        # TODO(gp): End of duplicated section.
+        # Update `info`.
+        info = collections.OrderedDict()
         info["df_out_info"] = get_df_info_as_string(df_out)
         self._set_info("predict", info)
         return {"df_out": df_out}
@@ -185,6 +195,7 @@ class SmaModel(FitPredictNode, RegFreqMixin, ColModeMixin, ToListMixin):
         self._tau = fit_state["_tau"]
         self._info["fit"] = fit_state["_info['fit']"]
 
+    # TODO(gp): A bit difficult to read. How about _get_forward_y_df().
     def _get_fwd_y_df(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Return dataframe of `steps_ahead` forward y values.
@@ -194,6 +205,8 @@ class SmaModel(FitPredictNode, RegFreqMixin, ColModeMixin, ToListMixin):
         fwd_y_df = df[self._col].shift(-self._steps_ahead).rename(columns=mapper)
         return fwd_y_df
 
+    # TODO(gp): There are several copies of this. Move it to a central location, e.g.,
+    #  `dataflow/utils.py`?
     def _handle_nans(
         self, idx: pd.DataFrame.index, non_nan_idx: pd.DataFrame.index
     ) -> None:
@@ -237,7 +250,7 @@ class SmaModel(FitPredictNode, RegFreqMixin, ColModeMixin, ToListMixin):
 
         Multiplies `tau` by `min_tau_periods` and converts to an integer.
 
-        :param tau: kernel tau (approximately equal to com)
+        :param tau: kernel tau (approximately equal to center of mass)
         :return: minimum number of periods required to generate a prediction
         """
         return int(np.rint(self._min_tau_periods * tau))
@@ -286,13 +299,7 @@ class SingleColumnVolatilityModel(FitPredictNode):
         out_col_prefix: Optional[str] = None,
     ) -> None:
         """
-
-        :param nid:
-        :param steps_ahead:
-        :param col:
-        :param p_moment:
-        :param tau:
-        :param nan_mode:
+        Parameters have the same meaning as `SmaModel`.
         """
         super().__init__(nid)
         self._col = col
@@ -446,6 +453,7 @@ class SingleColumnVolatilityModel(FitPredictNode):
         self._append(dag, tail_nid, node)
         return dag
 
+    # TODO(gp): This code has several copies. Move it to the base class.
     @staticmethod
     def _append(dag: DAG, tail_nid: Optional[str], node: Node) -> str:
         dag.add_node(node)
@@ -458,8 +466,8 @@ class VolatilityModel(FitPredictNode, RegFreqMixin, ColModeMixin, ToListMixin):
     """
     Fit and predict a smooth moving average volatility model.
 
-    Wraps SmaModel internally, handling calculation of volatility from
-    returns and column appends.
+    Wraps `SmaModel` internally, handling calculation of volatility from returns
+    and column appends.
     """
 
     def __init__(
@@ -474,7 +482,7 @@ class VolatilityModel(FitPredictNode, RegFreqMixin, ColModeMixin, ToListMixin):
         nan_mode: Optional[str] = None,
     ) -> None:
         """
-        Specify the data and sma modeling parameters.
+        Specify the data and Smooth Moving Average (SMA) modeling parameters.
 
         :param nid: unique node id
         :param cols: name of columns to model
@@ -484,30 +492,34 @@ class VolatilityModel(FitPredictNode, RegFreqMixin, ColModeMixin, ToListMixin):
             learn this parameter
         :param col_rename_func: renaming function for z-scored column
         :param col_mode:
-            - If "merge_all", merge all columns from input dataframe and
-                transformed columns
+            - If "merge_all" (default), merge all columns from input dataframe and
+              transformed columns
             - If "replace_selected", merge unselected columns from input dataframe
-                and transformed selected columns
+              and transformed selected columns
             - If "replace_all", leave only transformed selected columns
         :param nan_mode: as in ContinuousSkLearnModel
         """
         super().__init__(nid)
         self._cols = cols
         self._steps_ahead = steps_ahead
+        #
         dbg.dassert_lte(1, p_moment)
         self._p_moment = p_moment
         #
+        dbg.dassert(tau is None or tau > 0)
         self._tau = tau
         self._col_rename_func = col_rename_func
         self._col_mode = col_mode or "merge_all"
         self._nan_mode = nan_mode
-        #
+        # State of the model to serialize/deserialize.
         self._fit_cols: List[_COL_TYPE] = []
         self._col_fit_state = {}
 
     def fit(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
         self._validate_input_df(df_in)
+        # Get the columns.
         self._fit_cols = self._to_list(self._cols or df_in.columns.tolist())
+        # Scan the columns and use `SingleColumnVolatilityModel` for each of them.
         dfs = []
         info = collections.OrderedDict()
         for col in self._fit_cols:
@@ -521,8 +533,8 @@ class VolatilityModel(FitPredictNode, RegFreqMixin, ColModeMixin, ToListMixin):
                 out_col_prefix=str(col),
             )
             df_out = scvm.fit(df_in[[col]])["df_out"]
-            info_out = scvm.get_info("fit")
             dfs.append(df_out)
+            info_out = scvm.get_info("fit")
             info[col] = info_out
             self._col_fit_state[col] = scvm.get_fit_state()
         df_out = pd.concat(dfs, axis=1)

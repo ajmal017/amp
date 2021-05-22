@@ -16,13 +16,29 @@ _LOG = logging.getLogger(__name__)
 
 
 # TODO(*): Create a dataflow types file.
+# TODO(*): -> COL_NAME or COLUMN_NAME
 _COL_TYPE = Union[int, str]
+# TODO(*): -> DATETIME
 _PANDAS_DATE_TYPE = Union[str, pd.Timestamp, datetime.datetime]
-_TO_LIST_MIXIN_TYPE = Union[List[_COL_TYPE], Callable[[], List[_COL_TYPE]]]
 
+# TODO(*) -> COLUMN_LIST
+_TO_LIST_MIXIN_TYPE = Union[
+    # List of columns.
+    List[_COL_TYPE],
+    # List of functions operating on list of columns.
+    Callable[[], List[_COL_TYPE]],
+]
+
+# TODO(*): Should we allow None to indicate beginning / end of time?
+#  This approach complicates the code to simplify the life of the client.
+#  Instead we can define constants START_DATETIME=..., END_DATETIME
+# Intervals are interpreted as closed [a, b].
+# TODO(*): Should we stick to usual (a, b] or [a, b) interpretation everywhere
+#  for consistency? This might be a big change.
+# INTERVAL = List[Tuple[Optional[DATETIME], Optional[DATETIME]]]
 
 # #############################################################################
-# Abstract Node classes with sklearn-style interfaces
+# Abstract node classes with sklearn-style interfaces
 # #############################################################################
 
 
@@ -30,8 +46,11 @@ class FitPredictNode(Node, abc.ABC):
     """
     Define an abstract class with sklearn-style `fit` and `predict` functions.
 
-    Nodes may store a dictionary of information for each method
-    following the method's invocation.
+    The class contains an optional state that can be serialized/deserialized with
+    `get_fit_state()` and `set_fit_state()`.
+
+    Nodes may store a dictionary of information for each method following the
+    method's invocation.
     """
 
     def __init__(
@@ -89,8 +108,13 @@ class DataSource(FitPredictNode, abc.ABC):
     def __init__(self, nid: str, outputs: Optional[List[str]] = None) -> None:
         if outputs is None:
             outputs = ["df_out"]
-        # Do not allow any empty list.
+        # TODO(gp): This seems a common function. We can factor it out in a
+        #  `validate_string_list()`.
+        # Do not allow any empty list, repetition, or empty strings.
         dbg.dassert(outputs)
+        dbg.dassert_no_duplicates(outputs)
+        for output in outputs:
+            dbg.dassert_ne(output, "")
         super().__init__(nid, inputs=[], outputs=outputs)
         #
         self.df = None
@@ -113,19 +137,23 @@ class DataSource(FitPredictNode, abc.ABC):
         """
         :return: training set as df
         """
+        # TODO(gp): This code is the same as in `predict()`. We can factor it out in
+        #  a `_transform
         if self._fit_intervals is not None:
             idx_slices = [
                 self.df.loc[interval[0] : interval[1]].index
                 for interval in self._fit_intervals
             ]
             idx = functools.reduce(lambda x, y: x.union(y), idx_slices)
-            fit_df = self.df.loc[idx].copy()
+            fit_df = self.df.loc[idx]
         else:
-            fit_df = self.df.copy()
+            fit_df = self.df
+        fit_df = fit_df.copy()
+        dbg.dassert(not fit_df.empty)
+        # Update `info`.
         info = collections.OrderedDict()
         info["fit_df_info"] = get_df_info_as_string(fit_df)
         self._set_info("fit", info)
-        dbg.dassert(not fit_df.empty)
         return {self.output_names[0]: fit_df}
 
     def set_predict_intervals(self, intervals: List[Tuple[Any, Any]]) -> None:
@@ -153,16 +181,18 @@ class DataSource(FitPredictNode, abc.ABC):
             predict_df = self.df.loc[idx].copy()
         else:
             predict_df = self.df.copy()
+        dbg.dassert(not predict_df.empty)
+        # Update `info`.
         info = collections.OrderedDict()
         info["predict_df_info"] = get_df_info_as_string(predict_df)
         self._set_info("predict", info)
-        dbg.dassert(not predict_df.empty)
         return {self.output_names[0]: predict_df}
 
     def get_df(self) -> pd.DataFrame:
         dbg.dassert_is_not(self.df, None, "No DataFrame found!")
         return self.df
 
+    # TODO(gp): This is a nice function to move to `dataflow/utils.py`.
     @staticmethod
     def _validate_intervals(intervals: List[Tuple[Any, Any]]) -> None:
         dbg.dassert_isinstance(intervals, list)
@@ -174,28 +204,34 @@ class DataSource(FitPredictNode, abc.ABC):
 
 class Transformer(FitPredictNode, abc.ABC):
     """
-    Stateless Single-Input Single-Output node.
+    Single-input single-output node that calls a user-defined stateless
+    transformation before `fit()` and `predict()`
     """
 
     # TODO(Paul): Consider giving users the option of renaming the single
-    # input and single output (but verify there is only one of each).
+    #  input and single output (but verify there is only one of each).
     def __init__(self, nid: str) -> None:
         super().__init__(nid)
 
+    # TODO(gp): fit and predict are the same. We can factor out the common code in
+    #  _preprocess(df_in, method_name) or _fit_predict()
     def fit(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+        # TODO(gp): -> validate_df(df_in)
         dbg.dassert_no_duplicates(df_in.columns)
         # Transform the input df.
         df_out, info = self._transform(df_in)
-        self._set_info("fit", info)
         dbg.dassert_no_duplicates(df_out.columns)
+        # Update `info`.
+        self._set_info("fit", info)
         return {"df_out": df_out}
 
     def predict(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
         dbg.dassert_no_duplicates(df_in.columns)
         # Transform the input df.
         df_out, info = self._transform(df_in)
-        self._set_info("predict", info)
         dbg.dassert_no_duplicates(df_out.columns)
+        # Update `info`.
+        self._set_info("predict", info)
         return {"df_out": df_out}
 
     @abc.abstractmethod
@@ -300,9 +336,11 @@ class YConnector(FitPredictNode):
         return col_names
 
 
+# TODO(gp): I would make it a free-standing function, whose value is assigned by
+#  the caller to `self._transformed_col_names`.
 class ColModeMixin:
     """
-    Selects columns to propagate in output dataframe.
+    Select columns to propagate in output dataframe.
 
     TODO(*): Refactor this so that it has clear pre and post processing stages.
     """
@@ -320,21 +358,25 @@ class ColModeMixin:
 
         :param df_in: original dataframe
         :param df_out: transformed dataframe
-        :param cols: columns in `df_in` that were transformed to obtain
-            `df_out`. `None` defaults to all columns in `df_out`
-        :param col_mode: `None`, "merge_all", "replace_selected", or
-            "replace_all". Determines what columns are propagated. `None`
-            defaults to "merge all". If "merge_all", perform an outer merge
+        :param cols: columns in `df_in` that were transformed to obtain `df_out`
+            - `None` defaults to all columns in `df_out`
+        :param col_mode: Determines what columns are propagated.
+            - "merge_all" (default): perform an outer merge between the
+            - "replace_selected":
+            - "replace_all": all columns are propagated
         :param col_rename_func: function for naming transformed columns, e.g.,
-            lambda x: "zscore_" + x. `None` defaults to identity transform
+            `lambda x: "zscore_" + x`
+            - `None` defaults to identity transform
         :return: dataframe with columns selected by `col_mode`
         """
         dbg.dassert_isinstance(df_in, pd.DataFrame)
         dbg.dassert_isinstance(df_out, pd.DataFrame)
         dbg.dassert(cols is None or isinstance(cols, list))
         cols = cols or df_out.columns.tolist()
+        #
         col_rename_func = col_rename_func or (lambda x: x)
         dbg.dassert_isinstance(col_rename_func, collections.Callable)
+        #
         col_mode = col_mode or "merge_all"
         # Rename transformed columns.
         df_out = df_out.rename(columns=col_rename_func)
@@ -452,9 +494,11 @@ class MultiColModeMixin:
         return df_out
 
 
+# TODO(gp): This is a general function that can be made free-standing. Lots of code
+#  in core relies on this invariants. We can factor it in a central location.
 class RegFreqMixin:
     """
-    Requires input dataframe to have a well-defined frequency and unique cols.
+    Require input dataframe to have a well-defined frequency and unique cols.
     """
 
     @staticmethod
@@ -464,13 +508,14 @@ class RegFreqMixin:
         """
         dbg.dassert_isinstance(df, pd.DataFrame)
         dbg.dassert_no_duplicates(df.columns.tolist())
-
         dbg.dassert(df.index.freq)
 
 
+# TODO(gp): It has no state so we can make it a free-standing functions,
+#  and also unit test it in isolation.
 class ToListMixin:
     """
-    Supports callables that return lists.
+    Support callables that return lists.
     """
 
     @staticmethod
@@ -483,20 +528,24 @@ class ToListMixin:
           the function is returned.
 
         How this might arise in practice:
-          - A ColumnTransformer returns a number of x variables, with the
-            number dependent upon a hyperparameter expressed in config
-          - The column names of the x variables may be derived from the input
-            dataframe column names, not necessarily known until graph execution
-            (and not at construction)
-          - The ColumnTransformer output columns are merged with its input
-            columns (e.g., x vars and y vars are in the same DataFrame)
+        - A `ColumnTransformer` returns a number of x variables, with the
+          number dependent upon a hyper-parameter expressed in config
+        - The column names of the x variables may be derived from the input
+          dataframe column names, not necessarily known until graph execution
+          (and not at construction)
+        - The `ColumnTransformer` output columns are merged with its input
+          columns (e.g., x vars and y vars are in the same dataframe)
         Post-merge, we need a way to distinguish the x vars and y vars.
-        Allowing a callable here allows us to pass in the ColumnTransformer's
-        method `transformed_col_names` and defer the call until graph
+        Allowing a callable here allows us to pass in the `ColumnTransformer`'s
+        method `transformed_col_names()` and defer the call until graph
         execution.
         """
+        # TODO(gp): to_list -> res or out?
         if callable(to_list):
             to_list = to_list()
         if isinstance(to_list, list):
+            # Check that the list of columns
+            dbg.dassert_lte(1, len(to_list))
+            dbg.dassert_no_duplicates(to_list)
             return to_list
         raise TypeError("Data type=`%s`" % type(to_list))
