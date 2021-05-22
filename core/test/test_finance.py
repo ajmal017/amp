@@ -307,8 +307,8 @@ class Test_resample_ohlcv_bars1(hut.TestCase):
             np.testing.assert_almost_equal(
                 df_out.loc[timestamp, col], df.loc[timestamp, col]
             )
-        # The second interval corresponds to (9:30, 9:30] and is timestamped with
-        # 9:30am. The values are the same as the first row of the input.
+        # The second interval corresponds to (9:30, 9:35] and is timestamped
+        # with 9:30am. The values are the same as the first row of the input.
         timestamp = "2016-01-04 09:35:00"
         np.testing.assert_almost_equal(df_out.loc[timestamp, "open"], 94.72)
         np.testing.assert_almost_equal(

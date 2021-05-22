@@ -6,8 +6,6 @@ from typing import Any, Dict, List, Optional
 import core.config as cconfi
 import core.config_builders as cfgb
 import core.finance as fin
-
-# TODO(gp): Use `import core.dataflow` if possible
 from core.dataflow.core import DAG, Node
 from core.dataflow.nodes.sources import ArmaGenerator
 from core.dataflow.nodes.transformers import (
