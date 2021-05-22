@@ -116,7 +116,7 @@ class SmaModel(FitPredictNode, RegFreqMixin, ColModeMixin, ToListMixin):
         if self._must_learn_tau:
             self._tau = self._learn_tau(x_fit, fwd_y_fit)
         min_periods = self._get_min_periods(self._tau)
-        _LOG.debug("tau=", self._tau)
+        _LOG.debug("tau=%s", self._tau)
         # Update `info`.
         info = collections.OrderedDict()
         info["tau"] = self._tau
