@@ -222,21 +222,24 @@ def _get_files_to_process(
     :param files_from_user: return files passed to this function
     :param mutually_exclusive: ensure that all options are mutually exclusive
     """
-    dbg.dassert_lte(
-        int(modified) + int(branch) + int(last_commit),
-        1,
-        msg="You can specify only one among --modified, --branch, --last_commit",
-    )
+    _LOG.debug(hprint.to_str("modified branch last_commit files_from_user "
+        "mutually_exclusive remove_dirs"))
     if mutually_exclusive:
-        dbg.dassert_lte(
+        dbg.dassert_eq(
             int(modified)
             + int(branch)
             + int(last_commit)
             + int(len(files_from_user) > 0),
             1,
-            msg="You can specify only one option among --modified, --branch, "
-            "--last_commit, and --files",
-        )
+            msg="You need to specify exactly one option among --modified, --branch, "
+            "--last_commit, and --files")
+    else:
+        dbg.dassert_eq(
+            int(modified) + int(branch) + int(last_commit),
+            1,
+            msg="You need to specify exactly one among --modified, --branch, "
+                "--last_commit",
+            )
     if modified:
         files = git.get_modified_files(".")
     elif branch:

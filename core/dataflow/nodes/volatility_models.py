@@ -466,8 +466,8 @@ class VolatilityModel(FitPredictNode, RegFreqMixin, ColModeMixin, ToListMixin):
     """
     Fit and predict a smooth moving average volatility model.
 
-    Wraps `SmaModel` internally, handling calculation of volatility from returns
-    and column appends.
+    Wraps `SmaModel` internally, handling calculation of volatility from
+    returns and column appends.
     """
 
     def __init__(
