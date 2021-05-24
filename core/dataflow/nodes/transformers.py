@@ -9,6 +9,7 @@ import pandas as pd
 import core.finance as cfinan
 import core.signal_processing as csigna
 import helpers.dbg as dbg
+import helpers.introspection as intro
 
 _LOG = logging.getLogger(__name__)
 
@@ -69,7 +70,7 @@ class ColumnTransformer(Transformer, ColModeMixin):
         # Store the list of columns after the transformation.
         self._transformed_col_names = None
         self._nan_mode = nan_mode or "leave_unchanged"
-        # State of the class set by derived classes.
+        # State of the object. This is set by derived classes.
         self._fit_cols = cols
 
     @property
@@ -444,9 +445,16 @@ class Resample(Transformer):
         self, df: pd.DataFrame
     ) -> Tuple[pd.DataFrame, collections.OrderedDict]:
         df = df.copy()
-        resampler = csigna.resample(df, rule=self._rule, **self._resample_kwargs)
-        df = getattr(resampler, self._agg_func)(**self._agg_func_kwargs)
         #
+        #print("df.size=", df.size)
+        print("mem_size(df)=", intro.get_size(df))
+        print("Starting resampling")
+        resampler = csigna.resample(df, rule=self._rule, **self._resample_kwargs)
+        func = getattr(resampler, self._agg_func)
+        print("func=%s" % func)
+        df = func(**self._agg_func_kwargs)
+        # Update info.
+        print("Collecting info")
         info: collections.OrderedDict[str, Any] = collections.OrderedDict()
         info["df_transformed_info"] = get_df_info_as_string(df)
         return df, info

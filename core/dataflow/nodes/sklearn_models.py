@@ -67,7 +67,7 @@ class ContinuousSkLearnModel(
         :param model_kwargs: parameters to forward to the sklearn model
             (e.g., regularization constants)
         :param col_mode: "merge_all" or "replace_all", as in
-            ColumnTransformer()
+            `ColumnTransformer()`
         :param nan_mode: "drop" or "raise"
         """
         super().__init__(nid)
@@ -81,6 +81,7 @@ class ContinuousSkLearnModel(
             0, self._steps_ahead, "Non-causal prediction attempted! Aborting..."
         )
         # NOTE: Set to "replace_all" for backward compatibility.
+        # TODO(gp): Is this needed?
         self._col_mode = col_mode or "replace_all"
         dbg.dassert_in(self._col_mode, ["replace_all", "merge_all"])
         self._nan_mode = nan_mode or "raise"

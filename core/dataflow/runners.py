@@ -130,10 +130,10 @@ class PredictionDagRunner(FitPredictDagRunner):
 
 class IncrementalDagRunner:
     """
-    # TODO(gp): Improve.
-
     Class for running DAGs in incremental fashion, i.e., running one
     step at a time.
+
+    # TODO(gp): Improve description.
     """
 
     def __init__(
@@ -160,7 +160,7 @@ class IncrementalDagRunner:
         :param fit_state: Config containing any learned state required for
             initializing the DAG
         """
-        # TODO(gp): Call super.__init__ to avoid some repeatition.
+        # TODO(gp): Call super.__init__ to avoid some repetition.
         self.config = config
         self._dag_builder = dag_builder
         self._start = start
