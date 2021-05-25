@@ -30,13 +30,11 @@ class Test_config1(hut.TestCase):
         #
         act = self._check_roundtrip_transformation(config)
         exp = r"""
-        config=
+        # config=
         hello: world
         foo: [1, 2, 3]
-        code=Config([('hello', 'world'), ('foo', [1, 2, 3])])
-        config2=
-        hello: world
-        foo: [1, 2, 3]
+        # code=
+        Config([('hello', 'world'), ('foo', [1, 2, 3])])
         """.lstrip().rstrip()
         self.assert_equal(act, exp, fuzzy_match=True)
 
@@ -59,19 +57,34 @@ class Test_config1(hut.TestCase):
         config = self._get_nested_config1()
         _LOG.debug("config=%s", config)
         act = str(config)
-        exp = ""
+        exp = """
+        nrows: 10000
+        read_data:
+          file_name: foo_bar.txt
+          nrows: 999
+        single_val: hello
+        zscore:
+          style: gaz
+          com: 28
+        """
         self.assert_equal(act, exp, fuzzy_match=True)
         #
         with self.assertRaises(AssertionError) as cm:
             _ = config["read_data2"]
         act = str(cm.exception)
-        exp = ""
+        exp = """
+        * Failed assertion *
+        'read_data2' in 'odict_keys(['nrows', 'read_data', 'single_val', 'zscore'])'
+        """
         self.assert_equal(act, exp, fuzzy_match=True)
         #
         with self.assertRaises(AssertionError) as cm:
             _ = config["read_data"]["file_name2"]
         act = str(cm.exception)
-        exp = ""
+        exp = """
+        * Failed assertion *
+        'file_name2' in 'odict_keys(['file_name', 'nrows'])'
+        """
         self.assert_equal(act, exp, fuzzy_match=True)
         #
         with self.assertRaises(AssertionError):
@@ -104,7 +117,7 @@ class Test_config1(hut.TestCase):
         config = self._get_nested_config1()
         act = config.to_python()
         exp = r"""
-        Config([(nrows, 10000), (read_data, Config([(file_name, foo_bar.txt), (nrows, 999)])), (single_val, hello), (zscore, Config([(style, gaz), (com, 28)]))])
+        Config([('nrows', 10000), ('read_data', Config([('file_name', 'foo_bar.txt'), ('nrows', 999)])), ('single_val', 'hello'), ('zscore', Config([('style', 'gaz'), ('com', 28)]))])
         """.lstrip().rstrip()
         self.assert_equal(act, exp, fuzzy_match=True)
 
@@ -117,7 +130,8 @@ class Test_config1(hut.TestCase):
         act = self._check_roundtrip_transformation(config)
 
         exp = r"""
-        config=nrows: 10000
+        # config=
+        nrows: 10000
         read_data:
           file_name: foo_bar.txt
           nrows: 999
@@ -125,15 +139,8 @@ class Test_config1(hut.TestCase):
         zscore:
           style: gaz
           com: 28
-        code=Config([(nrows, 10000), (read_data, Config([(file_name, foo_bar.txt), (nrows, 999)])), (single_val, hello), (zscore, Config([(style, gaz), (com, 28)]))])
-        config2=nrows: 10000
-        read_data:
-          file_name: foo_bar.txt
-          nrows: 999
-        single_val: hello
-        zscore:
-          style: gaz
-          com: 28
+        # code=
+        Config([('nrows', 10000), ('read_data', Config([('file_name', 'foo_bar.txt'), ('nrows', 999)])), ('single_val', 'hello'), ('zscore', Config([('style', 'gaz'), ('com', 28)]))])
         """.lstrip().rstrip()
         self.assert_equal(act, exp, fuzzy_match=True)
         
@@ -341,11 +348,11 @@ class Test_config1(hut.TestCase):
         # string = pprint.pformat(flattened, sort_dicts=False)
         act = pprint.pformat(flattened)
         exp = r"""
-        OrderedDict([((read_data, file_name), foo_bar.txt),
-                     ((read_data, nrows), 999),
-                     ((single_val,), hello),
-                     ((zscore, style), gaz),
-                     ((zscore, com), 28)])
+OrderedDict([(('read_data', 'file_name'), 'foo_bar.txt'),
+             (('read_data', 'nrows'), 999),
+             (('single_val',), 'hello'),
+             (('zscore', 'style'), 'gaz'),
+             (('zscore', 'com'), 28)])
         """.lstrip().rstrip()
         self.assert_equal(act, exp, fuzzy_match=True)
 
@@ -365,10 +372,10 @@ class Test_config1(hut.TestCase):
         # string = pprint.pformat(flattened, sort_dicts=False)
         act = pprint.pformat(flattened)
         exp = r"""
-        OrderedDict([((read_data, file_name), foo_bar.txt),
-                     ((read_data, nrows), 999),
-                     ((single_val,), hello),
-                     ((zscore,), )])
+        OrderedDict([(('read_data', 'file_name'), 'foo_bar.txt'),
+             (('read_data', 'nrows'), 999),
+             (('single_val',), 'hello'),
+             (('zscore',), )])
         """.lstrip().rstrip()
         self.assert_equal(act, exp, fuzzy_match=True)
 
@@ -430,9 +437,8 @@ class Test_config1(hut.TestCase):
         self.assertEqual(str(config), str(config2))
         # Build the signature of the test.
         act = []
-        act.append("config=\n%s" % str(config))
-        act.append("code=%s" % str(code))
-        act.append("config2=\n%s" % str(config2))
+        act.append("# config=\n%s" % str(config))
+        act.append("# code=\n%s" % str(code))
         act = "\n".join(act)
         return act
 
