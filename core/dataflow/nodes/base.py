@@ -204,8 +204,10 @@ class DataSource(FitPredictNode, abc.ABC):
 
 class Transformer(FitPredictNode, abc.ABC):
     """
-    Single-input single-output node that calls a user-defined stateless
-    transformation before `fit()` and `predict()`
+    Single-input single-output node calling a stateless transformation.
+
+    The transformation is user-defined and called before `fit()` and
+    `predict()`.
     """
 
     # TODO(Paul): Consider giving users the option of renaming the single
@@ -544,7 +546,7 @@ class ToListMixin:
         if callable(to_list):
             to_list = to_list()
         if isinstance(to_list, list):
-            # Check that the list of columns
+            # Check that the list of columns is not empty and has no duplicates.
             dbg.dassert_lte(1, len(to_list))
             dbg.dassert_no_duplicates(to_list)
             return to_list
