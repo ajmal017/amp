@@ -447,7 +447,7 @@ class Resample(Transformer):
         df = df.copy()
         #
         #print("df.size=", df.size)
-        print("mem_size(df)=", intro.get_size(df))
+        print("mem_size(df)=", intro.get_size_in_bytes(df))
         print("Starting resampling")
         resampler = csigna.resample(df, rule=self._rule, **self._resample_kwargs)
         func = getattr(resampler, self._agg_func)
