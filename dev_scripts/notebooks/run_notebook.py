@@ -3,14 +3,11 @@ r"""
 Run a notebook given a config or a list of configs.
 
 Use example:
-> run_notebook.py --dst_dir nlp/test_results \
- --notebook nlp/notebooks/NLP_RP_pipeline.ipynb \
- --function "nlp.build_configs.build_PTask1088_configs()" \
- --num_threads 2
-
-Import as:
-
-import dev_scripts.run_notebook as devrunn
+> run_notebook.py \
+    --dst_dir nlp/test_results \
+    --notebook nlp/notebooks/NLP_RP_pipeline.ipynb \
+    --function "nlp.build_configs.build_PTask1088_configs()" \
+    --num_threads 2
 """
 import argparse
 import copy
@@ -34,49 +31,6 @@ import helpers.system_interaction as si
 _LOG = logging.getLogger(__name__)
 
 
-# TODO(gp): Is this used?
-def build_configs(dst_dir: str, dry_run: bool) -> List[cfg.Config]:
-    # TODO (*) Where to move this file?
-    config = cfg.Config()
-    config_tmp = config.add_subconfig("read_data")
-    config_tmp["file_name"] = None
-    if dry_run:
-        config_tmp["nrows"] = 10000
-    #
-    config["output_dir"] = dst_dir
-    config["sim_tag"] = None
-    #
-    config["zscore_style"] = "compute_rolling_std"
-    config["zscore_com"] = 28
-    config["filter_ath"] = True
-    config["target_y_var"] = "zret_0"
-    config["delay_lag"] = 1
-    # config["delay_lag"] = 2
-    config["num_lags"] = 3
-    # config["num_lags"] = 5
-    # config["num_lags"] = 10
-    config["cv_split_style"] = "TimeSeriesSplit"
-    config["cv_n_splits"] = 5
-    #
-    configs = []
-    if dry_run:
-        futures = "ES CL".split()
-    else:
-        futures = "AD C GC NG S CL ES HE NN TY".split()
-        # futures = "ES CL".split()
-    for f in futures:
-        config["descr"] = f
-        config_tmp = copy.deepcopy(config)
-        file_name = (
-            "s3://alphamatic-data/data/kibot/All_Futures_Contracts_1min/%s.csv.gz"
-            % f
-        )
-        config_tmp["file_name"] = file_name
-        config_tmp["sim_tag"] = f
-        configs.append(config_tmp)
-    return configs
-
-
 # #############################################################################
 
 
@@ -91,17 +45,17 @@ def _run_notebook(
     publish: bool,
 ) -> Optional[int]:
     """
-    Run a notebook for the particular config from a list.
+    Run a notebook for a specific `Config`.
 
     The `config_builder` is passed inside the notebook to generate a list
     of all configs to be run as part of a series of experiments, but only the
     `i`-th config is run inside a particular notebook.
 
-    :param i: index of config in a list of configs
+    :param i: index of config to select in a list of configs
     :param notebook_file: path to file with experiment template
-    :param dst_dir: path to directory with results
+    :param dst_dir: path to directory to store results
     :param config: config for the experiment
-    :param config_builder: function used to generate all configs
+    :param config_builder: function used to generate all the configs
     :param num_attempts: maximum number of times to attempt running the
         notebook
     :param abort_on_error: if `True`, raise an error
@@ -109,13 +63,12 @@ def _run_notebook(
     :return: if notebook is skipped ("success.txt" file already exists), return
         `None`; otherwise, return `rc`
     """
-    dbg.dassert_exists(notebook_file)
+    dbg.dassert_file_exists(notebook_file)
     dbg.dassert_isinstance(config, cfg.Config)
-    dbg.dassert_exists(dst_dir)
+    dbg.dassert_dir_exists(dst_dir)
     # Create subdirectory structure for simulation results.
     result_subdir = "result_%s" % i
     html_subdir_name = os.path.join(os.path.basename(dst_dir), result_subdir)
-    # TODO(gp): experiment_result_dir -> experiment_result_dir.
     experiment_result_dir = os.path.join(dst_dir, result_subdir)
     config = cfgb.set_experiment_result_dir(experiment_result_dir, config)
     _LOG.info("experiment_result_dir=%s", experiment_result_dir)

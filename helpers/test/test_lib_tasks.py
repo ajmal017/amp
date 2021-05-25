@@ -1103,14 +1103,8 @@ core/dataflow/builders.py:195:[pylint] [W0221(arguments-differ), ArmaReturnsBuil
 
 
 class Test_find_check_string_output1(hut.TestCase):
-    def test1(self) -> None:
-        """
-        Test `find_check_string_output()` by searching the `check_string` of
-        this test.
-        """
-        # Force to generate a `check_string` file so we can search for it.
-        act = "A fake check_string output to use as a test"
-        self.check_string(act, act)
+
+    def _helper(self, exp: str, fuzzy_match: bool) -> None:
         # Look for the `check_string()` corresponding to this test.
         ctx = _build_mock_context_returning_ok()
         class_name = self.__class__.__name__
@@ -1119,18 +1113,43 @@ class Test_find_check_string_output1(hut.TestCase):
         # We don't want to copy but just print.
         pbcopy = False
         act = ltasks.find_check_string_output(
-            ctx, class_name, method_name, as_python, pbcopy
+            ctx, class_name, method_name, as_python, fuzzy_match, pbcopy
         )
+        # Check that it matches exactly.
+        self.assert_equal(act, exp, fuzzy_match=False)
+
+    def test1(self) -> None:
+        """
+        Test `find_check_string_output()` by searching the `check_string` of
+        this test.
+        """
+        # Force to generate a `check_string` file so we can search for it.
+        act = "A fake check_string output to use for test1"
+        self.check_string(act, act)
         # Check.
         exp = '''
-act = ""
-exp = r"""
-A fake check_string output to use as a test
+        exp = r"""
+        A fake check_string output to use for test1
         """.lstrip().rstrip()
-self.assert_equal(act, exp)
+        self.assert_equal(act, exp, fuzzy_match=False)
         '''
-        self.assert_equal(act, exp, fuzzy_match=True)
+        self._helper(exp, fuzzy_match=False)
 
+    def test2(self) -> None:
+        """
+        Like test1 but using `fuzzy_match=True`.
+        """
+        # Force to generate a `check_string` file so we can search for it.
+        act = "A fake check_string output to use for test2"
+        self.check_string(act, act)
+        # Check.
+        exp = '''
+        exp = r"""
+A fake check_string output to use for test2
+        """.lstrip().rstrip()
+        self.assert_equal(act, exp, fuzzy_match=True)
+        '''
+        self._helper(exp, fuzzy_match=True)
 
 # #############################################################################
 

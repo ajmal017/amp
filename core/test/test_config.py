@@ -10,9 +10,9 @@ _LOG = logging.getLogger(__name__)
 
 
 class Test_config1(hut.TestCase):
-    def test_config1(self) -> None:
+    def test_set1(self) -> None:
         """
-        Test printing a non-hierarchical config.
+        Set a key and print a flat config.
         """
         config = cfg.Config()
         config["hello"] = "world"
@@ -22,25 +22,34 @@ class Test_config1(hut.TestCase):
         """
         self.assert_equal(act, exp, fuzzy_match=True)
 
-    def test_config2(self) -> None:
+    def test_check_python1(self) -> None:
         """
-        Test serialization/deserialization for flat config.
+        Test serialization/deserialization for a flat config.
         """
         config = self._get_flat_config1()
         #
-        act = self._check_python(config)
-        self.check_string(act)
+        act = self._check_roundtrip_transformation(config)
+        exp = r"""
+        config=
+        hello: world
+        foo: [1, 2, 3]
+        code=Config([('hello', 'world'), ('foo', [1, 2, 3])])
+        config2=
+        hello: world
+        foo: [1, 2, 3]
+        """.lstrip().rstrip()
+        self.assert_equal(act, exp, fuzzy_match=True)
 
-    def test_config3(self) -> None:
+    def test_get1(self) -> None:
         """
-        Test Config.get()
+        Test Config.get().
         """
         config = cfg.Config()
         config["nrows"] = 10000
-        #
+        # Look up the key.
         self.assertEqual(config["nrows"], 10000)
         self.assertEqual(config.get("nrows", None), 10000)
-        #
+        # Look up a non-existent key.
         self.assertEqual(config.get("nrows_tmp", None), None)
 
     def test_get2(self) -> None:
@@ -49,40 +58,85 @@ class Test_config1(hut.TestCase):
         """
         config = self._get_nested_config1()
         _LOG.debug("config=%s", config)
-        with self.assertRaises(AssertionError):
+        act = str(config)
+        exp = ""
+        self.assert_equal(act, exp, fuzzy_match=True)
+        #
+        with self.assertRaises(AssertionError) as cm:
             _ = config["read_data2"]
-        with self.assertRaises(AssertionError):
+        act = str(cm.exception)
+        exp = ""
+        self.assert_equal(act, exp, fuzzy_match=True)
+        #
+        with self.assertRaises(AssertionError) as cm:
             _ = config["read_data"]["file_name2"]
+        act = str(cm.exception)
+        exp = ""
+        self.assert_equal(act, exp, fuzzy_match=True)
+        #
         with self.assertRaises(AssertionError):
             _ = config["read_data2"]["file_name2"]
         elem = config["read_data"]["file_name"]
         self.assertEqual(elem, "foo_bar.txt")
 
-    def test_config4(self) -> None:
+    def test_nested_config_print1(self) -> None:
         """
         Test print nested config.
         """
         config = self._get_nested_config1()
         act = str(config)
-        self.check_string(act)
+        exp = r"""
+        nrows: 10000
+        read_data:
+          file_name: foo_bar.txt
+          nrows: 999
+        single_val: hello
+        zscore:
+          style: gaz
+          com: 28
+        """.lstrip().rstrip()
+        self.assert_equal(act, exp, fuzzy_match=True)
 
-    def test_config5(self) -> None:
+    def test_nested_config_to_python1(self) -> None:
         """
         Test to_python() nested config.
         """
         config = self._get_nested_config1()
         act = config.to_python()
-        self.check_string(act)
+        exp = r"""
+        Config([(nrows, 10000), (read_data, Config([(file_name, foo_bar.txt), (nrows, 999)])), (single_val, hello), (zscore, Config([(style, gaz), (com, 28)]))])
+        """.lstrip().rstrip()
+        self.assert_equal(act, exp, fuzzy_match=True)
 
     def test_config6(self) -> None:
         """
         Test serialization / deserialization for nested config.
         """
         config = self._get_nested_config1()
-        #
-        act = self._check_python(config)
-        self.check_string(act)
+        # Check.
+        act = self._check_roundtrip_transformation(config)
 
+        exp = r"""
+        config=nrows: 10000
+        read_data:
+          file_name: foo_bar.txt
+          nrows: 999
+        single_val: hello
+        zscore:
+          style: gaz
+          com: 28
+        code=Config([(nrows, 10000), (read_data, Config([(file_name, foo_bar.txt), (nrows, 999)])), (single_val, hello), (zscore, Config([(style, gaz), (com, 28)]))])
+        config2=nrows: 10000
+        read_data:
+          file_name: foo_bar.txt
+          nrows: 999
+        single_val: hello
+        zscore:
+          style: gaz
+          com: 28
+        """.lstrip().rstrip()
+        self.assert_equal(act, exp, fuzzy_match=True)
+        
     def test_config7(self) -> None:
         """
         Compare two different styles of building a nested config.
@@ -168,7 +222,26 @@ class Test_config1(hut.TestCase):
         config_tmp["com"] = 28
         #
         config1.update(config2)
-        self.check_string(str(config1))
+        # Check.
+        act = str(config1)
+        exp = r"""
+        read_data:
+          file_name: foo_bar.txt
+          nrows: 999
+        single_val: hello
+        zscore:
+          style: gaz
+          com: 28
+        write_data:
+          file_name: baz.txt
+          nrows: 999
+        single_val2: goodbye
+        zscore2:
+          style: gaz
+          com: 28
+        """.lstrip().rstrip()
+        self.assert_equal(act, exp, fuzzy_match=True)
+
 
     def test_hierarchical_update2(self) -> None:
         config1 = cfg.Config()
@@ -199,7 +272,22 @@ class Test_config1(hut.TestCase):
         config_tmp["tau"] = 32
         #
         config1.update(config2)
-        self.check_string(str(config1))
+        # Check.
+        act = str(config1)
+        exp = r"""
+        read_data:
+          file_name: baz.txt
+          nrows: 999
+        single_val: goodbye
+        zscore:
+          style: super
+          com: 28
+        extra_zscore:
+          style: universal
+          tau: 32
+        """.lstrip().rstrip()
+        self.assert_equal(act, exp, fuzzy_match=True)
+
 
     def test_hierarchical_update_empty_nested_config1(self) -> None:
         """
@@ -251,8 +339,15 @@ class Test_config1(hut.TestCase):
         flattened = config.flatten()
         # TODO(*): `sort_dicts` param new in 3.8.
         # string = pprint.pformat(flattened, sort_dicts=False)
-        string = pprint.pformat(flattened)
-        self.check_string(string)
+        act = pprint.pformat(flattened)
+        exp = r"""
+        OrderedDict([((read_data, file_name), foo_bar.txt),
+                     ((read_data, nrows), 999),
+                     ((single_val,), hello),
+                     ((zscore, style), gaz),
+                     ((zscore, com), 28)])
+        """.lstrip().rstrip()
+        self.assert_equal(act, exp, fuzzy_match=True)
 
     def test_flatten2(self) -> None:
         config = cfg.Config()
@@ -268,28 +363,20 @@ class Test_config1(hut.TestCase):
         flattened = config.flatten()
         # TODO(*): `sort_dicts` param new in 3.8.
         # string = pprint.pformat(flattened, sort_dicts=False)
-        string = pprint.pformat(flattened)
-        self.check_string(string)
+        act = pprint.pformat(flattened)
+        exp = r"""
+        OrderedDict([((read_data, file_name), foo_bar.txt),
+                     ((read_data, nrows), 999),
+                     ((single_val,), hello),
+                     ((zscore,), )])
+        """.lstrip().rstrip()
+        self.assert_equal(act, exp, fuzzy_match=True)
 
-    def _check_python(self, config: cfg.Config) -> str:
-        code = config.to_python()
-        _LOG.debug("code=%s", code)
-        config2 = cfg.Config.from_python(code)
-        #
-        act = []
-        act.append("config=%s" % str(config))
-        act.append("code=%s" % str(code))
-        act.append("config2=%s" % str(config2))
-        act = "\n".join(act)
-        self.assertEqual(str(config), str(config2))
-        return act
 
-    # TODO(gp): We use hierarchical/nested vs flat. Use only
-    #  hierarchical/non-hierarchical.
     @staticmethod
     def _get_flat_config1() -> cfg.Config:
         """
-        Build a (non-hierarchical) config like:
+        Build a flat (i.e., non-nested) config.
         """
         config = cfg.Config()
         config["hello"] = "world"
@@ -328,6 +415,27 @@ class Test_config1(hut.TestCase):
         config_tmp["com"] = 28
         return config
 
+    def _check_roundtrip_transformation(self, config: cfg.Config) -> str:
+        """
+        Convert a config into Python code and back.
+
+        :return: signature of the test
+        """
+        # Convert a config to Python code.
+        code = config.to_python()
+        _LOG.debug("code=%s", code)
+        # Build a config from Python code.
+        config2 = cfg.Config.from_python(code)
+        # Verify that the round-trip transformation is correct.
+        self.assertEqual(str(config), str(config2))
+        # Build the signature of the test.
+        act = []
+        act.append("config=\n%s" % str(config))
+        act.append("code=%s" % str(code))
+        act.append("config2=\n%s" % str(config2))
+        act = "\n".join(act)
+        return act
+
 
 class Test_subtract_config1(hut.TestCase):
     def test_test1(self) -> None:
@@ -342,7 +450,12 @@ class Test_subtract_config1(hut.TestCase):
         config2[["r1", "r2", "r3"]] = [1, 2]
         #
         diff = cfg.subtract_config(config1, config2)
-        self.check_string(str(diff))
+        # Check.
+        act = str(diff)
+        exp = r"""
+        l0: 1st_floor
+        """.lstrip().rstrip()
+        self.assert_equal(act, exp, fuzzy_match=True)
 
     def test_test2(self) -> None:
         config1 = cfg.Config()
@@ -357,7 +470,15 @@ class Test_subtract_config1(hut.TestCase):
         config2["empty"] = cfg.Config()
         #
         diff = cfg.subtract_config(config1, config2)
-        self.check_string(str(diff))
+        # Check.
+        act = str(diff)
+        exp = r"""
+        l0: 1st_floor
+        r1:
+          r2:
+            r3: [1, 2, 3]
+        """.lstrip().rstrip()
+        self.assert_equal(act, exp, fuzzy_match=True)
 
 
 # TODO(gp): Unit tests all the functions.

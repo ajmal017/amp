@@ -136,6 +136,10 @@ def get_config_from_env() -> Optional[cfg.Config]:
 
 
 # TODO(*): Is this used anywhere?
+# > jackpy assert_on_duplicated_configs
+# amp/core/test/test_config_builders.py:213:            cfgb.assert_on_duplicated_configs(configs)
+# amp/core/config_builders.py:139:def assert_on_duplicated_configs(configs: List[cfg.Config]) -> None:
+# amp/dev_scripts/notebooks/run_notebook.py:230:    cfgb.assert_on_duplicated_configs(configs)
 def assert_on_duplicated_configs(configs: List[cfg.Config]) -> None:
     """
     Assert if the list of configs contains no duplicates.
@@ -176,6 +180,7 @@ def _flatten_configs(configs: Iterable[cfg.Config]) -> List[Dict[str, Any]]:
 
 
 # TODO(*): Deprecate.
+# This is not unit tested.
 def get_config_intersection(configs: List[cfg.Config]) -> cfg.Config:
     """
     Compare configs from list to find the common part.
@@ -188,6 +193,7 @@ def get_config_intersection(configs: List[cfg.Config]) -> cfg.Config:
 
 # TODO(*): Are the values of this ever used anywhere?
 # TODO(*): Try to deprecate. If needed, compose with `cfg.diff_configs()`.
+# It's not used but unit tested
 def get_config_difference(configs: List[cfg.Config]) -> Dict[str, List[Any]]:
     """
     Find parameters in configs that are different and provide the varying
@@ -226,6 +232,12 @@ def get_config_difference(configs: List[cfg.Config]) -> Dict[str, List[Any]]:
 
 
 # TODO(*): Deprecate. Switch to `cfg.convert_to_dataframe()`.
+# > jackpy get_configs_dataframe
+# amp/core/test/test_config_builders.py:275:    `cfgb.get_configs_dataframe` using `pd.DataFrame.equals()`
+# amp/core/test/test_config_builders.py:286:        actual_result = cfgb.get_configs_dataframe([config_1, config_2])
+# amp/core/test/test_config_builders.py:309:        actual_result = cfgb.get_configs_dataframe(
+# amp/core/test/test_config_builders.py:326:        actual_result = cfgb.get_configs_dataframe(
+# amp/core/config_builders.py:233:def get_configs_dataframe(
 def get_configs_dataframe(
     configs: List[cfg.Config],
     params_subset: Optional[Union[str, List[str]]] = None,
