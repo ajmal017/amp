@@ -244,13 +244,6 @@ def _get_files_to_process(
             msg="You need to specify exactly one among --modified, --branch, "
                 "--last_commit",
             )
-    else:
-        dbg.dassert_eq(
-            int(modified) + int(branch) + int(last_commit),
-            1,
-            msg="You need to specify exactly one among --modified, --branch, "
-            "--last_commit",
-        )
     if modified:
         files = git.get_modified_files(".")
     elif branch:

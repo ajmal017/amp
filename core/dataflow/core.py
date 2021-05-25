@@ -12,9 +12,8 @@ import helpers.list as hlist
 _LOG = logging.getLogger(__name__)
 
 
-# TODO(gp): Move to dataflow/utils.py?
-
-## TODO(gp): Extend it to multi-index.
+# TODO(P0, gp): Move to dataflow/utils.py?
+# TODO(*): Extend it to multi-index.
 # def validate_df(df: pd.DataFrame) -> None:
 #    """
 #    Check basic properties of dataframes we work with.
@@ -34,7 +33,7 @@ _LOG = logging.getLogger(__name__)
 # #############################################################################
 
 
-# TODO(gp): If this is private -> _NodeInterface.
+# TODO(P0, gp): If this is private -> _NodeInterface.
 class NodeInterface(abc.ABC):
     """
     Abstract node class for creating DAGs of functions.

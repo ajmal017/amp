@@ -15,7 +15,7 @@ from core.dataflow.utils import get_df_info_as_string
 _LOG = logging.getLogger(__name__)
 
 
-# TODO(*): Create a dataflow types file.
+# TODO(P0, *): Create a dataflow types file.
 # TODO(*): -> COL_NAME or COLUMN_NAME
 _COL_TYPE = Union[int, str]
 # TODO(*): -> DATETIME

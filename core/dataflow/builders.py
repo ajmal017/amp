@@ -18,7 +18,7 @@ from core.dataflow.nodes.volatility_models import VolatilityModel
 _LOG = logging.getLogger(__name__)
 
 
-# TODO(Paul): Consider moving this to `core.py` or `dag_builder.py`
+# TODO(Paul): Consider moving this to `core.py`.
 class DagBuilder(abc.ABC):
     """
     Abstract class for creating DAGs.
@@ -98,7 +98,7 @@ class DagBuilder(abc.ABC):
         # TODO(*): Consider make this an abstractmethod.
         return ["fit", "predict"]
 
-    # TODO(gp): -> Dict[str, ... ?
+    # TODO(P0, gp): -> Dict[str, ... ?
     def get_column_to_tags_mapping(
         self, config: cconfi.Config
     ) -> Optional[Dict[Any, List[str]]]:
