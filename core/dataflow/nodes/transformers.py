@@ -445,16 +445,10 @@ class Resample(Transformer):
         self, df: pd.DataFrame
     ) -> Tuple[pd.DataFrame, collections.OrderedDict]:
         df = df.copy()
-        #
-        #print("df.size=", df.size)
-        print("mem_size(df)=", intro.get_size_in_bytes(df))
-        print("Starting resampling")
         resampler = csigna.resample(df, rule=self._rule, **self._resample_kwargs)
         func = getattr(resampler, self._agg_func)
-        print("func=%s" % func)
         df = func(**self._agg_func_kwargs)
         # Update info.
-        print("Collecting info")
         info: collections.OrderedDict[str, Any] = collections.OrderedDict()
         info["df_transformed_info"] = get_df_info_as_string(df)
         return df, info

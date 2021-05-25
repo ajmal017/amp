@@ -101,11 +101,10 @@ class Test_flat_config1(hut.TestCase):
         return config
 
 
-# ################################################################################
+# #############################################################################
 
 
 class Test_nested_config1(hut.TestCase):
-
     def test_config_print1(self) -> None:
         """
         Test printing a config.
@@ -173,7 +172,6 @@ class Test_nested_config1(hut.TestCase):
         elem = config["read_data"]["file_name"]
         self.assertEqual(elem, "foo_bar.txt")
 
-
     def test_config_to_python1(self) -> None:
         """
         Test `to_python()` on a nested config.
@@ -207,7 +205,7 @@ class Test_nested_config1(hut.TestCase):
         Config([('nrows', 10000), ('read_data', Config([('file_name', 'foo_bar.txt'), ('nrows', 999)])), ('single_val', 'hello'), ('zscore', Config([('style', 'gaz'), ('com', 28)]))])
         """.lstrip().rstrip()
         self.assert_equal(act, exp, fuzzy_match=True)
-        
+
     def test_config1(self) -> None:
         """
         Compare two different styles of building a nested config.
@@ -229,8 +227,8 @@ class Test_nested_config1(hut.TestCase):
 
     def test_getitem2(self) -> None:
         """
-        Test accessing the config with nested access with correct and
-        incorrect paths.
+        Test accessing the config with nested access with correct and incorrect
+        paths.
         """
         config = self._get_nested_config1()
         _LOG.debug("config=%s", config)
@@ -493,7 +491,7 @@ class Test_nested_config1(hut.TestCase):
         return config
 
 
-# ##############################################################################
+# #############################################################################
 
 
 class Test_subtract_config1(hut.TestCase):

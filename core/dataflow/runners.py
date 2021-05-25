@@ -130,8 +130,8 @@ class PredictionDagRunner(FitPredictDagRunner):
 
 class IncrementalDagRunner:
     """
-    Class for running DAGs in incremental fashion, i.e., running one
-    step at a time.
+    Class for running DAGs in incremental fashion, i.e., running one step at a
+    time.
 
     # TODO(gp): Improve description.
     """

@@ -10,7 +10,6 @@ Use example:
     --num_threads 2
 """
 import argparse
-import copy
 import logging
 import os
 import sys

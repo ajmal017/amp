@@ -113,20 +113,26 @@ class TestDryRunTasks1(hut.TestCase):
         target = "docker_ps"
         self._dry_run(target)
 
-    @pytest.mark.skip(reason="AmpTask1347: Add support for mocking `system*()` "
-                             "functions to unit test")
+    @pytest.mark.skip(
+        reason="AmpTask1347: Add support for mocking `system*()` "
+        "functions to unit test"
+    )
     def test_docker_stats(self) -> None:
         target = "docker_stats"
         self._dry_run(target)
 
-    @pytest.mark.skip(reason="AmpTask1347: Add support for mocking `system*()` "
-                             "functions to unit test")
+    @pytest.mark.skip(
+        reason="AmpTask1347: Add support for mocking `system*()` "
+        "functions to unit test"
+    )
     def test_docker_kill_last(self) -> None:
         target = "docker_kill"
         self._dry_run(target)
 
-    @pytest.mark.skip(reason="AmpTask1347: Add support for mocking `system*()` "
-                             "functions to unit test")
+    @pytest.mark.skip(
+        reason="AmpTask1347: Add support for mocking `system*()` "
+        "functions to unit test"
+    )
     def test_docker_kill_all(self) -> None:
         target = "docker_kill --all"
         self._dry_run(target)
@@ -174,14 +180,18 @@ class TestDryRunTasks2(_TestClassHandlingLibTasksSingleton):
         target = "docker_images_ls_repo(ctx)"
         self._check_output(target, check=False)
 
-    @pytest.mark.skip(reason="AmpTask1347: Add support for mocking `system*()` "
-                             "functions to unit test")
+    @pytest.mark.skip(
+        reason="AmpTask1347: Add support for mocking `system*()` "
+        "functions to unit test"
+    )
     def test_docker_kill_all(self) -> None:
         target = "docker_kill(ctx, all=True)"
         self._check_output(target)
 
-    @pytest.mark.skip(reason="AmpTask1347: Add support for mocking `system*()` "
-                             "functions to unit test")
+    @pytest.mark.skip(
+        reason="AmpTask1347: Add support for mocking `system*()` "
+        "functions to unit test"
+    )
     def test_docker_kill_last(self) -> None:
         target = "docker_kill(ctx)"
         self._check_output(target)
@@ -194,8 +204,10 @@ class TestDryRunTasks2(_TestClassHandlingLibTasksSingleton):
         target = "docker_pull(ctx)"
         self._check_output(target, check=False)
 
-    @pytest.mark.skip(reason="AmpTask1347: Add support for mocking `system*()` "
-                             "functions to unit test")
+    @pytest.mark.skip(
+        reason="AmpTask1347: Add support for mocking `system*()` "
+        "functions to unit test"
+    )
     def test_docker_stats(self) -> None:
         target = "docker_stats(ctx)"
         self._check_output(target)
@@ -268,22 +280,28 @@ class TestDryRunTasks2(_TestClassHandlingLibTasksSingleton):
         target = "git_merge_master(ctx)"
         self._check_output(target)
 
-    @pytest.mark.skip(reason="AmpTask1347: Add support for mocking `system*()` "
-        "functions to unit test")
+    @pytest.mark.skip(
+        reason="AmpTask1347: Add support for mocking `system*()` "
+        "functions to unit test"
+    )
     def test_lint1(self) -> None:
         target = "lint(ctx, modified=True)"
         # The output depends on the client, so don't check it.
         self._check_output(target, check=False)
 
-    @pytest.mark.skip(reason="AmpTask1347: Add support for mocking `system*()` "
-                             "functions to unit test")
+    @pytest.mark.skip(
+        reason="AmpTask1347: Add support for mocking `system*()` "
+        "functions to unit test"
+    )
     def test_lint2(self) -> None:
         target = "lint(ctx, branch=True)"
         # The output depends on the client, so don't check it.
         self._check_output(target, check=False)
 
-    @pytest.mark.skip(reason="AmpTask1347: Add support for mocking `system*()` "
-                             "functions to unit test")
+    @pytest.mark.skip(
+        reason="AmpTask1347: Add support for mocking `system*()` "
+        "functions to unit test"
+    )
     def test_lint3(self) -> None:
         file = __file__
         target = f"lint(ctx, files='{file}')"
@@ -911,7 +929,10 @@ class TestLibTasksGitCreatePatch1(hut.TestCase):
         """
         Exercise the code for:
 
-        > invoke git_create_patch --mode="tar" --files "this file" --modified
+        > invoke git_create_patch \
+                --mode="tar" \
+                --files "this file" \
+                --modified
         """
         # This test needs a reference to Git master branch.
         git.fetch_origin_master_if_needed()
@@ -1104,20 +1125,6 @@ core/dataflow/builders.py:195:[pylint] [W0221(arguments-differ), ArmaReturnsBuil
 
 class Test_find_check_string_output1(hut.TestCase):
 
-    def _helper(self, exp: str, fuzzy_match: bool) -> None:
-        # Look for the `check_string()` corresponding to this test.
-        ctx = _build_mock_context_returning_ok()
-        class_name = self.__class__.__name__
-        method_name = self._testMethodName
-        as_python = True
-        # We don't want to copy but just print.
-        pbcopy = False
-        act = ltasks.find_check_string_output(
-            ctx, class_name, method_name, as_python, fuzzy_match, pbcopy
-        )
-        # Check that it matches exactly.
-        self.assert_equal(act, exp, fuzzy_match=False)
-
     def test1(self) -> None:
         """
         Test `find_check_string_output()` by searching the `check_string` of
@@ -1150,6 +1157,21 @@ A fake check_string output to use for test2
         self.assert_equal(act, exp, fuzzy_match=True)
         '''
         self._helper(exp, fuzzy_match=True)
+
+    def _helper(self, exp: str, fuzzy_match: bool) -> None:
+        # Look for the `check_string()` corresponding to this test.
+        ctx = _build_mock_context_returning_ok()
+        class_name = self.__class__.__name__
+        method_name = self._testMethodName
+        as_python = True
+        # We don't want to copy but just print.
+        pbcopy = False
+        act = ltasks.find_check_string_output(
+            ctx, class_name, method_name, as_python, fuzzy_match, pbcopy
+        )
+        # Check that it matches exactly.
+        self.assert_equal(act, exp, fuzzy_match=False)
+
 
 # #############################################################################
 
@@ -1268,7 +1290,7 @@ class Test_get_files_to_process1(hut.TestCase):
         '2'
         ==
         '1'
-        You need to specify exactly one option among --modified, --branch, --last_commit, and --files 
+        You need to specify exactly one option among --modified, --branch, --last_commit, and --files
         """
         self.assert_equal(act, exp, fuzzy_match=True)
 

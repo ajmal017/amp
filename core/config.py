@@ -21,8 +21,6 @@ import helpers.printing as pri
 _LOG = logging.getLogger(__name__)
 
 
-
-
 class Config:
     """
     A nested ordered dictionary storing configuration information.
@@ -90,9 +88,10 @@ class Config:
         """
         Get value for `key` or assert, if it doesn't exist.
 
-        If `key` is an iterable of keys (e.g., `("read_data", "file_name")`, then
-        the hierarchy is navigated until the corresponding element is found or we
-        assert if the element doesn't exist.
+        If `key` is an iterable of keys (e.g., `("read_data",
+        "file_name")`, then the hierarchy is navigated until the
+        corresponding element is found or we assert if the element
+        doesn't exist.
         """
         if intr.is_iterable(key):
             head_key, tail_key = key[0], key[1:]  # type: ignore
