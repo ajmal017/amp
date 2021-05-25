@@ -434,9 +434,9 @@ def dassert_list_of_strings(
     list_: List[str], msg: Optional[str] = None, *args: Any
 ) -> None:
     # TODO(gp): Allow iterable?
-    dassert_isinstance(list_, list, msg=msg, *args)
+    dassert_isinstance(list_, list, msg, *args)
     for elem in list_:
-        dassert_isinstance(elem, str, msg=msg, *args)
+        dassert_isinstance(elem, str, msg, *args)
 
 
 # File related.
@@ -543,8 +543,8 @@ def dassert_index_is_datetime(
     import pandas as pd
 
     # TODO(gp): Add support also for series.
-    dassert_isinstance(df, pd.DataFrame, msg=msg, *args)
-    dassert_isinstance(df.index, pd.DatetimeIndex, msg=msg, *args)
+    dassert_isinstance(df, pd.DataFrame, msg, *args)
+    dassert_isinstance(df.index, pd.DatetimeIndex, msg, *args)
 
 
 def dassert_strictly_increasing_index(
@@ -650,8 +650,8 @@ class _ColoredFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         colored_record = copy.copy(record)
-        # `levelname` is the internal name and can't be changed to
-        # `level_name`, as per our conventions.
+        # `levelname` is the internal name and can't be changed to `level_name`
+        # as per our conventions.
         levelname = colored_record.levelname
         # Use white as default.
         seq = self.MAPPING.get(levelname, 37)
@@ -674,6 +674,7 @@ class ResourceUsageFilter(logging.Filter):
     def __init__(self, report_cpu_usage: bool):
         super().__init__()
         import psutil
+
         self._process = psutil.Process()
         self._report_cpu_usage = report_cpu_usage
         if self._report_cpu_usage:
@@ -684,20 +685,22 @@ class ResourceUsageFilter(logging.Filter):
         """
         Override `logging.Filter()`, adding several fields to the logger.
         """
-        import psutil
         p = self._process
         # Report memory usage.
         rss_in_GB = p.memory_info().rss / (1024 ** 3)
         vms_in_GB = p.memory_info().vms / (1024 ** 3)
         mem_pct = p.memory_percent()
-        resource_use = "rss=%.1fGB vms=%.1fGB mem_pct=%.0f%%" % (rss_in_GB, vms_in_GB,
-            mem_pct)
+        resource_use = "rss=%.1fGB vms=%.1fGB mem_pct=%.0f%%" % (
+            rss_in_GB,
+            vms_in_GB,
+            mem_pct,
+        )
         # Report CPU usage.
         if self._report_cpu_usage:
             # CPU usage since the previous call.
             cpu_use = p.cpu_percent(interval=None)
             resource_use += " cpu=%.0f%%" % cpu_use
-        record.resource_use = resource_use
+        record.resource_use = resource_use  # type: ignore
         return True
 
 
@@ -759,7 +762,8 @@ def _get_logging_format(
             # The remote branches to delete are 3:
             log_format = (
                 # 04-28_08:08 INFO :
-                "%(asctime)-5s %(levelname)-5s")
+                "%(asctime)-5s %(levelname)-5s"
+            )
             if report_resource_usage:
                 # rss=0.3GB vms=2.0GB mem_pct=2% cpu=91%
                 log_format += " [%(resource_use)-40s]"
@@ -775,7 +779,7 @@ def _get_logging_format(
             log_format = (
                 # 04-28_08:08 INFO :
                 "%(asctime)-5s %(levelname)-5s"
-                # /Users/saggese/src/lemonade1/amp/helpers/system_interaction.py:system_interaction.py
+                # .../src/lemonade1/amp/helpers/system_interaction.py
                 # _system       :
                 " %(pathname)s %(funcName)-20s "
                 # 199: ...
@@ -854,15 +858,16 @@ def init_logger(
     #
     print(INFO + ": > cmd='%s'" % get_command_line())
     # Turn on reporting memory and CPU usage.
-    report_resource_usage = True
-    report_cpu_usage = True
+    report_resource_usage = report_cpu_usage = False
     #
     ch = logging.StreamHandler(sys.stdout)
     ch.setLevel(verbosity)
     # Decide whether to use verbose or print format.
     date_fmt, log_format = _get_logging_format(
-        force_print_format, force_verbose_format, force_no_warning,
-        report_resource_usage
+        force_print_format,
+        force_verbose_format,
+        force_no_warning,
+        report_resource_usage,
     )
     # Use normal formatter.
     # formatter = logging.Formatter(log_format, datefmt=date_fmt)
@@ -873,7 +878,7 @@ def init_logger(
     # Report resource usage.
     if report_resource_usage:
         # Get root logger.
-        log = logging.getLogger('')
+        log = logging.getLogger("")
         # Create filter.
         f = ResourceUsageFilter(report_cpu_usage)
         # The ugly part:adding filter to handler.

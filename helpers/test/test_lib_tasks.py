@@ -911,14 +911,14 @@ class TestLibTasksGitCreatePatch1(hut.TestCase):
         """
         Exercise the code for:
 
-        > invoke git_create_patch ... --files "this file"
+        > invoke git_create_patch --mode="tar" --files "this file" --modified
         """
         # This test needs a reference to Git master branch.
         git.fetch_origin_master_if_needed()
         #
         ctx = _build_mock_context_returning_ok()
         mode = "tar"
-        modified = False
+        modified = True
         branch = False
         last_commit = False
         files = __file__
@@ -948,7 +948,11 @@ class TestLibTasksGitCreatePatch1(hut.TestCase):
             )
         act = str(cm.exception)
         exp = r"""
-        You need to specify one among -modified, --branch, --last-commit
+        * Failed assertion *
+        '0'
+        ==
+        '1'
+        You need to specify exactly one among --modified, --branch, --last_commit
         """
         self.assert_equal(act, exp, fuzzy_match=True)
 
@@ -1242,8 +1246,10 @@ class Test_get_files_to_process1(hut.TestCase):
         act = str(cm.exception)
         exp = """
         * Failed assertion *
-        2 <= 1
-        You can specify only one among --modified, --branch, --last_commit
+        '2'
+        ==
+        '1'
+        You need to specify exactly one option among --modified, --branch, --last_commit, and --files 
         """
         self.assert_equal(act, exp, fuzzy_match=True)
 
@@ -1270,8 +1276,10 @@ class Test_get_files_to_process1(hut.TestCase):
         act = str(cm.exception)
         exp = r"""
         * Failed assertion *
-        2 <= 1
-        You can specify only one option among --modified, --branch, --last_commit, and --files
+        '2'
+        ==
+        '1'
+        You need to specify exactly one option among --modified, --branch, --last_commit, and --files
         """
         self.assert_equal(act, exp, fuzzy_match=True)
 

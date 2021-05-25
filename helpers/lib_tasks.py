@@ -222,8 +222,12 @@ def _get_files_to_process(
     :param files_from_user: return files passed to this function
     :param mutually_exclusive: ensure that all options are mutually exclusive
     """
-    _LOG.debug(hprint.to_str("modified branch last_commit files_from_user "
-        "mutually_exclusive remove_dirs"))
+    _LOG.debug(
+        hprint.to_str(
+            "modified branch last_commit files_from_user "
+            "mutually_exclusive remove_dirs"
+        )
+    )
     if mutually_exclusive:
         dbg.dassert_eq(
             int(modified)
@@ -240,6 +244,13 @@ def _get_files_to_process(
             msg="You need to specify exactly one among --modified, --branch, "
                 "--last_commit",
             )
+    else:
+        dbg.dassert_eq(
+            int(modified) + int(branch) + int(last_commit),
+            1,
+            msg="You need to specify exactly one among --modified, --branch, "
+            "--last_commit",
+        )
     if modified:
         files = git.get_modified_files(".")
     elif branch:
@@ -251,7 +262,7 @@ def _get_files_to_process(
         files = files_from_user.split(" ")
     # Convert into a list.
     dbg.dassert_isinstance(files, list)
-    files = [f for f in files if f != ""]
+    files: List[str] = [f for f in files if f != ""]
     _LOG.debug("files='%s'", str(files))
     # Remove dirs, if needed.
     if remove_dirs:
@@ -707,12 +718,14 @@ def _get_last_container_id() -> str:
     _, txt = hsinte.system_to_one_line(cmd)
     # Parse the output: there should be at least one line.
     dbg.dassert_lte(1, len(txt.split(" ")), "Invalid output='%s'", txt)
-    container_id = txt.split(" ")[0]
+    container_id: str = txt.split(" ")[0]
     return container_id
 
 
 @task
-def docker_stats(ctx, all=False):  # type: ignore
+def docker_stats(  # type: ignore
+    ctx, all=False  # pylint: disable=redefined-builtin
+):
     # pylint: disable=line-too-long
     """
     Report last started Docker container stats, e.g., CPU, RAM.
@@ -758,7 +771,9 @@ def docker_stats(ctx, all=False):  # type: ignore
 
 
 @task
-def docker_kill(ctx, all=False):  # type: ignore
+def docker_kill(  # type: ignore
+    ctx, all=False  # pylint: disable=redefined-builtin
+):
     """
     Kill the last Docker container started.
 
@@ -915,6 +930,7 @@ def _get_amp_docker_compose_path() -> Optional[str]:
     `devops/compose/docker-compose_as_supermodule.yml`
     """
     path, _ = git.get_path_from_supermodule()
+    docker_compose_path: Optional[str]
     if path != "":
         _LOG.warning("amp is a submodule")
         docker_compose_path = "docker-compose_as_submodule.yml"
@@ -1117,10 +1133,11 @@ def _get_docker_cmd(
         )
     # Print the config for debugging purpose.
     if print_docker_config:
-        docker_config_cmd = _to_multi_line_cmd(docker_config_cmd)
-        _LOG.debug("docker_config_cmd=\n%s", docker_config_cmd)
+        docker_config_cmd_as_str = _to_multi_line_cmd(docker_config_cmd)
+        _LOG.debug("docker_config_cmd=\n%s", docker_config_cmd_as_str)
         _LOG.debug(
-            "docker_config=\n%s", hsinte.system_to_string(docker_config_cmd)[1]
+            "docker_config=\n%s",
+            hsinte.system_to_string(docker_config_cmd_as_str)[1],
         )
     # Print the config for debugging purpose.
     docker_cmd_ = _to_multi_line_cmd(docker_cmd_)
@@ -2051,17 +2068,20 @@ def _parse_linter_output(txt: str) -> str:
             _LOG.debug("  -> stage='%s' (%s)", stage, result)
             continue
         # core/dataflow/nodes.py:601:9: F821 undefined name '_check_col_names'
-        m = re.search("^(\S+):(\d+)[:\d+:]\s+(.*)$", line)
+        m = re.search(r"^(\S+):(\d+)[:\d+:]\s+(.*)$", line)
         if m:
             _LOG.debug("  -> Found a lint to parse: '%s'", line)
             dbg.dassert_is_not(stage, None)
             file_name = m.group(1)
-            line = int(m.group(2))
+            line_num = int(m.group(2))
             msg = m.group(3)
             _LOG.debug(
-                "  -> file_name='%s' line=%d msg='%s'", file_name, line, msg
+                "  -> file_name='%s' line_num=%d msg='%s'",
+                file_name,
+                line_num,
+                msg,
             )
-            output.append(f"{file_name}:{line}:[{stage}] {msg}")
+            output.append(f"{file_name}:{line_num}:[{stage}] {msg}")
     # Sort to keep the lints in order of files.
     output = sorted(output)
     output_as_str = "\n".join(output)
@@ -2069,7 +2089,7 @@ def _parse_linter_output(txt: str) -> str:
 
 
 @task
-def lint(
+def lint(  # type: ignore
     ctx,
     modified=False,
     branch=False,
@@ -2080,7 +2100,7 @@ def lint(
     run_bash=False,
     run_lint=True,
     parse_lint=True,
-):  # type: ignore
+):
     """
     Lint files.
 
@@ -2256,6 +2276,7 @@ def _get_repo_full_name_from_cmd(repo: str) -> str:
     Convert the `repo` from command line (e.g., "current", "amp", "lem") to the
     repo full name.
     """
+    repo_full_name: str
     if repo == "current":
         repo_full_name = git.get_repo_full_name_from_dirname(".")
     else:
@@ -2344,7 +2365,7 @@ def gh_create_pr(  # type: ignore
     # TODO(gp): Check whether the PR already exists.
     # TODO(gp): Use _to_single_line_cmd
     cmd = (
-        f"gh pr create"
+        "gh pr create"
         + f" --repo {repo_full_name}"
         + (" --draft" if draft else "")
         + f' --title "{title}"'
