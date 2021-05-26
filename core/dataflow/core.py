@@ -4,7 +4,6 @@ import logging
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import networkx as networ
-from tqdm.autonotebook import tqdm
 
 import helpers.dbg as dbg
 import helpers.list as hlist
