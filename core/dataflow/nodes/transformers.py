@@ -459,7 +459,7 @@ class Resample(Transformer):
         resampler = csigna.resample(df, rule=self._rule, **self._resample_kwargs)
         func = getattr(resampler, self._agg_func)
         df = func(**self._agg_func_kwargs)
-        # Update info.
+        # Update `info`.
         info: collections.OrderedDict[str, Any] = collections.OrderedDict()
         info["df_transformed_info"] = get_df_info_as_string(df)
         return df, info
