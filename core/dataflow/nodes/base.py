@@ -421,31 +421,6 @@ class ColModeMixin:
         return df_out
 
 
-# Deprecated. Use `validate_df_indices()`.
-class RegFreqMixin:
-    """
-    Require input dataframe to have a well-defined frequency and unique cols.
-    """
-
-    @staticmethod
-    def _validate_input_df(df: pd.DataFrame) -> None:
-        """
-        Assert if df violates constraints, otherwise return `None`.
-        """
-        validate_df_indices(df)
-
-
-# Deprecated. Use `convert_to_list()`.
-class ToListMixin:
-    """
-    Support callables that return lists.
-    """
-
-    @staticmethod
-    def _to_list(to_list: _TO_LIST_MIXIN_TYPE) -> List[_COL_TYPE]:
-        return convert_to_list(to_list)
-
-
 # #############################################################################
 # Column processing helpers
 # #############################################################################
@@ -526,7 +501,7 @@ class SeriesToDfColProcessor:
 
     @staticmethod
     def postprocess(
-        dfs: Dict[str, pd.DataFrame],
+        dfs: Dict[Tuple[_COL_TYPE], pd.DataFrame],
         col_group: Tuple[_COL_TYPE],
     ) -> pd.DataFrame:
         """
@@ -544,7 +519,6 @@ class SeriesToDfColProcessor:
         # Perform sanity checks on dataframe.
         # TODO(*): Check non-emptiness of dict, dataframes.
         for symbol, df in dfs.items():
-            dbg.dassert_isinstance(symbol, str)
             dbg.dassert_isinstance(df, pd.DataFrame)
             dbg.dassert_no_duplicates(df.columns)
             dbg.dassert_eq(
