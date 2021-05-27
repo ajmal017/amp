@@ -27,7 +27,7 @@ _LOG = logging.getLogger(__name__)
 # TODO(gp): In the code and in the comment we mix keys, fields, modes.
 # I propose to refer to:
 # - fields as to "returns", "predictions", ...
-# - keys (or models) as to the strings model
+# - models as to the strings representing model
 
 class ModelEvaluator:
     """
@@ -56,7 +56,7 @@ class ModelEvaluator:
         TODO(gp): Clarify the timing semantic of price, volume, volatility. Is it
          at the beginning of the return interval or at the end?
 
-        :param returns: realized returns for each model
+        :param returns: realized log returns for each model
         :param predictions: returns predictions
         :param price: price of instrument
         :param volume: volume traded
@@ -75,6 +75,7 @@ class ModelEvaluator:
         #
         dbg.dassert_isinstance(returns, dict)
         self.rets = {k: returns[k] for k in self.valid_keys}
+        #
         dbg.dassert_isinstance(predictions, dict)
         self.preds = {k: predictions[k] for k in self.valid_keys}
         # TODO(gp): Factor out this common code for price, volume, and volatility.
@@ -199,8 +200,9 @@ class ModelEvaluator:
             series_dict = self.volatility
         else:
             raise ValueError(f"Unrecognized series `{series}`.")
-        # NOTE: ins/oos overlap by one point as-is (consider changing).
+        # TODO(*): ins/oos overlap by one point as-is, needs to be changed.
         if mode == "all_available":
+            # TODO(gp): keys_to_series
             series_for_keys = {k: series_dict[k] for k in keys}
         elif mode == "ins":
             series_for_keys = {
@@ -223,28 +225,31 @@ class ModelEvaluator:
         target_volatility: Optional[float] = None,
     ) -> Tuple[pd.Series, pd.Series, pd.Series]:
         """
-        Combine selected pnls.
+        Combine selected PNLs.
 
-        :param keys: Use all available if `None`
-        :param weights: Average if `None`
-        :param mode: "all_available", "ins", or "oos"
-        :param target_volatility: Rescale portfolio to achieve
-            `target_volatility` on in-sample region
-        :return: aggregate pnl stream, position stream, statistics
+        :param keys: use all available models if `None`
+        :param weights: average if `None`
+        :param mode: "ins" (default), or "oos", "all_available"
+        :param target_volatility: rescale portfolio to achieve `target_volatility`
+            on in-sample period
+        :return: aggregate PNL stream, position stream, statistics
         """
+        # Get and validate the keys.
         keys = keys or self.valid_keys
         dbg.dassert_isinstance(keys, list)
         dbg.dassert_is_subset(keys, self.valid_keys)
         mode = mode or "ins"
         # Obtain dataframe of (log) returns.
         pnl_df = self._get_series_as_df("pnls", keys, mode)
+        # TODO(gp): Should we pass a bool to indicate if the rets are log or pct?
         # Convert to pct returns before aggregating.
         pnl_df = pnl_df.apply(fin.convert_log_rets_to_pct_rets)
-        # Average by default; otherwise use supplied weights.
+        # Average by default, otherwise use supplied weights.
         weights = weights or [1 / len(keys)] * len(keys)
         dbg.dassert_eq(len(keys), len(weights))
+        # TODO(gp): -> key_to_weight. More simply `dict(zip(keys, weights))`
         col_map = {keys[idx]: weights[idx] for idx in range(len(keys))}
-        # Calculate pnl srs.
+        # Calculate PNL series.
         pnl_df = pnl_df.apply(lambda x: x * col_map[x.name]).sum(
             axis=1, min_count=1
         )
@@ -259,7 +264,7 @@ class ModelEvaluator:
         )
         pos_srs = pos_df.squeeze()
         pos_srs.name = "portfolio_pos"
-        # Maybe rescale.
+        # Maybe rescale PNL and positions.
         if target_volatility is not None:
             if mode != "ins":
                 ins_pnl_srs, _, _ = self.aggregate_models(
@@ -276,6 +281,7 @@ class ModelEvaluator:
             pnl_srs *= scale_factor
             pos_srs *= scale_factor
         # Calculate statistics.
+        # TODO(gp): Factor out `get_oos_start()` since it's used in few places.
         oos_start = None
         if mode == "all_available" and self.oos_start is not None:
             oos_start = self.oos_start
@@ -329,6 +335,7 @@ class ModelEvaluator:
         positions: Optional[pd.Series] = None,
         pnl: Optional[pd.Series] = None,
         oos_start: Optional[Any] = None,
+        # TODO(gp): The code returns a pd.Series ?
     ) -> pd.DataFrame:
         """
         Calculate stats for a single model or portfolio.
@@ -337,6 +344,7 @@ class ModelEvaluator:
             not pd.isna([pnl, positions, returns]).all(),
             "At least one series should be not `None`.",
         )
+        # Ensure that all series have the same frequency.
         freqs = {
             srs.index.freq for srs in [pnl, positions, returns] if srs is not None
         }
@@ -344,6 +352,7 @@ class ModelEvaluator:
         # Calculate stats.
         stats_dict = {}
         if pnl is not None:
+            # TODO(gp): At least use append so we don't have to count.
             stats_dict[0] = stats.summarize_sharpe_ratio(pnl)
             stats_dict[1] = stats.ttest_1samp(pnl)
             stats_dict[2] = pd.Series(
@@ -394,14 +403,15 @@ class ModelEvaluator:
         mode: str,
     ) -> pd.DataFrame:
         """
-        Return request series streams as a single dataframe.
+        Return requested series streams as a single dataframe.
 
         :param keys: stream keys
         :param mode: "all_available", "ins", or "oos"
-        :return: Dataframe of series with `keys` as columns
+        :return: dataframe of series with `keys` as columns
         """
         series_for_keys = self.get_series_dict(series, keys, mode)
         # Confirm that the streams are of the same frequency.
+        # TODO(gp): This seems a common pattern: factor it out.
         freqs = set()
         for s in series_for_keys.values():
             freq = s.index.freq
@@ -544,7 +554,7 @@ class ModelEvaluator:
 
 class PnlComputer:
     """
-    Compute PnL from returns and holdings.
+    Compute PnL from returns and positions.
     """
 
     def __init__(
@@ -553,10 +563,9 @@ class PnlComputer:
         positions: pd.Series,
     ) -> None:
         """
-        Initialize by supply returns and positions.
+        Initialize from returns and positions.
 
-        :param returns: financial returns
-        :param predictions: returns predictions (aligned with returns)
+        Parameters have the same meaning as `ModelEvaluator`.
         """
         self._validate_series(returns)
         self._validate_series(positions)
@@ -576,13 +585,14 @@ class PnlComputer:
     @staticmethod
     def _validate_series(srs: pd.Series) -> None:
         dbg.dassert_isinstance(srs, pd.Series)
+        # TODO(gp): Check strict datetime index and monotonicity.
         dbg.dassert(not srs.dropna().empty)
         dbg.dassert(srs.index.freq)
 
 
 class PositionComputer:
     """
-    Computes target positions from returns, predictions, and constraints.
+    Compute target positions from returns, predictions, and constraints.
     """
 
     def __init__(
@@ -593,17 +603,15 @@ class PositionComputer:
         oos_start: Optional[float] = None,
     ) -> None:
         """
-        Initialize by supplying returns and predictions.
+        Initialize from returns and predictions.
 
-        :param returns: financial returns
-        :param predictions: returns predictions (aligned with returns)
-        :param oos_start: optional end of in-sample/start of out-of-sample.
+        Parameters have the same meaning as `ModelEvaluator`.
         """
-        self.oos_start = oos_start
         self._validate_series(returns, self.oos_start)
-        self._validate_series(predictions, self.oos_start)
         self.returns = returns
+        self._validate_series(predictions, self.oos_start)
         self.predictions = predictions
+        self.oos_start = oos_start
 
     def compute_positions(
         self,
@@ -617,15 +625,17 @@ class PositionComputer:
         Compute positions from returns and predictions.
 
         :param target_volatility: generate positions to achieve target
-            volatility on in-sample region.
+            volatility on in-sample region
         :param mode: "all_available", "ins", or "oos"
-        :param prediction_strategy: "raw", "kernel", "squash"
+        :param prediction_strategy: "raw" (default), "kernel", "squash"
         :param volatility_strategy: "rescale", "rolling" (not yet implemented)
         :return: series of positions
         """
         mode = mode or "ins"
         # Process/adjust predictions.
         prediction_strategy = prediction_strategy or "raw"
+        # TODO(gp): Ok to experiment with modulation here, but it's a bit mixing
+        #  responsibilities between running experiments and evaluation.
         if prediction_strategy == "raw":
             predictions = self.predictions.copy()
         elif prediction_strategy == "kernel":
@@ -649,8 +659,8 @@ class PositionComputer:
             volatility_strategy=volatility_strategy,
         )
 
+    @staticmethod
     def _multiply_kernel(
-        self,
         predictions: pd.Series,
         tau: float,
         delay: int,
@@ -667,14 +677,16 @@ class PositionComputer:
         adjusted_preds = zscored_preds.multiply(scale_factors)
         return adjusted_preds
 
+    @staticmethod
     def _squash(
-        self,
         predictions: pd.Series,
         tau: float,
         delay: int,
         scale: float,
     ) -> pd.Series:
-
+        """
+        Z-score prediction and apply a squashing function (e.g., tanh).
+        """
         zscored_preds = sigp.compute_rolling_zscore(
             predictions, tau=tau, delay=delay
         )
@@ -684,16 +696,12 @@ class PositionComputer:
         self,
         predictions: pd.Series,
         target_volatility: float,
+        # TODO(gp): mode -> period_mode to be more clear?
         mode: str,
         volatility_strategy: str,
     ) -> pd.Series:
         """
-
-        :param predictions:
-        :param target_volatility:
-        :param mode:
-        :param volatility_strategy:
-        :return:
+        Rescale positions targeting the desired volatility.
         """
         # Compute PnL by interpreting predictions as positions.
         pnl_computer = PnlComputer(self.returns, predictions)
@@ -711,6 +719,7 @@ class PositionComputer:
         else:
             raise ValueError(f"Unrecognized strategy `{volatility_strategy}`!")
 
+    # TODO(gp): _extract_srs_based_on_mode ?
     def _return_srs(self, srs: pd.Series, mode: str) -> pd.Series:
         if mode == "ins":
             return srs[: self.oos_start]
@@ -725,6 +734,7 @@ class PositionComputer:
         else:
             raise ValueError(f"Invalid mode `{mode}`!")
 
+    # TODO(gp): This is common to most of the code here, so we can just factor it out.
     @staticmethod
     def _validate_series(srs: pd.Series, oos_start: Optional[float]) -> None:
         dbg.dassert_isinstance(srs, pd.Series)
@@ -737,7 +747,7 @@ class PositionComputer:
 
 class TransactionCostModeler:
     """
-    Estimates transaction costs.
+    Estimate transaction costs.
     """
 
     def __init__(
@@ -765,12 +775,14 @@ class TransactionCostModeler:
         mode = mode or "ins"
         tick_size = tick_size or 0.01
         spread_pct = spread_pct or 0.5
+        # Transform the spread into a "negative return".
         spread = tick_size / self.price
         position_changes = np.abs(self.positions.diff())
         transaction_costs = spread_pct * spread.multiply(position_changes)
         transaction_costs.name = "transaction_costs"
         return self._return_srs(transaction_costs, mode=mode)
 
+    # TODO(gp): Same as above.
     def _return_srs(self, srs: pd.Series, mode: str) -> pd.Series:
         if mode == "ins":
             return srs[: self.oos_start]
@@ -785,6 +797,7 @@ class TransactionCostModeler:
         else:
             raise ValueError(f"Invalid mode `{mode}`!")
 
+    # TODO(gp): Same as above.
     @staticmethod
     def _validate_series(srs: pd.Series, oos_start: Optional[float]) -> None:
         dbg.dassert_isinstance(srs, pd.Series)
