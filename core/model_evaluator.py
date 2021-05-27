@@ -4,6 +4,7 @@ Import as:
 import core.model_evaluator as modeval
 """
 
+# TODO(gp): Is this still needed with Python 3.9?
 from __future__ import annotations
 
 import functools
@@ -23,14 +24,22 @@ import helpers.dbg as dbg
 _LOG = logging.getLogger(__name__)
 
 
+# TODO(gp): In the code and in the comment we mix keys, fields, modes.
+# I propose to refer to:
+# - fields as to "returns", "predictions", ...
+# - keys (or models) as to the strings model
+
 class ModelEvaluator:
     """
-    Evaluates performance of financial models for returns.
+    Evaluate performance of financial models for returns.
+
+    Each model is identified by a key string.
     """
 
     def __init__(
         self,
         *,
+        # TODO(gp): Any -> str?
         returns: Dict[Any, pd.Series],
         predictions: Dict[Any, pd.Series],
         price: Optional[Dict[Any, pd.Series]] = None,
@@ -40,62 +49,78 @@ class ModelEvaluator:
         oos_start: Optional[Any] = None,
     ) -> None:
         """
-        Initialize by supplying returns and predictions.
+        Initialize by supplying returns and predictions for all the models.
 
-        :param returns: financial returns
-        :param predictions: returns predictions (aligned with returns)
+        All the data relative to an interval (e.g., returns, predictions) should be
+        aligned with the `returns`.
+        TODO(gp): Clarify the timing semantic of price, volume, volatility. Is it
+         at the beginning of the return interval or at the end?
+
+        :param returns: realized returns for each model
+        :param predictions: returns predictions
         :param price: price of instrument
         :param volume: volume traded
-        :param volatility: returns volatility (used for adjustment)
-        :param target_volatility: generate positions to achieve target
-            volatility on in-sample region.
-        :param oos_start: optional end of in-sample/start of out-of-sample.
+        :param volatility: returns volatility
+        :param target_volatility: modulate positions to achieve target volatility
+            on in-sample region
+        :param oos_start: optional end of in-sample/start of out-of-sample period
+            - None (default): means all period is in-sample
         """
-        dbg.dassert_isinstance(returns, dict)
-        dbg.dassert_isinstance(predictions, dict)
+        # Compute the shared keys among all the models.
+        # TODO(gp): valid -> shared (or common)?
         self.oos_start = oos_start or None
         self.valid_keys = self._get_valid_keys(
             returns, predictions, self.oos_start
         )
+        #
+        dbg.dassert_isinstance(returns, dict)
         self.rets = {k: returns[k] for k in self.valid_keys}
+        dbg.dassert_isinstance(predictions, dict)
         self.preds = {k: predictions[k] for k in self.valid_keys}
+        # TODO(gp): Factor out this common code for price, volume, and volatility.
         self.price = None
-        self.volume = None
-        self.volatility = None
-        self.slippage = None
         if price is not None:
             keys = self._get_valid_keys(returns, price, self.oos_start)
             dbg.dassert(set(self.valid_keys) == set(keys))
             self.price = {k: price[k] for k in self.valid_keys}
+        #
+        self.volume = None
         if volume is not None:
             keys = self._get_valid_keys(returns, volume, self.oos_start)
             dbg.dassert(set(self.valid_keys) == set(keys))
             self.volume = {k: volume[k] for k in self.valid_keys}
+        #
+        self.volatility = None
         if volatility is not None:
             keys = self._get_valid_keys(returns, volatility, self.oos_start)
             dbg.dassert(set(self.valid_keys) == set(keys))
             self.volatility = {k: volatility[k] for k in self.valid_keys}
+        #
         self.target_volatility = target_volatility or None
-        # Calculate positions
+        # Calculate positions.
         self.pos = self._calculate_positions()
         # Calculate pnl streams.
         self.pnls = self._calculate_pnls(self.rets, self.pos)
+        # TODO(gp): Define slippage, also it doesn't seem to be used.
+        self.slippage = None
 
     def dump_json(self) -> str:
         """
-        Dump `ModelEvaluator` instance to json.
+        Dump `ModelEvaluator` instance to JSON.
 
         Implementation details:
           - series' indices are converted to `str`. This way they can be easily
             restored
           - if `self.oos_start` is `None`, it is saved as is. Otherwise, it is
             converted to `str`
-        :return: json with "returns", "predictions", "price", "volume",
+        :return: JSON dict with "returns", "predictions", "price", "volume",
             "volatility", "target_volatility", "oos_start" fields
         """
+        # Handle `oos_start`.
         oos_start = self.oos_start
         if oos_start is not None:
             oos_start = str(oos_start)
+        # Build JSON dictionary of serialized data.
         json_dict = {
             "returns": self._dump_series_dict_to_json_dict(self.rets),
             "predictions": self._dump_series_dict_to_json_dict(self.preds),
@@ -108,28 +133,36 @@ class ModelEvaluator:
         json_str = json.dumps(json_dict, indent=4)
         return json_str
 
+    # TODO(gp): keys_to_int -> cast_keys_to_int ?
     @classmethod
     def load_json(cls, json_str: str, keys_to_int: bool = True) -> ModelEvaluator:
         """
-        Load `ModelEvaluator` instance from json.
+        Load `ModelEvaluator` instance from JSON.
 
         :param json_str: the output of `ModelEvaluator.dump_json`
         :param keys_to_int: if `True`, convert dict keys to `int`
         :return: `ModelEvaluator` instance
         """
+        # Load raw data.
         json_dict = json.loads(json_str)
+        # TODO(gp): Check that the keys are all and only the expected ones.
+        # Deserialize the expected time series.
         for key in ["returns", "predictions", "price", "volume", "volatility"]:
+            dbg.dassert_in(key, json_dict)
             json_dict[key] = cls._load_series_dict_from_json_dict(
                 json_dict[key], keys_to_int=keys_to_int
             )
+        # Handle `oos_start`.
         if json_dict["oos_start"] is not None:
             json_dict["oos_start"] = pd.Timestamp(json_dict["oos_start"])
+        # Build the object.
         model_evaluator = cls(**json_dict)
         return model_evaluator
 
     # TODO(*): Consider exposing positions / returns in the same way.
     def get_series_dict(
         self,
+        # TODO(gp): series -> srs_name, since it's the name and not the actual series.
         series: str,
         keys: Optional[List[Any]] = None,
         mode: Optional[str] = None,
@@ -384,8 +417,7 @@ class ModelEvaluator:
         """
         Calculate positions from returns and predictions.
 
-        Rescales to target volatility over in-sample period (if
-        provided).
+        Rescales to target volatility over in-sample period (if provided).
         """
         position_dict = {}
         for key in tqdm(self.valid_keys):
@@ -419,19 +451,22 @@ class ModelEvaluator:
             pnls[key] = pnl
         return pnls
 
+    @staticmethod
     def _get_valid_keys(
-        self,
         dict1: Dict[Any, pd.Series],
         dict2: Dict[Any, pd.Series],
         oos_start: Optional[float],
-    ) -> list:
+    ) -> List:
         """
         Perform basic sanity checks.
+
+        :return: list of shared keys
         """
-        dict1_keys = set(self._get_valid_keys_helper(dict1, oos_start))
-        dict2_keys = set(self._get_valid_keys_helper(dict2, oos_start))
+        dict1_keys = set(ModelEvaluator._get_valid_keys_helper(dict1, oos_start))
+        dict2_keys = set(ModelEvaluator._get_valid_keys_helper(dict2, oos_start))
         shared_keys = dict1_keys.intersection(dict2_keys)
         dbg.dassert(shared_keys, msg="Set of valid keys must be nonempty!")
+        # Check that the shared keys have the same frequency.
         for key in shared_keys:
             dbg.dassert_eq(dict1[key].index.freq, dict2[key].index.freq)
         return list(shared_keys)
@@ -463,6 +498,7 @@ class ModelEvaluator:
             valid_keys.append(k)
         return valid_keys
 
+    # TODO(gp): Consider moving this to `helpers/pandas_helpers` since it's general.
     @staticmethod
     def _dump_series_to_json(srs: pd.Series) -> str:
         srs = srs.copy()
@@ -508,7 +544,7 @@ class ModelEvaluator:
 
 class PnlComputer:
     """
-    Computes PnL from returns and holdings.
+    Compute PnL from returns and holdings.
     """
 
     def __init__(
