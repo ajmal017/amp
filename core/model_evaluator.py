@@ -25,9 +25,9 @@ _LOG = logging.getLogger(__name__)
 
 
 # TODO(gp): In the code and in the comment we mix keys, fields, modes.
-# I propose to refer to:
-# - fields as to "returns", "predictions", ...
-# - models as to the strings representing model
+# I propose to refer as to:
+# - "fields" for "returns", "predictions", ...
+# - "model_keys" (or "models" or "keys") as to the strings representing model
 
 class ModelEvaluator:
     """
