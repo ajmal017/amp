@@ -70,6 +70,7 @@ def get_configs_from_builder(config_builder: str) -> List[cfg.Config]:
     :param config_builder: full Python command to create the configs.
         E.g., `nlp.build_configs.build_PTask1088_configs()`
     """
+    _LOG.info("Executing function '%s'", config_builder)
     # config_builder looks like:
     #   "nlp.build_configs.build_PTask1088_configs()"
     m = re.match(r"^(\S+)\.(\S+)\((.*)\)$", config_builder)
@@ -90,9 +91,12 @@ def get_configs_from_builder(config_builder: str) -> List[cfg.Config]:
     dbg.dassert_is_not(configs, None)
     # Cast to the right type.
     configs = cast(List[cfg.Config], configs)
+    # TODO(gp): -> validate_configs
     dbg.dassert_isinstance(configs, list)
     for c in configs:
         dbg.dassert_isinstance(c, cfg.Config)
+    #
+    cfgb.assert_on_duplicated_configs(configs)
     return configs
 
 
@@ -131,6 +135,48 @@ def get_config_from_env() -> Optional[cfg.Config]:
         config = None
     return config
 
+
+def select_config(
+        configs: List[cfg.Config], index: int, start_from_index: int
+) -> List[cfg.Config]:
+    """
+    Select configs to run from a list of configs.
+
+    :param configs: a list of configs
+    :param index: index of a config to execute
+    :param start_from_index: index of a config to start execution with
+    :return: a list of configs to execute
+    """
+    if index:
+        ind = int(index)
+        dbg.dassert_lte(0, ind)
+        dbg.dassert_lt(ind, len(configs))
+        _LOG.warning(
+            "Only config %s will be executed due to passing --index", ind
+        )
+        if "id" in configs[0]["meta"].to_dict():
+            # Select a config based on the id parameter if it exists.
+            configs = [x for x in configs if int(x[("meta", "id")]) == ind]
+        else:
+            # Otherwise use index to select a config.
+            configs = [x for i, x in enumerate(configs) if i == ind]
+    elif start_from_index:
+        start_from_index = int(start_from_index)
+        dbg.dassert_lte(0, start_from_index)
+        dbg.dassert_lt(start_from_index, len(configs))
+        _LOG.warning(
+            "Only configs %s and higher will be executed due to passing --start_from_index",
+            start_from_index,
+        )
+        if "id" in configs[0]["meta"].to_dict():
+            # Select configs based on the id parameter if it exists.
+            configs = [
+                x for x in configs if int(x[("meta", "id")]) >= start_from_index
+            ]
+        else:
+            # Otherwise use index to select configs.
+            configs = [x for i, x in enumerate(configs) if i >= start_from_index]
+    _LOG.info("Created %s config(s)", len(configs))
 
 # #############################################################################
 

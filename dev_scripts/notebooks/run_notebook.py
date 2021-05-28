@@ -75,9 +75,9 @@ def _run_notebook(
     # If there is already a success file in the dir, skip the experiment.
     file_name = os.path.join(experiment_result_dir, "success.txt")
     if os.path.exists(file_name):
-        _LOG.warning("Found file '%s': skipping simulation run", file_name)
+        _LOG.warning("Found file '%s': skipping run %d", file_name, i)
         return
-    # Generate book-keeping files.
+    # Prepare book-keeping files.
     file_name = os.path.join(experiment_result_dir, "config.pkl")
     _LOG.info("file_name=%s", file_name)
     hpickle.to_pickle(config, file_name)
@@ -92,17 +92,17 @@ def _run_notebook(
         file_name,
         "Config builder: %s\nConfig index: %s" % (config_builder, str(i)),
     )
-    #
+    # Prepare the destination file.
     dst_file = os.path.join(
         experiment_result_dir,
         os.path.basename(notebook_file).replace(".ipynb", ".%s.ipynb" % i),
     )
-    _LOG.info(dst_file)
+    _LOG.info("dst_file=%s", dst_file)
     dst_file = os.path.abspath(dst_file)
     log_file = os.path.join(experiment_result_dir, "run_notebook.%s.log" % i)
     log_file = os.path.abspath(os.path.abspath(log_file))
     # Execute notebook.
-    _LOG.info("Executing notebook %s", i)
+    _LOG.info("Executing notebook %d", i)
     # Export config function and its id to the notebook.
     cmd = (
         f'export __CONFIG_BUILDER__="{config_builder}"; '
@@ -161,73 +161,6 @@ def _run_notebook(
     _LOG.info("file_name=%s", file_name)
     io_.to_file(file_name, "")
     return rc
-
-
-def select_config(
-    configs: List[cfg.Config], index: int, start_from_index: int, dry_run: bool
-) -> List[cfg.Config]:
-    """
-    From a list of configs select configs to run.
-
-    :param configs: a list of configs
-    :param index: index of a config to execute
-    :param start_from_index: index of a config to start execution with
-    :param dry_run: do not run configs if True
-    :return: a list of configs to execute
-    """
-    if index:
-        ind = int(index)
-        dbg.dassert_lte(0, ind)
-        dbg.dassert_lt(ind, len(configs))
-        _LOG.warning(
-            "Only config %s will be executed due to passing --index", ind
-        )
-        if "id" in configs[0]["meta"].to_dict():
-            # Select a config based on the id parameter if it exists.
-            configs = [x for x in configs if int(x[("meta", "id")]) == ind]
-        else:
-            # Otherwise use index to select a config.
-            configs = [x for i, x in enumerate(configs) if i == ind]
-    elif start_from_index:
-        start_from_index = int(start_from_index)
-        dbg.dassert_lte(0, start_from_index)
-        dbg.dassert_lt(start_from_index, len(configs))
-        _LOG.warning(
-            "Only configs %s and higher will be executed due to passing --start_from_index",
-            start_from_index,
-        )
-        if "id" in configs[0]["meta"].to_dict():
-            # Select configs based on the id parameter if it exists.
-            configs = [
-                x for x in configs if int(x[("meta", "id")]) >= start_from_index
-            ]
-        else:
-            # Otherwise use index to select configs.
-            configs = [x for i, x in enumerate(configs) if i >= start_from_index]
-    _LOG.info("Created %s config(s)", len(configs))
-    if dry_run:
-        _LOG.warning(
-            "The following configs will not be executed due to passing --dry_run:"
-        )
-        for i, config in enumerate(configs):
-            print("config_%s:\n %s", i, config)
-        sys.exit(0)
-    return configs
-
-
-def get_configs_from_builder(config_builder: str) -> List[cfg.Config]:
-    """
-    Generate configs using a config building function.
-
-    :param config_builder: a config building function
-    :return: a list of configs
-    """
-    _LOG.info("Executing function '%s'", config_builder)
-    configs = cfgb.get_configs_from_builder(config_builder)
-    #
-    dbg.dassert_isinstance(configs, list)
-    cfgb.assert_on_duplicated_configs(configs)
-    return configs
 
 
 def _parse() -> argparse.ArgumentParser:
@@ -317,14 +250,22 @@ def _main(parser: argparse.ArgumentParser) -> None:
     configs = cfgb.add_result_dir(dst_dir, configs)
     configs = cfgb.add_config_idx(configs)
     # Select the configs.
-    configs = select_config(
+    configs = ccbuilders.select_config(
         configs, args.index, args.start_from_index, args.dry_run
     )
     #
+    if dry_run:
+        _LOG.warning(
+            "The following configs will not be executed due to passing --dry_run:"
+        )
+        for i, config in enumerate(configs):
+            print("config_%s:\n %s", i, config)
+        sys.exit(0)
+    # Get the notebook file.
     notebook_file = args.notebook
     notebook_file = os.path.abspath(notebook_file)
     dbg.dassert_exists(notebook_file)
-    #
+    # Parse command-line options.
     num_attempts = args.num_attempts
     abort_on_error = not args.skip_on_error
     publish = args.publish_notebook
