@@ -63,9 +63,12 @@ def get_config_from_nested_dict(nested: Dict[str, Any]) -> cfg.Config:
     return get_config_from_flattened(flattened)
 
 
+# #########################################################################
+
+
 def get_configs_from_builder(config_builder: str) -> List[cfg.Config]:
     """
-    Execute python code to.
+    Execute Python code `config_builder` to build configs.
 
     :param config_builder: full Python command to create the configs.
         E.g., `nlp.build_configs.build_PTask1088_configs()`
@@ -75,6 +78,7 @@ def get_configs_from_builder(config_builder: str) -> List[cfg.Config]:
     #   "nlp.build_configs.build_PTask1088_configs()"
     m = re.match(r"^(\S+)\.(\S+)\((.*)\)$", config_builder)
     dbg.dassert(m, "config_builder='%s'", config_builder)
+    # TODO(gp): Fix this.
     m = cast(re.Match, m)
     import_, function, args = m.groups()
     _LOG.debug("import=%s", import_)
@@ -90,6 +94,7 @@ def get_configs_from_builder(config_builder: str) -> List[cfg.Config]:
     configs: List[cfg.Config] = eval(python_code)
     dbg.dassert_is_not(configs, None)
     # Cast to the right type.
+    # TODO(gp): Is this needed?
     configs = cast(List[cfg.Config], configs)
     # TODO(gp): -> validate_configs
     dbg.dassert_isinstance(configs, list)
@@ -102,13 +107,12 @@ def get_configs_from_builder(config_builder: str) -> List[cfg.Config]:
 
 def get_config_from_env() -> Optional[cfg.Config]:
     """
-    Build a config passed through an environment variable, if possible, or
-    return None.
+    Build a config passed through environment vars, if possible, or return None.
     """
     config_vars = ["__CONFIG_BUILDER__", "__CONFIG_IDX__", "__CONFIG_DST_DIR__"]
     # Check the existence of any config var in env.
     if any(var in os.environ for var in config_vars):
-        _LOG.warning("Found some config vars in environment")
+        _LOG.warning("Found config vars in environment")
         if all(var in os.environ for var in config_vars):
             # Build all the configs.
             config_builder = os.environ["__CONFIG_BUILDER__"]
@@ -138,7 +142,7 @@ def get_config_from_env() -> Optional[cfg.Config]:
 
 
 def select_config(
-        configs: List[cfg.Config], index: int, start_from_index: int
+    configs: List[cfg.Config], index: int, start_from_index: int
 ) -> List[cfg.Config]:
     """
     Select configs to run from a list of configs.
@@ -178,6 +182,72 @@ def select_config(
             # Otherwise use index to select configs.
             configs = [x for i, x in enumerate(configs) if i >= start_from_index]
     _LOG.info("Created %s config(s)", len(configs))
+
+
+def add_result_dir(dst_dir: str, configs: List[cfg.Config]) -> List[cfg.Config]:
+    """
+    Add a result directory field to all configs in list.
+
+    :param dst_dir: Location of output directory
+    :param configs: List of configs for experiments
+    :return: List of copied configs with result directories added
+    """
+    # TODO(*): To be defensive maybe we should assert if the param already exists.
+    configs_with_dir = []
+    for config in configs:
+        config_with_dir = config.copy()
+        config_with_dir[("meta", "result_dir")] = dst_dir
+        configs_with_dir.append(config_with_dir)
+    return configs_with_dir
+
+
+# TODO(*): What is "the config id"? Why does my config have a `meta`? And why
+#  would this ever depend upon the order in which the configs appear in a
+#  list?
+def add_config_idx(configs: List[cfg.Config]) -> List[cfg.Config]:
+    """
+    Add the config id as parameter.
+
+    :param configs: List of configs for experiments
+    :return: List of copied configs with added ids
+    """
+    configs_idx = []
+    for i, config in enumerate(configs):
+        config_with_id = config.copy()
+        config_with_id[("meta", "id")] = i
+        configs_idx.append(config_with_id)
+    return configs_idx
+
+
+def set_experiment_result_dir(dst_dir: str, config: cfg.Config) -> cfg.Config:
+    """
+    Set path to the experiment results file.
+
+    :param dst_dir: Subdirectory with simulation results
+    :param config: Config used for simulation
+    :return: Config with absolute file path to results
+    """
+    config_with_filepath = config.copy()
+    config_with_filepath[("meta", "experiment_result_dir")] = dst_dir
+    return config_with_filepath
+
+
+def prepare_configs(config_builder, index, start_from_index):
+    # TODO(gp): -> utils.prepare_configs
+    # Build the configs from the builder.
+    configs = cfgb.get_configs_from_builder(config_builder)
+    # Patch the configs with extra information as a way to communicate
+    # with the notebook.
+    # TODO(gp): This can be patched inside the loop, then we can even
+    #  unify the code to create the config inside/outside the notebook.
+    configs = cfgb.add_result_dir(dst_dir, configs)
+    configs = cfgb.add_config_idx(configs)
+    # Select the configs.
+    configs = ccbuilders.select_config(
+        configs, index, start_from_index,
+    )
+    return configs
+
 
 # #############################################################################
 
@@ -313,57 +383,6 @@ def get_configs_dataframe(
         dbg.dassert_is_subset(params_subset, config_df.columns)
         config_df = config_df[params_subset]
     return config_df
-
-
-# #############################################################################
-
-
-def add_result_dir(dst_dir: str, configs: List[cfg.Config]) -> List[cfg.Config]:
-    """
-    Add a result directory field to all configs in list.
-
-    :param dst_dir: Location of output directory
-    :param configs: List of configs for experiments
-    :return: List of copied configs with result directories added
-    """
-    # TODO(*): To be defensive maybe we should assert if the param already exists.
-    configs_with_dir = []
-    for config in configs:
-        config_with_dir = config.copy()
-        config_with_dir[("meta", "result_dir")] = dst_dir
-        configs_with_dir.append(config_with_dir)
-    return configs_with_dir
-
-
-# TODO(*): What is "the config id"? Why does my config have a `meta`? And why
-#  would this ever depend upon the order in which the configs appear in a
-#  list?
-def add_config_idx(configs: List[cfg.Config]) -> List[cfg.Config]:
-    """
-    Add the config id as parameter.
-
-    :param configs: List of configs for experiments
-    :return: List of copied configs with added ids
-    """
-    configs_idx = []
-    for i, config in enumerate(configs):
-        config_with_id = config.copy()
-        config_with_id[("meta", "id")] = i
-        configs_idx.append(config_with_id)
-    return configs_idx
-
-
-def set_experiment_result_dir(dst_dir: str, config: cfg.Config) -> cfg.Config:
-    """
-    Set path to the experiment results file.
-
-    :param dst_dir: Subdirectory with simulation results
-    :param config: Config used for simulation
-    :return: Config with absolute file path to results
-    """
-    config_with_filepath = config.copy()
-    config_with_filepath[("meta", "experiment_result_dir")] = dst_dir
-    return config_with_filepath
 
 
 # #############################################################################

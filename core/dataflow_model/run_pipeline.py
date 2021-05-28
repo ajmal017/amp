@@ -33,22 +33,28 @@ _LOG = logging.getLogger(__name__)
 # #############################################################################
 
 
+def _get_pipeline_from_builder(pipeline_build: str):
+    # TODO(gp): Similar to get_configs_from_builder
+    # It should have a signature like:
+    # config_builder, index, start_from_index, verbosity
+    pass
+
+
 def _run_pipeline(
         i: int,
-        notebook_file: str,
+        pipeline_builder: str,
         dst_dir: str,
         config: cfg.Config,
         config_builder: str,
         num_attempts: int,
         abort_on_error: bool,
-        publish: bool,
 ) -> Optional[int]:
     """
     Run a pipeline for a specific `Config`.
 
-    The `config_builder` is passed inside the notebook to generate a list
-    of all configs to be run as part of a series of experiments, but only the
-    `i`-th config is run inside a particular notebook.
+    The `config_builder` is passed inside the notebook to generate a list of all
+    configs to be run as part of a series of experiments, but only the `i`-th config
+    is run inside a particular notebook.
 
     :param i: index of config to select in a list of configs
     :param notebook_file: path to file with experiment template
@@ -62,105 +68,33 @@ def _run_pipeline(
     :return: if notebook is skipped ("success.txt" file already exists), return
         `None`; otherwise, return `rc`
     """
-    dbg.dassert_file_exists(notebook_file)
-    dbg.dassert_isinstance(config, cfg.Config)
-    dbg.dassert_dir_exists(dst_dir)
-    # Create subdirectory structure for simulation results.
-    result_subdir = "result_%s" % i
-    html_subdir_name = os.path.join(os.path.basename(dst_dir), result_subdir)
-    experiment_result_dir = os.path.join(dst_dir, result_subdir)
-    config = cfgb.set_experiment_result_dir(experiment_result_dir, config)
-    _LOG.info("experiment_result_dir=%s", experiment_result_dir)
-    io_.create_dir(experiment_result_dir, incremental=True)
-    # If there is already a success file in the dir, skip the experiment.
-    file_name = os.path.join(experiment_result_dir, "success.txt")
-    if os.path.exists(file_name):
-        _LOG.warning("Found file '%s': skipping run %d", file_name, i)
-        return
-    # Prepare book-keeping files.
-    file_name = os.path.join(experiment_result_dir, "config.pkl")
-    _LOG.info("file_name=%s", file_name)
-    hpickle.to_pickle(config, file_name)
+    dbg.dassert_eq(1, num_attempts, "Multiple attempts not supported yet")
+    cdtfut.setup_experiment(config, dst_dir, i)
+
+    # Execute experiment.
+    _LOG.info("Executing experiment %d", i)
     #
-    file_name = os.path.join(experiment_result_dir, "config.txt")
-    _LOG.info("file_name=%s", file_name)
-    io_.to_file(file_name, str(config))
-    #
-    file_name = os.path.join(experiment_result_dir, "config_builder.txt")
-    _LOG.info("file_name=%s", file_name)
-    io_.to_file(
-        file_name,
-        "Config builder: %s\nConfig index: %s" % (config_builder, str(i)),
-        )
-    # Prepare the destination file.
-    dst_file = os.path.join(
-        experiment_result_dir,
-        os.path.basename(notebook_file).replace(".ipynb", ".%s.ipynb" % i),
-    )
-    _LOG.info("dst_file=%s", dst_file)
-    dst_file = os.path.abspath(dst_file)
-    log_file = os.path.join(experiment_result_dir, "run_notebook.%s.log" % i)
+    log_file = os.path.join(experiment_result_dir, "run_pipeline.%s.log" % i)
     log_file = os.path.abspath(os.path.abspath(log_file))
-    # Execute notebook.
-    _LOG.info("Executing notebook %d", i)
-    # Export config function and its id to the notebook.
-    cmd = (
-            f'export __CONFIG_BUILDER__="{config_builder}"; '
-            + f'export __CONFIG_IDX__="{i}"; '
-            + f'export __CONFIG_DST_DIR__="{experiment_result_dir}"'
-    )
-    cmd += (
-            f"; jupyter nbconvert {notebook_file} "
-            + " --execute"
-            + " --to notebook"
-            + f" --output {dst_file}"
-            + " --ExecutePreprocessor.kernel_name=python"
-            +
-            # https://github.com/ContinuumIO/anaconda-issues/issues/877
-            " --ExecutePreprocessor.timeout=-1"
-    )
-    # Try running the notebook up to `num_attempts` times.
-    dbg.dassert_lte(1, num_attempts)
-    rc = -1
-    for n in range(1, num_attempts + 1):
-        if n > 1:
-            _LOG.warning(
-                "Attempting to re-run the notebook for the %d / %d time after "
-                "rc='%s'",
-                n - 1,
-                num_attempts,
-                rc,
-                )
-        # Possibly abort on the last attempt.
-        is_last_attempt = n == num_attempts
-        abort_on_error_curr = is_last_attempt and abort_on_error
-        rc = si.system(
-            cmd, output_file=log_file, abort_on_error=abort_on_error_curr
-        )
-        if rc == 0:
-            break
+    rc = 0
+    pipeline_runner = _get_pipeline_runner_from_builder(pipeline_builder)
+    try:
+        pipeline_runner()
+    except RunTimeError as e:
+        _LOG.error("Error: %s", str(e))
+        rc = -1
     if not abort_on_error and rc != 0:
         _LOG.error(
             "Execution failed for experiment `%s`. "
             "Continuing execution for next experiments.",
             i,
         )
-    # Convert to html and publish.
-    if publish:
-        _LOG.info("Converting notebook %s", i)
-        log_file = log_file.replace(".log", ".html.log")
-        cmd = (
-                "python amp/dev_scripts/notebooks/publish_notebook.py"
-                + f" --file {dst_file}"
-                + f" --subdir {html_subdir_name}"
-                + " --action publish"
-        )
-        si.system(cmd, output_file=log_file)
     # Publish an empty file to indicate a successful finish.
     file_name = os.path.join(experiment_result_dir, "success.txt")
     _LOG.info("file_name=%s", file_name)
     io_.to_file(file_name, "")
     return rc
+
 
 
 def _parse() -> argparse.ArgumentParser:
@@ -183,20 +117,16 @@ def _parse() -> argparse.ArgumentParser:
 def _main(parser: argparse.ArgumentParser) -> None:
     args = parser.parse_args()
     dbg.init_logger(verbosity=args.log_level, use_exec_path=True)
-    #
+    # Create the dst dir.
     dst_dir = os.path.abspath(args.dst_dir)
     io_.create_dir(dst_dir, incremental=not args.no_incremental)
+
     config_builder = args.function
-    # Build the configs from the builder.
-    configs = get_configs_from_builder(config_builder)
-    # Patch the configs.
-    configs = cfgb.add_result_dir(dst_dir, configs)
-    configs = cfgb.add_config_idx(configs)
-    # Select the configs.
-    configs = ccbuilders.select_config(
-        configs, args.index, args.start_from_index,
-    )
-    #
+    index = args.index
+    start_from_index = args.start_from_index
+    ccbuilders.prepare_configs(config_builder, index, start_from_index)
+
+    # Handle --dry_run, if needed.
     if dry_run:
         _LOG.warning(
             "The following configs will not be executed due to passing --dry_run:"
@@ -204,10 +134,10 @@ def _main(parser: argparse.ArgumentParser) -> None:
         for i, config in enumerate(configs):
             print("config_%s:\n %s", i, config)
         sys.exit(0)
-    # Get the notebook file.
-    notebook_file = args.notebook
-    notebook_file = os.path.abspath(notebook_file)
-    dbg.dassert_exists(notebook_file)
+
+    # Get the file with the pipeline to run.
+    pipeline_file = os.path.abspath(args.pipeline)
+    dbg.dassert_exists(pipeline_file)
     # Parse command-line options.
     num_attempts = args.num_attempts
     abort_on_error = not args.skip_on_error
@@ -220,7 +150,7 @@ def _main(parser: argparse.ArgumentParser) -> None:
             i = int(config[("meta", "id")])
             _LOG.debug("\n%s", printing.frame("Config %s" % i))
             #
-            rc = _run_notebook(
+            rc = _run_pipeline(
                 i,
                 notebook_file,
                 dst_dir,

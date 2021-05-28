@@ -65,42 +65,45 @@ def _run_notebook(
         `None`; otherwise, return `rc`
     """
     dbg.dassert_file_exists(notebook_file)
-    # TODO(gp): Move all this to -> create_experiment_info()
-    dbg.dassert_isinstance(config, cfg.Config)
-    # TODO(gp): Can we just create instead of asserting?
-    dbg.dassert_dir_exists(dst_dir)
 
-    # Create subdirectory structure for experiment results.
-    result_subdir = "result_%s" % i
-    experiment_result_dir = os.path.join(dst_dir, result_subdir)
-    _LOG.info("experiment_result_dir=%s", experiment_result_dir)
-    # If there is already a success file in the dir, skip the experiment.
-    file_name = os.path.join(experiment_result_dir, "success.txt")
-    if os.path.exists(file_name):
-        _LOG.warning("Found file '%s': skipping run %d", file_name, i)
-        return
-    io_.create_dir(experiment_result_dir, incremental=True)
+    # # TODO(gp): Move all this to -> create_experiment_info()
+    # dbg.dassert_isinstance(config, cfg.Config)
+    # # TODO(gp): Can we just create instead of asserting?
+    # dbg.dassert_dir_exists(dst_dir)
+    #
+    # # Create subdirectory structure for experiment results.
+    # result_subdir = "result_%s" % i
+    # experiment_result_dir = os.path.join(dst_dir, result_subdir)
+    # _LOG.info("experiment_result_dir=%s", experiment_result_dir)
+    # # If there is already a success file in the dir, skip the experiment.
+    # file_name = os.path.join(experiment_result_dir, "success.txt")
+    # if os.path.exists(file_name):
+    #     _LOG.warning("Found file '%s': skipping run %d", file_name, i)
+    #     return
+    # io_.create_dir(experiment_result_dir, incremental=True)
+    #
+    # # Inject the experiment result dir inside the config.
+    # # TODO(gp): This operation is also performed on the notebook side
+    # #  in `get_config_from_env()`. Find a better way to achieve this.
+    # config = cfgb.set_experiment_result_dir(experiment_result_dir,
+    #                                         config)
+    # # Prepare book-keeping files.
+    # file_name = os.path.join(experiment_result_dir, "config.pkl")
+    # _LOG.info("file_name=%s", file_name)
+    # hpickle.to_pickle(config, file_name)
+    # #
+    # file_name = os.path.join(experiment_result_dir, "config.txt")
+    # _LOG.info("file_name=%s", file_name)
+    # io_.to_file(file_name, str(config))
+    # #
+    # file_name = os.path.join(experiment_result_dir, "config_builder.txt")
+    # _LOG.info("file_name=%s", file_name)
+    # io_.to_file(
+    #     file_name,
+    #     "Config builder: %s\nConfig index: %s" % (config_builder, str(i)),
+    # )
 
-    # Inject the experiment result dir inside the config.
-    # TODO(gp): This operation is also performed on the notebook side
-    #  in `get_config_from_env()`. Find a better way to achieve this.
-    config = cfgb.set_experiment_result_dir(experiment_result_dir,
-                                            config)
-    # Prepare book-keeping files.
-    file_name = os.path.join(experiment_result_dir, "config.pkl")
-    _LOG.info("file_name=%s", file_name)
-    hpickle.to_pickle(config, file_name)
-    #
-    file_name = os.path.join(experiment_result_dir, "config.txt")
-    _LOG.info("file_name=%s", file_name)
-    io_.to_file(file_name, str(config))
-    #
-    file_name = os.path.join(experiment_result_dir, "config_builder.txt")
-    _LOG.info("file_name=%s", file_name)
-    io_.to_file(
-        file_name,
-        "Config builder: %s\nConfig index: %s" % (config_builder, str(i)),
-    )
+    cdtfut.setup_experiment(config, dst_dir, i)
 
     # Execute notebook.
     _LOG.info("Executing notebook %d", i)
@@ -156,7 +159,7 @@ def _run_notebook(
             "Continuing execution for next experiments.",
             i,
         )
-    # Convert to html and publish.
+    # Convert to HTML and publish.
     if publish:
         _LOG.info("Converting notebook %s", i)
         log_file = log_file.replace(".log", ".html.log")
@@ -168,6 +171,8 @@ def _run_notebook(
             + " --action publish"
         )
         si.system(cmd, output_file=log_file)
+
+    # TODO(gp): Factor this out in utils.mark_as_success()
     # Publish an empty file to indicate a successful finish.
     file_name = os.path.join(experiment_result_dir, "success.txt")
     _LOG.info("file_name=%s", file_name)
@@ -232,21 +237,32 @@ def _parse() -> argparse.ArgumentParser:
 def _main(parser: argparse.ArgumentParser) -> None:
     args = parser.parse_args()
     dbg.init_logger(verbosity=args.log_level, use_exec_path=True)
+
     # Create the dst dir.
     dst_dir = os.path.abspath(args.dst_dir)
     io_.create_dir(dst_dir, incremental=not args.no_incremental)
-    # Build the configs from the builder.
+
+
+
+    # # TODO(gp): -> utils.prepare_configs
+    # # Build the configs from the builder.
+    # config_builder = args.function
+    # configs = cfgb.get_configs_from_builder(config_builder)
+    # # Patch the configs with extra information as a way to communicate
+    # # with the notebook.
+    # # TODO(gp): This can be patched inside the loop, then we can even
+    # #  unify the code to create the config inside/outside the notebook.
+    # configs = cfgb.add_result_dir(dst_dir, configs)
+    # configs = cfgb.add_config_idx(configs)
+    # # Select the configs.
+    # configs = ccbuilders.select_config(
+    #     configs, args.index, args.start_from_index,
+    # )
     config_builder = args.function
-    configs = cfgb.get_configs_from_builder(config_builder)
-    # Patch the configs with extra information as a way to communicate
-    # with the notebook.
-    # TODO(gp): This can be patched inside the loop.
-    configs = cfgb.add_result_dir(dst_dir, configs)
-    configs = cfgb.add_config_idx(configs)
-    # Select the configs.
-    configs = ccbuilders.select_config(
-        configs, args.index, args.start_from_index,
-    )
+    index = args.index
+    start_from_index = args.start_from_index
+    ccbuilders.prepare_configs(config_builder, index, start_from_index)
+
     # Handle --dry_run, if needed.
     if dry_run:
         _LOG.warning(

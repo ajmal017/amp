@@ -69,17 +69,43 @@ def add_experiment_arg(
     )
 
 
-def _setup_experiment(i,
-                      dst_dir)
+def setup_experiment(config, dst_dir, i):
+    """
+    Set up the directory and the book-keeping artifacts for the experiment running
+    `config`.
+    """
+    dbg.dassert_isinstance(config, cfg.Config)
+    # TODO(gp): Can we just create instead of asserting?
+    dbg.dassert_dir_exists(dst_dir)
+
     # Create subdirectory structure for experiment results.
     result_subdir = "result_%s" % i
     experiment_result_dir = os.path.join(dst_dir, result_subdir)
-    # Inject
-    config = cfgb.set_experiment_result_dir(experiment_result_dir, config)
     _LOG.info("experiment_result_dir=%s", experiment_result_dir)
-    io_.create_dir(experiment_result_dir, incremental=True)
     # If there is already a success file in the dir, skip the experiment.
     file_name = os.path.join(experiment_result_dir, "success.txt")
     if os.path.exists(file_name):
         _LOG.warning("Found file '%s': skipping run %d", file_name, i)
         return
+    io_.create_dir(experiment_result_dir, incremental=True)
+
+    # Inject the experiment result dir inside the config.
+    # TODO(gp): This operation is also performed on the notebook side
+    #  in `get_config_from_env()`. Find a better way to achieve this.
+    config = cfgb.set_experiment_result_dir(experiment_result_dir,
+                                            config)
+    # Prepare book-keeping files.
+    file_name = os.path.join(experiment_result_dir, "config.pkl")
+    _LOG.info("file_name=%s", file_name)
+    hpickle.to_pickle(config, file_name)
+    #
+    file_name = os.path.join(experiment_result_dir, "config.txt")
+    _LOG.info("file_name=%s", file_name)
+    io_.to_file(file_name, str(config))
+    #
+    file_name = os.path.join(experiment_result_dir, "config_builder.txt")
+    _LOG.info("file_name=%s", file_name)
+    io_.to_file(
+        file_name,
+        "Config builder: %s\nConfig index: %s" % (config_builder, str(i)),
+        )
