@@ -334,6 +334,24 @@ def add_result_dir(dst_dir: str, configs: List[cfg.Config]) -> List[cfg.Config]:
     return configs_with_dir
 
 
+# TODO(*): What is "the config id"? Why does my config have a `meta`? And why
+# would this ever depend upon the order in which the configs appear in a
+# list?
+def add_config_idx(configs: List[cfg.Config]) -> List[cfg.Config]:
+    """
+    Add the config id as parameter.
+
+    :param configs: List of configs for experiments
+    :return: List of copied configs with added ids
+    """
+    configs_idx = []
+    for i, config in enumerate(configs):
+        config_with_id = config.copy()
+        config_with_id[("meta", "id")] = i
+        configs_idx.append(config_with_id)
+    return configs_idx
+
+
 def set_experiment_result_dir(dst_dir: str, config: cfg.Config) -> cfg.Config:
     """
     Set path to the experiment results file.
@@ -345,25 +363,6 @@ def set_experiment_result_dir(dst_dir: str, config: cfg.Config) -> cfg.Config:
     config_with_filepath = config.copy()
     config_with_filepath[("meta", "experiment_result_dir")] = dst_dir
     return config_with_filepath
-
-
-def add_config_idx(configs: List[cfg.Config]) -> List[cfg.Config]:
-    """
-    Add the config id as parameter.
-
-    TODO(*): What is "the config id"? Why does my config have a `meta`? And why
-        would this ever depend upon the order in which the configs appear in a
-        list?
-
-    :param configs: List of configs for experiments
-    :return: List of copied configs with added ids
-    """
-    configs_idx = []
-    for i, config in enumerate(configs):
-        config_with_id = config.copy()
-        config_with_id[("meta", "id")] = i
-        configs_idx.append(config_with_id)
-    return configs_idx
 
 
 # #############################################################################

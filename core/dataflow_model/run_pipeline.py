@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 r"""
-Run a notebook given a config or a list of configs.
+Run a pipeline given a list of configs.
 
-# Use example:
-> run_notebook.py \
-    --dst_dir nlp/test_results \
-    --notebook nlp/notebooks/NLP_RP_pipeline.ipynb \
-    --function "nlp.build_configs.build_PTask1088_configs()" \
+# Run an RH1E pipeline using 2 threads:
+> run_pipeline.py \
+    --dst_dir experiment1 \
+    --pipeline ./core/dataflow_model/notebooks/Master_pipeline_runner.py \
+    --function "dataflow_lemonade.RH1E.task89_config_builder.build_15min_ar_model_configs()" \
     --num_threads 2
 """
 import argparse
@@ -20,7 +20,6 @@ import tqdm
 
 import core.config as cfg
 import core.config_builders as cfgb
-import core.dataflow_model.utils as cdtfut
 import helpers.dbg as dbg
 import helpers.io_ as io_
 import helpers.parser as prsr
@@ -28,25 +27,24 @@ import helpers.pickle_ as hpickle
 import helpers.printing as printing
 import helpers.system_interaction as si
 
-
 _LOG = logging.getLogger(__name__)
 
 
 # #############################################################################
 
 
-def _run_notebook(
-    i: int,
-    notebook_file: str,
-    dst_dir: str,
-    config: cfg.Config,
-    config_builder: str,
-    num_attempts: int,
-    abort_on_error: bool,
-    publish: bool,
+def _run_pipeline(
+        i: int,
+        notebook_file: str,
+        dst_dir: str,
+        config: cfg.Config,
+        config_builder: str,
+        num_attempts: int,
+        abort_on_error: bool,
+        publish: bool,
 ) -> Optional[int]:
     """
-    Run a notebook for a specific `Config`.
+    Run a pipeline for a specific `Config`.
 
     The `config_builder` is passed inside the notebook to generate a list
     of all configs to be run as part of a series of experiments, but only the
@@ -67,23 +65,18 @@ def _run_notebook(
     dbg.dassert_file_exists(notebook_file)
     dbg.dassert_isinstance(config, cfg.Config)
     dbg.dassert_dir_exists(dst_dir)
-
-    # Create subdirectory structure for experiment results.
+    # Create subdirectory structure for simulation results.
     result_subdir = "result_%s" % i
+    html_subdir_name = os.path.join(os.path.basename(dst_dir), result_subdir)
     experiment_result_dir = os.path.join(dst_dir, result_subdir)
+    config = cfgb.set_experiment_result_dir(experiment_result_dir, config)
     _LOG.info("experiment_result_dir=%s", experiment_result_dir)
+    io_.create_dir(experiment_result_dir, incremental=True)
     # If there is already a success file in the dir, skip the experiment.
     file_name = os.path.join(experiment_result_dir, "success.txt")
     if os.path.exists(file_name):
         _LOG.warning("Found file '%s': skipping run %d", file_name, i)
         return
-    io_.create_dir(experiment_result_dir, incremental=True)
-
-    # Inject the experiment result dir inside the config.
-    # TODO(gp): This operation is also performed on the notebook side
-    #  in `get_config_from_env()`. Find a better way to achieve this.
-    config = cfgb.set_experiment_result_dir(experiment_result_dir,
-                                            config)
     # Prepare book-keeping files.
     file_name = os.path.join(experiment_result_dir, "config.pkl")
     _LOG.info("file_name=%s", file_name)
@@ -98,10 +91,7 @@ def _run_notebook(
     io_.to_file(
         file_name,
         "Config builder: %s\nConfig index: %s" % (config_builder, str(i)),
-    )
-
-    # Execute notebook.
-    _LOG.info("Executing notebook %d", i)
+        )
     # Prepare the destination file.
     dst_file = os.path.join(
         experiment_result_dir,
@@ -109,25 +99,26 @@ def _run_notebook(
     )
     _LOG.info("dst_file=%s", dst_file)
     dst_file = os.path.abspath(dst_file)
-    # Export config function and its `id` to the notebook.
-    cmd = (
-        f'export __CONFIG_BUILDER__="{config_builder}"; '
-        + f'export __CONFIG_IDX__="{i}"; '
-        + f'export __CONFIG_DST_DIR__="{experiment_result_dir}"'
-    )
-    cmd += (
-        f"; jupyter nbconvert {notebook_file} "
-        + " --execute"
-        + " --to notebook"
-        + f" --output {dst_file}"
-        + " --ExecutePreprocessor.kernel_name=python"
-        +
-        # https://github.com/ContinuumIO/anaconda-issues/issues/877
-        " --ExecutePreprocessor.timeout=-1"
-    )
-    #
     log_file = os.path.join(experiment_result_dir, "run_notebook.%s.log" % i)
     log_file = os.path.abspath(os.path.abspath(log_file))
+    # Execute notebook.
+    _LOG.info("Executing notebook %d", i)
+    # Export config function and its id to the notebook.
+    cmd = (
+            f'export __CONFIG_BUILDER__="{config_builder}"; '
+            + f'export __CONFIG_IDX__="{i}"; '
+            + f'export __CONFIG_DST_DIR__="{experiment_result_dir}"'
+    )
+    cmd += (
+            f"; jupyter nbconvert {notebook_file} "
+            + " --execute"
+            + " --to notebook"
+            + f" --output {dst_file}"
+            + " --ExecutePreprocessor.kernel_name=python"
+            +
+            # https://github.com/ContinuumIO/anaconda-issues/issues/877
+            " --ExecutePreprocessor.timeout=-1"
+    )
     # Try running the notebook up to `num_attempts` times.
     dbg.dassert_lte(1, num_attempts)
     rc = -1
@@ -139,7 +130,7 @@ def _run_notebook(
                 n - 1,
                 num_attempts,
                 rc,
-            )
+                )
         # Possibly abort on the last attempt.
         is_last_attempt = n == num_attempts
         abort_on_error_curr = is_last_attempt and abort_on_error
@@ -158,12 +149,11 @@ def _run_notebook(
     if publish:
         _LOG.info("Converting notebook %s", i)
         log_file = log_file.replace(".log", ".html.log")
-        html_subdir_name = os.path.join(os.path.basename(dst_dir), result_subdir)
         cmd = (
-            "python amp/dev_scripts/notebooks/publish_notebook.py"
-            + f" --file {dst_file}"
-            + f" --subdir {html_subdir_name}"
-            + " --action publish"
+                "python amp/dev_scripts/notebooks/publish_notebook.py"
+                + f" --file {dst_file}"
+                + f" --subdir {html_subdir_name}"
+                + " --action publish"
         )
         si.system(cmd, output_file=log_file)
     # Publish an empty file to indicate a successful finish.
@@ -179,26 +169,18 @@ def _parse() -> argparse.ArgumentParser:
     )
     # Add common experiment options.
     parser = cdtfut.add_experiment_arg(parser)
-    # Add notebook options.
+    # Add pipeline options.
     parser.add_argument(
-        "--notebook",
+        "--pipeline",
         action="store",
         required=True,
-        help="File storing the notebook to iterate over",
-    )
-    parser.add_argument(
-        "--publish_notebook",
-        action="store_true",
-        help="Publish each notebook after it executes",
+        help="File storing the pipeline to iterate over",
     )
     prsr.add_verbosity_arg(parser)
     return parser
 
 
 def _main(parser: argparse.ArgumentParser) -> None:
-    # TODO(*): Stop modifying the "meta" level of configs:
-    #     https://github.com/.../.../issues/6487
-    _LOG.warning("Modifying 'meta' level of the configs.")
     args = parser.parse_args()
     dbg.init_logger(verbosity=args.log_level, use_exec_path=True)
     #
