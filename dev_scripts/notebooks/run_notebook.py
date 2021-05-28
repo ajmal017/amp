@@ -65,7 +65,9 @@ def _run_notebook(
         `None`; otherwise, return `rc`
     """
     dbg.dassert_file_exists(notebook_file)
+    # TODO(gp): Move all this to -> create_experiment_info()
     dbg.dassert_isinstance(config, cfg.Config)
+    # TODO(gp): Can we just create instead of asserting?
     dbg.dassert_dir_exists(dst_dir)
 
     # Create subdirectory structure for experiment results.
@@ -195,26 +197,57 @@ def _parse() -> argparse.ArgumentParser:
     return parser
 
 
+# Currently, run_notebook.py changes the configs' "meta" level, modifying fields
+# like "result_dir" and "experiment_result_dir". We want to avoid modifying input
+# configs by wrapping them into a larger config that will have two levels: the
+# original config and what is now "meta".
+
+# This script needs to pass the config to execute to the notebook.
+# There are 2 problems:
+# 1) It's not easy to serialize/deserialize a config between this script
+#    and the notebook (e.g., a config could contain functions and thus
+#    not pickle-able)
+# 2) There is not a mechanism to pass information from this script to a
+#    notebook
+#
+# To work around these issues we pass various information to the notebook
+# through environment vars, such as:
+# 1) the name of a config builder (so that it can be executed through an `eval`)
+# 2) the index of the config to execute
+# 3) a destination dir representing the scratch space for the artifacts from the
+#    notebook
+# This information is passed through a "meta" part of the config
+# TODO(gp): Separate `meta` from `run_notebook` since we don't want this information
+#  to collide.
+
+# We then keep the config in sync between this script and the notebook
+# by executing the same code on both sides.
+
+# TODO(gp): Make the notebook save the config that it sees. This might
+#  make the code simpler and more robust.
+# TODO(gp): We could try to serialize/deserialize the config and pass to the notebook
+#  a pointer to the file.
+
+
 def _main(parser: argparse.ArgumentParser) -> None:
-    # TODO(*): Stop modifying the "meta" level of configs:
-    #     https://github.com/.../.../issues/6487
-    _LOG.warning("Modifying 'meta' level of the configs.")
     args = parser.parse_args()
     dbg.init_logger(verbosity=args.log_level, use_exec_path=True)
-    #
+    # Create the dst dir.
     dst_dir = os.path.abspath(args.dst_dir)
     io_.create_dir(dst_dir, incremental=not args.no_incremental)
-    config_builder = args.function
     # Build the configs from the builder.
-    configs = get_configs_from_builder(config_builder)
-    # Patch the configs.
+    config_builder = args.function
+    configs = cfgb.get_configs_from_builder(config_builder)
+    # Patch the configs with extra information as a way to communicate
+    # with the notebook.
+    # TODO(gp): This can be patched inside the loop.
     configs = cfgb.add_result_dir(dst_dir, configs)
     configs = cfgb.add_config_idx(configs)
     # Select the configs.
     configs = ccbuilders.select_config(
         configs, args.index, args.start_from_index,
     )
-    #
+    # Handle --dry_run, if needed.
     if dry_run:
         _LOG.warning(
             "The following configs will not be executed due to passing --dry_run:"
@@ -230,8 +263,8 @@ def _main(parser: argparse.ArgumentParser) -> None:
     num_attempts = args.num_attempts
     abort_on_error = not args.skip_on_error
     publish = args.publish_notebook
-    #
     num_threads = args.num_threads
+    # Execute.
     if num_threads == "serial":
         rcs = []
         for config in tqdm.tqdm(configs):
@@ -266,7 +299,7 @@ def _main(parser: argparse.ArgumentParser) -> None:
             )
             for config in configs
         )
-    # Report failing experiments.
+    # Report failing experiments in terms of their IDs.
     experiment_ids = [int(config[("meta", "id")]) for config in configs]
     failed_experiment_ids = [
         i for i, rc in zip(experiment_ids, rcs) if rc is not None and rc != 0

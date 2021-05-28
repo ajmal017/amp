@@ -110,7 +110,7 @@ def get_config_from_env() -> Optional[cfg.Config]:
     if any(var in os.environ for var in config_vars):
         _LOG.warning("Found some config vars in environment")
         if all(var in os.environ for var in config_vars):
-            # Build configs.
+            # Build all the configs.
             config_builder = os.environ["__CONFIG_BUILDER__"]
             _LOG.info("__CONFIG_BUILDER__=%s", config_builder)
             configs = get_configs_from_builder(config_builder)
@@ -119,6 +119,7 @@ def get_config_from_env() -> Optional[cfg.Config]:
             _LOG.info("__DST_DIR__=%s", dst_dir)
             configs = add_result_dir(dst_dir, configs)
             # Pick config with relevant index.
+            # TODO(gp): Just select and then patch only that one.
             config_idx = int(os.environ["__CONFIG_IDX__"])
             _LOG.info("__CONFIG_IDX__=%s", config_idx)
             dbg.dassert_lte(0, config_idx)
@@ -335,8 +336,8 @@ def add_result_dir(dst_dir: str, configs: List[cfg.Config]) -> List[cfg.Config]:
 
 
 # TODO(*): What is "the config id"? Why does my config have a `meta`? And why
-# would this ever depend upon the order in which the configs appear in a
-# list?
+#  would this ever depend upon the order in which the configs appear in a
+#  list?
 def add_config_idx(configs: List[cfg.Config]) -> List[cfg.Config]:
     """
     Add the config id as parameter.
