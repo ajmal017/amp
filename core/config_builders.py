@@ -105,6 +105,42 @@ def get_configs_from_builder(config_builder: str) -> List[cfg.Config]:
     return configs
 
 
+def patch_configs(configs, dst_dir):
+    """
+    Patch the configs to contain information needed to run.
+    """
+    configs_out = []
+    for idx, config in enumerate(configs):
+        config = config.copy()
+        config[("meta", "id")] = id
+        dst_subdir = f"result_{id}"
+        dst_dir = os.path.join(dst_dir, dst_subdir)
+        config[("meta", "experiment_result_dir")] = dst_dir
+        configs_out.append(config)
+    return configs_out
+
+
+def get_config_from_params(config_builder, idx, dst_dir) -> cfg.Config:
+    """
+    Build a config from the passed parameters.
+    """
+    # Build all the configs.
+    configs = get_configs_from_builder(config_builder)
+    # Pick the config.
+    dbg.dassert_lte(0, idx)
+    dbg.dassert_lt(idx, len(configs))
+    config = configs[config_idx]
+    config = config.copy()
+    # Patch the values.
+    # `id` is only a bread crumb and not really needed.
+    config[("meta", "id")] = i
+    # TODO(gp): What's the difference between result_dir and experiment_result_dir.
+    config[("meta", "result_dir")] = dst_dir
+    config[("meta", "experiment_result_dir")] = dst_dir
+    return config
+
+
+# TODO(gp): Rewrite this in terms of get_config_from_params.
 def get_config_from_env() -> Optional[cfg.Config]:
     """
     Build a config passed through environment vars, if possible, or return None.
@@ -141,112 +177,72 @@ def get_config_from_env() -> Optional[cfg.Config]:
     return config
 
 
-def select_config(
-    configs: List[cfg.Config], index: int, start_from_index: int
-) -> List[cfg.Config]:
-    """
-    Select configs to run from a list of configs.
 
-    :param configs: a list of configs
-    :param index: index of a config to execute
-    :param start_from_index: index of a config to start execution with
-    :return: a list of configs to execute
-    """
-    if index:
-        ind = int(index)
-        dbg.dassert_lte(0, ind)
-        dbg.dassert_lt(ind, len(configs))
-        _LOG.warning(
-            "Only config %s will be executed due to passing --index", ind
-        )
-        if "id" in configs[0]["meta"].to_dict():
-            # Select a config based on the id parameter if it exists.
-            configs = [x for x in configs if int(x[("meta", "id")]) == ind]
-        else:
-            # Otherwise use index to select a config.
-            configs = [x for i, x in enumerate(configs) if i == ind]
-    elif start_from_index:
-        start_from_index = int(start_from_index)
-        dbg.dassert_lte(0, start_from_index)
-        dbg.dassert_lt(start_from_index, len(configs))
-        _LOG.warning(
-            "Only configs %s and higher will be executed due to passing --start_from_index",
-            start_from_index,
-        )
-        if "id" in configs[0]["meta"].to_dict():
-            # Select configs based on the id parameter if it exists.
-            configs = [
-                x for x in configs if int(x[("meta", "id")]) >= start_from_index
-            ]
-        else:
-            # Otherwise use index to select configs.
-            configs = [x for i, x in enumerate(configs) if i >= start_from_index]
-    _LOG.info("Created %s config(s)", len(configs))
-
-
-def add_result_dir(dst_dir: str, configs: List[cfg.Config]) -> List[cfg.Config]:
-    """
-    Add a result directory field to all configs in list.
-
-    :param dst_dir: Location of output directory
-    :param configs: List of configs for experiments
-    :return: List of copied configs with result directories added
-    """
-    # TODO(*): To be defensive maybe we should assert if the param already exists.
-    configs_with_dir = []
-    for config in configs:
-        config_with_dir = config.copy()
-        config_with_dir[("meta", "result_dir")] = dst_dir
-        configs_with_dir.append(config_with_dir)
-    return configs_with_dir
+# # TODO(gp): Switch the order of the params: configs, dst_dir.
+# def add_result_dir(dst_dir: str, configs: List[cfg.Config]) -> List[cfg.Config]:
+#     """
+#     Add a result directory field to all configs in list.
+#
+#     :param dst_dir: Location of output directory
+#     :param configs: List of configs for experiments
+#     :return: List of copied configs with result directories added
+#     """
+#     # TODO(*): To be defensive maybe we should assert if the param already exists.
+#     configs_with_dir = []
+#     for config in configs:
+#         config_with_dir = config.copy()
+#         config_with_dir[("meta", "result_dir")] = dst_dir
+#         configs_with_dir.append(config_with_dir)
+#     return configs_with_dir
+#
+#
+# # TODO(*): What is "the config id"? Why does my config have a `meta`? And why
+# #  would this ever depend upon the order in which the configs appear in a
+# #  list?
+# def add_config_idx(configs: List[cfg.Config]) -> List[cfg.Config]:
+#     """
+#     Add the config id as parameter.
+#
+#     :param configs: List of configs for experiments
+#     :return: List of copied configs with added ids
+#     """
+#     configs_idx = []
+#     for i, config in enumerate(configs):
+#         config_with_id = config.copy()
+#         config_with_id[("meta", "id")] = i
+#         configs_idx.append(config_with_id)
+#     return configs_idx
+#
+#
+# # TODO(gp): Switch the order of the params: configs, dst_dir.
+# def set_experiment_result_dir(dst_dir: str, config: cfg.Config) -> cfg.Config:
+#     """
+#     Set path to the experiment results file.
+#
+#     :param dst_dir: Subdirectory with simulation results
+#     :param config: Config used for simulation
+#     :return: Config with absolute file path to results
+#     """
+#     config_with_filepath = config.copy()
+#     config_with_filepath[("meta", "experiment_result_dir")] = dst_dir
+#     return config_with_filepath
 
 
-# TODO(*): What is "the config id"? Why does my config have a `meta`? And why
-#  would this ever depend upon the order in which the configs appear in a
-#  list?
-def add_config_idx(configs: List[cfg.Config]) -> List[cfg.Config]:
-    """
-    Add the config id as parameter.
-
-    :param configs: List of configs for experiments
-    :return: List of copied configs with added ids
-    """
-    configs_idx = []
-    for i, config in enumerate(configs):
-        config_with_id = config.copy()
-        config_with_id[("meta", "id")] = i
-        configs_idx.append(config_with_id)
-    return configs_idx
-
-
-def set_experiment_result_dir(dst_dir: str, config: cfg.Config) -> cfg.Config:
-    """
-    Set path to the experiment results file.
-
-    :param dst_dir: Subdirectory with simulation results
-    :param config: Config used for simulation
-    :return: Config with absolute file path to results
-    """
-    config_with_filepath = config.copy()
-    config_with_filepath[("meta", "experiment_result_dir")] = dst_dir
-    return config_with_filepath
-
-
-def prepare_configs(config_builder, index, start_from_index):
-    # TODO(gp): -> utils.prepare_configs
-    # Build the configs from the builder.
-    configs = cfgb.get_configs_from_builder(config_builder)
-    # Patch the configs with extra information as a way to communicate
-    # with the notebook.
-    # TODO(gp): This can be patched inside the loop, then we can even
-    #  unify the code to create the config inside/outside the notebook.
-    configs = cfgb.add_result_dir(dst_dir, configs)
-    configs = cfgb.add_config_idx(configs)
-    # Select the configs.
-    configs = ccbuilders.select_config(
-        configs, index, start_from_index,
-    )
-    return configs
+# # TODO(gp): This is just build + select. Maybe too thin to keep.
+# def prepare_configs(config_builder, index, start_from_index):
+#     # Build the configs from the builder.
+#     configs = cfgb.get_configs_from_builder(config_builder)
+#     # Patch the configs with extra information as a way to communicate
+#     # with the notebook.
+#     # TODO(gp): This can be patched inside the loop, then we can even
+#     #  unify the code to create the config inside/outside the notebook.
+#     configs = cfgb.add_result_dir(dst_dir, configs)
+#     configs = cfgb.add_config_idx(configs)
+#     # Select the configs.
+#     configs = ccbuilders.select_config(
+#         configs, index, start_from_index,
+#     )
+#     return configs
 
 
 # #############################################################################

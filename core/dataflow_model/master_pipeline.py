@@ -15,21 +15,25 @@ _LOG = logging.getLogger(__name__)
 # TODO(gp): if this was a script there would be more separation and easier
 #  to save output to log. But then we need to pass the config in the same way
 #  we pass it to a notebook but using command-line opts instead of env vars.
-def run_pipeline(dag_config, verbosity, log_file):
+def run_pipeline(config_builder, config_idx, dst_dir):
     """
-    Run a DAG.
-    """
-    # TODO(gp): Save output to file.
-    dbg.init_logger(verbosity=logging.INFO)
+    Implement the master pipeline to:
+    - create a DAG
+    - run it
+    - save the generated `ResultBundle`
 
-    #config = ccbuild.get_config_from_env()
+    All parameters are passed through a `Config`.
+    """
+    config = ccbuild.get_config_from_params(config_builder, config_idx, dst_dir)
 
     dag_config = config.pop("DAG")
 
-    dag_runner = cdataf.PredictionDagRunner(dag_config, config["meta"]["dag_builder"])
-
+    dag_runner = cdataf.PredictionDagRunner(dag_config,
+                                            config["meta"]["dag_builder"])
+    # TODO(gp): Maybe save the drawing to file?
     #cdataf.draw(dag_runner.dag)
 
+    # TODO(gp): Why passing function instead of the values directly?
     if "set_fit_intervals" in config["meta"].to_dict():
         dag_runner.set_fit_intervals(
             **config["meta", "set_fit_intervals", "func_kwargs"].to_dict()
@@ -53,11 +57,9 @@ def run_pipeline(dag_config, verbosity, log_file):
 
     # TODO(gp): We could pass the payload back and let _run_pipeline take care
     #  of that.
-    try:
-        path = os.path.join(
-            config["meta", "experiment_result_dir"], "result_bundle.pkl"
-        )
-        if True:
-            hpickl.to_pickle(result_bundle.to_config().to_dict(), path)
-    except AssertionError:
-        _LOG.warning("Unable to serialize results.")
+    # TODO(gp): Make sure that the meta part has the right info.
+    #dbg.dassert_
+    path = os.path.join(
+        config["meta", "experiment_result_dir"], "result_bundle.pkl"
+    )
+    hpickl.to_pickle(result_bundle.to_config().to_dict(), path)

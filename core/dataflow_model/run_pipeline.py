@@ -33,13 +33,6 @@ _LOG = logging.getLogger(__name__)
 # #############################################################################
 
 
-def _get_pipeline_from_builder(pipeline_build: str):
-    # TODO(gp): Similar to get_configs_from_builder
-    # It should have a signature like:
-    # config_builder, index, start_from_index, verbosity
-    pass
-
-
 def _run_pipeline(
         i: int,
         pipeline_builder: str,
@@ -69,7 +62,7 @@ def _run_pipeline(
         `None`; otherwise, return `rc`
     """
     dbg.dassert_eq(1, num_attempts, "Multiple attempts not supported yet")
-    cdtfut.setup_experiment(config, dst_dir, i)
+    cdtfut.setup_experiment(config, incremental)
 
     # Execute experiment.
     _LOG.info("Executing experiment %d", i)
@@ -77,12 +70,13 @@ def _run_pipeline(
     log_file = os.path.join(experiment_result_dir, "run_pipeline.%s.log" % i)
     log_file = os.path.abspath(os.path.abspath(log_file))
     rc = 0
-    pipeline_runner = _get_pipeline_runner_from_builder(pipeline_builder)
-    try:
-        pipeline_runner()
-    except RunTimeError as e:
-        _LOG.error("Error: %s", str(e))
-        rc = -1
+    #pipeline_runner = _get_pipeline_runner_from_builder(pipeline_builder)
+    # try:
+    #     pipeline_runner()
+    # except RunTimeError as e:
+    #     _LOG.error("Error: %s", str(e))
+    #     rc = -1
+    cmd = "run_pipeline_stub.py ..."
     if not abort_on_error and rc != 0:
         _LOG.error(
             "Execution failed for experiment `%s`. "
@@ -94,7 +88,6 @@ def _run_pipeline(
     _LOG.info("file_name=%s", file_name)
     io_.to_file(file_name, "")
     return rc
-
 
 
 def _parse() -> argparse.ArgumentParser:
@@ -122,9 +115,14 @@ def _main(parser: argparse.ArgumentParser) -> None:
     io_.create_dir(dst_dir, incremental=not args.no_incremental)
 
     config_builder = args.function
+    configs = cfgb.get_configs_from_builder(config_builder)
+    configs = cfgb.patch_configs(configs, dst_dir)
+    # Select the configs.
     index = args.index
     start_from_index = args.start_from_index
-    ccbuilders.prepare_configs(config_builder, index, start_from_index)
+    configs = ccbuilders.select_config(
+        configs, index, start_from_index,
+    )
 
     # Handle --dry_run, if needed.
     if dry_run:
@@ -147,18 +145,16 @@ def _main(parser: argparse.ArgumentParser) -> None:
     if num_threads == "serial":
         rcs = []
         for config in tqdm.tqdm(configs):
-            i = int(config[("meta", "id")])
             _LOG.debug("\n%s", printing.frame("Config %s" % i))
             #
             rc = _run_pipeline(
-                i,
+                int(config[("meta", "id")]),
                 notebook_file,
                 dst_dir,
                 config,
                 config_builder,
                 num_attempts,
                 abort_on_error,
-                publish,
             )
             rcs.append(rc)
     else:
@@ -166,7 +162,7 @@ def _main(parser: argparse.ArgumentParser) -> None:
         # -1 is interpreted by joblib like for all cores.
         _LOG.info("Using %d threads", num_threads)
         rcs = joblib.Parallel(n_jobs=num_threads, verbose=50)(
-            joblib.delayed(_run_notebook)(
+            joblib.delayed(_run_pipeline)(
                 int(config[("meta", "id")]),
                 notebook_file,
                 dst_dir,

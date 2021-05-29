@@ -66,6 +66,8 @@ def _run_notebook(
     """
     dbg.dassert_file_exists(notebook_file)
 
+    patch_configs(configs)
+
     # # TODO(gp): Move all this to -> create_experiment_info()
     # dbg.dassert_isinstance(config, cfg.Config)
     # # TODO(gp): Can we just create instead of asserting?
@@ -242,8 +244,6 @@ def _main(parser: argparse.ArgumentParser) -> None:
     dst_dir = os.path.abspath(args.dst_dir)
     io_.create_dir(dst_dir, incremental=not args.no_incremental)
 
-
-
     # # TODO(gp): -> utils.prepare_configs
     # # Build the configs from the builder.
     # config_builder = args.function
@@ -259,9 +259,20 @@ def _main(parser: argparse.ArgumentParser) -> None:
     #     configs, args.index, args.start_from_index,
     # )
     config_builder = args.function
+    configs = cfgb.get_configs_from_builder(config_builder)
+    configs = cfgb.patch_configs(configs, dst_dir)
+    _LOG.info("Generated %d configs from the builder", len(configs))
+    # Select the configs.
     index = args.index
     start_from_index = args.start_from_index
-    ccbuilders.prepare_configs(config_builder, index, start_from_index)
+    configs = ccbuilders.select_config(
+        configs, index, start_from_index,
+    )
+    _LOG.info("Selected %d configs from command line", len(configs))
+    # Remove the configs already executed.
+    configs, num_skipped = skip_configs_already_executed(configs, incremental)
+    _LOG.info("Removed %d configs since already executed", num_skipped)
+    _LOG.info("Need to execute %d configs", len(configs))
 
     # Handle --dry_run, if needed.
     if dry_run:
