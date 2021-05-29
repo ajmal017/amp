@@ -32,6 +32,7 @@ _LOG = logging.getLogger(__name__)
 
 # #############################################################################
 
+import helpers.system_interaction as hsinte
 
 def _run_pipeline(
         i: int,
@@ -57,36 +58,37 @@ def _run_pipeline(
     :param num_attempts: maximum number of times to attempt running the
         notebook
     :param abort_on_error: if `True`, raise an error
-    :param publish: publish notebook if `True`
     :return: if notebook is skipped ("success.txt" file already exists), return
         `None`; otherwise, return `rc`
     """
     dbg.dassert_eq(1, num_attempts, "Multiple attempts not supported yet")
-    cdtfut.setup_experiment(config, incremental)
-
+    cdtfut.setup_experiment_dir(config)
     # Execute experiment.
     _LOG.info("Executing experiment %d", i)
-    #
+    # Prepare the log file.
     log_file = os.path.join(experiment_result_dir, "run_pipeline.%s.log" % i)
     log_file = os.path.abspath(os.path.abspath(log_file))
-    rc = 0
-    #pipeline_runner = _get_pipeline_runner_from_builder(pipeline_builder)
-    # try:
-    #     pipeline_runner()
-    # except RunTimeError as e:
-    #     _LOG.error("Error: %s", str(e))
-    #     rc = -1
-    cmd = "run_pipeline_stub.py ..."
-    if not abort_on_error and rc != 0:
-        _LOG.error(
-            "Execution failed for experiment `%s`. "
-            "Continuing execution for next experiments.",
-            i,
-        )
-    # Publish an empty file to indicate a successful finish.
-    file_name = os.path.join(experiment_result_dir, "success.txt")
-    _LOG.info("file_name=%s", file_name)
-    io_.to_file(file_name, "")
+    # Prepare command line.
+    cmd = ["run_pipeline_stub.py",
+       f"--pipeline_builder '{pipeline_builder}'",
+        f"--config_builder '{config_builder}'",
+        f"--idx {i}",
+        f"--dst_dir {dst_dir}",
+        "-v INFO",
+        ]
+    cmd = " ".join(cmd)
+    # Execute.
+    rc = hsinte.system(cmd, output_file=log_file, abort_on_error=False)
+    if rc != 0:
+        # The notebook run wasn't successful.
+        _LOG.error("Execution failed for experiment %d", i)
+        if abort_on_error:
+            dbg.dfatal("Aborting")
+        else:
+            _LOG.error("Continuing execution for next experiments")
+    else:
+        # Mark as success.
+        cdtfut.mark_config_as_success(experiment_result_dir)
     return rc
 
 
@@ -114,24 +116,7 @@ def _main(parser: argparse.ArgumentParser) -> None:
     dst_dir = os.path.abspath(args.dst_dir)
     io_.create_dir(dst_dir, incremental=not args.no_incremental)
 
-    config_builder = args.function
-    configs = cfgb.get_configs_from_builder(config_builder)
-    configs = cfgb.patch_configs(configs, dst_dir)
-    # Select the configs.
-    index = args.index
-    start_from_index = args.start_from_index
-    configs = ccbuilders.select_config(
-        configs, index, start_from_index,
-    )
-
-    # Handle --dry_run, if needed.
-    if dry_run:
-        _LOG.warning(
-            "The following configs will not be executed due to passing --dry_run:"
-        )
-        for i, config in enumerate(configs):
-            print("config_%s:\n %s", i, config)
-        sys.exit(0)
+    configs = cdtfut.get_configs_from_command_line(args)
 
     # Get the file with the pipeline to run.
     pipeline_file = os.path.abspath(args.pipeline)
@@ -140,8 +125,8 @@ def _main(parser: argparse.ArgumentParser) -> None:
     num_attempts = args.num_attempts
     abort_on_error = not args.skip_on_error
     publish = args.publish_notebook
-    #
     num_threads = args.num_threads
+    # Execute.
     if num_threads == "serial":
         rcs = []
         for config in tqdm.tqdm(configs):

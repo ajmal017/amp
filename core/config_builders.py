@@ -107,15 +107,21 @@ def get_configs_from_builder(config_builder: str) -> List[cfg.Config]:
 
 def patch_configs(configs, dst_dir):
     """
-    Patch the configs to contain information needed to run.
+    Patch the configs with information needed to run.
+
+    This function is used by `run_notebook.py` and `run_pipeline.py` to pass
+    information through the `Config` to the process running the experiment.
     """
     configs_out = []
     for idx, config in enumerate(configs):
         config = config.copy()
-        config[("meta", "id")] = id
-        dst_subdir = f"result_{id}"
+        # Add `idx` for book-keeping.
+        config[("meta", "id")] = idx
+        # Add experiment result dir.
+        dst_subdir = f"result_{idx}"
         dst_dir = os.path.join(dst_dir, dst_subdir)
         config[("meta", "experiment_result_dir")] = dst_dir
+        #
         configs_out.append(config)
     return configs_out
 
@@ -126,19 +132,51 @@ def get_config_from_params(config_builder, idx, dst_dir) -> cfg.Config:
     """
     # Build all the configs.
     configs = get_configs_from_builder(config_builder)
+    # Patch the configs with metadata.
+    configs = patch_configs(configs, dst_dir)
     # Pick the config.
     dbg.dassert_lte(0, idx)
     dbg.dassert_lt(idx, len(configs))
     config = configs[config_idx]
     config = config.copy()
-    # Patch the values.
-    # `id` is only a bread crumb and not really needed.
-    config[("meta", "id")] = i
-    # TODO(gp): What's the difference between result_dir and experiment_result_dir.
-    config[("meta", "result_dir")] = dst_dir
-    config[("meta", "experiment_result_dir")] = dst_dir
     return config
 
+
+# # TODO(gp): Rewrite this in terms of get_config_from_params.
+# def get_config_from_env() -> Optional[cfg.Config]:
+#     """
+#     Build a config passed through environment vars, if possible, or return None.
+#     """
+#     config_vars = ["__CONFIG_BUILDER__", "__CONFIG_IDX__", "__CONFIG_DST_DIR__"]
+#     # Check the existence of any config var in env.
+#     if any(var in os.environ for var in config_vars):
+#         _LOG.warning("Found config vars in environment")
+#         if all(var in os.environ for var in config_vars):
+#             # Build all the configs.
+#             config_builder = os.environ["__CONFIG_BUILDER__"]
+#             _LOG.info("__CONFIG_BUILDER__=%s", config_builder)
+#             configs = get_configs_from_builder(config_builder)
+#             # Add destination directory.
+#             dst_dir = os.environ["__CONFIG_DST_DIR__"]
+#             _LOG.info("__DST_DIR__=%s", dst_dir)
+#             configs = add_result_dir(dst_dir, configs)
+#             # Pick config with relevant index.
+#             # TODO(gp): Just select and then patch only that one.
+#             config_idx = int(os.environ["__CONFIG_IDX__"])
+#             _LOG.info("__CONFIG_IDX__=%s", config_idx)
+#             dbg.dassert_lte(0, config_idx)
+#             dbg.dassert_lt(config_idx, len(configs))
+#             config = configs[config_idx]
+#             # Set file path by index.
+#             config = set_experiment_result_dir(dst_dir, config)
+#         else:
+#             msg = "Some config vars '%s' were defined, but not all" % (
+#                 ", ".join(config_vars)
+#             )
+#             raise RuntimeError(msg)
+#     else:
+#         config = None
+#     return config
 
 # TODO(gp): Rewrite this in terms of get_config_from_params.
 def get_config_from_env() -> Optional[cfg.Config]:
@@ -147,33 +185,22 @@ def get_config_from_env() -> Optional[cfg.Config]:
     """
     config_vars = ["__CONFIG_BUILDER__", "__CONFIG_IDX__", "__CONFIG_DST_DIR__"]
     # Check the existence of any config var in env.
-    if any(var in os.environ for var in config_vars):
-        _LOG.warning("Found config vars in environment")
-        if all(var in os.environ for var in config_vars):
-            # Build all the configs.
-            config_builder = os.environ["__CONFIG_BUILDER__"]
-            _LOG.info("__CONFIG_BUILDER__=%s", config_builder)
-            configs = get_configs_from_builder(config_builder)
-            # Add destination directory.
-            dst_dir = os.environ["__CONFIG_DST_DIR__"]
-            _LOG.info("__DST_DIR__=%s", dst_dir)
-            configs = add_result_dir(dst_dir, configs)
-            # Pick config with relevant index.
-            # TODO(gp): Just select and then patch only that one.
-            config_idx = int(os.environ["__CONFIG_IDX__"])
-            _LOG.info("__CONFIG_IDX__=%s", config_idx)
-            dbg.dassert_lte(0, config_idx)
-            dbg.dassert_lt(config_idx, len(configs))
-            config = configs[config_idx]
-            # Set file path by index.
-            config = set_experiment_result_dir(dst_dir, config)
-        else:
-            msg = "Some config vars '%s' were defined, but not all" % (
-                ", ".join(config_vars)
-            )
-            raise RuntimeError(msg)
-    else:
+    if not any(var in os.environ for var in config_vars):
+        _LOG.debug("No CONFIG* env vars for building config: returning")
         config = None
+        return config
+    _LOG.warning("Found config vars in environment")
+    dbg.dassert(all(var in os.environ for var in config_vars),
+                "Some config vars '%s' were defined, but not all" % (
+                    ", ".join(config_vars)
+                ))
+    config_builder = os.environ["__CONFIG_BUILDER__"]
+    _LOG.info("__CONFIG_BUILDER__=%s", config_builder)
+    dst_dir = os.environ["__CONFIG_DST_DIR__"]
+    _LOG.info("__DST_DIR__=%s", dst_dir)
+    config_idx = int(os.environ["__CONFIG_IDX__"])
+    _LOG.info("__CONFIG_IDX__=%s", config_idx)
+    config = get_config_from_params(config_builder, idx, dst_dir)
     return config
 
 

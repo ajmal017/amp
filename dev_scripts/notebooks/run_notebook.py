@@ -64,49 +64,7 @@ def _run_notebook(
     :return: if notebook is skipped ("success.txt" file already exists), return
         `None`; otherwise, return `rc`
     """
-    dbg.dassert_file_exists(notebook_file)
-
-    patch_configs(configs)
-
-    # # TODO(gp): Move all this to -> create_experiment_info()
-    # dbg.dassert_isinstance(config, cfg.Config)
-    # # TODO(gp): Can we just create instead of asserting?
-    # dbg.dassert_dir_exists(dst_dir)
-    #
-    # # Create subdirectory structure for experiment results.
-    # result_subdir = "result_%s" % i
-    # experiment_result_dir = os.path.join(dst_dir, result_subdir)
-    # _LOG.info("experiment_result_dir=%s", experiment_result_dir)
-    # # If there is already a success file in the dir, skip the experiment.
-    # file_name = os.path.join(experiment_result_dir, "success.txt")
-    # if os.path.exists(file_name):
-    #     _LOG.warning("Found file '%s': skipping run %d", file_name, i)
-    #     return
-    # io_.create_dir(experiment_result_dir, incremental=True)
-    #
-    # # Inject the experiment result dir inside the config.
-    # # TODO(gp): This operation is also performed on the notebook side
-    # #  in `get_config_from_env()`. Find a better way to achieve this.
-    # config = cfgb.set_experiment_result_dir(experiment_result_dir,
-    #                                         config)
-    # # Prepare book-keeping files.
-    # file_name = os.path.join(experiment_result_dir, "config.pkl")
-    # _LOG.info("file_name=%s", file_name)
-    # hpickle.to_pickle(config, file_name)
-    # #
-    # file_name = os.path.join(experiment_result_dir, "config.txt")
-    # _LOG.info("file_name=%s", file_name)
-    # io_.to_file(file_name, str(config))
-    # #
-    # file_name = os.path.join(experiment_result_dir, "config_builder.txt")
-    # _LOG.info("file_name=%s", file_name)
-    # io_.to_file(
-    #     file_name,
-    #     "Config builder: %s\nConfig index: %s" % (config_builder, str(i)),
-    # )
-
-    cdtfut.setup_experiment(config, dst_dir, i)
-
+    cdtfut.setup_experiment_dir(config)
     # Execute notebook.
     _LOG.info("Executing notebook %d", i)
     # Prepare the destination file.
@@ -132,53 +90,48 @@ def _run_notebook(
         # https://github.com/ContinuumIO/anaconda-issues/issues/877
         " --ExecutePreprocessor.timeout=-1"
     )
-    #
+    # Prepare the log file.
     log_file = os.path.join(experiment_result_dir, "run_notebook.%s.log" % i)
     log_file = os.path.abspath(os.path.abspath(log_file))
     # Try running the notebook up to `num_attempts` times.
     dbg.dassert_lte(1, num_attempts)
-    rc = -1
+    rc = None
     for n in range(1, num_attempts + 1):
         if n > 1:
             _LOG.warning(
-                "Attempting to re-run the notebook for the %d / %d time after "
-                "rc='%s'",
-                n - 1,
+                "Attempting to run the notebook for the %d / %d time",
+                n,
                 num_attempts,
-                rc,
             )
-        # Possibly abort on the last attempt.
-        is_last_attempt = n == num_attempts
-        abort_on_error_curr = is_last_attempt and abort_on_error
         rc = si.system(
-            cmd, output_file=log_file, abort_on_error=abort_on_error_curr
+            cmd, output_file=log_file, abort_on_error=False
         )
         if rc == 0:
+            _LOG.info("Running notebook was successful")
             break
-    if not abort_on_error and rc != 0:
-        _LOG.error(
-            "Execution failed for experiment `%s`. "
-            "Continuing execution for next experiments.",
-            i,
-        )
-    # Convert to HTML and publish.
-    if publish:
-        _LOG.info("Converting notebook %s", i)
-        log_file = log_file.replace(".log", ".html.log")
-        html_subdir_name = os.path.join(os.path.basename(dst_dir), result_subdir)
-        cmd = (
-            "python amp/dev_scripts/notebooks/publish_notebook.py"
-            + f" --file {dst_file}"
-            + f" --subdir {html_subdir_name}"
-            + " --action publish"
-        )
-        si.system(cmd, output_file=log_file)
-
-    # TODO(gp): Factor this out in utils.mark_as_success()
-    # Publish an empty file to indicate a successful finish.
-    file_name = os.path.join(experiment_result_dir, "success.txt")
-    _LOG.info("file_name=%s", file_name)
-    io_.to_file(file_name, "")
+    if rc != 0:
+        # The notebook run wasn't successful.
+        _LOG.error("Execution failed for experiment %d", i)
+        if abort_on_error:
+            dbg.dfatal("Aborting")
+        else:
+            _LOG.error("Continuing execution for next experiments")
+    else:
+        # Mark as success.
+        cdtfut.mark_config_as_success(experiment_result_dir)
+        # Convert to HTML and publish.
+        if publish:
+            _LOG.info("Publishing notebook %d", i)
+            html_subdir_name = os.path.join(os.path.basename(dst_dir), result_subdir)
+            # TODO(gp): Look for the script.
+            cmd = (
+                "python amp/dev_scripts/notebooks/publish_notebook.py"
+                + f" --file {dst_file}"
+                + f" --subdir {html_subdir_name}"
+                + " --action publish"
+            )
+            log_file = log_file.replace(".log", ".html.log")
+            si.system(cmd, output_file=log_file)
     return rc
 
 
@@ -258,33 +211,24 @@ def _main(parser: argparse.ArgumentParser) -> None:
     # configs = ccbuilders.select_config(
     #     configs, args.index, args.start_from_index,
     # )
-    config_builder = args.function
-    configs = cfgb.get_configs_from_builder(config_builder)
-    configs = cfgb.patch_configs(configs, dst_dir)
-    _LOG.info("Generated %d configs from the builder", len(configs))
-    # Select the configs.
-    index = args.index
-    start_from_index = args.start_from_index
-    configs = ccbuilders.select_config(
-        configs, index, start_from_index,
-    )
-    _LOG.info("Selected %d configs from command line", len(configs))
-    # Remove the configs already executed.
-    configs, num_skipped = skip_configs_already_executed(configs, incremental)
-    _LOG.info("Removed %d configs since already executed", num_skipped)
-    _LOG.info("Need to execute %d configs", len(configs))
+    # config_builder = args.function
+    # configs = cfgb.get_configs_from_builder(config_builder)
+    # configs = cfgb.patch_configs(configs, dst_dir)
+    # _LOG.info("Generated %d configs from the builder", len(configs))
+    # # Select the configs based on command line options.
+    # index = args.index
+    # start_from_index = args.start_from_index
+    # configs = ccbuilders.select_config(configs, index, start_from_index)
+    # _LOG.info("Selected %d configs from command line", len(configs))
+    # # Remove the configs already executed.
+    # configs, num_skipped = skip_configs_already_executed(configs, incremental)
+    # _LOG.info("Removed %d configs since already executed", num_skipped)
+    # _LOG.info("Need to execute %d configs", len(configs))
 
-    # Handle --dry_run, if needed.
-    if dry_run:
-        _LOG.warning(
-            "The following configs will not be executed due to passing --dry_run:"
-        )
-        for i, config in enumerate(configs):
-            print("config_%s:\n %s", i, config)
-        sys.exit(0)
+    configs = cdtfut.get_configs_from_command_line(args)
+
     # Get the notebook file.
-    notebook_file = args.notebook
-    notebook_file = os.path.abspath(notebook_file)
+    notebook_file = os.path.abspath(args.notebook)
     dbg.dassert_exists(notebook_file)
     # Parse command-line options.
     num_attempts = args.num_attempts

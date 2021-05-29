@@ -1,4 +1,7 @@
 """
+Contain functions used by both `run_pipeline.py` and `run_notebook.py` to run
+experiment.
+
 Import as:
 
 import core.dataflow_model.utils as cdtfut
@@ -49,11 +52,12 @@ def add_experiment_arg(
         action="store_true",
         help="Print the configs and exit",
     )
-    # parser.add_argument(
-    #     "--dry_run",
-    #     action="store_true",
-    #     help="Run a short experiment to sanity check the flow",
-    # )
+    parser.add_argument(
+        "--dry_run",
+        action="store_true",
+        help="Print configs and exit without running"
+    )
+    # TODO(gp): Run a short experiment to sanity check the flow.
     parser.add_argument(
         "--num_attempts",
         default=1,
@@ -82,6 +86,13 @@ def skip_configs_already_executed(configs, incremental):
         else:
             configs_out.append(config)
     return configs_out, num_skipped
+
+
+def mark_config_as_success(experiment_result_dir):
+    # Publish an empty file to indicate a successful finish.
+    file_name = os.path.join(experiment_result_dir, "success.txt")
+    _LOG.info("file_name=%s", file_name)
+    io_.to_file(file_name, "")
 
 
 def setup_experiment_dir(config):
@@ -177,3 +188,26 @@ def select_config(
     _LOG.info("Created %s config(s)", len(configs))
 
 
+def get_configs_from_command_line(args):
+    config_builder = args.function
+    configs = cfgb.get_configs_from_builder(config_builder)
+    configs = cfgb.patch_configs(configs, dst_dir)
+    _LOG.info("Generated %d configs from the builder", len(configs))
+    # Select the configs based on command line options.
+    index = args.index
+    start_from_index = args.start_from_index
+    configs = select_config(configs, index, start_from_index)
+    _LOG.info("Selected %d configs from command line", len(configs))
+    # Remove the configs already executed.
+    configs, num_skipped = skip_configs_already_executed(configs, incremental)
+    _LOG.info("Removed %d configs since already executed", num_skipped)
+    _LOG.info("Need to execute %d configs", len(configs))
+    # Handle --dry_run, if needed.
+    if args.dry_run:
+        _LOG.warning(
+            "The following configs will not be executed due to passing --dry_run:"
+        )
+        for i, config in enumerate(configs):
+            print("config_%s:\n %s", i, config)
+        sys.exit(0)
+    return configs
