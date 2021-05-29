@@ -473,6 +473,30 @@ def create_executable_script(file_name: str, content: str) -> None:
     system(cmd)
 
 
+
+def find_file_with_dir(file_name: str, dir_name: str, root_dir: str = ".") -> str:
+    """
+    Find a file or a directory that matches the pattern `dir_name/file_name` starting from `root_dir`.
+    """
+    cmd = "find {root_dir} -name '{file_name}'"
+    # > find . -name "utils.py"
+    # ./amp/core/dataflow/utils.py
+    # ./amp/core/dataflow_model/utils.py
+    # ./amp/instrument_master/common/test/utils.py
+    # TODO(gp): use system_to_files.
+    _, output = hsinte.system_to_string(cmd)
+    files = output.split("\n")
+    files = list(map(os.path.abspath, files))
+    found_files = []
+    for file in sorted(files):
+        if os.path.dirname(file) == dir_name and os.path.filename(file) == file_name:
+            found_files.append(file)
+    _LOG.debug("Found %d files:\n%s", len(found_files),
+               "\n".join(found_files))
+    dbg.dassert_eq(len(found_files), 1)
+    return found_files[0]
+
+
 # #############################################################################
 
 

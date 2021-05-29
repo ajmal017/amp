@@ -594,7 +594,7 @@ def _check_files(files: List[str]) -> List[str]:
         if os.path.exists(f):
             files_tmp.append(f)
         else:
-            _LOG.debug("File '%s' doesn't exist: skipping", f)
+            _LOG.warning("File '%s' doesn't exist: skipping", f)
     return files_tmp
 
 
@@ -617,6 +617,11 @@ def remove_dirs(files: List[str]) -> List[str]:
 
 
 # TODO(gp): Move to system_interactions.py
+# TODO(gp): dir_name should be the last and optional param.
+# TODO(gp): In general there are 2 patterns:
+# - assert unless there is exactly one
+# - return all of them
+# We can factor out this behavior inside system_to_files.
 def system_to_files(
     dir_name: str, cmd: str, remove_files_non_present: bool
 ) -> List[str]:
@@ -624,11 +629,16 @@ def system_to_files(
     Execute command `cmd` in `dir_name` and return the output as a list of
     strings.
     """
-    cd_cmd = "cd %s && " % dir_name
-    _, output = hsinte.system_to_string(cd_cmd + cmd)
+    if dir_name is None:
+        dir_name = "."
+    cmd = f"cd {dir_name} && {cmd}"
+    _, output = hsinte.system_to_string(cmd)
     #
-    files = output.split()
+    _LOG.debug("output=\n%s", output)
+    files = output.split("\n")
+    _LOG.debug("files=%s", " ".join(files))
     files = [os.path.join(dir_name, f) for f in files]
+    files = list(map(os.path.normpath, files))
     # Remove non-existent files, if needed.
     if remove_files_non_present:
         files = _check_files(files)

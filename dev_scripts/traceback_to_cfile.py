@@ -19,6 +19,7 @@ import logging
 import sys
 
 import helpers.dbg as dbg
+import helpers.git as git
 import helpers.io_ as hio
 import helpers.parser as prsr
 import helpers.printing as hprint
@@ -48,15 +49,19 @@ def _main(parser: argparse.ArgumentParser) -> None:
     in_file_name, out_file_name = prsr.parse_input_output_args(
         args, clear_screen=True
     )
-    if input_file_name == _NEWEST_LOG_FILE:
-        cmd = "find . -type f -name "*.log" | xargs ls -1 -t"
+    if in_file_name == _NEWEST_LOG_FILE:
+        cmd = 'find . -type f -name "*.log" | xargs ls -1 -t'
         # > find . -type f -name "*.log" | xargs ls -1 -t
         # ./run.log
         # ./amp/core/dataflow_model/run_pipeline.py.log
         # ./experiments/RH1E/result_1/run_notebook.1.log
         # ./experiments/RH1E/result_0/run_notebook.0.log
-        rc, txt
-
+        dir_name = None
+        remove_files_non_present = False
+        files = git.system_to_files(dir_name, cmd, remove_files_non_present)
+        # Pick the newest file.
+        in_file_name = files[0]
+    _LOG.info("in_file_name=%s", in_file_name)
     if out_file_name != "-":
         hio.delete_file(out_file_name)
     # Read file.
