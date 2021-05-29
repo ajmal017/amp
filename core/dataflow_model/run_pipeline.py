@@ -12,20 +12,17 @@ Run a pipeline given a list of configs.
 import argparse
 import logging
 import os
-import sys
-from typing import List, Optional
+from typing import Optional
 
 import joblib
 import tqdm
 
 import core.config as cfg
-import core.config_builders as cfgb
+import core.dataflow_model.utils as cdtfut
 import helpers.dbg as dbg
 import helpers.io_ as io_
 import helpers.parser as prsr
-import helpers.pickle_ as hpickle
 import helpers.printing as printing
-import helpers.system_interaction as si
 
 _LOG = logging.getLogger(__name__)
 
@@ -34,32 +31,20 @@ _LOG = logging.getLogger(__name__)
 
 import helpers.system_interaction as hsinte
 
+
 def _run_pipeline(
-        i: int,
-        pipeline_builder: str,
-        dst_dir: str,
-        config: cfg.Config,
-        config_builder: str,
-        num_attempts: int,
-        abort_on_error: bool,
-) -> Optional[int]:
+    config: cfg.Config,
+    num_attempts: int,
+    abort_on_error: bool,
+) -> int:
     """
     Run a pipeline for a specific `Config`.
 
-    The `config_builder` is passed inside the notebook to generate a list of all
-    configs to be run as part of a series of experiments, but only the `i`-th config
-    is run inside a particular notebook.
-
-    :param i: index of config to select in a list of configs
-    :param notebook_file: path to file with experiment template
-    :param dst_dir: path to directory to store results
     :param config: config for the experiment
-    :param config_builder: function used to generate all the configs
     :param num_attempts: maximum number of times to attempt running the
         notebook
     :param abort_on_error: if `True`, raise an error
-    :return: if notebook is skipped ("success.txt" file already exists), return
-        `None`; otherwise, return `rc`
+    :return: rc from executing the pipeline
     """
     dbg.dassert_eq(1, num_attempts, "Multiple attempts not supported yet")
     cdtfut.setup_experiment_dir(config)
@@ -69,13 +54,14 @@ def _run_pipeline(
     log_file = os.path.join(experiment_result_dir, "run_pipeline.%s.log" % i)
     log_file = os.path.abspath(os.path.abspath(log_file))
     # Prepare command line.
-    cmd = ["run_pipeline_stub.py",
-       f"--pipeline_builder '{pipeline_builder}'",
+    cmd = [
+        "run_pipeline_stub.py",
+        f"--pipeline_builder '{pipeline_builder}'",
         f"--config_builder '{config_builder}'",
         f"--idx {i}",
         f"--dst_dir {dst_dir}",
         "-v INFO",
-        ]
+    ]
     cmd = " ".join(cmd)
     # Execute.
     rc = hsinte.system(cmd, output_file=log_file, abort_on_error=False)
@@ -105,7 +91,7 @@ def _parse() -> argparse.ArgumentParser:
         required=True,
         help="File storing the pipeline to iterate over",
     )
-    prsr.add_verbosity_arg(parser)
+    parser = prsr.add_verbosity_arg(parser)
     return parser
 
 
@@ -118,26 +104,18 @@ def _main(parser: argparse.ArgumentParser) -> None:
 
     configs = cdtfut.get_configs_from_command_line(args)
 
-    # Get the file with the pipeline to run.
-    pipeline_file = os.path.abspath(args.pipeline)
-    dbg.dassert_exists(pipeline_file)
     # Parse command-line options.
     num_attempts = args.num_attempts
     abort_on_error = not args.skip_on_error
-    publish = args.publish_notebook
     num_threads = args.num_threads
     # Execute.
     if num_threads == "serial":
         rcs = []
-        for config in tqdm.tqdm(configs):
+        for i, config in tqdm.tqdm(enumerate(configs)):
             _LOG.debug("\n%s", printing.frame("Config %s" % i))
             #
             rc = _run_pipeline(
-                int(config[("meta", "id")]),
-                notebook_file,
-                dst_dir,
                 config,
-                config_builder,
                 num_attempts,
                 abort_on_error,
             )
@@ -148,17 +126,13 @@ def _main(parser: argparse.ArgumentParser) -> None:
         _LOG.info("Using %d threads", num_threads)
         rcs = joblib.Parallel(n_jobs=num_threads, verbose=50)(
             joblib.delayed(_run_pipeline)(
-                int(config[("meta", "id")]),
-                notebook_file,
-                dst_dir,
                 config,
-                config_builder,
                 num_attempts,
                 abort_on_error,
-                publish,
             )
             for config in configs
         )
+    # TODO(gp): Factor this out.
     # Report failing experiments.
     experiment_ids = [int(config[("meta", "id")]) for config in configs]
     failed_experiment_ids = [

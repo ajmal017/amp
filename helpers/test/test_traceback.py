@@ -80,3 +80,12 @@ Traceback
         #
         exp_traceback = None
         self.assertIs(act_traceback, exp_traceback)
+
+
+# Traceback (most recent call last):
+#   File "./amp/core/dataflow_model/run_pipeline.py", line 146, in <module>
+#     _main(_parse())
+#   File "./amp/core/dataflow_model/run_pipeline.py", line 105, in _main
+#     configs = cdtfut.get_configs_from_command_line(args)
+#   File "/app/amp/core/dataflow_model/utils.py", line 228, in get_configs_from_command_line
+#     "config_builder": args.config_builder,

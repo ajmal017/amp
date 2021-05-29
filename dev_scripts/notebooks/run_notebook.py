@@ -9,25 +9,22 @@ Run a notebook given a config or a list of configs.
     --function "nlp.build_configs.build_PTask1088_configs()" \
     --num_threads 2
 """
+
 import argparse
 import logging
 import os
-import sys
-from typing import List, Optional
+from typing import Optional
 
 import joblib
 import tqdm
 
 import core.config as cfg
-import core.config_builders as cfgb
 import core.dataflow_model.utils as cdtfut
 import helpers.dbg as dbg
 import helpers.io_ as io_
 import helpers.parser as prsr
-import helpers.pickle_ as hpickle
 import helpers.printing as printing
 import helpers.system_interaction as si
-
 
 _LOG = logging.getLogger(__name__)
 
@@ -36,11 +33,8 @@ _LOG = logging.getLogger(__name__)
 
 
 def _run_notebook(
-    i: int,
-    notebook_file: str,
-    dst_dir: str,
     config: cfg.Config,
-    config_builder: str,
+    notebook_file: str,
     num_attempts: int,
     abort_on_error: bool,
     publish: bool,
@@ -48,15 +42,8 @@ def _run_notebook(
     """
     Run a notebook for a specific `Config`.
 
-    The `config_builder` is passed inside the notebook to generate a list
-    of all configs to be run as part of a series of experiments, but only the
-    `i`-th config is run inside a particular notebook.
-
-    :param i: index of config to select in a list of configs
-    :param notebook_file: path to file with experiment template
-    :param dst_dir: path to directory to store results
     :param config: config for the experiment
-    :param config_builder: function used to generate all the configs
+    :param notebook_file: path to file with experiment template
     :param num_attempts: maximum number of times to attempt running the
         notebook
     :param abort_on_error: if `True`, raise an error
@@ -65,8 +52,6 @@ def _run_notebook(
         `None`; otherwise, return `rc`
     """
     cdtfut.setup_experiment_dir(config)
-    # Execute notebook.
-    _LOG.info("Executing notebook %d", i)
     # Prepare the destination file.
     dst_file = os.path.join(
         experiment_result_dir,
@@ -75,9 +60,12 @@ def _run_notebook(
     _LOG.info("dst_file=%s", dst_file)
     dst_file = os.path.abspath(dst_file)
     # Export config function and its `id` to the notebook.
+    config_builder = config[("meta", "config_builder")]
+    idx = config[("meta", "idx")]
+    dst_dir = config[("meta", "dst_dir")]
     cmd = (
         f'export __CONFIG_BUILDER__="{config_builder}"; '
-        + f'export __CONFIG_IDX__="{i}"; '
+        + f'export __CONFIG_IDX__="{idx}"; '
         + f'export __CONFIG_DST_DIR__="{experiment_result_dir}"'
     )
     cmd += (
@@ -93,6 +81,8 @@ def _run_notebook(
     # Prepare the log file.
     log_file = os.path.join(experiment_result_dir, "run_notebook.%s.log" % i)
     log_file = os.path.abspath(os.path.abspath(log_file))
+    # TODO(gp): Repeating a command n-times is an idiom that we could
+    # move to system_interaction.
     # Try running the notebook up to `num_attempts` times.
     dbg.dassert_lte(1, num_attempts)
     rc = None
@@ -103,9 +93,7 @@ def _run_notebook(
                 n,
                 num_attempts,
             )
-        rc = si.system(
-            cmd, output_file=log_file, abort_on_error=False
-        )
+        rc = si.system(cmd, output_file=log_file, abort_on_error=False)
         if rc == 0:
             _LOG.info("Running notebook was successful")
             break
@@ -122,7 +110,9 @@ def _run_notebook(
         # Convert to HTML and publish.
         if publish:
             _LOG.info("Publishing notebook %d", i)
-            html_subdir_name = os.path.join(os.path.basename(dst_dir), result_subdir)
+            html_subdir_name = os.path.join(
+                os.path.basename(dst_dir), result_subdir
+            )
             # TODO(gp): Look for the script.
             cmd = (
                 "python amp/dev_scripts/notebooks/publish_notebook.py"

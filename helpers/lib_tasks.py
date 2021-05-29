@@ -1988,7 +1988,7 @@ def jump_to_pytest_error(ctx, log_name=""):  # type: ignore
         log_name = "tmp.pytest.log"
     _LOG.info("Reading %s", log_name)
     # Convert the traceback into a cfile.
-    cmd = f"dev_scripts/traceback_to_cfile.py -i {log_name} -o cfile"
+    cmd = f"traceback_to_cfile.py -i {log_name} -o cfile"
     _run(ctx, cmd)
     # Read and navigate the cfile with vim.
     cmd = 'vim -c "cfile cfile"'

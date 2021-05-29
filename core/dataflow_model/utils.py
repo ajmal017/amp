@@ -7,6 +7,30 @@ Import as:
 import core.dataflow_model.utils as cdtfut
 """
 
+import argparse
+import logging
+import os
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    Union,
+    cast,
+)
+
+
+import core.config as cfg
+import core.config_builders as cfgb
+import helpers.dbg as dbg
+import helpers.io_ as io_
+
+_LOG = logging.getLogger(__name__)
+
+
 def add_experiment_arg(
     parser: argparse.ArgumentParser,
 ) -> argparse.ArgumentParser:
@@ -29,8 +53,8 @@ def add_experiment_arg(
         action="store",
         required=True,
         help="Full invocation of Python function to create configs, e.g., "
-             "`nlp.build_configs.build_PTask1297_configs(random_seed_variants="
-             "[911,2,42,0])`",
+        "`nlp.build_configs.build_PTask1297_configs(random_seed_variants="
+        "[911,2,42,0])`",
     )
     parser.add_argument(
         "--skip_on_error",
@@ -55,7 +79,7 @@ def add_experiment_arg(
     parser.add_argument(
         "--dry_run",
         action="store_true",
-        help="Print configs and exit without running"
+        help="Print configs and exit without running",
     )
     # TODO(gp): Run a short experiment to sanity check the flow.
     parser.add_argument(
@@ -71,6 +95,7 @@ def add_experiment_arg(
         help="Number of threads to use (-1 to use all CPUs)",
         required=True,
     )
+    return parser
 
 
 def skip_configs_already_executed(configs, incremental):
@@ -97,14 +122,14 @@ def mark_config_as_success(experiment_result_dir):
 
 def setup_experiment_dir(config):
     """
-    Set up the directory and the book-keeping artifacts for the experiment running
-    `config`.
+    Set up the directory and the book-keeping artifacts for the experiment
+    running `config`.
 
     :return: whether we need to run this config or not
     """
     dbg.dassert_isinstance(config, cfg.Config)
     # TODO(gp): Can we just create instead of asserting?
-    #dbg.dassert_dir_exists(dst_dir)
+    # dbg.dassert_dir_exists(dst_dir)
 
     # Create subdirectory structure for experiment results.
     # result_subdir = "result_%s" % i
@@ -140,11 +165,11 @@ def setup_experiment_dir(config):
     io_.to_file(
         file_name,
         "Config builder: %s\nConfig index: %s" % (config_builder, str(i)),
-        )
+    )
 
 
 def select_config(
-        configs: List[cfg.Config], index: int, start_from_index: int
+    configs: List[cfg.Config], index: int, start_from_index: int
 ) -> List[cfg.Config]:
     """
     Select configs to run from a list of configs.
@@ -189,9 +214,23 @@ def select_config(
 
 
 def get_configs_from_command_line(args):
+    """
+    Return all the configs to run given the command line interface.
+
+    The configs are patched with all the information from the command line
+    (e.g., `idx`, `config_builder`, `pipeline_builder`, `dst_dir`,
+    `experiment_dst_dir`).
+    """
     config_builder = args.function
     configs = cfgb.get_configs_from_builder(config_builder)
-    configs = cfgb.patch_configs(configs, dst_dir)
+    # Common params.
+    params = {
+        "config_builder": args.config_builder,
+        "dst_dir": args.dst_dir,
+      }
+    if getattr(args, "pipeline_builder"):
+        params["pipeline_builder"] = args.pipeline_builder
+    configs = cfgb.patch_configs(configs, params)
     _LOG.info("Generated %d configs from the builder", len(configs))
     # Select the configs based on command line options.
     index = args.index

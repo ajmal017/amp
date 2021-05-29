@@ -15,6 +15,16 @@
         - index
         - dst_dir
     
+- The invariant is that 
+
+- There are two interfaces to materialize configs
+    - One on the command line side
+    
+    - One on the run_pipeline, notebook side
+        - The params to reconstruct the configs 
+          are passed through env vars or params of the
+          script
+    
 ```
 > run_pipeline.py \
   --dst_dir experiment1 \

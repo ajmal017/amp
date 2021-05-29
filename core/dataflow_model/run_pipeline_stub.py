@@ -11,24 +11,13 @@ Run a single DAG model wrapping
 import argparse
 import logging
 import os
-import sys
-from typing import List, Optional
 
-import joblib
-import tqdm
-
-import core.config as cfg
-import core.config_builders as cfgb
-import core.dataflow_model.utils as cdtfut
 import helpers.dbg as dbg
 import helpers.io_ as io_
 import helpers.parser as prsr
-import helpers.pickle_ as hpickle
-import helpers.printing as printing
-import helpers.system_interaction as si
-
 
 _LOG = logging.getLogger(__name__)
+
 
 def _parse() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -54,7 +43,7 @@ def _parse() -> argparse.ArgumentParser:
         help="",
     )
     parser.add_argument(
-        "--dst_dir",
+        "--experiment_dst_dir",
         action="store",
         required=True,
         help="",
@@ -68,8 +57,17 @@ def _main(parser: argparse.ArgumentParser) -> None:
     # TODO(gp): Save log.
     dbg.init_logger(verbosity=args.log_level)
     # Create the dst dir.
-    dst_dir = os.path.abspath(args.dst_dir)
-    io_.create_dir(dst_dir, incremental=True)
+    experiment_dst_dir = os.path.abspath(args.experiment_dst_dir)
+    io_.create_dir(experiment_dst_dir, incremental=True)
+    #
+    params = {
+        "config_builder": args.config_builder,
+        "experiment_dst_dir": args.experiment_dst_dir,
+        "pipeline_builder": args.pipeline_builder,
+    }
+    config = ccbuild.get_config_from_params(config_idx, params)
+    # TODO(gp): Generalize this in terms of `pipeline_builder`.
+    master_pipeline.run_pipeline(config)
 
 
 if __name__ == "__main__":

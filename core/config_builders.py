@@ -63,7 +63,7 @@ def get_config_from_nested_dict(nested: Dict[str, Any]) -> cfg.Config:
     return get_config_from_flattened(flattened)
 
 
-# #########################################################################
+# #############################################################################
 
 
 def get_configs_from_builder(config_builder: str) -> List[cfg.Config]:
@@ -101,87 +101,61 @@ def get_configs_from_builder(config_builder: str) -> List[cfg.Config]:
     for c in configs:
         dbg.dassert_isinstance(c, cfg.Config)
     #
-    cfgb.assert_on_duplicated_configs(configs)
+    assert_on_duplicated_configs(configs)
     return configs
 
 
-def patch_configs(configs, dst_dir):
+def patch_configs(configs: List[cfg.Config],
+                  params: Dict[str, str]
+                  ) -> List[cfg.Config]:
     """
     Patch the configs with information needed to run.
 
-    This function is used by `run_notebook.py` and `run_pipeline.py` to pass
-    information through the `Config` to the process running the experiment.
+    This function is used by `run_notebook.py` and `run_pipeline.py` to
+    pass information through the `Config` to the process running the
+    experiment.
     """
     configs_out = []
     for idx, config in enumerate(configs):
         config = config.copy()
         # Add `idx` for book-keeping.
         config[("meta", "id")] = idx
+        # Inject all the params in the config.
+        for key in sorted(params.keys()):
+            config[("meta", key)] = params[k]
+        # Inject the experiment result dir.
+        dbg.dassert_in("dst_dir", params)
+        dst_dir = params["dst_dir"]
         # Add experiment result dir.
         dst_subdir = f"result_{idx}"
-        dst_dir = os.path.join(dst_dir, dst_subdir)
-        config[("meta", "experiment_result_dir")] = dst_dir
+        experiment_dst_dir = os.path.join(dst_dir, dst_subdir)
+        config[("meta", "experiment_result_dir")] = experiment_dst_dir
         #
         configs_out.append(config)
     return configs_out
 
 
-def get_config_from_params(config_builder, idx, dst_dir) -> cfg.Config:
+def get_config_from_params(idx: int, params: Dict[str, str]) -> cfg.Config:
     """
     Build a config from the passed parameters.
     """
+    config_builder = params["config_builder"]
     # Build all the configs.
     configs = get_configs_from_builder(config_builder)
     # Patch the configs with metadata.
-    configs = patch_configs(configs, dst_dir)
+    configs = patch_configs(configs, params)
     # Pick the config.
     dbg.dassert_lte(0, idx)
     dbg.dassert_lt(idx, len(configs))
-    config = configs[config_idx]
+    config = configs[idx]
     config = config.copy()
     return config
 
 
-# # TODO(gp): Rewrite this in terms of get_config_from_params.
-# def get_config_from_env() -> Optional[cfg.Config]:
-#     """
-#     Build a config passed through environment vars, if possible, or return None.
-#     """
-#     config_vars = ["__CONFIG_BUILDER__", "__CONFIG_IDX__", "__CONFIG_DST_DIR__"]
-#     # Check the existence of any config var in env.
-#     if any(var in os.environ for var in config_vars):
-#         _LOG.warning("Found config vars in environment")
-#         if all(var in os.environ for var in config_vars):
-#             # Build all the configs.
-#             config_builder = os.environ["__CONFIG_BUILDER__"]
-#             _LOG.info("__CONFIG_BUILDER__=%s", config_builder)
-#             configs = get_configs_from_builder(config_builder)
-#             # Add destination directory.
-#             dst_dir = os.environ["__CONFIG_DST_DIR__"]
-#             _LOG.info("__DST_DIR__=%s", dst_dir)
-#             configs = add_result_dir(dst_dir, configs)
-#             # Pick config with relevant index.
-#             # TODO(gp): Just select and then patch only that one.
-#             config_idx = int(os.environ["__CONFIG_IDX__"])
-#             _LOG.info("__CONFIG_IDX__=%s", config_idx)
-#             dbg.dassert_lte(0, config_idx)
-#             dbg.dassert_lt(config_idx, len(configs))
-#             config = configs[config_idx]
-#             # Set file path by index.
-#             config = set_experiment_result_dir(dst_dir, config)
-#         else:
-#             msg = "Some config vars '%s' were defined, but not all" % (
-#                 ", ".join(config_vars)
-#             )
-#             raise RuntimeError(msg)
-#     else:
-#         config = None
-#     return config
-
-# TODO(gp): Rewrite this in terms of get_config_from_params.
 def get_config_from_env() -> Optional[cfg.Config]:
     """
-    Build a config passed through environment vars, if possible, or return None.
+    Build a config passed through environment vars, if possible, or return
+    None.
     """
     config_vars = ["__CONFIG_BUILDER__", "__CONFIG_IDX__", "__CONFIG_DST_DIR__"]
     # Check the existence of any config var in env.
@@ -190,19 +164,27 @@ def get_config_from_env() -> Optional[cfg.Config]:
         config = None
         return config
     _LOG.warning("Found config vars in environment")
-    dbg.dassert(all(var in os.environ for var in config_vars),
-                "Some config vars '%s' were defined, but not all" % (
-                    ", ".join(config_vars)
-                ))
-    config_builder = os.environ["__CONFIG_BUILDER__"]
-    _LOG.info("__CONFIG_BUILDER__=%s", config_builder)
-    dst_dir = os.environ["__CONFIG_DST_DIR__"]
-    _LOG.info("__DST_DIR__=%s", dst_dir)
+    dbg.dassert(
+        all(var in os.environ for var in config_vars),
+        "Some config vars '%s' were defined, but not all"
+        % (", ".join(config_vars)),
+    )
+    params = {}
+    #
     config_idx = int(os.environ["__CONFIG_IDX__"])
-    _LOG.info("__CONFIG_IDX__=%s", config_idx)
-    config = get_config_from_params(config_builder, idx, dst_dir)
+    _LOG.info("config_idx=%s", config_idx)
+    #
+    config_builder = os.environ["__CONFIG_BUILDER__"]
+    _LOG.info("config_builder=%s", config_builder)
+    params["config_builder"] = config_builder
+    #
+    experiment_dst_dir = os.environ["__CONFIG_EXPERIMENT_DST_DIR__"]
+    _LOG.info("experiment_dst_dir=%s", experiment_dst_dir)
+    params["experiment_dst_dir"] = experiment_dst_dir
+    #
+    config = get_config_from_params(config_idx, params)
+    #
     return config
-
 
 
 # # TODO(gp): Switch the order of the params: configs, dst_dir.
