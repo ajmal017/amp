@@ -1,4 +1,5 @@
 import logging
+import os
 import re
 from typing import List, Match, Optional, Tuple
 
@@ -101,6 +102,7 @@ def parse_traceback(
             code_as_single_line = "/".join(code)
             _LOG.debug("  -> code_as_single_line=\n%s", code_as_single_line)
             # Assemble the result.
+            file_name = os.path.normpath(file_name)
             cfile_row = (
                 file_name,
                 line_num,
@@ -131,6 +133,9 @@ def parse_traceback(
         traceback = "\n".join(lines[start_idx:end_idx])
     else:
         raise ValueError("Invalid state='%s'" % state)
+    _LOG.debug("# Before purifying from client")
+    _LOG.debug("cfile=\n%s", cfile_to_str(cfile))
+    _LOG.debug("traceback=\n%s", traceback)
     # Purify filenames from client so that refer to files in this client.
     if cfile and purify_from_client:
         cfile_tmp = []
@@ -140,10 +145,19 @@ def parse_traceback(
                 base_name = os.path.basename(file_name)
                 dir_name = os.path.dirname(file_name)
                 file_name_tmp = hsinte.find_file_with_dir(base_name, dir_name, ".")
-                if not os.path.exists(file_name_tmp):
-                    _LOG.warning(f"The file_name '{file_name_tmp}' corresponding to"
-                                 f"the original file_name '{file_name}' doesn't exist")
-                cfile_tmp.append((file_name_tmp, line_num, text))
-        cfile= cfile_tmp
-    #
+                if file_name_tmp is None:
+                    # We didn't find the file in the current client: leave the file as it was.
+                    _LOG.warning("Can't find the file_name corresponding to"
+                                 f"file_name '{file_name}'")
+                else:
+                    if not os.path.exists(file_name_tmp):
+                        _LOG.warning(f"The file_name '{file_name_tmp}' corresponding to"
+                                     f"the original file_name '{file_name}' doesn't exist")
+                    file_name = file_name_tmp
+            file_name = os.path.normpath(file_name)
+            cfile_tmp.append((file_name, line_num, text))
+        cfile = cfile_tmp
+        _LOG.debug("# After purifying from client")
+        _LOG.debug("cfile=\n%s", cfile_to_str(cfile))
+        _LOG.debug("traceback=\n%s", traceback)
     return cfile, traceback

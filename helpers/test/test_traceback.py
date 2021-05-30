@@ -1,4 +1,5 @@
 import logging
+import os.path
 from typing import List, Match, Optional, Tuple
 
 import helpers.traceback_helper as htrace
@@ -50,6 +51,7 @@ NameError: name 'repo_short_name' is not defined
             ),
         ]
         # pylint: enable=line-too-long
+        act_cfile = self._purify_from_client(act_cfile)
         self.assert_equal(
             htrace.cfile_to_str(act_cfile), htrace.cfile_to_str(exp_cfile)
         )
@@ -92,7 +94,10 @@ Traceback
         """
         purify_from_client = True
         # pylint: disable=line-too-long
-        exp_cfile = []
+        exp_cfile = [
+            ("core/dataflow_model/run_pipeline.py", 146, ""),
+            ("core/dataflow_model/run_pipeline.py", 105, ""),
+            ("core/dataflow_model/utils.py", 228, "")]
         # pylint: enable=line-too-long
         exp_traceback = None
         self._test_parse_helper(purify_from_client, exp_cfile, exp_traceback)
@@ -120,3 +125,20 @@ Traceback (most recent call last):
         )
         #
         self.assertIs(act_traceback, exp_traceback)
+
+    @staticmethod
+    def _purify_from_client(cfile: htrace.CFILE_ROW) -> htrace.CFILE_ROW:
+        """
+        Remove the references to '/app/amp/' and '/app/` from a CFILE_ROW.
+        """
+        cfile_tmp = []
+        for cfile_row in cfile:
+            file_name, line_num, text = cfile_row
+            file_name = os.path.normpath(file_name)
+            for prefix in ["/app/amp/", "/app/", "amp/"]:
+                if file_name.startswith(prefix):
+                    # TODO(gp): Use Python3.9 removeprefix.
+                    file_name = file_name.replace(prefix, "")
+            cfile_row = (file_name, line_num, text)
+            cfile_tmp.append(cfile_row)
+        return cfile_tmp
