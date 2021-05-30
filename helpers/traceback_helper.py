@@ -4,6 +4,7 @@ import re
 from typing import List, Match, Optional, Tuple
 
 import helpers.dbg as dbg
+import helpers.git as git
 import helpers.system_interaction as hsinte
 
 
@@ -133,31 +134,32 @@ def parse_traceback(
         traceback = "\n".join(lines[start_idx:end_idx])
     else:
         raise ValueError("Invalid state='%s'" % state)
+    _LOG.debug("traceback=\n%s", traceback)
     _LOG.debug("# Before purifying from client")
     _LOG.debug("cfile=\n%s", cfile_to_str(cfile))
-    _LOG.debug("traceback=\n%s", traceback)
     # Purify filenames from client so that refer to files in this client.
+    git_client = git.get_
     if cfile and purify_from_client:
         cfile_tmp = []
         for cfile_row in cfile:
             file_name, line_num, text = cfile_row
-            if file_name.startswith("/app"):
-                base_name = os.path.basename(file_name)
-                dir_name = os.path.dirname(file_name)
-                file_name_tmp = hsinte.find_file_with_dir(base_name, dir_name, ".")
-                if file_name_tmp is None:
-                    # We didn't find the file in the current client: leave the file as it was.
-                    _LOG.warning("Can't find the file_name corresponding to"
-                                 f"file_name '{file_name}'")
-                else:
-                    if not os.path.exists(file_name_tmp):
-                        _LOG.warning(f"The file_name '{file_name_tmp}' corresponding to"
-                                     f"the original file_name '{file_name}' doesn't exist")
-                    file_name = file_name_tmp
-            file_name = os.path.normpath(file_name)
+            # if file_name.startswith("/app"):
+            #     base_name = os.path.basename(file_name)
+            #     dir_name = os.path.dirname(file_name)
+            #     file_name_tmp = hsinte.find_file_with_dir(base_name, dir_name, ".")
+            #     if file_name_tmp is None:
+            #         # We didn't find the file in the current client: leave the file as it was.
+            #         _LOG.warning("Can't find the file_name corresponding to"
+            #                      f"file_name '{file_name}'")
+            #     else:
+            #         if not os.path.exists(file_name_tmp):
+            #             _LOG.warning(f"The file_name '{file_name_tmp}' corresponding to"
+            #                          f"the original file_name '{file_name}' doesn't exist")
+            #         file_name = file_name_tmp
+            # #
+            # file_name = os.path.normpath(file_name)
             cfile_tmp.append((file_name, line_num, text))
         cfile = cfile_tmp
         _LOG.debug("# After purifying from client")
         _LOG.debug("cfile=\n%s", cfile_to_str(cfile))
-        _LOG.debug("traceback=\n%s", traceback)
     return cfile, traceback

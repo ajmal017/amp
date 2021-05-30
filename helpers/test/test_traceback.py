@@ -9,7 +9,6 @@ import helpers.dbg as dbg
 import helpers.system_interaction as hsinte
 
 
-
 _LOG = logging.getLogger(__name__)
 
 
@@ -93,12 +92,22 @@ Traceback
         Parse a traceback file with / without purifying files.
         """
         purify_from_client = True
-        # pylint: disable=line-too-long
         exp_cfile = [
             ("core/dataflow_model/run_pipeline.py", 146, ""),
             ("core/dataflow_model/run_pipeline.py", 105, ""),
             ("core/dataflow_model/utils.py", 228, "")]
-        # pylint: enable=line-too-long
+        exp_traceback = None
+        self._test_parse_helper(purify_from_client, exp_cfile, exp_traceback)
+
+    def test_parse4(self) -> None:
+        """
+        Like `test_parse3` but without purifying from client.
+        """
+        purify_from_client = False
+        exp_cfile = [
+            ("core/dataflow_model/run_pipeline.py", 146, ""),
+            ("core/dataflow_model/run_pipeline.py", 105, ""),
+            ("core/dataflow_model/utils.py", 228, "")]
         exp_traceback = None
         self._test_parse_helper(purify_from_client, exp_cfile, exp_traceback)
 

@@ -465,8 +465,7 @@ def find_file_in_git_tree(file_name: str, super_module: bool = True) -> str:
     """
     Find the path of a file in a Git tree.
 
-    In practice we find the Git root and then search from there for the
-    file.
+    We get the Git root and then search for the file from there.
     """
     root_dir = get_client_root(super_module=super_module)
     cmd = "find %s -name '%s' | grep -v .git" % (root_dir, file_name)
@@ -486,7 +485,9 @@ def get_path_from_git_root(file_name: str, super_module: bool) -> str:
 
     :param super_module: like get_client_root()
     """
+    # Get Git root.
     git_root = get_client_root(super_module) + "/"
+    # TODO(gp): Use os.path.relpath()
     abs_path = os.path.abspath(file_name)
     dbg.dassert(abs_path.startswith(git_root))
     end_idx = len(git_root)
@@ -530,6 +531,39 @@ def get_repo_dirs() -> List[str]:
         if os.path.exists(dir_name):
             dir_names.append(dir_name)
     return dir_names
+
+
+def purify_docker_file_from_client(file_name: str, super_module) -> str:
+    """
+    Convert a file that was generated inside Docker to a file in the current dir.
+
+    This operation is best effort since it might not be able to find a file in the
+    current repo. E.g., a file in Docker under a super-module is not in a sub-module.
+
+    E.g.,
+    - A file like '/app/amp/core/dataflow_model/utils.py', in a Docker container with
+      Git root in '/app' becomes 'amp/core/dataflow_model/utils.py'
+    - For a file like '/app/amp/core/dataflow_model/utils.py' outside Docker, we look
+      for the file 'dataflow_model/utils.py' in the current client and then normalize
+      with respect to the
+    """
+    # Clean up file name.
+    file_name = os.path.normpath(file_name)
+    #
+    base_name = os.path.basename(file_name)
+    dir_name = os.path.dirname(file_name)
+    file_name_tmp = hsinte.find_file_with_dir(base_name, dir_name, ".")
+    if file_name_tmp is None:
+        # We didn't find the file in the current client: leave the file as it was.
+        _LOG.warning("Can't find the file_name corresponding to"
+                     f"file_name '{file_name}'")
+    else:
+        # We have found the file.
+        file_name = file_name_tmp
+    #
+    file_name = get_path_from_git_root(file_name, super_module)
+    file_name = os.path.normpath(file_name)
+    return file_name
 
 
 # #############################################################################

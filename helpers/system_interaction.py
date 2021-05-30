@@ -500,7 +500,6 @@ def find_file_with_dir(file_name: str, dir_name: str, root_dir: str = ".") -> Op
         dbg.dfatal("Found found_files=\n%s", "\n".join(found_files))
     return res
 
-
 # #############################################################################
 
 
