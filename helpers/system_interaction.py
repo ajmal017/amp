@@ -473,32 +473,129 @@ def create_executable_script(file_name: str, content: str) -> None:
     system(cmd)
 
 
-def find_file_with_dir(file_name: str, dir_name: str, root_dir: str = ".") -> Optional[str]:
+def find_file_with_dir(file_name: str, root_dir: str = ".") -> Optional[str]:
     """
-    Find a file or a directory that matches the pattern `dir_name/file_name` starting from `root_dir`.
+    Find a file matching basename and enclosing dir name starting from `root_dir`.
+
+    E.g., find a file matching `amp/core/dataflow_model/utils.py` by looking for a
+    file with basename 'utils.py' under a dir 'dataflow_model'.
+
+    :return:
+        - return `None` if no matching file was found
+        - return the match, if only one matching file was found
+        - assert if more than one files matching the pattern were found
     """
-    cmd = f"find {root_dir} -name '{file_name}'"
+    _LOG.debug(hprint.to_str("file_name dir_name root_dir"))
+    # Find all the files in the dir with the same basename.
+    base_name = os.path.basename(file_name)
+    cmd = f"find {root_dir} -name '{base_name}' -not -path '*/\.git/*'"
     # > find . -name "utils.py"
     # ./amp/core/dataflow/utils.py
     # ./amp/core/dataflow_model/utils.py
     # ./amp/instrument_master/common/test/utils.py
     # TODO(gp): use system_to_files.
     _, output = system_to_string(cmd)
-    files = output.split("\n")
-    files = list(map(os.path.abspath, files))
+    found_files = output.split("\n")
+    _LOG.debug("files=\n%s", "\n".join(found_files))
+    # Check which files match enclosing dir name and basename.
     found_files = []
-    for file in sorted(files):
-        if os.path.dirname(file) == dir_name and os.path.basename(file) == file_name:
-            found_files.append(file)
+    def _compute_file_signature(file_: str) -> str:
+        enclosing_dir_name = os.path.basename(os.path.dirname(file_))
+        basename = os.path.basename(file_)
+        return (enclosing_dir_name, basename)
+
+    for found_file in sorted(found_files):
+        if _compute_file_signature(found_file) == _compute_file_signature(file_name):
+            found_files.append(found_file)
     _LOG.debug("Found %d files:\n%s", len(found_files),
                "\n".join(found_files))
+    # Process output.
     if len(found_files) == 0:
+        # Found no matching file: return `None`.
         res = None
     elif len(found_files) == 1:
+        # Found a single match: return the only one.
         res = found_files[0]
     else:
+        # Found more than one potential match: assert.
         dbg.dfatal("Found found_files=\n%s", "\n".join(found_files))
     return res
+
+
+def to_normal_paths(files: List[str]) -> List[str]:
+    files = list(map(os.path.normpath, files))
+    return files
+
+
+def to_absolute_paths(files: List[str]) -> List[str]:
+    files = list(map(os.path.abspath, files))
+    return files
+
+
+def remove_file_non_present(files: List[str]) -> List[str]:
+    """
+    Return list of files from `files` excluding the files that don't exist.
+    """
+    files_tmp = []
+    for f in files:
+        if os.path.exists(f):
+            files_tmp.append(f)
+        else:
+            _LOG.warning("File '%s' doesn't exist: skipping", f)
+    return files_tmp
+
+
+def remove_dirs(files: List[str]) -> List[str]:
+    """
+    Return list of files from `files` excluding the files that are directories.
+    """
+    files_tmp: List[str] = []
+    dirs_tmp: List[str] = []
+    for file in files:
+        if os.path.isdir(file):
+            _LOG.debug("file='%s' is a dir: skipping", file)
+            dirs_tmp.append(file)
+        else:
+            files_tmp.append(file)
+    if dirs_tmp:
+        _LOG.warning("Removed dirs: %s", ", ".join(dirs_tmp))
+    return files_tmp
+
+
+# TODO(gp): In general there are 2 patterns:
+# - assert unless there is exactly one
+# - return all of them
+# We can factor out this behavior inside system_to_files.
+def system_to_files(
+    cmd: str, dir_name: str, remove_files_non_present: bool, mode: str = "return_results"
+) -> List[str]:
+    """
+    Execute command `cmd` in `dir_name` and return the output as a list of
+    strings.
+
+    :param mode: controls how the output is processed
+        - "return_results" (default): return the list of files, whatever it is
+        - "assert_unless_result": assert unless there is a single file. Note that we
+           still return a list
+    """
+    if dir_name is None:
+        dir_name = "."
+    cmd = f"cd {dir_name} && {cmd}"
+    _, output = hsinte.system_to_string(cmd)
+    #
+    _LOG.debug("output=\n%s", output)
+    files = output.split("\n")
+    _LOG.debug("files=%s", " ".join(files))
+    files = [os.path.join(dir_name, f) for f in files]
+    files = list(map(os.path.normpath, files))
+    # Remove non-existent files, if needed.
+    if remove_files_non_present:
+        files = remove_file_non_present(files)
+    # Process output.
+    if mode == "assert_unless_one_result":
+        if len(files) != 1:
+            dbg.dfatal("Found found_files=\n%s", "\n".join(found_files))
+    return files
 
 # #############################################################################
 

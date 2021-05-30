@@ -138,11 +138,11 @@ def parse_traceback(
     _LOG.debug("# Before purifying from client")
     _LOG.debug("cfile=\n%s", cfile_to_str(cfile))
     # Purify filenames from client so that refer to files in this client.
-    git_client = git.get_
     if cfile and purify_from_client:
         cfile_tmp = []
         for cfile_row in cfile:
             file_name, line_num, text = cfile_row
+            file_name = git.purify_docker_file_from_git_client(file_name, super_module=True)
             # if file_name.startswith("/app"):
             #     base_name = os.path.basename(file_name)
             #     dir_name = os.path.dirname(file_name)

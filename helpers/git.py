@@ -30,6 +30,9 @@ _LOG = logging.getLogger(__name__)
 # TODO(gp): Add mem caching to some functions below. We assume that one doesn't
 #  change dir (which is a horrible idea) and thus we can memoize.
 
+# TODO(gp): Spell super_module and sub_module always in the same way in both
+#  comments and code. For simplicity (e.g., instead of `super_module` in code and
+#  `super-module` in comment) we might want to spell `supermodule` everywhere.
 
 # #############################################################################
 # Git submodule functions
@@ -468,6 +471,7 @@ def find_file_in_git_tree(file_name: str, super_module: bool = True) -> str:
     We get the Git root and then search for the file from there.
     """
     root_dir = get_client_root(super_module=super_module)
+    # TODO(gp): Use -not -path '*/\.git/*'
     cmd = "find %s -name '%s' | grep -v .git" % (root_dir, file_name)
     _, file_name = hsinte.system_to_one_line(cmd)
     _LOG.debug("file_name=%s", file_name)
@@ -533,7 +537,7 @@ def get_repo_dirs() -> List[str]:
     return dir_names
 
 
-def purify_docker_file_from_client(file_name: str, super_module) -> str:
+def purify_docker_file_from_git_client(file_name: str, super_module) -> str:
     """
     Convert a file that was generated inside Docker to a file in the current dir.
 
@@ -555,8 +559,7 @@ def purify_docker_file_from_client(file_name: str, super_module) -> str:
     file_name_tmp = hsinte.find_file_with_dir(base_name, dir_name, ".")
     if file_name_tmp is None:
         # We didn't find the file in the current client: leave the file as it was.
-        _LOG.warning("Can't find the file_name corresponding to"
-                     f"file_name '{file_name}'")
+        _LOG.warning(f"Can't find the file_name corresponding to '{file_name}'")
     else:
         # We have found the file.
         file_name = file_name_tmp
@@ -618,65 +621,6 @@ def get_remote_head_hash(dir_name: str) -> str:
 # #############################################################################
 
 
-# TODO(gp): -> remove_files_non_present() and move to system_interaction.py
-def _check_files(files: List[str]) -> List[str]:
-    """
-    Return list of files from `files`, skipping the files that don't exist.
-    """
-    files_tmp = []
-    for f in files:
-        if os.path.exists(f):
-            files_tmp.append(f)
-        else:
-            _LOG.warning("File '%s' doesn't exist: skipping", f)
-    return files_tmp
-
-
-# TODO(gp): Move to system_interaction.py
-def remove_dirs(files: List[str]) -> List[str]:
-    """
-    Return list of files from `files`, skipping the files that are directories.
-    """
-    files_tmp: List[str] = []
-    dirs_tmp: List[str] = []
-    for file in files:
-        if os.path.isdir(file):
-            _LOG.debug("file='%s' is a dir: skipping", file)
-            dirs_tmp.append(file)
-        else:
-            files_tmp.append(file)
-    if dirs_tmp:
-        _LOG.warning("Removed dirs: %s", ", ".join(dirs_tmp))
-    return files_tmp
-
-
-# TODO(gp): Move to system_interactions.py
-# TODO(gp): dir_name should be the last and optional param.
-# TODO(gp): In general there are 2 patterns:
-# - assert unless there is exactly one
-# - return all of them
-# We can factor out this behavior inside system_to_files.
-def system_to_files(
-    dir_name: str, cmd: str, remove_files_non_present: bool
-) -> List[str]:
-    """
-    Execute command `cmd` in `dir_name` and return the output as a list of
-    strings.
-    """
-    if dir_name is None:
-        dir_name = "."
-    cmd = f"cd {dir_name} && {cmd}"
-    _, output = hsinte.system_to_string(cmd)
-    #
-    _LOG.debug("output=\n%s", output)
-    files = output.split("\n")
-    _LOG.debug("files=%s", " ".join(files))
-    files = [os.path.join(dir_name, f) for f in files]
-    files = list(map(os.path.normpath, files))
-    # Remove non-existent files, if needed.
-    if remove_files_non_present:
-        files = _check_files(files)
-    return files
 
 
 def get_modified_files(
@@ -707,7 +651,7 @@ def get_modified_files(
     #   dev_scripts/infra/ssh_tunnels.py
     #   helpers/git.py
     cmd = "(git diff --cached --name-only; git ls-files -m) | sort | uniq"
-    files = system_to_files(dir_name, cmd, remove_files_non_present)
+    files = system_to_files(cmd, dir_name, remove_files_non_present)
     return files
 
 
@@ -733,7 +677,7 @@ def get_previous_committed_files(
     cmd.append("$(git log --author $(git config user.name) -%d" % num_commits)
     cmd.append(r"""| \grep "^commit " | perl -pe 's/commit (.*)/$1/')""")
     cmd_as_str = " ".join(cmd)
-    files = system_to_files(dir_name, cmd_as_str, remove_files_non_present)
+    files = system_to_files(cmd_as_str, dir_name, remove_files_non_present)
     return files
 
 
@@ -754,7 +698,7 @@ def get_modified_files_in_branch(
     :return: list of files
     """
     cmd = "git diff --name-only %s..." % dst_branch
-    files = system_to_files(dir_name, cmd, remove_files_non_present)
+    files = system_to_files(cmd, dir_name, remove_files_non_present)
     return files
 
 
@@ -782,7 +726,7 @@ def get_summary_files_in_branch(
     res = ""
     for tag, diff_type in file_types:
         cmd = f"git diff --diff-filter={diff_type} --name-only {dst_branch}..."
-        files = system_to_files(dir_name, cmd, remove_files_non_present=False)
+        files = system_to_files(cmd, dir_name, remove_files_non_present=False)
         if files:
             res += f"# {tag}: {len(files)}\n"
             res += hprint.indent("\n".join(files)) + "\n"
