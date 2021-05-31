@@ -266,6 +266,7 @@ class SeriesToDfTransformer(Transformer):
     ) -> None:
         """
         For reference, let:
+
           - N = df.columns.nlevels
           - leaf_cols = df[in_col_group].columns
 
@@ -371,6 +372,7 @@ class SeriesToSeriesTransformer(Transformer):
     ) -> None:
         """
         For reference, let:
+
           - N = df.columns.nlevels
           - leaf_cols = df[in_col_group].columns
 

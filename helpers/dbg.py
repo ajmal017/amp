@@ -657,7 +657,10 @@ class _LocalTimeZoneFormatter:
     Override logging.Formatter to use an aware datetime object.
     """
 
-    def converter(self, timestamp: datetime.datetime) -> datetime.datetime:
+    def converter(self, timestamp: float) -> datetime.datetime:
+        # To make the linter happy and respecting the signature of the
+        # superclass method.
+        _ = self
         # timestamp=1622423570.0147252
         dt = datetime.datetime.utcfromtimestamp(timestamp)
         # Convert it to an aware datetime object in UTC time.
@@ -672,7 +675,7 @@ class _LocalTimeZoneFormatter:
 
     def formatTime(
         self, record: logging.LogRecord, datefmt: Optional[str] = None
-    ) -> datetime.datetime:
+    ) -> str:
         dt = self.converter(record.created)
         if datefmt:
             s = dt.strftime(datefmt)

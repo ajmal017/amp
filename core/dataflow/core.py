@@ -33,7 +33,7 @@ _LOG = logging.getLogger(__name__)
 # #############################################################################
 
 
-# TODO(P0, gp): If this is private -> _NodeInterface.
+# TODO(gp): If this is private -> _NodeInterface.
 class NodeInterface(abc.ABC):
     """
     Abstract node class for creating DAGs of functions.

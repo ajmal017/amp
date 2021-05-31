@@ -1,7 +1,7 @@
 import logging
 import os
 import re
-from typing import List, Match, Optional, Tuple
+from typing import Any, List, Match, Optional, Tuple
 
 import helpers.dbg as dbg
 import helpers.git as git

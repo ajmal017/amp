@@ -53,15 +53,16 @@ def _run_notebook(
     """
     cdtfut.setup_experiment_dir(config)
     # Prepare the destination file.
+    idx = config[("meta", "idx")]
+    experiment_result_dir = config[("meta", "experiment_result_dir")]
     dst_file = os.path.join(
         experiment_result_dir,
-        os.path.basename(notebook_file).replace(".ipynb", ".%s.ipynb" % i),
+        os.path.basename(notebook_file).replace(".ipynb", ".%s.ipynb" % idx),
     )
     _LOG.info("dst_file=%s", dst_file)
     dst_file = os.path.abspath(dst_file)
     # Export config function and its `id` to the notebook.
     config_builder = config[("meta", "config_builder")]
-    idx = config[("meta", "idx")]
     dst_dir = config[("meta", "dst_dir")]
     cmd = (
         f'export __CONFIG_BUILDER__="{config_builder}"; '
@@ -78,7 +79,7 @@ def _run_notebook(
         + " --ExecutePreprocessor.timeout=-1"
     )
     # Prepare the log file.
-    log_file = os.path.join(experiment_result_dir, "run_notebook.%s.log" % i)
+    log_file = os.path.join(experiment_result_dir, "run_notebook.%s.log" % idx)
     log_file = os.path.abspath(os.path.abspath(log_file))
     # TODO(gp): Repeating a command n-times is an idiom that we could
     #  move to system_interaction.
@@ -98,7 +99,7 @@ def _run_notebook(
             break
     if rc != 0:
         # The notebook run wasn't successful.
-        _LOG.error("Execution failed for experiment %d", i)
+        _LOG.error("Execution failed for experiment %d", idx)
         if abort_on_error:
             dbg.dfatal("Aborting")
         else:
@@ -108,9 +109,9 @@ def _run_notebook(
         cdtfut.mark_config_as_success(experiment_result_dir)
         # Convert to HTML and publish.
         if publish:
-            _LOG.info("Publishing notebook %d", i)
+            _LOG.info("Publishing notebook %d", idx)
             html_subdir_name = os.path.join(
-                os.path.basename(dst_dir), result_subdir
+                os.path.basename(dst_dir), experiment_result_dir
             )
             # TODO(gp): Look for the script.
             cmd = (
@@ -142,7 +143,7 @@ def _parse() -> argparse.ArgumentParser:
         action="store_true",
         help="Publish each notebook after it executes",
     )
-    prsr.add_verbosity_arg(parser)
+    parser = prsr.add_verbosity_arg(parser)
     return parser
 
 

@@ -489,7 +489,7 @@ def find_file_with_dir(file_name: str, root_dir: str = ".") -> Optional[str]:
     _LOG.debug(hprint.to_str("file_name root_dir"))
     # Find all the files in the dir with the same basename.
     base_name = os.path.basename(file_name)
-    cmd = f"find . -name '{base_name}' -not -path '*/\.git/*'"
+    cmd = rf"find . -name '{base_name}' -not -path '*/\.git/*'"
     # > find . -name "utils.py"
     # ./amp/core/dataflow/utils.py
     # ./amp/core/dataflow_model/utils.py
@@ -500,8 +500,10 @@ def find_file_with_dir(file_name: str, root_dir: str = ".") -> Optional[str]:
         cmd, root_dir, remove_files_non_present, mode
     )
     _LOG.debug("files=\n%s", "\n".join(candidate_files))
-    # Check which files match enclosing dir name and basename.
     def _compute_file_signature(file_: str) -> Tuple[str, str]:
+        """
+        Check which files match enclosing dir name and basename.
+        """
         enclosing_dir_name = os.path.basename(os.path.dirname(file_))
         basename = os.path.basename(file_)
         return (enclosing_dir_name, basename)
@@ -531,12 +533,12 @@ def find_file_with_dir(file_name: str, root_dir: str = ".") -> Optional[str]:
 
 
 def to_normal_paths(files: List[str]) -> List[str]:
-    files = list(map(os.path.normpath, files))
+    files: List[str] = list(map(os.path.normpath, files))  # type: ignore
     return files
 
 
 def to_absolute_paths(files: List[str]) -> List[str]:
-    files = list(map(os.path.abspath, files))
+    files: List[str] = list(map(os.path.abspath, files))  # type: ignore
     return files
 
 
@@ -598,14 +600,14 @@ def system_to_files(
     files = output.split("\n")
     _LOG.debug("files=%s", " ".join(files))
     files = [os.path.join(dir_name, f) for f in files]
-    files = list(map(os.path.normpath, files))
+    files: List[str] = list(map(os.path.normpath, files))  # type: ignore
     # Remove non-existent files, if needed.
     if remove_files_non_present:
         files = remove_file_non_present(files)
     # Process output.
     if mode == "assert_unless_one_result":
         if len(files) != 1:
-            dbg.dfatal("Found found_files=\n%s", "\n".join(found_files))
+            dbg.dfatal("Found multiple files=\n%s", "\n".join(files))
     return files
 
 

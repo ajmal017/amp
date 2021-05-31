@@ -11,17 +11,7 @@ import argparse
 import logging
 import os
 import sys
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    Iterable,
-    List,
-    Optional,
-    Tuple,
-    Union,
-    cast,
-)
+from typing import List, Optional, Tuple
 
 import core.config as cfg
 import core.config_builders as cfgb
@@ -118,7 +108,8 @@ def skip_configs_already_executed(
         experiment_result_dir = config[("meta", "experiment_result_dir")]
         file_name = os.path.join(experiment_result_dir, "success.txt")
         if incremental and os.path.exists(file_name):
-            _LOG.warning("Found file '%s': skipping run %d", file_name, i)
+            idx = config[("meta", "id")]
+            _LOG.warning("Found file '%s': skipping run %d", file_name, idx)
             num_skipped += 1
         else:
             configs_out.append(config)
@@ -234,7 +225,7 @@ def get_configs_from_command_line(args: argparse.Namespace) -> List[cfg.Config]:
     return configs
 
 
-def report_failed_experiments(configs: List[cfg.Config], rcs: List[int]):
+def report_failed_experiments(configs: List[cfg.Config], rcs: List[int]) -> None:
     """
     Report failing experiments.
     """
@@ -251,4 +242,4 @@ def report_failed_experiments(configs: List[cfg.Config], rcs: List[int]):
             len(failed_experiment_ids),
             failed_experiment_ids,
         )
-        # TODO(gp): Save on a file the failed experiments' configs.
+    # TODO(gp): Save on a file the failed experiments' configs.

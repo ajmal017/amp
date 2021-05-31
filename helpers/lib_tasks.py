@@ -256,16 +256,16 @@ def _get_files_to_process(
         files = files_from_user.split(" ")
     # Convert into a list.
     dbg.dassert_isinstance(files, list)
-    files: List[str] = [f for f in files if f != ""]
-    _LOG.debug("files='%s'", str(files))
+    files_to_process = [f for f in files if f != ""]
+    _LOG.debug("files_to_process='%s'", str(files_to_process))
     # Remove dirs, if needed.
     if remove_dirs:
-        hsinte.remove_dirs(files)
-    _LOG.debug("files='%s'", str(files))
+        hsinte.remove_dirs(files_to_process)
+    _LOG.debug("files_to_process='%s'", str(files_to_process))
     # Ensure that there are files to process.
-    if not files:
+    if not files_to_process:
         _LOG.warning("No files were selected")
-    return files
+    return files_to_process
 
 
 # Copied from helpers.datetime_ to avoid dependency from pandas.
@@ -2094,7 +2094,7 @@ def lint(  # type: ignore
     files="",
     phases="",
     only_format_steps=False,
-    stage="prod",
+    #stage="prod",
     run_bash=False,
     run_linter_step=True,
     parse_linter_output=True,

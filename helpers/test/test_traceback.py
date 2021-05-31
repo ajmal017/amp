@@ -1,4 +1,5 @@
 import logging
+from typing import List
 
 import helpers.dbg as dbg
 import helpers.traceback_helper as htrace
@@ -69,7 +70,7 @@ Traceback
     TEST TEST TEST
 """
         purify_from_client = True
-        exp_cfile = []
+        exp_cfile: List[htrace.CFILE_ROW] = []
         exp_cfile = htrace.cfile_to_str(exp_cfile)
         exp_traceback = "None"
         self._parse_traceback_helper(

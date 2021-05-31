@@ -537,7 +537,7 @@ def get_repo_dirs() -> List[str]:
     return dir_names
 
 
-def purify_docker_file_from_git_client(file_name: str, super_module) -> str:
+def purify_docker_file_from_git_client(file_name: str, super_module: bool) -> str:
     """
     Convert a file that was generated inside Docker to a file in the current
     dir.
@@ -558,7 +558,7 @@ def purify_docker_file_from_git_client(file_name: str, super_module) -> str:
     file_name_tmp = hsinte.find_file_with_dir(file_name, ".")
     if file_name_tmp is None:
         # We didn't find the file in the current client: leave the file as it was.
-        _LOG.warning(f"Can't find the file_name corresponding to '{file_name}'")
+        _LOG.warning("Can't find the file_name corresponding to %s", file_name)
     else:
         # We have found the file.
         file_name = file_name_tmp
@@ -573,7 +573,7 @@ def purify_docker_file_from_git_client(file_name: str, super_module) -> str:
 # #############################################################################
 
 
-def get_head_hash(dir_name: str = ".", short_hash=False) -> str:
+def get_head_hash(dir_name: str = ".", short_hash: bool = False) -> str:
     """
     Report the hash that a Git repo is synced at.
 
@@ -648,7 +648,7 @@ def get_modified_files(
     #   dev_scripts/infra/ssh_tunnels.py
     #   helpers/git.py
     cmd = "(git diff --cached --name-only; git ls-files -m) | sort | uniq"
-    files = hsinte.system_to_files(cmd, dir_name, remove_files_non_present)
+    files: List[str] = hsinte.system_to_files(cmd, dir_name, remove_files_non_present)
     return files
 
 
@@ -674,7 +674,7 @@ def get_previous_committed_files(
     cmd.append("$(git log --author $(git config user.name) -%d" % num_commits)
     cmd.append(r"""| \grep "^commit " | perl -pe 's/commit (.*)/$1/')""")
     cmd_as_str = " ".join(cmd)
-    files = hsinte.system_to_files(cmd_as_str, dir_name, remove_files_non_present)
+    files : List[str] = hsinte.system_to_files(cmd_as_str, dir_name, remove_files_non_present)
     return files
 
 
@@ -695,14 +695,14 @@ def get_modified_files_in_branch(
     :return: list of files
     """
     cmd = "git diff --name-only %s..." % dst_branch
-    files = hsinte.system_to_files(cmd, dir_name, remove_files_non_present)
+    files : List[str] = hsinte.system_to_files(cmd, dir_name, remove_files_non_present)
     return files
 
 
 def get_summary_files_in_branch(
     dst_branch: str,
     dir_name: str = ".",
-):
+) -> str:
     """
     Report summary of files in the current branch with respect to `dst_branch'.
 
@@ -836,13 +836,19 @@ def git_add_update(
     hsinte.system(cmd, suppress_output=False, log_level=log_level)
 
 
-def fetch_origin_master_if_needed():
+def fetch_origin_master_if_needed() -> None:
+    """
+    If inside CI system, force fetching `master` branch from Git repo.
+
+    When testing a branch, `master` is not always fetched, but it might be
+    needed by tests.
+    """
     if hsinte.is_inside_ci():
         _LOG.warning("Running inside CI so fetching master")
         cmd = "git branch -a"
         _, txt = hsinte.system_to_string(cmd)
         _LOG.debug("%s=%s", cmd, txt)
-        cmd = 'git branch -a | egrep "\s+master\s*$" | wc -l'
+        cmd = r'git branch -a | egrep "\s+master\s*$" | wc -l'
         # * (HEAD detached at pull/1337/merge)
         # master
         # remotes/origin/master
