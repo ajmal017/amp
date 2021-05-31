@@ -5,7 +5,6 @@ from typing import List, Match, Optional, Tuple
 
 import helpers.dbg as dbg
 import helpers.git as git
-import helpers.system_interaction as hsinte
 
 
 _LOG = logging.getLogger(__name__)

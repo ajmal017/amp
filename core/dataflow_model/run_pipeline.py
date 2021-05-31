@@ -12,7 +12,6 @@ Run a pipeline given a list of configs.
 import argparse
 import logging
 import os
-from typing import Optional
 
 import joblib
 import tqdm
@@ -20,16 +19,16 @@ import tqdm
 import core.config as cfg
 import core.dataflow_model.utils as cdtfut
 import helpers.dbg as dbg
+import helpers.git as git
 import helpers.io_ as io_
 import helpers.parser as prsr
 import helpers.printing as printing
+import helpers.system_interaction as hsinte
 
 _LOG = logging.getLogger(__name__)
 
 
 # #############################################################################
-
-import helpers.system_interaction as hsinte
 
 
 def _run_pipeline(
@@ -53,6 +52,7 @@ def _run_pipeline(
     #  jackpy "meta" | grep id | grep config
     idx = config[("meta", "id")]
     _LOG.info("Executing experiment for config %d\n%s", idx, config)
+    dst_dir = config[("meta", "dst_dir")]
     # Prepare the log file.
     # TODO(gp): -> experiment_dst_dir
     experiment_result_dir = config[("meta", "experiment_result_dir")]
@@ -61,17 +61,22 @@ def _run_pipeline(
     # Prepare command line.
     pipeline_builder = config[("meta", "pipeline_builder")]
     config_builder = config[("meta", "config_builder")]
+    file_name = "run_pipeline_stub.py"
+    exec_name = git.find_file_in_git_tree(file_name, super_module=True)
     cmd = [
-        "run_pipeline_stub.py",
+        exec_name,
         f"--pipeline_builder '{pipeline_builder}'",
         f"--config_builder '{config_builder}'",
-        f"--idx {idx}",
-        f"--experiment_result_dir {experiment_result_dir}",
+        f"--config_idx {idx}",
+        f"--dst_dir {dst_dir}",
         "-v INFO",
     ]
     cmd = " ".join(cmd)
     # Execute.
-    rc = hsinte.system(cmd, output_file=log_file, abort_on_error=False)
+    _LOG.info("Executing '%s'", cmd)
+    rc = hsinte.system(cmd, output_file=log_file, suppress_output=False,
+                       abort_on_error=False)
+    _LOG.info("Executed cmd")
     if rc != 0:
         # The notebook run wasn't successful.
         _LOG.error("Execution failed for experiment %d", idx)
@@ -114,7 +119,7 @@ def _main(parser: argparse.ArgumentParser) -> None:
     num_attempts = args.num_attempts
     abort_on_error = not args.skip_on_error
     num_threads = args.num_threads
-    # TODO(gp): Try to factor out this.
+    # TODO(gp): Try to factor out this. Pass a function and a list of params.
     # Execute.
     if num_threads == "serial":
         rcs = []
@@ -139,14 +144,8 @@ def _main(parser: argparse.ArgumentParser) -> None:
             )
             for config in configs
         )
-    # TODO(gp): Factor this out.
     # Report failing experiments.
-    experiment_ids = [int(config[("meta", "id")]) for config in configs]
-    failed_experiment_ids = [
-        i for i, rc in zip(experiment_ids, rcs) if rc is not None and rc != 0
-    ]
-    if failed_experiment_ids:
-        _LOG.error("Failed experiments are: %s", failed_experiment_ids)
+    cdtfut.report_failed_experiments(configs, rcs)
 
 
 if __name__ == "__main__":

@@ -364,7 +364,7 @@ class Test_dassert_container_type1(hut.TestCase):
         act = str(cm.exception)
         exp = r"""
         * Failed assertion *
-        instance of '['a', 'b', 'c']' is '<class 'list'>' instead of 'typing.Tuple' 
+        instance of '['a', 'b', 'c']' is '<class 'list'>' instead of 'typing.Tuple'
         obj='['a', 'b', 'c']'
         """
         self.assert_equal(act, exp, fuzzy_match=True)

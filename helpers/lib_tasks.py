@@ -260,7 +260,7 @@ def _get_files_to_process(
     _LOG.debug("files='%s'", str(files))
     # Remove dirs, if needed.
     if remove_dirs:
-        git.remove_dirs(files)
+        hsinte.remove_dirs(files)
     _LOG.debug("files='%s'", str(files))
     # Ensure that there are files to process.
     if not files:

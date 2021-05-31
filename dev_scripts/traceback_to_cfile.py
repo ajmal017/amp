@@ -19,7 +19,7 @@ import logging
 import sys
 
 import helpers.dbg as dbg
-import helpers.git as git
+import helpers.system_interaction as hsinte
 import helpers.io_ as hio
 import helpers.parser as prsr
 import helpers.printing as hprint
@@ -58,7 +58,7 @@ def _main(parser: argparse.ArgumentParser) -> None:
         # ./experiments/RH1E/result_0/run_notebook.0.log
         dir_name = None
         remove_files_non_present = False
-        files = git.system_to_files(dir_name, cmd, remove_files_non_present)
+        files = hsinte.system_to_files(dir_name, cmd, remove_files_non_present)
         # Pick the newest file.
         in_file_name = files[0]
     _LOG.info("in_file_name=%s", in_file_name)

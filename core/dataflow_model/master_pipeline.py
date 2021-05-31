@@ -23,6 +23,7 @@ def run_pipeline(config: cfg.Config) -> None:
 
     All parameters are passed through a `Config`.
     """
+    _LOG.debug("config=\n%s", config)
 
     dag_config = config.pop("DAG")
 
@@ -44,7 +45,7 @@ def run_pipeline(config: cfg.Config) -> None:
 
     fit_result_bundle = dag_runner.fit()
 
-    payload = ccbuild.get_config_from_nested_dict({"config": config})
+    payload = cfgb.get_config_from_nested_dict({"config": config})
 
     if "run_oos" in config["meta"].to_dict().keys() and config["meta"]:
         result_bundle = dag_runner.predict()

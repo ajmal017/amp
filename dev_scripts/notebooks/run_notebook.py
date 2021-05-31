@@ -66,7 +66,7 @@ def _run_notebook(
     cmd = (
         f'export __CONFIG_BUILDER__="{config_builder}"; '
         + f'export __CONFIG_IDX__="{idx}"; '
-        + f'export __CONFIG_DST_DIR__="{experiment_result_dir}"'
+        + f'export __CONFIG_DST_DIR__="{dst_dir}"'
     )
     cmd += (
         f"; jupyter nbconvert {notebook_file} "
@@ -74,15 +74,14 @@ def _run_notebook(
         + " --to notebook"
         + f" --output {dst_file}"
         + " --ExecutePreprocessor.kernel_name=python"
-        +
-        # https://github.com/ContinuumIO/anaconda-issues/issues/877
-        " --ExecutePreprocessor.timeout=-1"
+        # From https://github.com/ContinuumIO/anaconda-issues/issues/877
+        + " --ExecutePreprocessor.timeout=-1"
     )
     # Prepare the log file.
     log_file = os.path.join(experiment_result_dir, "run_notebook.%s.log" % i)
     log_file = os.path.abspath(os.path.abspath(log_file))
     # TODO(gp): Repeating a command n-times is an idiom that we could
-    # move to system_interaction.
+    #  move to system_interaction.
     # Try running the notebook up to `num_attempts` times.
     dbg.dassert_lte(1, num_attempts)
     rc = None
@@ -203,11 +202,8 @@ def _main(parser: argparse.ArgumentParser) -> None:
             _LOG.debug("\n%s", printing.frame("Config %s" % i))
             #
             rc = _run_notebook(
-                i,
-                notebook_file,
-                dst_dir,
                 config,
-                config_builder,
+                notebook_file,
                 num_attempts,
                 abort_on_error,
                 publish,
@@ -219,24 +215,16 @@ def _main(parser: argparse.ArgumentParser) -> None:
         _LOG.info("Using %d threads", num_threads)
         rcs = joblib.Parallel(n_jobs=num_threads, verbose=50)(
             joblib.delayed(_run_notebook)(
-                int(config[("meta", "id")]),
-                notebook_file,
-                dst_dir,
                 config,
-                config_builder,
+                notebook_file,
                 num_attempts,
                 abort_on_error,
                 publish,
             )
             for config in configs
         )
-    # Report failing experiments in terms of their IDs.
-    experiment_ids = [int(config[("meta", "id")]) for config in configs]
-    failed_experiment_ids = [
-        i for i, rc in zip(experiment_ids, rcs) if rc is not None and rc != 0
-    ]
-    if failed_experiment_ids:
-        _LOG.error("Failed experiments are: %s", failed_experiment_ids)
+    # Report failing experiments.
+    cdtfut.report_failed_experiments(configs, rcs)
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@
       - save config for each experiment
       - parallelize the experiments
       - implement the retry logic
-    
+
     - `run_pipeline_stub.py`
       - runs a single experiment
       - It has the same interface as a notebook
@@ -14,17 +14,17 @@
         - config_builder
         - index
         - dst_dir
-    
-- The invariant is that 
+
+- The invariant is that
 
 - There are two interfaces to materialize configs
     - One on the command line side
-    
+
     - One on the run_pipeline, notebook side
-        - The params to reconstruct the configs 
+        - The params to reconstruct the configs
           are passed through env vars or params of the
           script
-    
+
 ```
 > run_pipeline.py \
   --dst_dir experiment1 \

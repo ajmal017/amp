@@ -177,7 +177,7 @@ def get_config_from_env() -> Optional[cfg.Config]:
     _LOG.info("config_builder=%s", config_builder)
     params["config_builder"] = config_builder
     # TODO(gp): Make the env var name mimic the var name.
-    experiment_dst_dir = os.environ["__CONFIG_EXPERIMENT_DST_DIR__"]
+    experiment_result_dir = os.environ["__CONFIG_EXPERIMENT_DST_DIR__"]
     _LOG.info("experiment_result_dir=%s", experiment_result_dir)
     params["experiment_result_dir"] = experiment_result_dir
     #

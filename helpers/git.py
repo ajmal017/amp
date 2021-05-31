@@ -619,8 +619,6 @@ def get_remote_head_hash(dir_name: str) -> str:
 # #############################################################################
 
 
-
-
 def get_modified_files(
     dir_name: str = ".", remove_files_non_present: bool = True
 ) -> List[str]:
@@ -649,7 +647,7 @@ def get_modified_files(
     #   dev_scripts/infra/ssh_tunnels.py
     #   helpers/git.py
     cmd = "(git diff --cached --name-only; git ls-files -m) | sort | uniq"
-    files = system_to_files(cmd, dir_name, remove_files_non_present)
+    files = hsinte.system_to_files(cmd, dir_name, remove_files_non_present)
     return files
 
 
@@ -675,7 +673,7 @@ def get_previous_committed_files(
     cmd.append("$(git log --author $(git config user.name) -%d" % num_commits)
     cmd.append(r"""| \grep "^commit " | perl -pe 's/commit (.*)/$1/')""")
     cmd_as_str = " ".join(cmd)
-    files = system_to_files(cmd_as_str, dir_name, remove_files_non_present)
+    files = hsinte.system_to_files(cmd_as_str, dir_name, remove_files_non_present)
     return files
 
 
@@ -696,7 +694,7 @@ def get_modified_files_in_branch(
     :return: list of files
     """
     cmd = "git diff --name-only %s..." % dst_branch
-    files = system_to_files(cmd, dir_name, remove_files_non_present)
+    files = hsinte.system_to_files(cmd, dir_name, remove_files_non_present)
     return files
 
 
@@ -724,7 +722,7 @@ def get_summary_files_in_branch(
     res = ""
     for tag, diff_type in file_types:
         cmd = f"git diff --diff-filter={diff_type} --name-only {dst_branch}..."
-        files = system_to_files(cmd, dir_name, remove_files_non_present=False)
+        files = hsinte.system_to_files(cmd, dir_name, remove_files_non_present=False)
         if files:
             res += f"# {tag}: {len(files)}\n"
             res += hprint.indent("\n".join(files)) + "\n"

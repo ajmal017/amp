@@ -73,11 +73,13 @@ def add_experiment_arg(
     parser.add_argument(
         "--index",
         action="store",
+        default = None,
         help="Run a single experiment corresponding to the i-th config",
     )
     parser.add_argument(
         "--start_from_index",
         action="store",
+        default = None,
         help="Run experiments starting from a specified index",
     )
     parser.add_argument(
@@ -107,7 +109,8 @@ def add_experiment_arg(
     return parser
 
 
-def skip_configs_already_executed(configs, incremental):
+def skip_configs_already_executed(configs: List[cfg.Config], incremental: bool) ->\
+        Tuple[List[cfg.Config], int]:
     configs_out = []
     num_skipped = 0
     for config in configs:
@@ -122,16 +125,16 @@ def skip_configs_already_executed(configs, incremental):
     return configs_out, num_skipped
 
 
-def mark_config_as_success(experiment_result_dir):
+def mark_config_as_success(experiment_result_dir: str) -> None:
     """
     Publish an empty file to indicate a successful finish.
     """
     file_name = os.path.join(experiment_result_dir, "success.txt")
-    _LOG.info("file_name=%s", file_name)
-    io_.to_file(file_name, "")
+    _LOG.info("Creating file_name='%s'", file_name)
+    io_.to_file(file_name, "success")
 
 
-def setup_experiment_dir(config):
+def setup_experiment_dir(config: cfg.Config) -> None:
     """
     Set up the directory and the book-keeping artifacts for the experiment
     running `config`.
@@ -139,72 +142,57 @@ def setup_experiment_dir(config):
     :return: whether we need to run this config or not
     """
     dbg.dassert_isinstance(config, cfg.Config)
+    _LOG.info("Creating experiment dir")
     # Create subdirectory structure for experiment results.
-    # result_subdir = "result_%s" % i
-    # experiment_result_dir = os.path.join(dst_dir, result_subdir)
-    # _LOG.info("experiment_result_dir=%s", experiment_result_dir)
     experiment_result_dir = config[("meta", "experiment_result_dir")]
     # TODO(gp): Create dir.
     io_.create_dir(experiment_result_dir, incremental=True)
-
-    # # If there is already a success file in the dir, skip the experiment.
-    # file_name = os.path.join(experiment_result_dir, "success.txt")
-    # if incremental and os.path.exists(file_name):
-    #     _LOG.warning("Found file '%s': skipping run %d", file_name, i)
-    #     # TODO(gp): Return to execute.
-    #     return False
-
-    # # Inject the experiment result dir inside the config.
-    # # TODO(gp): This operation is also performed on the notebook side
-    # #  in `get_config_from_env()`. Find a better way to achieve this.
-    # config = cfgb.set_experiment_result_dir(experiment_result_dir,
-    #                                         config)
     # Prepare book-keeping files.
     file_name = os.path.join(experiment_result_dir, "config.pkl")
-    _LOG.info("file_name=%s", file_name)
+    _LOG.debug("Saving '%s'", file_name)
     hpickle.to_pickle(config, file_name)
     #
     file_name = os.path.join(experiment_result_dir, "config.txt")
-    _LOG.info("file_name=%s", file_name)
+    _LOG.debug("Saving '%s'", file_name)
     io_.to_file(file_name, str(config))
 
 
 def select_config(
-    configs: List[cfg.Config], index: int, start_from_index: int
+    configs: List[cfg.Config], index: Optional[int], start_from_index: Optional[int]
 ) -> List[cfg.Config]:
     """
-    Select configs to run from a list of configs.
+    Select configs to run based on the command line parameters.
 
-    :param configs: a list of configs
-    :param index: index of a config to execute
-    :param start_from_index: index of a config to start execution with
-    :return: a list of configs to execute
+    :param configs: list of configs
+    :param index: index of a config to execute, if not `None`
+    :param start_from_index: index of a config to start execution from, if not `None`
+    :return: list of configs to execute
     """
     dbg.dassert_container_type(configs, List, cfg.Config)
     dbg.dassert_lte(1, len(configs))
-    if index:
+    if index is not None:
         index = int(index)
         _LOG.warning(
-            "Only config %s will be executed due to passing --index", index
+            "Only config %d will be executed because of --index", index
         )
         dbg.dassert_lte(0, index)
         dbg.dassert_lt(index, len(configs))
         configs = [configs[index]]
-    elif start_from_index:
+    elif start_from_index is not None:
         start_from_index = int(start_from_index)
         _LOG.warning(
-            "Only configs %s and higher will be executed due to passing --start_from_index",
+            "Only configs >= %d will be executed because of --start_from_index",
             start_from_index,
         )
         dbg.dassert_lte(0, start_from_index)
         dbg.dassert_lt(start_from_index, len(configs))
         configs = [c for idx, c in enumerate(configs) if idx >= start_from_index]
-    _LOG.info("Created %s config(s)", len(configs))
+    _LOG.info("Selected %s configs", len(configs))
     dbg.dassert_container_type(configs, List, cfg.Config)
     return configs
 
 
-def get_configs_from_command_line(args):
+def get_configs_from_command_line(args: argparse.Namespace) -> List[cfg.Config]:
     """
     Return all the configs to run given the command line interface.
 
@@ -212,15 +200,16 @@ def get_configs_from_command_line(args):
     (e.g., `idx`, `config_builder`, `pipeline_builder`, `dst_dir`,
     `experiment_result_dir`).
     """
+    # Build the map with the config parameters.
     config_builder = args.config_builder
     configs = cfgb.get_configs_from_builder(config_builder)
-    # Common params.
     params = {
         "config_builder": args.config_builder,
         "dst_dir": args.dst_dir,
       }
     if getattr(args, "pipeline_builder"):
         params["pipeline_builder"] = args.pipeline_builder
+    # Patch the configs with the command line parameters.
     configs = cfgb.patch_configs(configs, params)
     _LOG.info("Generated %d configs from the builder", len(configs))
     # Select the configs based on command line options.
@@ -243,3 +232,20 @@ def get_configs_from_command_line(args):
             print(str(config))
         sys.exit(0)
     return configs
+
+
+def report_failed_experiments(configs: List[cfg.Config], rcs: List[int]):
+    """
+    Report failing experiments.
+    """
+    # Get the experiment idxs.
+    experiment_ids = [int(config[("meta", "id")]) for config in configs]
+    # Match experiment idxs with their return codes.
+    failed_experiment_ids = [
+        i for i, rc in zip(experiment_ids, rcs) if rc is not None and rc != 0
+    ]
+    # Report.
+    if failed_experiment_ids:
+        _LOG.error("There are %d failed experiments are: %s", len(failed_experiment_ids),
+            failed_experiment_ids)
+        # TODO(gp): Save on a file the failed experiments' configs.
