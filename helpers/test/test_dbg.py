@@ -239,6 +239,7 @@ class Test_dassert_lgt1(hut.TestCase):
     def test3(self) -> None:
         """
         Raise assertion since it is not true that `0 < 100 <= 3`.
+
         The formatting of the assertion is correct.
         """
         with self.assertRaises(AssertionError) as cm:
@@ -349,7 +350,6 @@ class Test_dassert_is_proportion1(hut.TestCase):
 
 
 class Test_dassert_container_type1(hut.TestCase):
-
     def test1(self) -> None:
         list_ = "a b c".split()
         dbg.dassert_container_type(list_, List, str)
@@ -390,7 +390,9 @@ class Test_dassert_container_type1(hut.TestCase):
         """
         list_ = ["a", 2, "c", "d"]
         with self.assertRaises(AssertionError) as cm:
-            dbg.dassert_container_type(list_, list, str, "list_ is %s homogeneous", "not")
+            dbg.dassert_container_type(
+                list_, list, str, "list_ is %s homogeneous", "not"
+            )
         act = str(cm.exception)
         exp = r"""
         * Failed assertion *

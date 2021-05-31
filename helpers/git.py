@@ -539,7 +539,8 @@ def get_repo_dirs() -> List[str]:
 
 def purify_docker_file_from_git_client(file_name: str, super_module) -> str:
     """
-    Convert a file that was generated inside Docker to a file in the current dir.
+    Convert a file that was generated inside Docker to a file in the current
+    dir.
 
     This operation is best effort since it might not be able to find a file in the
     current repo. E.g., a file in Docker under a super-module is not in a sub-module.
@@ -722,7 +723,9 @@ def get_summary_files_in_branch(
     res = ""
     for tag, diff_type in file_types:
         cmd = f"git diff --diff-filter={diff_type} --name-only {dst_branch}..."
-        files = hsinte.system_to_files(cmd, dir_name, remove_files_non_present=False)
+        files = hsinte.system_to_files(
+            cmd, dir_name, remove_files_non_present=False
+        )
         if files:
             res += f"# {tag}: {len(files)}\n"
             res += hprint.indent("\n".join(files)) + "\n"

@@ -6,7 +6,6 @@ from typing import List, Match, Optional, Tuple
 import helpers.dbg as dbg
 import helpers.git as git
 
-
 _LOG = logging.getLogger(__name__)
 
 
@@ -141,7 +140,9 @@ def parse_traceback(
         cfile_tmp = []
         for cfile_row in cfile:
             file_name, line_num, text = cfile_row
-            file_name = git.purify_docker_file_from_git_client(file_name, super_module=True)
+            file_name = git.purify_docker_file_from_git_client(
+                file_name, super_module=True
+            )
             cfile_tmp.append((file_name, line_num, text))
         cfile = cfile_tmp
         _LOG.debug("# After purifying from client")

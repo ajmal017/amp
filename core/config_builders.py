@@ -105,14 +105,15 @@ def get_configs_from_builder(config_builder: str) -> List[cfg.Config]:
     return configs
 
 
-def patch_configs(configs: List[cfg.Config],
-                  params: Dict[str, str]
-                  ) -> List[cfg.Config]:
+def patch_configs(
+    configs: List[cfg.Config], params: Dict[str, str]
+) -> List[cfg.Config]:
     """
     Patch the configs with information needed to run.
 
-    This function is used by `run_notebook.py` and `run_pipeline.py` to pass
-    information through the `Config` to the process running the experiment.
+    This function is used by `run_notebook.py` and `run_pipeline.py` to
+    pass information through the `Config` to the process running the
+    experiment.
     """
     configs_out = []
     for idx, config in enumerate(configs):

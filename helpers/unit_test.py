@@ -959,8 +959,7 @@ class TestCase(unittest.TestCase):
             False, which should be used only for unit testing
         """
         _LOG.debug(hprint.to_str("fuzzy_match purify_text abort_on_error"))
-        dbg.dassert_in(type(actual), (bytes, str),
-                       "actual='%s'", actual)
+        dbg.dassert_in(type(actual), (bytes, str), "actual='%s'", actual)
         #
         dir_name, file_name = self._get_golden_outcome_file_name(tag)
         if use_gzip:

@@ -1,10 +1,8 @@
 import logging
 
+import helpers.dbg as dbg
 import helpers.traceback_helper as htrace
 import helpers.unit_test as hut
-
-import helpers.dbg as dbg
-
 
 _LOG = logging.getLogger(__name__)
 
@@ -57,10 +55,8 @@ Traceback (most recent call last):
     if repo_short_name == "amp":
         """.rstrip().lstrip()
         self._parse_traceback_helper(
-                                txt,
-                                purify_from_client,
-                                exp_cfile,
-                                exp_traceback)
+            txt, purify_from_client, exp_cfile, exp_traceback
+        )
 
     def test_parse_empty_traceback1(self) -> None:
         """
@@ -77,10 +73,8 @@ Traceback
         exp_cfile = htrace.cfile_to_str(exp_cfile)
         exp_traceback = "None"
         self._parse_traceback_helper(
-            txt,
-            purify_from_client,
-            exp_cfile,
-            exp_traceback)
+            txt, purify_from_client, exp_cfile, exp_traceback
+        )
 
     def test_parse2(self) -> None:
         """
@@ -97,29 +91,42 @@ Traceback (most recent call last):
 """
         purify_from_client = True
         exp_cfile = [
-            ("amp/core/dataflow_model/run_pipeline.py", 146, "<module>:_main(_parse())"),
-            ("amp/core/dataflow_model/run_pipeline.py", 105, "_main:configs = cdtfut.get_configs_from_command_line(args)"),
-            ("amp/core/dataflow_model/utils.py", 228, 'get_configs_from_command_line:"config_builder": args.config_builder,')
-            ]
+            (
+                "amp/core/dataflow_model/run_pipeline.py",
+                146,
+                "<module>:_main(_parse())",
+            ),
+            (
+                "amp/core/dataflow_model/run_pipeline.py",
+                105,
+                "_main:configs = cdtfut.get_configs_from_command_line(args)",
+            ),
+            (
+                "amp/core/dataflow_model/utils.py",
+                228,
+                'get_configs_from_command_line:"config_builder": args.config_builder,',
+            ),
+        ]
         exp_cfile = htrace.cfile_to_str(exp_cfile)
         exp_traceback = txt
         self._parse_traceback_helper(
-            txt,
-            purify_from_client,
-            exp_cfile,
-            exp_traceback)
+            txt, purify_from_client, exp_cfile, exp_traceback
+        )
 
-    def _parse_traceback_helper(self,
-                           txt: str,
-                           purify_from_client: bool,
-                           exp_cfile: str,
-                           exp_traceback: str) -> None:
+    def _parse_traceback_helper(
+        self,
+        txt: str,
+        purify_from_client: bool,
+        exp_cfile: str,
+        exp_traceback: str,
+    ) -> None:
         dbg.dassert_isinstance(txt, str)
         dbg.dassert_isinstance(exp_cfile, str)
         dbg.dassert_isinstance(exp_traceback, str)
         # Run the function under test.
-        act_cfile, act_traceback = htrace.parse_traceback(txt,
-                                                          purify_from_client=purify_from_client)
+        act_cfile, act_traceback = htrace.parse_traceback(
+            txt, purify_from_client=purify_from_client
+        )
         _LOG.debug("act_cfile=\n%s", act_cfile)
         # Compare cfile.
         act_cfile = htrace.cfile_to_str(act_cfile)

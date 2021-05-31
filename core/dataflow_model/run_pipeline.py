@@ -74,8 +74,9 @@ def _run_pipeline(
     cmd = " ".join(cmd)
     # Execute.
     _LOG.info("Executing '%s'", cmd)
-    rc = hsinte.system(cmd, output_file=log_file, suppress_output=False,
-                       abort_on_error=False)
+    rc = hsinte.system(
+        cmd, output_file=log_file, suppress_output=False, abort_on_error=False
+    )
     _LOG.info("Executed cmd")
     if rc != 0:
         # The notebook run wasn't successful.

@@ -19,10 +19,10 @@ import logging
 import sys
 
 import helpers.dbg as dbg
-import helpers.system_interaction as hsinte
 import helpers.io_ as hio
 import helpers.parser as prsr
 import helpers.printing as hprint
+import helpers.system_interaction as hsinte
 import helpers.traceback_helper as htrace
 
 _LOG = logging.getLogger(__name__)
@@ -31,13 +31,13 @@ _LOG = logging.getLogger(__name__)
 
 _NEWEST_LOG_FILE = "__NEWEST_LOG_FILE__"
 
+
 def _parse() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     in_default = _NEWEST_LOG_FILE
-    prsr.add_input_output_args(parser, in_default=in_default,
-        out_default="cfile")
+    prsr.add_input_output_args(parser, in_default=in_default, out_default="cfile")
     prsr.add_verbosity_arg(parser)
     return parser
 

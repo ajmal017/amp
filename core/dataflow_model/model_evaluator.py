@@ -29,6 +29,7 @@ _LOG = logging.getLogger(__name__)
 # - "fields" for "returns", "predictions", ...
 # - "model_keys" (or "models" or "keys") as to the strings representing model
 
+
 class ModelEvaluator:
     """
     Evaluate performance of financial models for returns.
@@ -427,7 +428,8 @@ class ModelEvaluator:
         """
         Calculate positions from returns and predictions.
 
-        Rescales to target volatility over in-sample period (if provided).
+        Rescales to target volatility over in-sample period (if
+        provided).
         """
         position_dict = {}
         for key in tqdm(self.valid_keys):

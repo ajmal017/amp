@@ -23,7 +23,6 @@ from typing import (
     cast,
 )
 
-
 import core.config as cfg
 import core.config_builders as cfgb
 import helpers.dbg as dbg
@@ -73,13 +72,13 @@ def add_experiment_arg(
     parser.add_argument(
         "--index",
         action="store",
-        default = None,
+        default=None,
         help="Run a single experiment corresponding to the i-th config",
     )
     parser.add_argument(
         "--start_from_index",
         action="store",
-        default = None,
+        default=None,
         help="Run experiments starting from a specified index",
     )
     parser.add_argument(
@@ -109,8 +108,9 @@ def add_experiment_arg(
     return parser
 
 
-def skip_configs_already_executed(configs: List[cfg.Config], incremental: bool) ->\
-        Tuple[List[cfg.Config], int]:
+def skip_configs_already_executed(
+    configs: List[cfg.Config], incremental: bool
+) -> Tuple[List[cfg.Config], int]:
     configs_out = []
     num_skipped = 0
     for config in configs:
@@ -158,7 +158,9 @@ def setup_experiment_dir(config: cfg.Config) -> None:
 
 
 def select_config(
-    configs: List[cfg.Config], index: Optional[int], start_from_index: Optional[int]
+    configs: List[cfg.Config],
+    index: Optional[int],
+    start_from_index: Optional[int],
 ) -> List[cfg.Config]:
     """
     Select configs to run based on the command line parameters.
@@ -172,9 +174,7 @@ def select_config(
     dbg.dassert_lte(1, len(configs))
     if index is not None:
         index = int(index)
-        _LOG.warning(
-            "Only config %d will be executed because of --index", index
-        )
+        _LOG.warning("Only config %d will be executed because of --index", index)
         dbg.dassert_lte(0, index)
         dbg.dassert_lt(index, len(configs))
         configs = [configs[index]]
@@ -196,8 +196,8 @@ def get_configs_from_command_line(args: argparse.Namespace) -> List[cfg.Config]:
     """
     Return all the configs to run given the command line interface.
 
-    The configs are patched with all the information from the command line
-    (e.g., `idx`, `config_builder`, `pipeline_builder`, `dst_dir`,
+    The configs are patched with all the information from the command
+    line (e.g., `idx`, `config_builder`, `pipeline_builder`, `dst_dir`,
     `experiment_result_dir`).
     """
     # Build the map with the config parameters.
@@ -206,7 +206,7 @@ def get_configs_from_command_line(args: argparse.Namespace) -> List[cfg.Config]:
     params = {
         "config_builder": args.config_builder,
         "dst_dir": args.dst_dir,
-      }
+    }
     if getattr(args, "pipeline_builder"):
         params["pipeline_builder"] = args.pipeline_builder
     # Patch the configs with the command line parameters.
@@ -246,6 +246,9 @@ def report_failed_experiments(configs: List[cfg.Config], rcs: List[int]):
     ]
     # Report.
     if failed_experiment_ids:
-        _LOG.error("There are %d failed experiments are: %s", len(failed_experiment_ids),
-            failed_experiment_ids)
+        _LOG.error(
+            "There are %d failed experiments are: %s",
+            len(failed_experiment_ids),
+            failed_experiment_ids,
+        )
         # TODO(gp): Save on a file the failed experiments' configs.

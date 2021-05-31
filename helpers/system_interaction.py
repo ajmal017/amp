@@ -475,7 +475,8 @@ def create_executable_script(file_name: str, content: str) -> None:
 
 def find_file_with_dir(file_name: str, root_dir: str = ".") -> Optional[str]:
     """
-    Find a file matching basename and enclosing dir name starting from `root_dir`.
+    Find a file matching basename and enclosing dir name starting from
+    `root_dir`.
 
     E.g., find a file matching `amp/core/dataflow_model/utils.py` by looking for a
     file with basename 'utils.py' under a dir 'dataflow_model'.
@@ -495,7 +496,9 @@ def find_file_with_dir(file_name: str, root_dir: str = ".") -> Optional[str]:
     # ./amp/instrument_master/common/test/utils.py
     remove_files_non_present = False
     mode = "return_results"
-    candidate_files = system_to_files(cmd, root_dir, remove_files_non_present, mode)
+    candidate_files = system_to_files(
+        cmd, root_dir, remove_files_non_present, mode
+    )
     _LOG.debug("files=\n%s", "\n".join(candidate_files))
     # Check which files match enclosing dir name and basename.
     def _compute_file_signature(file_: str) -> Tuple[str, str]:
@@ -505,12 +508,15 @@ def find_file_with_dir(file_name: str, root_dir: str = ".") -> Optional[str]:
 
     matching_files = []
     for file in sorted(candidate_files):
-        is_equal = _compute_file_signature(file) == _compute_file_signature(file_name)
+        is_equal = _compute_file_signature(file) == _compute_file_signature(
+            file_name
+        )
         _LOG.debug("found_file=%s -> is_equal=%s", file, is_equal)
         if is_equal:
             matching_files.append(file)
-    _LOG.debug("Found %d files:\n%s", len(matching_files),
-               "\n".join(matching_files))
+    _LOG.debug(
+        "Found %d files:\n%s", len(matching_files), "\n".join(matching_files)
+    )
     # Process output.
     if len(matching_files) == 0:
         # Found no matching file: return `None`.
@@ -569,7 +575,10 @@ def remove_dirs(files: List[str]) -> List[str]:
 # - return all of them
 # We can factor out this behavior inside system_to_files.
 def system_to_files(
-    cmd: str, dir_name: str, remove_files_non_present: bool, mode: str = "return_results"
+    cmd: str,
+    dir_name: str,
+    remove_files_non_present: bool,
+    mode: str = "return_results",
 ) -> List[str]:
     """
     Execute command `cmd` in `dir_name` and return the output as a list of

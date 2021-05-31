@@ -1,30 +1,32 @@
+<!--ts-->
+      * [run_pipeline.py](#run_pipelinepy)
+
+
+
+<!--te-->
 ## run_pipeline.py
 
 - Separation of responsibilities
-    - `run_pipeline.py`
-      - run all the experiments
-      - save config for each experiment
-      - parallelize the experiments
-      - implement the retry logic
-
-    - `run_pipeline_stub.py`
-      - runs a single experiment
-      - It has the same interface as a notebook
-        - pipeline_builder
-        - config_builder
-        - index
-        - dst_dir
+  - `run_pipeline.py`
+    - Run all the experiments
+    - Save config for each experiment
+    - Parallelize the experiments
+    - Implement the retry logic
+  - `run_pipeline_stub.py`
+    - Runs a single experiment
+    - It has the same interface as a notebook
+      - Pipeline_builder
+      - Config_builder
+      - Index
+      - Dst_dir
 
 - The invariant is that
 
 - There are two interfaces to materialize configs
-    - One on the command line side
-
-    - One on the run_pipeline, notebook side
-        - The params to reconstruct the configs
-          are passed through env vars or params of the
-          script
-
+  - One on the command line side
+  - One on the run_pipeline, notebook side
+    - The params to reconstruct the configs are passed through env vars or
+      params of the script
 ```
 > run_pipeline.py \
   --dst_dir experiment1 \

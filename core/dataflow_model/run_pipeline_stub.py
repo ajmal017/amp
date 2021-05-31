@@ -16,7 +16,6 @@ import core.dataflow_model.master_pipeline as mstpip
 import helpers.dbg as dbg
 import helpers.parser as prsr
 
-
 _LOG = logging.getLogger(__name__)
 
 

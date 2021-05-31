@@ -6,12 +6,13 @@ import helpers.dbg as dbg
 
 import copy
 import datetime
-from dateutil import tz
 import logging
 import os
 import pprint
 import sys
 from typing import Any, Iterable, List, Optional, Tuple, Type, Union
+
+from dateutil import tz
 
 # import helpers.versioning as hversi
 # hversi.check_version()
@@ -431,11 +432,15 @@ def dassert_array_has_same_type_element(
 
 
 def dassert_container_type(
-    obj: Any, container_type: Optional[Any], elem_type: Optional[Any],
-    msg: Optional[str] = None, *args: Any
+    obj: Any,
+    container_type: Optional[Any],
+    elem_type: Optional[Any],
+    msg: Optional[str] = None,
+    *args: Any,
 ) -> None:
     """
-    Assert `obj` is a certain type of container containing certain type of objects.
+    Assert `obj` is a certain type of container containing certain type of
+    objects.
 
     E.g., `obj` is a list of strings.
     """
@@ -454,7 +459,7 @@ def dassert_container_type(
 
 # TODO(gp): Replace calls to this with calls to `dassert_container_type()`.
 def dassert_list_of_strings(
-        list_: List[str], msg: Optional[str] = None, *args: Any
+    list_: List[str], msg: Optional[str] = None, *args: Any
 ) -> None:
     # TODO(gp): Allow iterable?
     dassert_isinstance(list_, list, msg, *args)
@@ -652,26 +657,28 @@ class _LocalTimeZoneFormatter:
     Override logging.Formatter to use an aware datetime object.
     """
 
-    def converter(self, timestamp:datetime.datetime) -> datetime.datetime:
+    def converter(self, timestamp: datetime.datetime) -> datetime.datetime:
         # timestamp=1622423570.0147252
         dt = datetime.datetime.utcfromtimestamp(timestamp)
         # Convert it to an aware datetime object in UTC time.
-        dt=dt.replace(tzinfo=datetime.timezone.utc)
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
         # TODO(gp): Automatically detect the time zone. It might be complicated in
         #  Docker.
-        #tzinfo = pytz.timezone('America/New_York')
-        tzinfo = tz.gettz('America/New_York')
+        # tzinfo = pytz.timezone('America/New_York')
+        tzinfo = tz.gettz("America/New_York")
         # Convert it to your local timezone (still aware)
-        dt=dt.astimezone(tzinfo)
+        dt = dt.astimezone(tzinfo)
         return dt
 
-    def formatTime(self, record: logging.LogRecord, datefmt: Optional[str] =None) -> datetime.datetime:
+    def formatTime(
+        self, record: logging.LogRecord, datefmt: Optional[str] = None
+    ) -> datetime.datetime:
         dt = self.converter(record.created)
         if datefmt:
             s = dt.strftime(datefmt)
         else:
             try:
-                s = dt.isoformat(timespec='milliseconds')
+                s = dt.isoformat(timespec="milliseconds")
             except TypeError:
                 s = dt.isoformat()
         return s
