@@ -122,7 +122,7 @@ def patch_configs(configs: List[cfg.Config],
         config[("meta", "id")] = idx
         # Inject all the params in the config.
         for key in sorted(params.keys()):
-            config[("meta", key)] = params[k]
+            config[("meta", key)] = params[key]
         # Inject the experiment result dir.
         dbg.dassert_in("dst_dir", params)
         dst_dir = params["dst_dir"]

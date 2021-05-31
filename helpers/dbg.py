@@ -5,6 +5,7 @@ import helpers.dbg as dbg
 """
 
 import copy
+import time
 import logging
 import os
 import pprint
@@ -78,8 +79,7 @@ def dfatal(message: str, assertion_type: Optional[Any] = None) -> None:
 
 def _to_msg(msg: Optional[str], *args: Any) -> str:
     """
-    Format the error message `msg` using the params in `args`, like `msg %
-    args`.
+    Format error message `msg` using the params in `args`, like `msg % args`.
     """
     if msg is None:
         # If there is no message, we should have no arguments to format.
@@ -429,9 +429,31 @@ def dassert_array_has_same_type_element(
         _dfatal(txt, msg, *args)
 
 
-# TODO(gp): -> is_list_of_strings
+def dassert_container_type(
+    obj: Any, container_type: Optional[Any], elem_type: Optional[Any],
+    msg: Optional[str] = None, *args: Any
+) -> None:
+    """
+    Assert `obj` is a certain type of container containing certain type of objects.
+
+    E.g., `obj` is a list of strings.
+    """
+    # Add information about the obj.
+    if not msg:
+        msg = ""
+    msg = msg.rstrip("\n") + "\nobj='%s'" % str(obj)
+    # Check container.
+    if container_type is not None:
+        dassert_isinstance(obj, container_type, msg, *args)
+    # Check the elements of the container.
+    if elem_type is not None:
+        for elem in obj:
+            dassert_isinstance(elem, elem_type, msg, *args)
+
+
+# TODO(gp): Replace calls to this with calls to `dassert_container_type()`.
 def dassert_list_of_strings(
-    list_: List[str], msg: Optional[str] = None, *args: Any
+        list_: List[str], msg: Optional[str] = None, *args: Any
 ) -> None:
     # TODO(gp): Allow iterable?
     dassert_isinstance(list_, list, msg, *args)
@@ -623,7 +645,43 @@ WARNING = "\033[33mWARNING\033[0m"
 ERROR = "\033[31mERROR\033[0m"
 
 
-class _ColoredFormatter(logging.Formatter):
+import datetime
+import logging
+import pytz
+
+
+# TODO(gp): This doesn't work for some reason.
+# From https://stackoverflow.com/questions/32402502
+class _LocalTimeZoneFormatter:
+    """
+    Override logging.Formatter to use an aware datetime object.
+    """
+
+    def converter(self, timestamp:datetime.datetime) -> datetime.datetime:
+        # timestamp=1622423570.0147252
+        dt = datetime.datetime.utcfromtimestamp(timestamp)
+        # Convert it to an aware datetime object in UTC time.
+        dt=dt.replace(tzinfo=datetime.timezone.utc)
+        # TODO(gp): Automatically detect the time zone. It might be complicated in
+        #  Docker.
+        tzinfo = pytz.timezone('America/New_York')
+        # Convert it to your local timezone (still aware)
+        dt=dt.astimezone(tzinfo)
+        return dt
+
+    def formatTime(self, record: logging.LogRecord, datefmt: Optional[str] =None) -> datetime.datetime:
+        dt = self.converter(record.created)
+        if datefmt:
+            s = dt.strftime(datefmt)
+        else:
+            try:
+                s = dt.isoformat(timespec='milliseconds')
+            except TypeError:
+                s = dt.isoformat()
+        return s
+
+
+class _ColoredFormatter(_LocalTimeZoneFormatter, logging.Formatter):
     """
     Logging formatter using colors for different levels.
     """
@@ -646,7 +704,7 @@ class _ColoredFormatter(logging.Formatter):
     SUFFIX = "\033[0m"
 
     def __init__(self, log_format: str, date_format: str):
-        logging.Formatter.__init__(self, log_format, date_format)
+        super().__init__(log_format, date_format)
 
     def format(self, record: logging.LogRecord) -> str:
         colored_record = copy.copy(record)
@@ -769,7 +827,7 @@ def _get_logging_format(
                 log_format += " [%(resource_use)-40s]"
             log_format += (
                 # lib_tasks _delete_branches
-                " %(module)-15s %(funcName)-20s"
+                " %(module)-15s: %(funcName)-30s:"
                 # 142: ...
                 " %(lineno)-4d:"
                 " %(message)s"

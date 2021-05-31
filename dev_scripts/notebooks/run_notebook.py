@@ -182,41 +182,11 @@ def _parse() -> argparse.ArgumentParser:
 def _main(parser: argparse.ArgumentParser) -> None:
     args = parser.parse_args()
     dbg.init_logger(verbosity=args.log_level, use_exec_path=True)
-
     # Create the dst dir.
     dst_dir = os.path.abspath(args.dst_dir)
-    io_.create_dir(dst_dir, incremental=not args.no_incremental)
-
-    # # TODO(gp): -> utils.prepare_configs
-    # # Build the configs from the builder.
-    # config_builder = args.function
-    # configs = cfgb.get_configs_from_builder(config_builder)
-    # # Patch the configs with extra information as a way to communicate
-    # # with the notebook.
-    # # TODO(gp): This can be patched inside the loop, then we can even
-    # #  unify the code to create the config inside/outside the notebook.
-    # configs = cfgb.add_result_dir(dst_dir, configs)
-    # configs = cfgb.add_config_idx(configs)
-    # # Select the configs.
-    # configs = ccbuilders.select_config(
-    #     configs, args.index, args.start_from_index,
-    # )
-    # config_builder = args.function
-    # configs = cfgb.get_configs_from_builder(config_builder)
-    # configs = cfgb.patch_configs(configs, dst_dir)
-    # _LOG.info("Generated %d configs from the builder", len(configs))
-    # # Select the configs based on command line options.
-    # index = args.index
-    # start_from_index = args.start_from_index
-    # configs = ccbuilders.select_config(configs, index, start_from_index)
-    # _LOG.info("Selected %d configs from command line", len(configs))
-    # # Remove the configs already executed.
-    # configs, num_skipped = skip_configs_already_executed(configs, incremental)
-    # _LOG.info("Removed %d configs since already executed", num_skipped)
-    # _LOG.info("Need to execute %d configs", len(configs))
-
+    io_.create_dir(dst_dir, incremental=not args.clean_dst_dir)
+    # Get the configs to run.
     configs = cdtfut.get_configs_from_command_line(args)
-
     # Get the notebook file.
     notebook_file = os.path.abspath(args.notebook)
     dbg.dassert_exists(notebook_file)

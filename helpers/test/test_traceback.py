@@ -136,20 +136,3 @@ Traceback (most recent call last):
         # Handle `None`.
         act_traceback = str(act_traceback)
         self.assert_equal(act_traceback, exp_traceback, fuzzy_match=True)
-
-    # @staticmethod
-    # def _purify_from_client(cfile: htrace.CFILE_ROW) -> htrace.CFILE_ROW:
-    #     """
-    #     Remove the references to '/app/amp/' and '/app/` from a CFILE_ROW.
-    #     """
-    #     cfile_tmp = []
-    #     for cfile_row in cfile:
-    #         file_name, line_num, text = cfile_row
-    #         file_name = os.path.normpath(file_name)
-    #         for prefix in ["/app/amp/", "/app/", "amp/"]:
-    #             if file_name.startswith(prefix):
-    #                 # TODO(gp): Use Python3.9 removeprefix.
-    #                 file_name = file_name.replace(prefix, "")
-    #         cfile_row = (file_name, line_num, text)
-    #         cfile_tmp.append(cfile_row)
-    #     return cfile_tmp

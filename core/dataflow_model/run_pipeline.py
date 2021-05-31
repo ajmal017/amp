@@ -100,14 +100,14 @@ def _main(parser: argparse.ArgumentParser) -> None:
     dbg.init_logger(verbosity=args.log_level, use_exec_path=True)
     # Create the dst dir.
     dst_dir = os.path.abspath(args.dst_dir)
-    io_.create_dir(dst_dir, incremental=not args.no_incremental)
-
+    io_.create_dir(dst_dir, incremental=not args.clean_dst_dir)
+    # Get the configs to run.
     configs = cdtfut.get_configs_from_command_line(args)
-
     # Parse command-line options.
     num_attempts = args.num_attempts
     abort_on_error = not args.skip_on_error
     num_threads = args.num_threads
+    # TODO(gp): Try to factor out this.
     # Execute.
     if num_threads == "serial":
         rcs = []
