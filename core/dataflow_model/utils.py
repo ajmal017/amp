@@ -10,6 +10,7 @@ import core.dataflow_model.utils as cdtfut
 import argparse
 import logging
 import os
+import sys
 from typing import (
     Any,
     Callable,
@@ -28,6 +29,7 @@ import core.config_builders as cfgb
 import helpers.dbg as dbg
 import helpers.io_ as io_
 import helpers.pickle_ as hpickle
+import helpers.printing as hprint
 
 _LOG = logging.getLogger(__name__)
 
@@ -165,13 +167,6 @@ def setup_experiment_dir(config):
     file_name = os.path.join(experiment_result_dir, "config.txt")
     _LOG.info("file_name=%s", file_name)
     io_.to_file(file_name, str(config))
-    #
-    file_name = os.path.join(experiment_result_dir, "config_builder.txt")
-    _LOG.info("file_name=%s", file_name)
-    io_.to_file(
-        file_name,
-        "Config builder: %s\nConfig index: %s" % (config_builder, str(i)),
-    )
 
 
 def select_config(
@@ -215,7 +210,7 @@ def get_configs_from_command_line(args):
 
     The configs are patched with all the information from the command line
     (e.g., `idx`, `config_builder`, `pipeline_builder`, `dst_dir`,
-    `experiment_dst_dir`).
+    `experiment_result_dir`).
     """
     config_builder = args.config_builder
     configs = cfgb.get_configs_from_builder(config_builder)
@@ -244,6 +239,7 @@ def get_configs_from_command_line(args):
             "The following configs will not be executed due to passing --dry_run:"
         )
         for i, config in enumerate(configs):
-            print("config_%s:\n %s", i, config)
+            print(hprint.frame("Config %d/%s" % (i + 1, len(configs))))
+            print(str(config))
         sys.exit(0)
     return configs

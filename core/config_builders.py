@@ -111,9 +111,8 @@ def patch_configs(configs: List[cfg.Config],
     """
     Patch the configs with information needed to run.
 
-    This function is used by `run_notebook.py` and `run_pipeline.py` to
-    pass information through the `Config` to the process running the
-    experiment.
+    This function is used by `run_notebook.py` and `run_pipeline.py` to pass
+    information through the `Config` to the process running the experiment.
     """
     configs_out = []
     for idx, config in enumerate(configs):
@@ -128,8 +127,8 @@ def patch_configs(configs: List[cfg.Config],
         dst_dir = params["dst_dir"]
         # Add experiment result dir.
         dst_subdir = f"result_{idx}"
-        experiment_dst_dir = os.path.join(dst_dir, dst_subdir)
-        config[("meta", "experiment_result_dir")] = experiment_dst_dir
+        experiment_result_dir = os.path.join(dst_dir, dst_subdir)
+        config[("meta", "experiment_result_dir")] = experiment_result_dir
         #
         configs_out.append(config)
     return configs_out
@@ -177,10 +176,10 @@ def get_config_from_env() -> Optional[cfg.Config]:
     config_builder = os.environ["__CONFIG_BUILDER__"]
     _LOG.info("config_builder=%s", config_builder)
     params["config_builder"] = config_builder
-    #
+    # TODO(gp): Make the env var name mimic the var name.
     experiment_dst_dir = os.environ["__CONFIG_EXPERIMENT_DST_DIR__"]
-    _LOG.info("experiment_dst_dir=%s", experiment_dst_dir)
-    params["experiment_dst_dir"] = experiment_dst_dir
+    _LOG.info("experiment_result_dir=%s", experiment_result_dir)
+    params["experiment_result_dir"] = experiment_result_dir
     #
     config = get_config_from_params(config_idx, params)
     #

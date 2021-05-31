@@ -5,7 +5,8 @@ import helpers.dbg as dbg
 """
 
 import copy
-import time
+import datetime
+from dateutil import tz
 import logging
 import os
 import pprint
@@ -645,12 +646,6 @@ WARNING = "\033[33mWARNING\033[0m"
 ERROR = "\033[31mERROR\033[0m"
 
 
-import datetime
-import logging
-import pytz
-
-
-# TODO(gp): This doesn't work for some reason.
 # From https://stackoverflow.com/questions/32402502
 class _LocalTimeZoneFormatter:
     """
@@ -664,7 +659,8 @@ class _LocalTimeZoneFormatter:
         dt=dt.replace(tzinfo=datetime.timezone.utc)
         # TODO(gp): Automatically detect the time zone. It might be complicated in
         #  Docker.
-        tzinfo = pytz.timezone('America/New_York')
+        #tzinfo = pytz.timezone('America/New_York')
+        tzinfo = tz.gettz('America/New_York')
         # Convert it to your local timezone (still aware)
         dt=dt.astimezone(tzinfo)
         return dt

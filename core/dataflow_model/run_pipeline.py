@@ -49,17 +49,24 @@ def _run_pipeline(
     dbg.dassert_eq(1, num_attempts, "Multiple attempts not supported yet")
     cdtfut.setup_experiment_dir(config)
     # Execute experiment.
-    _LOG.info("Executing experiment %d", i)
+    # TODO(gp): Rename id -> idx everywhere
+    #  jackpy "meta" | grep id | grep config
+    idx = config[("meta", "id")]
+    _LOG.info("Executing experiment for config %d\n%s", idx, config)
     # Prepare the log file.
-    log_file = os.path.join(experiment_result_dir, "run_pipeline.%s.log" % i)
+    # TODO(gp): -> experiment_dst_dir
+    experiment_result_dir = config[("meta", "experiment_result_dir")]
+    log_file = os.path.join(experiment_result_dir, "run_pipeline.%s.log" % idx)
     log_file = os.path.abspath(os.path.abspath(log_file))
     # Prepare command line.
+    pipeline_builder = config[("meta", "pipeline_builder")]
+    config_builder = config[("meta", "config_builder")]
     cmd = [
         "run_pipeline_stub.py",
         f"--pipeline_builder '{pipeline_builder}'",
         f"--config_builder '{config_builder}'",
-        f"--idx {i}",
-        f"--dst_dir {dst_dir}",
+        f"--idx {idx}",
+        f"--experiment_result_dir {experiment_result_dir}",
         "-v INFO",
     ]
     cmd = " ".join(cmd)
@@ -67,9 +74,9 @@ def _run_pipeline(
     rc = hsinte.system(cmd, output_file=log_file, abort_on_error=False)
     if rc != 0:
         # The notebook run wasn't successful.
-        _LOG.error("Execution failed for experiment %d", i)
+        _LOG.error("Execution failed for experiment %d", idx)
         if abort_on_error:
-            dbg.dfatal("Aborting")
+            dbg.dfatal("Aborting on experiment error")
         else:
             _LOG.error("Continuing execution for next experiments")
     else:

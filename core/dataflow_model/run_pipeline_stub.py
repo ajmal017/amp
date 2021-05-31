@@ -43,7 +43,7 @@ def _parse() -> argparse.ArgumentParser:
         help="",
     )
     parser.add_argument(
-        "--experiment_dst_dir",
+        "--experiment_result_dir",
         action="store",
         required=True,
         help="",
@@ -54,15 +54,14 @@ def _parse() -> argparse.ArgumentParser:
 
 def _main(parser: argparse.ArgumentParser) -> None:
     args = parser.parse_args()
-    # TODO(gp): Save log.
     dbg.init_logger(verbosity=args.log_level)
     # Create the dst dir.
-    experiment_dst_dir = os.path.abspath(args.experiment_dst_dir)
-    io_.create_dir(experiment_dst_dir, incremental=True)
+    experiment_result_dir = os.path.abspath(args.experiment_result_dir)
+    io_.create_dir(experiment_result_dir, incremental=True)
     #
     params = {
         "config_builder": args.config_builder,
-        "experiment_dst_dir": args.experiment_dst_dir,
+        "experiment_result_dir": args.experiment_result_dir,
         "pipeline_builder": args.pipeline_builder,
     }
     config = ccbuild.get_config_from_params(config_idx, params)
