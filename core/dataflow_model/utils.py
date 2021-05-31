@@ -49,7 +49,7 @@ def add_experiment_arg(
         help="Delete the dir before running or skip experiments already performed",
     )
     parser.add_argument(
-        "--function",
+        "--config_builder",
         action="store",
         required=True,
         help="Full invocation of Python function to create configs, e.g., "

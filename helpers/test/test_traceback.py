@@ -29,12 +29,11 @@ Traceback (most recent call last):
 NameError: name 'repo_short_name' is not defined
     TEST TEST TEST
 """
-        act_cfile, act_traceback = htrace.parse_traceback(txt)
-        _LOG.debug("act_cfile=\n%s", act_cfile)
+        purify_from_client = True
         # pylint: disable=line-too-long
         exp_cfile = [
             (
-                "test/test_lib_tasks.py",
+                "helpers/test/test_lib_tasks.py",
                 27,
                 "test_get_gh_issue_title2:act = ltasks._get_gh_issue_title(issue_id, repo)",
             ),
@@ -49,12 +48,8 @@ NameError: name 'repo_short_name' is not defined
                 'get_task_prefix_from_repo_short_name:if repo_short_name == "amp":',
             ),
         ]
+        exp_cfile = htrace.cfile_to_str(exp_cfile)
         # pylint: enable=line-too-long
-        act_cfile = self._purify_from_client(act_cfile)
-        self.assert_equal(
-            htrace.cfile_to_str(act_cfile), htrace.cfile_to_str(exp_cfile)
-        )
-        #
         exp_traceback = """
 Traceback (most recent call last):
   File "/app/amp/test/test_lib_tasks.py", line 27, in test_get_gh_issue_title2
@@ -64,9 +59,13 @@ Traceback (most recent call last):
   File "/app/amp/helpers/git.py", line 397, in get_task_prefix_from_repo_short_name
     if repo_short_name == "amp":
         """.rstrip().lstrip()
-        self.assert_equal(act_traceback, exp_traceback)
+        self._parse_traceback_helper(
+                                txt,
+                                purify_from_client,
+                                exp_cfile,
+                                exp_traceback)
 
-    def test_parse2(self) -> None:
+    def test_parse_empty_traceback1(self) -> None:
         """
         Parse an empty traceback file.
         """
@@ -76,48 +75,20 @@ Traceback (most recent call last):
 Traceback
     TEST TEST TEST
 """
-        #
-        act_cfile, act_traceback = htrace.parse_traceback(txt)
-        _LOG.debug("act_cfile=\n%s", act_cfile)
-        exp_cfile = []
-        self.assert_equal(
-            htrace.cfile_to_str(act_cfile), htrace.cfile_to_str(exp_cfile)
-        )
-        #
-        exp_traceback = None
-        self.assertIs(act_traceback, exp_traceback)
-
-    def test_parse3(self) -> None:
-        """
-        Parse a traceback file with / without purifying files.
-        """
         purify_from_client = True
-        exp_cfile = [
-            ("core/dataflow_model/run_pipeline.py", 146, ""),
-            ("core/dataflow_model/run_pipeline.py", 105, ""),
-            ("core/dataflow_model/utils.py", 228, "")]
-        exp_traceback = None
-        self._test_parse_helper(purify_from_client, exp_cfile, exp_traceback)
+        exp_cfile = []
+        exp_cfile = htrace.cfile_to_str(exp_cfile)
+        exp_traceback = "None"
+        self._parse_traceback_helper(
+            txt,
+            purify_from_client,
+            exp_cfile,
+            exp_traceback)
 
-    def test_parse4(self) -> None:
+    def test_parse2(self) -> None:
         """
-        Like `test_parse3` but without purifying from client.
+        Parse a traceback file with both files from Docker and local files.
         """
-        purify_from_client = False
-        exp_cfile = [
-            ("core/dataflow_model/run_pipeline.py", 146, ""),
-            ("core/dataflow_model/run_pipeline.py", 105, ""),
-            ("core/dataflow_model/utils.py", 228, "")]
-        exp_traceback = None
-        self._test_parse_helper(purify_from_client, exp_cfile, exp_traceback)
-
-    def _test_parse_helper(self, purify_from_client: bool,
-                           exp_cfile: List[htrace.CFILE_ROW],
-                           exp_traceback: str) -> None:
-        """
-        Parse a traceback file with / without purifying files.
-        """
-        #
         txt = """
 Traceback (most recent call last):
   File "./amp/core/dataflow_model/run_pipeline.py", line 146, in <module>
@@ -127,27 +98,58 @@ Traceback (most recent call last):
   File "/app/amp/core/dataflow_model/utils.py", line 228, in get_configs_from_command_line
     "config_builder": args.config_builder,
 """
-        act_cfile, act_traceback = htrace.parse_traceback(txt, purify_from_client=purify_from_client)
-        _LOG.debug("act_cfile=\n%s", act_cfile)
-        self.assert_equal(
-            htrace.cfile_to_str(act_cfile), htrace.cfile_to_str(exp_cfile)
-        )
-        #
-        self.assertIs(act_traceback, exp_traceback)
+        purify_from_client = True
+        exp_cfile = [
+            ("amp/core/dataflow_model/run_pipeline.py", 146, "<module>:_main(_parse())"),
+            ("amp/core/dataflow_model/run_pipeline.py", 105, "_main:configs = cdtfut.get_configs_from_command_line(args)"),
+            ("amp/core/dataflow_model/utils.py", 228, 'get_configs_from_command_line:"config_builder": args.config_builder,')
+            ]
+        exp_cfile = htrace.cfile_to_str(exp_cfile)
+        exp_traceback = txt
+        self._parse_traceback_helper(
+            txt,
+            purify_from_client,
+            exp_cfile,
+            exp_traceback)
 
-    @staticmethod
-    def _purify_from_client(cfile: htrace.CFILE_ROW) -> htrace.CFILE_ROW:
-        """
-        Remove the references to '/app/amp/' and '/app/` from a CFILE_ROW.
-        """
-        cfile_tmp = []
-        for cfile_row in cfile:
-            file_name, line_num, text = cfile_row
-            file_name = os.path.normpath(file_name)
-            for prefix in ["/app/amp/", "/app/", "amp/"]:
-                if file_name.startswith(prefix):
-                    # TODO(gp): Use Python3.9 removeprefix.
-                    file_name = file_name.replace(prefix, "")
-            cfile_row = (file_name, line_num, text)
-            cfile_tmp.append(cfile_row)
-        return cfile_tmp
+    def _parse_traceback_helper(self,
+                           txt: str,
+                           purify_from_client: bool,
+                           exp_cfile: str,
+                           exp_traceback: str) -> None:
+        dbg.dassert_isinstance(txt, str)
+        dbg.dassert_isinstance(exp_cfile, str)
+        dbg.dassert_isinstance(exp_traceback, str)
+        # Run the function under test.
+        act_cfile, act_traceback = htrace.parse_traceback(txt,
+                                                          purify_from_client=purify_from_client)
+        _LOG.debug("act_cfile=\n%s", act_cfile)
+        # Compare cfile.
+        act_cfile = htrace.cfile_to_str(act_cfile)
+        act_cfile = hut.purify_amp_references(act_cfile)
+        act_cfile = hut.purify_app_references(act_cfile)
+        #
+        exp_cfile = hut.purify_amp_references(exp_cfile)
+        exp_cfile = hut.purify_app_references(exp_cfile)
+        self.assert_equal(act_cfile, exp_cfile, fuzzy_match=True)
+        # Compare traceback.
+        # Handle `None`.
+        act_traceback = str(act_traceback)
+        self.assert_equal(act_traceback, exp_traceback, fuzzy_match=True)
+
+    # @staticmethod
+    # def _purify_from_client(cfile: htrace.CFILE_ROW) -> htrace.CFILE_ROW:
+    #     """
+    #     Remove the references to '/app/amp/' and '/app/` from a CFILE_ROW.
+    #     """
+    #     cfile_tmp = []
+    #     for cfile_row in cfile:
+    #         file_name, line_num, text = cfile_row
+    #         file_name = os.path.normpath(file_name)
+    #         for prefix in ["/app/amp/", "/app/", "amp/"]:
+    #             if file_name.startswith(prefix):
+    #                 # TODO(gp): Use Python3.9 removeprefix.
+    #                 file_name = file_name.replace(prefix, "")
+    #         cfile_row = (file_name, line_num, text)
+    #         cfile_tmp.append(cfile_row)
+    #     return cfile_tmp

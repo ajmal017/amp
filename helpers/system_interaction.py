@@ -485,40 +485,42 @@ def find_file_with_dir(file_name: str, root_dir: str = ".") -> Optional[str]:
         - return the match, if only one matching file was found
         - assert if more than one files matching the pattern were found
     """
-    _LOG.debug(hprint.to_str("file_name dir_name root_dir"))
+    _LOG.debug(hprint.to_str("file_name root_dir"))
     # Find all the files in the dir with the same basename.
     base_name = os.path.basename(file_name)
-    cmd = f"find {root_dir} -name '{base_name}' -not -path '*/\.git/*'"
+    cmd = f"find . -name '{base_name}' -not -path '*/\.git/*'"
     # > find . -name "utils.py"
     # ./amp/core/dataflow/utils.py
     # ./amp/core/dataflow_model/utils.py
     # ./amp/instrument_master/common/test/utils.py
-    # TODO(gp): use system_to_files.
-    _, output = system_to_string(cmd)
-    found_files = output.split("\n")
-    _LOG.debug("files=\n%s", "\n".join(found_files))
+    remove_files_non_present = False
+    mode = "return_results"
+    candidate_files = system_to_files(cmd, root_dir, remove_files_non_present, mode)
+    _LOG.debug("files=\n%s", "\n".join(candidate_files))
     # Check which files match enclosing dir name and basename.
-    found_files = []
-    def _compute_file_signature(file_: str) -> str:
+    def _compute_file_signature(file_: str) -> Tuple[str, str]:
         enclosing_dir_name = os.path.basename(os.path.dirname(file_))
         basename = os.path.basename(file_)
         return (enclosing_dir_name, basename)
 
-    for found_file in sorted(found_files):
-        if _compute_file_signature(found_file) == _compute_file_signature(file_name):
-            found_files.append(found_file)
-    _LOG.debug("Found %d files:\n%s", len(found_files),
-               "\n".join(found_files))
+    matching_files = []
+    for file in sorted(candidate_files):
+        is_equal = _compute_file_signature(file) == _compute_file_signature(file_name)
+        _LOG.debug("found_file=%s -> is_equal=%s", file, is_equal)
+        if is_equal:
+            matching_files.append(file)
+    _LOG.debug("Found %d files:\n%s", len(matching_files),
+               "\n".join(matching_files))
     # Process output.
-    if len(found_files) == 0:
+    if len(matching_files) == 0:
         # Found no matching file: return `None`.
         res = None
-    elif len(found_files) == 1:
+    elif len(matching_files) == 1:
         # Found a single match: return the only one.
-        res = found_files[0]
+        res = matching_files[0]
     else:
         # Found more than one potential match: assert.
-        dbg.dfatal("Found found_files=\n%s", "\n".join(found_files))
+        dbg.dfatal("Found found_files=\n%s", "\n".join(matching_files))
     return res
 
 
@@ -581,7 +583,7 @@ def system_to_files(
     if dir_name is None:
         dir_name = "."
     cmd = f"cd {dir_name} && {cmd}"
-    _, output = hsinte.system_to_string(cmd)
+    _, output = system_to_string(cmd)
     #
     _LOG.debug("output=\n%s", output)
     files = output.split("\n")

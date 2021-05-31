@@ -143,21 +143,6 @@ def parse_traceback(
         for cfile_row in cfile:
             file_name, line_num, text = cfile_row
             file_name = git.purify_docker_file_from_git_client(file_name, super_module=True)
-            # if file_name.startswith("/app"):
-            #     base_name = os.path.basename(file_name)
-            #     dir_name = os.path.dirname(file_name)
-            #     file_name_tmp = hsinte.find_file_with_dir(base_name, dir_name, ".")
-            #     if file_name_tmp is None:
-            #         # We didn't find the file in the current client: leave the file as it was.
-            #         _LOG.warning("Can't find the file_name corresponding to"
-            #                      f"file_name '{file_name}'")
-            #     else:
-            #         if not os.path.exists(file_name_tmp):
-            #             _LOG.warning(f"The file_name '{file_name_tmp}' corresponding to"
-            #                          f"the original file_name '{file_name}' doesn't exist")
-            #         file_name = file_name_tmp
-            # #
-            # file_name = os.path.normpath(file_name)
             cfile_tmp.append((file_name, line_num, text))
         cfile = cfile_tmp
         _LOG.debug("# After purifying from client")

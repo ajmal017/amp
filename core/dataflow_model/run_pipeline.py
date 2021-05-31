@@ -86,7 +86,7 @@ def _parse() -> argparse.ArgumentParser:
     parser = cdtfut.add_experiment_arg(parser)
     # Add pipeline options.
     parser.add_argument(
-        "--pipeline",
+        "--pipeline_builder",
         action="store",
         required=True,
         help="File storing the pipeline to iterate over",

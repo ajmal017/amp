@@ -554,9 +554,7 @@ def purify_docker_file_from_git_client(file_name: str, super_module) -> str:
     # Clean up file name.
     file_name = os.path.normpath(file_name)
     #
-    base_name = os.path.basename(file_name)
-    dir_name = os.path.dirname(file_name)
-    file_name_tmp = hsinte.find_file_with_dir(base_name, dir_name, ".")
+    file_name_tmp = hsinte.find_file_with_dir(file_name, ".")
     if file_name_tmp is None:
         # We didn't find the file in the current client: leave the file as it was.
         _LOG.warning(f"Can't find the file_name corresponding to '{file_name}'")
