@@ -14,42 +14,42 @@ import helpers.unit_test as hut
 _LOG = logging.getLogger(__name__)
 
 
-@pytest.mark.slow
 class TestRunNotebook1(hut.TestCase):
     def test1(self) -> None:
         """
         Run an experiment with 2 notebooks (without any failure) serially.
         """
-        cmd = (
-            "--config_builder 'dev_scripts.test.test_run_notebook.build_configs1()' "
-            "--skip_on_error "
+        cmd = [
+            "--config_builder 'dev_scripts.test.test_run_notebook.build_configs1()'",
+            "--skip_on_error",
             "--num_threads 'serial'"
-        )
+        ]
         exp = ""
         rc = self._run_notebook_helper(cmd, exp)
         self.assertEqual(rc, 0)
 
+    @pytest.mark.slow
     def test2(self) -> None:
         """
         Run an experiment with 2 notebooks (without any failure) with 2 threads.
         """
-        cmd = (
-            "--config_builder 'dev_scripts.test.test_run_notebook.build_configs1()' "
+        cmd = [
+            "--config_builder 'dev_scripts.test.test_run_notebook.build_configs1()'",
             "--num_threads 2"
-        )
+        ]
         exp = ""
         rc = self._run_notebook_helper(cmd, exp)
         self.assertEqual(rc, 0)
 
+    @pytest.mark.slow
     def test3(self) -> None:
         """
         Run an experiment with 3 notebooks (with one failing) using 3 threads.
         """
-        cmd = (
-            "--config_builder 'dev_scripts.test.test_run_notebook.build_configs2()' "
+        cmd = [
+            "--config_builder 'dev_scripts.test.test_run_notebook.build_configs2()'",
             "--num_threads 3"
-        )
-        cmd += " 2>&1 >/dev/null"
+        ]
         _LOG.warning("This command is supposed to fail")
         exp = ""
         rc = self._run_notebook_helper(cmd, exp)
@@ -58,25 +58,28 @@ class TestRunNotebook1(hut.TestCase):
     @staticmethod
     def _get_files() -> Tuple[str, str]:
         amp_path = git.get_amp_abs_path()
+        #
         exec_file = os.path.join(
             amp_path, "dev_scripts/notebooks/run_notebook.py"
         )
         dbg.dassert_file_exists(exec_file)
+        #
         notebook_file = os.path.join(
             amp_path, "dev_scripts/notebooks/test/simple_notebook.ipynb"
         )
         dbg.dassert_file_exists(notebook_file)
         return exec_file, notebook_file
 
-    def _run_notebook_helper(self, cmd: str, exp: str) -> int:
+    def _run_notebook_helper(self, cmd: List[str], exp: str) -> int:
         # Build command line.
         dst_dir = self.get_scratch_space()
         exec_file, notebook_file = self._get_files()
-        cmd = (
-            f"{exec_file} "
-            f"--dst_dir {dst_dir} "
-            f"--notebook {notebook_file} " +
-            cmd)
+        cmd_tmp = [
+            f"{exec_file}",
+            f"--dst_dir {dst_dir}",
+            f"--notebook {notebook_file}"]
+        cmd_tmp.extend(cmd)
+        cmd = " ".join(cmd_tmp)
         # Run command.
         rc = si.system(cmd, abort_on_error=False)
         # Compute and compare the dir signature.
