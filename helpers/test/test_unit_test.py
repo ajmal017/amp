@@ -747,7 +747,42 @@ class TestDataframeToJson(hut.TestCase):
 # ################################################################################
 
 
-class Test_get_dir_signature(hut.TestCase):
+class Test_get_dir_signature1(hut.TestCase):
 
     def test1(self):
+        """
+        Test dir signature excluding the file content.
+        """
+        include_file_content = False
+        act = self._helper(include_file_content)
+        # pylint: disable=line-too-long
+        exp = r"""
+        $GIT_ROOT/helpers/test/Test_get_dir_signature1.test1/input
+        $GIT_ROOT/helpers/test/Test_get_dir_signature1.test1/input/result_0
+        $GIT_ROOT/helpers/test/Test_get_dir_signature1.test1/input/result_0/config.pkl
+        $GIT_ROOT/helpers/test/Test_get_dir_signature1.test1/input/result_0/config.txt
+        $GIT_ROOT/helpers/test/Test_get_dir_signature1.test1/input/result_0/run_notebook.0.log
+        $GIT_ROOT/helpers/test/Test_get_dir_signature1.test1/input/result_1
+        $GIT_ROOT/helpers/test/Test_get_dir_signature1.test1/input/result_1/config.pkl
+        $GIT_ROOT/helpers/test/Test_get_dir_signature1.test1/input/result_1/config.txt
+        $GIT_ROOT/helpers/test/Test_get_dir_signature1.test1/input/result_1/run_notebook.1.log
+        """
+        # pylint: enable=line-too-long
+        self.assert_equal(act, exp, fuzzy_match=True)
+
+    def test2(self):
+        """
+        Test dir signature including the file content.
+        """
+        include_file_content = True
+        act = self._helper(include_file_content)
+        # The golden outcome is long and uninteresting so we use check_string.
+        self.check_string(act, fuzzy_match=True)
+
+    def _helper(self, include_file_content: bool) -> str:
         in_dir = self.get_input_dir()
+        num_lines = None
+        act = hut.get_dir_signature(in_dir, num_lines=num_lines,
+                                    include_file_content=include_file_content)
+        act = hut.purify_txt_from_client(act)
+        return act

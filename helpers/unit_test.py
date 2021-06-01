@@ -303,37 +303,48 @@ def create_test_dir(
         hio.to_file(dst_file_name, file_content)
 
 
-def get_dir_signature(dir_name: str, num_lines: Optional[int] = None) -> str:
+def get_dir_signature(dir_name: str, num_lines: Optional[int] = None, include_file_content: bool = True) -> str:
     """
-    Compute a string with the content of files in dir_name.
+    Compute a string with the content of the files in `dir_name`.
 
     :param num_lines: number of lines to print for each file
     """
     # Find all the files under `dir_name`.
     _LOG.debug("dir_name=%s", dir_name)
     dbg.dassert_exists(dir_name)
-    file_names = glob.glob(os.path.join(dir_name, "*"), recursive=True)
+    #file_names = glob.glob(os.path.join(dir_name, "*"), recursive=True)
+    cmd = f'find {dir_name} -name "*"'
+    remove_files_non_present = False
+    file_names = hsinte.system_to_files(cmd, dir_name, remove_files_non_present)
     file_names = sorted(file_names)
     #
     txt: List[str] = []
-    txt.append("len(file_names)=%s" % len(file_names))
-    txt.append("file_names=%s" % ", ".join(file_names))
-    # Scan the files.
-    for file_name in file_names:
-        _LOG.debug("file_name=%s", file_name)
-        txt.append("# " + file_name)
-        # Read file.
-        txt_tmp = hio.from_file(file_name)
-        # This seems unstable on different systems.
-        # txt.append("num_chars=%s" % len(txt_tmp))
-        txt_tmp = txt_tmp.split("\n")
-        # Filter lines, if needed.
-        txt.append("num_lines=%s" % len(txt_tmp))
-        if num_lines is not None:
-            dbg.dassert_lte(1, num_lines)
-            txt_tmp = txt_tmp[:num_lines]
-        txt.append("'''\n" + "\n".join(txt_tmp) + "\n'''")
-    # Concat.
+    # Save the directory / file structure.
+    txt.append("\n".join(file_names))
+    #
+    if include_file_content:
+        # Remove the dirs.
+        file_names = hsinte.remove_dirs(file_names)
+        # Scan the files.
+        txt.append("len(file_names)=%s" % len(file_names))
+        txt.append("file_names=%s" % ", ".join(file_names))
+        for file_name in file_names:
+            _LOG.debug("file_name=%s", file_name)
+            txt.append("# " + file_name)
+            # Read file.
+            txt_tmp = hio.from_file(file_name)
+            # This seems unstable on different systems.
+            # txt.append("num_chars=%s" % len(txt_tmp))
+            txt_tmp = txt_tmp.split("\n")
+            # Filter lines, if needed.
+            txt.append("num_lines=%s" % len(txt_tmp))
+            if num_lines is not None:
+                dbg.dassert_lte(1, num_lines)
+                txt_tmp = txt_tmp[:num_lines]
+            txt.append("'''\n" + "\n".join(txt_tmp) + "\n'''")
+    else:
+        dbg.dassert_is(num_lines, None)
+    # Concat everything in a single string.
     txt = "\n".join(txt)
     return txt
 
@@ -387,8 +398,7 @@ def purify_app_references(txt: str) -> str:
 
 def purify_file_names(file_names: List[str]) -> List[str]:
     """
-    Express file names in terms of the root of git repo, removing reference to
-    amp.
+    Express file names in terms of the root of git repo, removing reference to `amp`.
     """
     git_root = git.get_client_root(super_module=True)
     file_names = [os.path.relpath(f, git_root) for f in file_names]
@@ -416,7 +426,9 @@ def purify_txt_from_client(txt: str) -> str:
     # Replace the user name with `$USER_NAME`.
     user_name = hsinte.get_user_name()
     txt = txt.replace(user_name, "$USER_NAME")
-    # Remove amp reference, if any.
+    # Remove `/app` references.
+    txt = purify_app_references(txt)
+    # Remove `amp` reference.
     txt = purify_amp_references(txt)
     return txt
 
