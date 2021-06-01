@@ -198,7 +198,7 @@ def get_configs_from_command_line(args: argparse.Namespace) -> List[cfg.Config]:
         "config_builder": args.config_builder,
         "dst_dir": args.dst_dir,
     }
-    if getattr(args, "pipeline_builder"):
+    if hasattr(args, "pipeline_builder"):
         params["pipeline_builder"] = args.pipeline_builder
     # Patch the configs with the command line parameters.
     configs = cfgb.patch_configs(configs, params)

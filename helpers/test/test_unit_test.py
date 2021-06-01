@@ -34,6 +34,9 @@ def _git_add(file_name: str) -> None:
         )
 
 
+# ################################################################################
+
+
 class TestTestCase1(hut.TestCase):
     """
     Test free-standing functions in unit_test.py.
@@ -154,6 +157,9 @@ class TestTestCase1(hut.TestCase):
         self.assert_equal(act, exp, fuzzy_match=False)
 
 
+# ################################################################################
+
+
 class Test_AssertEqual1(hut.TestCase):
     def test_equal1(self) -> None:
         """
@@ -252,6 +258,9 @@ completed       success Lint    Slow_tests
         # We don't use self.assert_equal() since this is exactly we are testing,
         # so we use a trusted function.
         self.assertEqual(act, exp)
+
+
+# ################################################################################
 
 
 class TestCheckString1(hut.TestCase):
@@ -407,6 +416,9 @@ class TestCheckString1(hut.TestCase):
             )
             to_skip = True
         return to_skip
+
+
+# ################################################################################
 
 
 class TestCheckDataFrame1(hut.TestCase):
@@ -607,6 +619,9 @@ class TestCheckDataFrame1(hut.TestCase):
         return outcome_updated, file_exists, is_equal
 
 
+# ################################################################################
+
+
 class Test_unit_test1(hut.TestCase):
     def test_purify_txt_from_client1(self) -> None:
         super_module_path = git.get_client_root(super_module=True)
@@ -648,6 +663,9 @@ dev_scripts/test/Test_linter_py1.test_linter1/tmp.scratch/input.py:3: error: Nam
         exp = txt
         act = hut.purify_txt_from_client(txt)
         self.assertEqual(act, exp)
+
+
+# ################################################################################
 
 
 class TestDataframeToJson(hut.TestCase):
@@ -724,3 +742,12 @@ class TestDataframeToJson(hut.TestCase):
             test_dataframe, n_head=None, n_tail=None
         )
         self.check_string(output_str)
+
+
+# ################################################################################
+
+
+class Test_get_dir_signature(hut.TestCase):
+
+    def test1(self):
+        in_dir = self.get_input_dir()

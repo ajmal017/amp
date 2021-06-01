@@ -6,7 +6,7 @@ Run a notebook given a config or a list of configs.
 > run_notebook.py \
     --dst_dir nlp/test_results \
     --notebook nlp/notebooks/NLP_RP_pipeline.ipynb \
-    --function "nlp.build_configs.build_PTask1088_configs()" \
+    --config_builder "nlp.build_configs.build_PTask1088_configs()" \
     --num_threads 2
 """
 
@@ -53,7 +53,7 @@ def _run_notebook(
     """
     cdtfut.setup_experiment_dir(config)
     # Prepare the destination file.
-    idx = config[("meta", "idx")]
+    idx = config[("meta", "id")]
     experiment_result_dir = config[("meta", "experiment_result_dir")]
     dst_file = os.path.join(
         experiment_result_dir,
