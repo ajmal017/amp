@@ -5,7 +5,7 @@ Run a single DAG model wrapping
 # Use example:
 > run_notebook_stub.py \
     --dst_dir nlp/test_results \
-    --pipeline_builder "core.dataflow_model.master_pipeline.run_pipeline" \
+    --pipeline_builder "core.dataflow_model.master_experiment.run_experiment" \
     --config_builder "nlp.build_configs.build_PTask1088_configs()" \
     --num_threads 2
 """
@@ -13,7 +13,7 @@ import argparse
 import logging
 
 import core.config_builders as cfgb
-import core.dataflow_model.master_pipeline as mstpip
+import core.dataflow_model.master_experiment as mstpip
 import helpers.dbg as dbg
 import helpers.parser as prsr
 
@@ -29,7 +29,7 @@ def _parse() -> argparse.ArgumentParser:
         "--pipeline_builder",
         action="store",
         required=True,
-        help="E.g., 'core.dataflow_model.master_pipeline.run_pipeline'"
+        help="E.g., 'core.dataflow_model.master_experiment.run_experiment'"
     )
     parser.add_argument(
         "--config_builder",
@@ -67,7 +67,7 @@ def _main(parser: argparse.ArgumentParser) -> None:
     config = cfgb.get_config_from_params(config_idx, params)
     _LOG.info("config=\n%s", config)
     # TODO(gp): Generalize this in terms of `pipeline_builder`.
-    mstpip.run_pipeline(config)
+    mstpip.run_experiment(config)
 
 
 if __name__ == "__main__":

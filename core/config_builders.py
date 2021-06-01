@@ -253,7 +253,7 @@ def patch_configs(
     """
     Patch the configs with information needed to run.
 
-    This function is used by `run_notebook.py` and `run_pipeline.py` to
+    This function is used by `run_notebook.py` and `run_experiment.py` to
     pass information through the `Config` to the process running the
     experiment.
     """

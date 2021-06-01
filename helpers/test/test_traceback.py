@@ -83,9 +83,9 @@ Traceback
         """
         txt = """
 Traceback (most recent call last):
-  File "./amp/core/dataflow_model/run_pipeline.py", line 146, in <module>
+  File "./amp/core/dataflow_model/run_experiment.py", line 146, in <module>
     _main(_parse())
-  File "./amp/core/dataflow_model/run_pipeline.py", line 105, in _main
+  File "./amp/core/dataflow_model/run_experiment.py", line 105, in _main
     configs = cdtfut.get_configs_from_command_line(args)
   File "/app/amp/core/dataflow_model/utils.py", line 228, in get_configs_from_command_line
     "config_builder": args.config_builder,
@@ -93,12 +93,12 @@ Traceback (most recent call last):
         purify_from_client = True
         exp_cfile = [
             (
-                "amp/core/dataflow_model/run_pipeline.py",
+                "amp/core/dataflow_model/run_experiment.py",
                 146,
                 "<module>:_main(_parse())",
             ),
             (
-                "amp/core/dataflow_model/run_pipeline.py",
+                "amp/core/dataflow_model/run_experiment.py",
                 105,
                 "_main:configs = cdtfut.get_configs_from_command_line(args)",
             ),

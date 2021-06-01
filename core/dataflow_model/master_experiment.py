@@ -8,16 +8,9 @@ import helpers.pickle_ as hpickl
 
 _LOG = logging.getLogger(__name__)
 
-# TODO(gp): master_pipeline.py -> master_experiment.py
-
-# TODO(gp): -> run_dag, run_model? run_experiment
-# TODO(gp): if this was a script there would be more separation and easier
-#  to save output to log. But then we need to pass the config in the same way
-#  we pass it to a notebook but using command-line opts instead of env vars.
-def run_pipeline(config: cfg.Config) -> None:
+def run_experiment(config: cfg.Config) -> None:
     """
-    Implement the master pipeline to:
-
+    Implement the master experiment to:
     - create a DAG
     - run it
     - save the generated `ResultBundle`
@@ -56,9 +49,9 @@ def run_pipeline(config: cfg.Config) -> None:
 
     result_bundle.payload = payload
 
-    # TODO(gp): We could pass the payload back and let _run_pipeline take care
-    #  of that.
-    # TODO(gp): Make sure that the meta part has the right info.
+    # TODO(gp): We could pass the payload back and let _run_experiment take
+    # care of that.
+    # TODO(gp): Make sure that the meta part has the right info. E.g.,
     # dbg.dassert_
     path = os.path.join(
         config["meta", "experiment_result_dir"], "result_bundle.pkl"

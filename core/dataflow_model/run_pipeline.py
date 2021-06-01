@@ -3,7 +3,7 @@ r"""
 Run a pipeline given a list of configs.
 
 # Run an RH1E pipeline using 2 threads:
-> run_pipeline.py \
+> run_experiment.py \
     --dst_dir experiment1 \
     --pipeline_builder ./core/dataflow_model/
     --config_builder "dataflow_lemonade.RH1E.task89_config_builder.build_15min_ar_model_configs()" \
@@ -31,7 +31,7 @@ _LOG = logging.getLogger(__name__)
 # #############################################################################
 
 
-def _run_pipeline(
+def _run_experiment(
     config: cfg.Config,
     num_attempts: int,
     abort_on_error: bool,
@@ -56,12 +56,12 @@ def _run_pipeline(
     # Prepare the log file.
     # TODO(gp): -> experiment_dst_dir
     experiment_result_dir = config[("meta", "experiment_result_dir")]
-    log_file = os.path.join(experiment_result_dir, "run_pipeline.%s.log" % idx)
+    log_file = os.path.join(experiment_result_dir, "run_experiment.%s.log" % idx)
     log_file = os.path.abspath(os.path.abspath(log_file))
     # Prepare command line.
     pipeline_builder = config[("meta", "pipeline_builder")]
     config_builder = config[("meta", "config_builder")]
-    file_name = "run_pipeline_stub.py"
+    file_name = "run_experiment_stub.py"
     exec_name = git.find_file_in_git_tree(file_name, super_module=True)
     cmd = [
         exec_name,
@@ -127,7 +127,7 @@ def _main(parser: argparse.ArgumentParser) -> None:
         for i, config in tqdm.tqdm(enumerate(configs)):
             _LOG.debug("\n%s", printing.frame("Config %s" % i))
             #
-            rc = _run_pipeline(
+            rc = _run_experiment(
                 config,
                 num_attempts,
                 abort_on_error,
@@ -138,7 +138,7 @@ def _main(parser: argparse.ArgumentParser) -> None:
         # -1 is interpreted by joblib like for all cores.
         _LOG.info("Using %d threads", num_threads)
         rcs = joblib.Parallel(n_jobs=num_threads, verbose=50)(
-            joblib.delayed(_run_pipeline)(
+            joblib.delayed(_run_experiment)(
                 config,
                 num_attempts,
                 abort_on_error,

@@ -1,5 +1,5 @@
 """
-Contain functions used by both `run_pipeline.py` and `run_notebook.py` to run
+Contain functions used by both `run_experiment.py` and `run_notebook.py` to run
 experiments.
 
 Import as:
