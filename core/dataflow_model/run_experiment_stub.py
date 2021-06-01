@@ -5,7 +5,7 @@ Run a single DAG model wrapping
 # Use example:
 > run_notebook_stub.py \
     --dst_dir nlp/test_results \
-    --pipeline_builder "core.dataflow_model.master_experiment.run_experiment" \
+    --experiment_builder "core.dataflow_model.master_experiment.run_experiment" \
     --config_builder "nlp.build_configs.build_PTask1088_configs()" \
     --num_threads 2
 """
@@ -26,7 +26,7 @@ def _parse() -> argparse.ArgumentParser:
     )
     # Add notebook options.
     parser.add_argument(
-        "--pipeline_builder",
+        "--experiment_builder",
         action="store",
         required=True,
         help="E.g., 'core.dataflow_model.master_experiment.run_experiment'"
@@ -57,16 +57,18 @@ def _parse() -> argparse.ArgumentParser:
 def _main(parser: argparse.ArgumentParser) -> None:
     args = parser.parse_args()
     dbg.init_logger(verbosity=args.log_level)
-    #
+    # TODO(gp): Generalize this allowing multiple experiments. This should reuse
+    #  most of the logic or executing a config builder.
+    dbg.dassert_eq(args.experiment_builder,
+                   'core.dataflow_model.master_experiment.run_experiment')
     params = {
         "config_builder": args.config_builder,
         "dst_dir": args.dst_dir,
-        "pipeline_builder": args.pipeline_builder,
+        "experiment_builder": args.experiment_builder,
     }
     config_idx = int(args.config_idx)
     config = cfgb.get_config_from_params(config_idx, params)
     _LOG.info("config=\n%s", config)
-    # TODO(gp): Generalize this in terms of `pipeline_builder`.
     mstpip.run_experiment(config)
 
 

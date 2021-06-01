@@ -190,7 +190,7 @@ def get_configs_from_command_line(args: argparse.Namespace) -> List[cfg.Config]:
     Return all the configs to run given the command line interface.
 
     The configs are patched with all the information from the command
-    line (e.g., `idx`, `config_builder`, `pipeline_builder`, `dst_dir`,
+    line (e.g., `idx`, `config_builder`, `experiment_builder`, `dst_dir`,
     `experiment_result_dir`).
     """
     # Build the map with the config parameters.
@@ -200,8 +200,8 @@ def get_configs_from_command_line(args: argparse.Namespace) -> List[cfg.Config]:
         "config_builder": args.config_builder,
         "dst_dir": args.dst_dir,
     }
-    if hasattr(args, "pipeline_builder"):
-        params["pipeline_builder"] = args.pipeline_builder
+    if hasattr(args, "experiment_builder"):
+        params["experiment_builder"] = args.experiment_builder
     # Patch the configs with the command line parameters.
     configs = cfgb.patch_configs(configs, params)
     _LOG.info("Generated %d configs from the builder", len(configs))

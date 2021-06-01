@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 r"""
-Run a pipeline given a list of configs.
+Run an experiment given a list of configs.
 
 # Run an RH1E pipeline using 2 threads:
 > run_experiment.py \
-    --dst_dir experiment1 \
-    --pipeline_builder ./core/dataflow_model/
+    --experiment_builder "core.dataflow_model.master_experiment.run_experiment" \
     --config_builder "dataflow_lemonade.RH1E.task89_config_builder.build_15min_ar_model_configs()" \
+    --dst_dir experiment1 \
     --num_threads 2
 """
 import argparse
@@ -59,13 +59,13 @@ def _run_experiment(
     log_file = os.path.join(experiment_result_dir, "run_experiment.%s.log" % idx)
     log_file = os.path.abspath(os.path.abspath(log_file))
     # Prepare command line.
-    pipeline_builder = config[("meta", "pipeline_builder")]
+    experiment_builder = config[("meta", "experiment_builder")]
     config_builder = config[("meta", "config_builder")]
     file_name = "run_experiment_stub.py"
     exec_name = git.find_file_in_git_tree(file_name, super_module=True)
     cmd = [
         exec_name,
-        f"--pipeline_builder '{pipeline_builder}'",
+        f"--experiment_builder '{experiment_builder}'",
         f"--config_builder '{config_builder}'",
         f"--config_idx {idx}",
         f"--dst_dir {dst_dir}",
@@ -99,7 +99,7 @@ def _parse() -> argparse.ArgumentParser:
     parser = cdtfut.add_experiment_arg(parser)
     # Add pipeline options.
     parser.add_argument(
-        "--pipeline_builder",
+        "--experiment_builder",
         action="store",
         required=True,
         help="File storing the pipeline to iterate over",
