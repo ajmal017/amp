@@ -70,20 +70,14 @@ def get_config_from_nested_dict(nested: Dict[str, Any]) -> cfg.Config:
     return get_config_from_flattened(flattened)
 
 
-# TODO(*): Is this used anywhere?
-# > jackpy assert_on_duplicated_configs
-# amp/core/test/test_config_builders.py:213:            cfgb.assert_on_duplicated_configs(configs)
-# amp/core/config_builders.py:139:def assert_on_duplicated_configs(configs: List[cfg.Config]) -> None:
-# amp/dev_scripts/notebooks/run_notebook.py:230:    cfgb.assert_on_duplicated_configs(configs)
-def assert_on_duplicated_configs(configs: List[cfg.Config]) -> None:
+def validate_configs(configs: List[cfg.Config]) -> None:
     """
-    Assert if the list of configs contains no duplicates.
-
-    :param configs: List of configs to run experiments on.
+    Assert if the list of configs contains duplicates.
     """
-    configs_as_str = [str(config) for config in configs]
+    dbg.dassert_container_type(configs, List, cfg.Config)
     dbg.dassert_no_duplicates(
-        configs_as_str, msg="There are duplicate configs in passed list."
+        list(map(str, configs)),
+        "There are duplicate configs in passed list"
     )
 
 
@@ -226,10 +220,10 @@ def get_configs_from_builder(config_builder: str) -> List[cfg.Config]:
     _LOG.debug("import=%s", import_)
     _LOG.debug("function=%s", function)
     _LOG.debug("args=%s", args)
-    #
+    # Import the needed module.
     imp = importlib.import_module(import_)
-    # Force the linter not to remove this import which is needed in the
-    # following eval.
+    # Force the linter not to remove this import which is needed in the following
+    # eval.
     _ = imp
     python_code = "imp.%s(%s)" % (function, args)
     _LOG.debug("executing '%s'", python_code)
@@ -237,13 +231,8 @@ def get_configs_from_builder(config_builder: str) -> List[cfg.Config]:
     dbg.dassert_is_not(configs, None)
     # Cast to the right type.
     # TODO(gp): Is this needed?
-    configs = cast(List[cfg.Config], configs)
-    # TODO(gp): -> validate_configs
-    dbg.dassert_isinstance(configs, list)
-    for c in configs:
-        dbg.dassert_isinstance(c, cfg.Config)
-    #
-    assert_on_duplicated_configs(configs)
+    #configs = cast(List[cfg.Config], configs)
+    validate_configs(configs)
     return configs
 
 

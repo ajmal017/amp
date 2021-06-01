@@ -63,7 +63,8 @@ class TestRunNotebook1(hut.TestCase):
             amp_path, "dev_scripts/notebooks/run_notebook.py"
         )
         dbg.dassert_file_exists(exec_file)
-        #
+        # This notebook fails/succeeds depending on the return code stored inside
+        # each config.
         notebook_file = os.path.join(
             amp_path, "dev_scripts/notebooks/test/simple_notebook.ipynb"
         )
@@ -88,19 +89,25 @@ class TestRunNotebook1(hut.TestCase):
         return rc
 
 
+def _build_config(values: List[bool]) -> List[cfg.Config]:
+    config_template = cfg.Config()
+    config_template["fail"] = None
+    configs = cfgb.build_multiple_configs(
+        config_template, {("fail",): values}
+    )
+    # Duplicate configs are not allowed, so we need to add identifiers to make
+    # each config unique.
+    for i, config in enumerate(configs):
+        config["id"] = i
+    return configs
+
+
 def build_configs1() -> List[cfg.Config]:
     """
     Build 2 configs that won't make the notebook to fail.
     """
-    config_template = cfg.Config()
-    config_template["fail"] = None
-    configs = cfgb.build_multiple_configs(
-        config_template, {("fail",): (False, False)}
-    )
-    # Duplicate configs are not allowed, so we need to add identifiers for
-    # them.
-    for i, config in enumerate(configs):
-        config["id"] = i
+    values = (False, False)
+    configs = _build_config(values)
     return configs
 
 
@@ -108,13 +115,6 @@ def build_configs2() -> List[cfg.Config]:
     """
     Build 3 configs with one failing.
     """
-    config_template = cfg.Config()
-    config_template["fail"] = None
-    configs = cfgb.build_multiple_configs(
-        config_template, {("fail",): (False, False, True)}
-    )
-    # Duplicate configs are not allowed, so we need to add identifiers for
-    # them.
-    for i, config in enumerate(configs):
-        config["id"] = i
+    values = (False, False, True)
+    configs = _build_config(values)
     return configs

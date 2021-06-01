@@ -10,7 +10,9 @@ Run a single DAG model wrapping
     --num_threads 2
 """
 import argparse
+import importlib
 import logging
+import re
 
 import core.config_builders as cfgb
 import core.dataflow_model.master_experiment as mstpip
@@ -57,19 +59,37 @@ def _parse() -> argparse.ArgumentParser:
 def _main(parser: argparse.ArgumentParser) -> None:
     args = parser.parse_args()
     dbg.init_logger(verbosity=args.log_level)
-    # TODO(gp): Generalize this allowing multiple experiments. This should reuse
-    #  most of the logic or executing a config builder.
-    dbg.dassert_eq(args.experiment_builder,
-                   'core.dataflow_model.master_experiment.run_experiment')
+    #
     params = {
         "config_builder": args.config_builder,
         "dst_dir": args.dst_dir,
         "experiment_builder": args.experiment_builder,
     }
+    # Get the config.
     config_idx = int(args.config_idx)
     config = cfgb.get_config_from_params(config_idx, params)
     _LOG.info("config=\n%s", config)
-    mstpip.run_experiment(config)
+    # Execute the `experiment_builder.`
+    # E.g., `core.dataflow_model.master_experiment.run_experiment`
+    builder = args.experiment_builder
+    _LOG.info("experiment_builder='%s'", builder)
+    dbg.dassert(not builder.endswith("()"), "Invalid experiment_builder='%s'", builder)
+    builder = f"{builder}(config)"
+    # E.g., ``.
+    m: re.Match = re.match(r"^(\S+)\.(\S+)\((.*)\)$", builder)
+    dbg.dassert(m, "builder='%s'", builder)
+    import_, function, args = m.groups()
+    _LOG.debug("import=%s", import_)
+    _LOG.debug("function=%s", function)
+    _LOG.debug("args=%s", args)
+    # Import the needed module.
+    imp = importlib.import_module(import_)
+    # Force the linter not to remove this import which is needed in the following
+    # eval.
+    _ = imp
+    python_code = "imp.%s(%s)" % (function, args)
+    _LOG.debug("executing '%s'", python_code)
+    exec(python_code)
 
 
 if __name__ == "__main__":

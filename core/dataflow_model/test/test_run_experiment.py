@@ -71,7 +71,7 @@ class TestRunExperiment1(hut.TestCase):
         dst_dir = self.get_scratch_space()
         cmd_tmp = [
                 f"{exec_file}",
-                "--exeriment_builder core.dataflow_model.master_experiment.run_experiment",
+                "--experiment_builder core.dataflow_model.test.simple_experiment.run_experiment",
                 f"--dst_dir {dst_dir}"]
         cmd_tmp.extend(cmd)
         cmd = " ".join(cmd_tmp)

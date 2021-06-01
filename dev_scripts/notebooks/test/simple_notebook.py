@@ -32,11 +32,11 @@ config = cfgb.get_config_from_env()
 
 # %%
 if config is None:
-    raise ValueError("No config provided.")
+    raise ValueError("No config provided")
 
 # %%
 if config["fail"]:
-    raise ValueError("Fail.")
-print("success")
+    raise ValueError("Failure")
+print("Success")
 
 # %%

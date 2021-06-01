@@ -87,7 +87,7 @@
 - Note that `--experiment_builder` needs the name of a function, while
   `--config_builder` needs a function invocation
   - This is because `run_experiment` function has a fixed signature, while a config
-    builder function can accepts parameters
+    builder function can accept parameters
   
 - This command line:
   - runs the experiment in `core.dataflow_model.master_experiment.run_experiment`
