@@ -31,6 +31,13 @@ import helpers.pickle_ as hpickle
 
 _LOG = logging.getLogger(__name__)
 
+# #####################
+# Utilities
+# #####################
+
+# TODO(gp): Move these functions to `config_utils.py` or even better
+#  `config/utils.py`.
+
 
 # TODO(gp): -> get_config_from_flattened_config ?
 def get_config_from_flattened(flattened: Dict[Tuple[str], Any]) -> cfg.Config:
@@ -61,200 +68,6 @@ def get_config_from_nested_dict(nested: Dict[str, Any]) -> cfg.Config:
     iter_ = dct.get_nested_dict_iterator(nested)
     flattened = collections.OrderedDict(iter_)
     return get_config_from_flattened(flattened)
-
-
-# #############################################################################
-
-
-def get_configs_from_builder(config_builder: str) -> List[cfg.Config]:
-    """
-    Execute Python code `config_builder` to build configs.
-
-    :param config_builder: full Python command to create the configs.
-        E.g., `nlp.build_configs.build_PTask1088_configs()`
-    """
-    _LOG.info("Executing function '%s'", config_builder)
-    # config_builder looks like:
-    #   "nlp.build_configs.build_PTask1088_configs()"
-    m = re.match(r"^(\S+)\.(\S+)\((.*)\)$", config_builder)
-    dbg.dassert(m, "config_builder='%s'", config_builder)
-    # TODO(gp): Fix this.
-    m = cast(re.Match, m)
-    import_, function, args = m.groups()
-    _LOG.debug("import=%s", import_)
-    _LOG.debug("function=%s", function)
-    _LOG.debug("args=%s", args)
-    #
-    imp = importlib.import_module(import_)
-    # Force the linter not to remove this import which is needed in the
-    # following eval.
-    _ = imp
-    python_code = "imp.%s(%s)" % (function, args)
-    _LOG.debug("executing '%s'", python_code)
-    configs: List[cfg.Config] = eval(python_code)
-    dbg.dassert_is_not(configs, None)
-    # Cast to the right type.
-    # TODO(gp): Is this needed?
-    configs = cast(List[cfg.Config], configs)
-    # TODO(gp): -> validate_configs
-    dbg.dassert_isinstance(configs, list)
-    for c in configs:
-        dbg.dassert_isinstance(c, cfg.Config)
-    #
-    assert_on_duplicated_configs(configs)
-    return configs
-
-
-def patch_configs(
-    configs: List[cfg.Config], params: Dict[str, str]
-) -> List[cfg.Config]:
-    """
-    Patch the configs with information needed to run.
-
-    This function is used by `run_notebook.py` and `run_pipeline.py` to
-    pass information through the `Config` to the process running the
-    experiment.
-    """
-    configs_out = []
-    for idx, config in enumerate(configs):
-        config = config.copy()
-        # Add `idx` for book-keeping.
-        config[("meta", "id")] = idx
-        # Inject all the params in the config.
-        for key in sorted(params.keys()):
-            config[("meta", key)] = params[key]
-        # Inject the experiment result dir.
-        dbg.dassert_in("dst_dir", params)
-        dst_dir = params["dst_dir"]
-        # Add experiment result dir.
-        dst_subdir = f"result_{idx}"
-        experiment_result_dir = os.path.join(dst_dir, dst_subdir)
-        config[("meta", "experiment_result_dir")] = experiment_result_dir
-        #
-        configs_out.append(config)
-    return configs_out
-
-
-def get_config_from_params(idx: int, params: Dict[str, str]) -> cfg.Config:
-    """
-    Build a config from the passed parameters.
-    """
-    config_builder = params["config_builder"]
-    # Build all the configs.
-    configs = get_configs_from_builder(config_builder)
-    # Patch the configs with metadata.
-    configs = patch_configs(configs, params)
-    # Pick the config.
-    dbg.dassert_lte(0, idx)
-    dbg.dassert_lt(idx, len(configs))
-    config = configs[idx]
-    config = config.copy()
-    return config
-
-
-def get_config_from_env() -> Optional[cfg.Config]:
-    """
-    Build a config passed through environment vars, if possible, or return
-    None.
-    """
-    config_vars = ["__CONFIG_BUILDER__", "__CONFIG_IDX__", "__CONFIG_DST_DIR__"]
-    # Check the existence of any config var in env.
-    if not any(var in os.environ for var in config_vars):
-        _LOG.debug("No CONFIG* env vars for building config: returning")
-        config = None
-        return config
-    _LOG.warning("Found config vars in environment")
-    dbg.dassert(
-        all(var in os.environ for var in config_vars),
-        "Some config vars '%s' were defined, but not all"
-        % (", ".join(config_vars)),
-    )
-    params = {}
-    #
-    config_idx = int(os.environ["__CONFIG_IDX__"])
-    _LOG.info("config_idx=%s", config_idx)
-    #
-    config_builder = os.environ["__CONFIG_BUILDER__"]
-    _LOG.info("config_builder=%s", config_builder)
-    params["config_builder"] = config_builder
-    # TODO(gp): Make the env var name mimic the var name.
-    experiment_result_dir = os.environ["__CONFIG_EXPERIMENT_DST_DIR__"]
-    _LOG.info("experiment_result_dir=%s", experiment_result_dir)
-    params["experiment_result_dir"] = experiment_result_dir
-    #
-    config = get_config_from_params(config_idx, params)
-    #
-    return config
-
-
-# # TODO(gp): Switch the order of the params: configs, dst_dir.
-# def add_result_dir(dst_dir: str, configs: List[cfg.Config]) -> List[cfg.Config]:
-#     """
-#     Add a result directory field to all configs in list.
-#
-#     :param dst_dir: Location of output directory
-#     :param configs: List of configs for experiments
-#     :return: List of copied configs with result directories added
-#     """
-#     # TODO(*): To be defensive maybe we should assert if the param already exists.
-#     configs_with_dir = []
-#     for config in configs:
-#         config_with_dir = config.copy()
-#         config_with_dir[("meta", "result_dir")] = dst_dir
-#         configs_with_dir.append(config_with_dir)
-#     return configs_with_dir
-#
-#
-# # TODO(*): What is "the config id"? Why does my config have a `meta`? And why
-# #  would this ever depend upon the order in which the configs appear in a
-# #  list?
-# def add_config_idx(configs: List[cfg.Config]) -> List[cfg.Config]:
-#     """
-#     Add the config id as parameter.
-#
-#     :param configs: List of configs for experiments
-#     :return: List of copied configs with added ids
-#     """
-#     configs_idx = []
-#     for i, config in enumerate(configs):
-#         config_with_id = config.copy()
-#         config_with_id[("meta", "id")] = i
-#         configs_idx.append(config_with_id)
-#     return configs_idx
-#
-#
-# # TODO(gp): Switch the order of the params: configs, dst_dir.
-# def set_experiment_result_dir(dst_dir: str, config: cfg.Config) -> cfg.Config:
-#     """
-#     Set path to the experiment results file.
-#
-#     :param dst_dir: Subdirectory with simulation results
-#     :param config: Config used for simulation
-#     :return: Config with absolute file path to results
-#     """
-#     config_with_filepath = config.copy()
-#     config_with_filepath[("meta", "experiment_result_dir")] = dst_dir
-#     return config_with_filepath
-
-
-# # TODO(gp): This is just build + select. Maybe too thin to keep.
-# def prepare_configs(config_builder, index, start_from_index):
-#     # Build the configs from the builder.
-#     configs = cfgb.get_configs_from_builder(config_builder)
-#     # Patch the configs with extra information as a way to communicate
-#     # with the notebook.
-#     # TODO(gp): This can be patched inside the loop, then we can even
-#     #  unify the code to create the config inside/outside the notebook.
-#     configs = cfgb.add_result_dir(dst_dir, configs)
-#     configs = cfgb.add_config_idx(configs)
-#     # Select the configs.
-#     configs = ccbuilders.select_config(
-#         configs, index, start_from_index,
-#     )
-#     return configs
-
-
-# #############################################################################
 
 
 # TODO(*): Is this used anywhere?
@@ -361,8 +174,8 @@ def get_config_difference(configs: List[cfg.Config]) -> Dict[str, List[Any]]:
 # amp/core/test/test_config_builders.py:326:        actual_result = cfgb.get_configs_dataframe(
 # amp/core/config_builders.py:233:def get_configs_dataframe(
 def get_configs_dataframe(
-    configs: List[cfg.Config],
-    params_subset: Optional[Union[str, List[str]]] = None,
+        configs: List[cfg.Config],
+        params_subset: Optional[Union[str, List[str]]] = None,
 ) -> pd.DataFrame:
     """
     Convert the configs into a df with full nested names.
@@ -391,7 +204,134 @@ def get_configs_dataframe(
 
 
 # #############################################################################
+# Experiment builders.
+# #############################################################################
 
+
+def get_configs_from_builder(config_builder: str) -> List[cfg.Config]:
+    """
+    Execute Python code `config_builder` to build configs.
+
+    :param config_builder: full Python command to create the configs.
+        E.g., `nlp.build_configs.build_PTask1088_configs()`
+    """
+    _LOG.info("Executing function '%s'", config_builder)
+    # config_builder looks like:
+    #   "nlp.build_configs.build_PTask1088_configs()"
+    m = re.match(r"^(\S+)\.(\S+)\((.*)\)$", config_builder)
+    dbg.dassert(m, "config_builder='%s'", config_builder)
+    # TODO(gp): Fix this.
+    m = cast(re.Match, m)
+    import_, function, args = m.groups()
+    _LOG.debug("import=%s", import_)
+    _LOG.debug("function=%s", function)
+    _LOG.debug("args=%s", args)
+    #
+    imp = importlib.import_module(import_)
+    # Force the linter not to remove this import which is needed in the
+    # following eval.
+    _ = imp
+    python_code = "imp.%s(%s)" % (function, args)
+    _LOG.debug("executing '%s'", python_code)
+    configs: List[cfg.Config] = eval(python_code)
+    dbg.dassert_is_not(configs, None)
+    # Cast to the right type.
+    # TODO(gp): Is this needed?
+    configs = cast(List[cfg.Config], configs)
+    # TODO(gp): -> validate_configs
+    dbg.dassert_isinstance(configs, list)
+    for c in configs:
+        dbg.dassert_isinstance(c, cfg.Config)
+    #
+    assert_on_duplicated_configs(configs)
+    return configs
+
+
+def patch_configs(
+    configs: List[cfg.Config], params: Dict[str, str]
+) -> List[cfg.Config]:
+    """
+    Patch the configs with information needed to run.
+
+    This function is used by `run_notebook.py` and `run_pipeline.py` to
+    pass information through the `Config` to the process running the
+    experiment.
+    """
+    configs_out = []
+    for idx, config in enumerate(configs):
+        config = config.copy()
+        # Add `idx` for book-keeping.
+        config[("meta", "id")] = idx
+        # Inject all the params in the config.
+        for key in sorted(params.keys()):
+            config[("meta", key)] = params[key]
+        # Inject the experiment result dir.
+        dbg.dassert_in("dst_dir", params)
+        dst_dir = params["dst_dir"]
+        # Add experiment result dir.
+        dst_subdir = f"result_{idx}"
+        experiment_result_dir = os.path.join(dst_dir, dst_subdir)
+        config[("meta", "experiment_result_dir")] = experiment_result_dir
+        #
+        configs_out.append(config)
+    return configs_out
+
+
+def get_config_from_params(idx: int, params: Dict[str, str]) -> cfg.Config:
+    """
+    Get the `idx`-th config built from the params, which includes `config_builder`.
+    """
+    config_builder = params["config_builder"]
+    # Build all the configs.
+    configs = get_configs_from_builder(config_builder)
+    # Patch the configs with metadata.
+    configs = patch_configs(configs, params)
+    # Pick the config.
+    dbg.dassert_lte(0, idx)
+    dbg.dassert_lt(idx, len(configs))
+    config = configs[idx]
+    config = config.copy()
+    return config
+
+
+def get_config_from_env() -> Optional[cfg.Config]:
+    """
+    Build a config passed through environment vars, if possible, or return
+    None.
+    """
+    config_vars = ["__CONFIG_BUILDER__", "__CONFIG_IDX__", "__CONFIG_DST_DIR__"]
+    # Check the existence of any config var in env.
+    if not any(var in os.environ for var in config_vars):
+        _LOG.debug("No CONFIG* env vars for building config: returning")
+        config = None
+        return config
+    _LOG.warning("Found config vars in environment")
+    dbg.dassert(
+        all(var in os.environ for var in config_vars),
+        "Some config vars '%s' were defined, but not all"
+        % (", ".join(config_vars)),
+    )
+    params = {}
+    #
+    config_idx = int(os.environ["__CONFIG_IDX__"])
+    _LOG.info("config_idx=%s", config_idx)
+    #
+    config_builder = os.environ["__CONFIG_BUILDER__"]
+    _LOG.info("config_builder=%s", config_builder)
+    params["config_builder"] = config_builder
+    # TODO(gp): Make the env var name mimic the var name.
+    experiment_result_dir = os.environ["__CONFIG_EXPERIMENT_DST_DIR__"]
+    _LOG.info("experiment_result_dir=%s", experiment_result_dir)
+    params["experiment_result_dir"] = experiment_result_dir
+    #
+    config = get_config_from_params(config_idx, params)
+    #
+    return config
+
+
+# #############################################################################
+
+# TODO(gp): Not clear what this does and if it's needed.
 
 def _generate_template_config(
     config: cfg.Config,
@@ -483,18 +423,23 @@ def build_multiple_configs(
                                 ('resample', 'rule'): ['5T', '10T']}
     :return: a list of configs
     """
-    # In the example from above, list(params_values) = [('CL', '5T'),
-    # ('CL', '10T'), ('QM', '5T'), ('QM', '10T')]
+    # In the example from above:
+    # ```
+    # list(params_values) = [('CL', '5T'), ('CL', '10T'), ('QM', '5T'), ('QM', '10T')]
+    # ```
     params_values = itertools.product(*params_variants.values())
     param_vars = list(
         dict(zip(params_variants.keys(), values)) for values in params_values
     )
-    # In the example above, param_vars = [
+    # In the example above:
+    # ```
+    # param_vars = [
     #    {('read_data', 'symbol'): 'CL', ('resample', 'rule'): '5T'},
     #    {('read_data', 'symbol'): 'CL', ('resample', 'rule'): '10T'},
     #    {('read_data', 'symbol'): 'QM', ('resample', 'rule'): '5T'},
     #    {('read_data', 'symbol'): 'QM', ('resample', 'rule'): '10T'},
     #  ]
+    # ```
     param_configs = []
     for params in param_vars:
         # Create a config for the chosen parameter values.

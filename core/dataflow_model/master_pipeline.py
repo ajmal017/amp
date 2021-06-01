@@ -8,8 +8,9 @@ import helpers.pickle_ as hpickl
 
 _LOG = logging.getLogger(__name__)
 
+# TODO(gp): master_pipeline.py -> master_experiment.py
 
-# TODO(gp): -> run_dag, run_model?
+# TODO(gp): -> run_dag, run_model? run_experiment
 # TODO(gp): if this was a script there would be more separation and easier
 #  to save output to log. But then we need to pass the config in the same way
 #  we pass it to a notebook but using command-line opts instead of env vars.

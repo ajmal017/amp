@@ -147,32 +147,6 @@ def _parse() -> argparse.ArgumentParser:
     return parser
 
 
-# Currently, run_notebook.py changes the configs' "meta" level, modifying fields
-# like "result_dir" and "experiment_result_dir". We want to avoid modifying input
-# configs by wrapping them into a larger config that will have two levels: the
-# original config and what is now "meta".
-
-# This script needs to pass the config to execute to the notebook.
-# There are 2 problems:
-# 1) It's not easy to serialize/deserialize a config between this script
-#    and the notebook (e.g., a config could contain functions and thus
-#    not pickle-able)
-# 2) There is not a mechanism to pass information from this script to a
-#    notebook
-#
-# To work around these issues we pass various information to the notebook
-# through environment vars, such as:
-# 1) the name of a config builder (so that it can be executed through an `eval`)
-# 2) the index of the config to execute
-# 3) a destination dir representing the scratch space for the artifacts from the
-#    notebook
-# This information is passed through a "meta" part of the config
-# TODO(gp): Separate `meta` from `run_notebook` since we don't want this information
-#  to collide.
-
-# We then keep the config in sync between this script and the notebook
-# by executing the same code on both sides.
-
 # TODO(gp): Make the notebook save the config that it sees. This might
 #  make the code simpler and more robust.
 # TODO(gp): We could try to serialize/deserialize the config and pass to the notebook

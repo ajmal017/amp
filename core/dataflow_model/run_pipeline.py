@@ -5,8 +5,8 @@ Run a pipeline given a list of configs.
 # Run an RH1E pipeline using 2 threads:
 > run_pipeline.py \
     --dst_dir experiment1 \
-    --pipeline ./core/dataflow_model/notebooks/Master_pipeline_runner.py \
-    --function "dataflow_lemonade.RH1E.task89_config_builder.build_15min_ar_model_configs()" \
+    --pipeline_builder ./core/dataflow_model/
+    --config_builder "dataflow_lemonade.RH1E.task89_config_builder.build_15min_ar_model_configs()" \
     --num_threads 2
 """
 import argparse

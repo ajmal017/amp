@@ -1,11 +1,13 @@
 """
 Contain functions used by both `run_pipeline.py` and `run_notebook.py` to run
-experiment.
+experiments.
 
 Import as:
 
 import core.dataflow_model.utils as cdtfut
 """
+
+# TODO(gp): experiment_utils.py
 
 import argparse
 import logging
