@@ -528,7 +528,7 @@ def find_file_with_dir(file_name: str, root_dir: str = ".") -> Optional[str]:
         res = matching_files[0]
     else:
         # Found more than one potential match: assert.
-        dbg.dfatal("Found found_files=\n%s" % "\n".join(matching_files))
+        dbg.dfatal("Found found_files=\n%s", "\n".join(matching_files))
     return res
 
 
