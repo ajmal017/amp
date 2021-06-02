@@ -297,6 +297,7 @@ class SingleColumnVolatilityModel(FitPredictNode):
         steps_ahead: int,
         col: _COL_TYPE,
         p_moment: float = 2,
+        progress_bar: bool = False,
         tau: Optional[float] = None,
         nan_mode: Optional[str] = None,
         out_col_prefix: Optional[str] = None,
@@ -309,6 +310,7 @@ class SingleColumnVolatilityModel(FitPredictNode):
         self._steps_ahead = steps_ahead
         dbg.dassert_lte(1, p_moment)
         self._p_moment = p_moment
+        self._progress_bar = progress_bar
         self._tau = tau
         self._learn_tau_on_fit = tau is None
         self._nan_mode = nan_mode
@@ -350,7 +352,9 @@ class SingleColumnVolatilityModel(FitPredictNode):
             mode = "fit"
         else:
             mode = "predict"
-        df_out = dag.run_leq_node("demodulate_using_vol_pred", mode)["df_out"]
+        df_out = dag.run_leq_node(
+            "demodulate_using_vol_pred", mode, progress_bar=self._progress_bar
+        )["df_out"]
         info[self._col] = extract_info(dag, [mode])
         if self._learn_tau_on_fit and fit:
             self._tau = info[self._col]["compute_smooth_moving_average"]["fit"][
@@ -478,6 +482,7 @@ class _MultiColVolatilityModelMixin:
                 steps_ahead=self._steps_ahead,
                 col=col,
                 p_moment=self._p_moment,
+                progress_bar=self._progress_bar,
                 tau=self._tau,
                 nan_mode=self._nan_mode,
                 out_col_prefix=local_out_col_prefix,
@@ -513,6 +518,7 @@ class VolatilityModel(
         steps_ahead: int,
         cols: Optional[_TO_LIST_MIXIN_TYPE] = None,
         p_moment: float = 2,
+        progress_bar: bool = False,
         tau: Optional[float] = None,
         col_rename_func: Callable[[Any], Any] = lambda x: f"{x}_zscored",
         col_mode: Optional[str] = None,
@@ -542,6 +548,8 @@ class VolatilityModel(
         #
         dbg.dassert_lte(1, p_moment)
         self._p_moment = p_moment
+        #
+        self._progress_bar = progress_bar
         #
         dbg.dassert(tau is None or tau > 0)
         self._tau = tau
@@ -605,6 +613,7 @@ class MultiindexVolatilityModel(FitPredictNode, _MultiColVolatilityModelMixin):
         in_col_group: Tuple[_COL_TYPE],
         steps_ahead: int,
         p_moment: float = 2,
+        progress_bar: bool = False,
         tau: Optional[float] = None,
         nan_mode: Optional[str] = None,
     ) -> None:
@@ -627,6 +636,8 @@ class MultiindexVolatilityModel(FitPredictNode, _MultiColVolatilityModelMixin):
         self._steps_ahead = steps_ahead
         dbg.dassert_lte(1, p_moment)
         self._p_moment = p_moment
+        #
+        self._progress_bar = progress_bar
         #
         self._tau = tau
         self._nan_mode = nan_mode
