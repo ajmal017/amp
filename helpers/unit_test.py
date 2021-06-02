@@ -28,6 +28,7 @@ import helpers.timer as htimer
 
 # Minimize dependencies from installed packages.
 
+# TODO(gp): Use `hprint.color_highlight`.
 _WARNING = "\033[33mWARNING\033[0m"
 
 try:
@@ -100,7 +101,7 @@ _CONFTEST_IN_PYTEST = False
 
 
 # TODO(gp): Use https://stackoverflow.com/questions/25188119
-# -> is_in_unit_test()
+# TODO(gp): -> is_in_unit_test()
 def in_unit_test_mode() -> bool:
     """
     Return True if we are inside a pytest run.
@@ -113,17 +114,29 @@ def in_unit_test_mode() -> bool:
 # #############################################################################
 
 
-# Set by conftest.py.
+# Set by `conftest.py`.
 _GLOBAL_CAPSYS = None
 
 
 def pytest_print(txt: str) -> None:
     """
-    Print independently of the pytest output capture.
+    Print bypassing `pytest` output capture.
     """
-
     with _GLOBAL_CAPSYS.disabled():  # type: ignore
         sys.stdout.write(txt)
+
+
+def pytest_warning(txt: str, prepend_new_line: bool = False) -> None:
+    """
+    Print a warning bypassing `pytest` output capture.
+
+    :param prepend_new_line: start the warning with a new line to make it visibile
+    """
+    txt_tmp = ""
+    if prepend_new_line:
+        txt_tmp += "\n"
+    txt_tmp += hprint.color_highlight("WARNING", "yellow") + f": {txt}"
+    pytest_print(txt_tmp)
 
 
 # #############################################################################
@@ -173,14 +186,14 @@ def convert_info_to_string(info: Mapping) -> str:
     """
     Convert info to string for verifying test results.
 
-    Info often contains pd.Series, so pandas context is provided
-    to print all rows and all contents.
+    Info often contains `pd.Series`, so pandas context is provided to print all rows
+    and all contents.
 
     :param info: info to convert to string
     :return: string representation of info
     """
     output = []
-    # Provide context for full representation of pd.Series in info.
+    # Provide context for full representation of `pd.Series` in info.
     with pd.option_context(
         "display.max_colwidth",
         int(1e6),
@@ -202,7 +215,7 @@ def convert_df_to_json_string(
     columns_order: Optional[List[str]] = None,
 ) -> str:
     """
-    Convert dataframe to pretty-printed json string.
+    Convert dataframe to pretty-printed JSON string.
 
     To select all rows of the dataframe, pass `n_head` as None.
 
@@ -689,6 +702,8 @@ def _assert_equal(
 ) -> bool:
     """
     Same interface as in `assert_equal()`.
+
+    :param full_test_name: e.g., `TestRunNotebook1.test2`
     """
     _LOG.debug(
         hprint.to_str(
@@ -727,7 +742,7 @@ def _assert_equal(
         #   2021-02-17 11:00:00-05:00
         #   """
         txt = []
-        txt.append(hprint.frame("The expected variable should be", "-"))
+        txt.append(hprint.frame(f"EXPECTED VARIABLE: {full_test_name}", "-"))
         # We always return the variable exactly as this should be, even if we could
         # make it look better through indentation in case of fuzzy match.
         txt.append(f'exp = r"""{actual_orig}"""')
@@ -736,14 +751,15 @@ def _assert_equal(
         # Select what to save.
         compare_orig = False
         if compare_orig:
-            tag = "(ORIGINAL) ACTUAL vs EXPECTED"
+            tag = "ORIGINAL ACTUAL vs EXPECTED"
             actual = actual_orig
             expected = expected_orig
         else:
             if fuzzy_match:
-                tag = "(FUZZY) ACTUAL vs EXPECTED"
+                tag = "FUZZY ACTUAL vs EXPECTED"
             else:
                 tag = "ACTUAL vs EXPECTED"
+        tag += f": {full_test_name}"
         # Save the actual and expected strings to files.
         act_file_name = "%s/tmp.actual.txt" % test_dir
         hio.to_file(act_file_name, actual)
@@ -813,11 +829,7 @@ class TestCase(unittest.TestCase):
         # Report if the test was updated
         if self._test_was_updated:
             if not self._overriden_update_tests:
-                pytest_print(
-                    "("
-                    + hprint.color_highlight("WARNING", "yellow")
-                    + ": Test was updated) ",
-                )
+                pytest_warning("Test was updated) ")
             else:
                 # We forced an update from the unit test itself, so no need
                 # to report an update.
@@ -1104,9 +1116,6 @@ class TestCase(unittest.TestCase):
                     )
             else:
                 # No golden outcome available: save the result.
-                _LOG.warning(
-                    "Can't find golden outcome file '%s': updating it", file_name
-                )
                 outcome_updated = True
                 self._check_df_update_outcome(file_name, actual)
                 is_equal = None
@@ -1121,14 +1130,15 @@ class TestCase(unittest.TestCase):
         Add to git repo `file_name`, if needed.
         """
         if self._git_add:
-            cmd = "git add %s; git add -u %s" % (file_name, file_name)
+            super_module = None
+            file_name_tmp = git.purify_docker_file_from_git_client(file_name, super_module)
+            _LOG.debug(hprint.to_str("file_name file_name_tmp"))
+            cmd = "git add -u %s" % file_name_tmp
             _LOG.debug("> %s", cmd)
             rc = hsinte.system(cmd, abort_on_error=False)
             if rc:
-                _LOG.warning(
-                    "Can't run '%s': you need to add the file manually",
-                    cmd,
-                )
+                pytest_warning(f"Can't git add file: git add the file manually",
+                               prepend_new_line=True)
 
     def _check_string_update_outcome(
         self, file_name: str, actual: str, use_gzip: bool
@@ -1148,6 +1158,7 @@ class TestCase(unittest.TestCase):
         _LOG.debug(hprint.to_str("file_name"))
         hio.create_enclosing_dir(file_name)
         actual.to_csv(file_name)
+        pytest_warning(f"Update golden outcome file '{file_name}'")
         # Add to git repo.
         self._git_add_file(file_name)
 

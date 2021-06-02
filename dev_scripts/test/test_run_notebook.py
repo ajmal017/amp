@@ -25,17 +25,20 @@ class TestRunNotebook1(hut.TestCase):
             "--num_threads 'serial'"
         ]
         # pylint: enable=line-too-long
-        exp = r"""
-        $GIT_ROOT/dev_scripts/test/TestRunNotebook1.test1/tmp.scratch
-        $GIT_ROOT/dev_scripts/test/TestRunNotebook1.test1/tmp.scratch/result_0
-        $GIT_ROOT/dev_scripts/test/TestRunNotebook1.test1/tmp.scratch/result_0/config.pkl
-        $GIT_ROOT/dev_scripts/test/TestRunNotebook1.test1/tmp.scratch/result_0/config.txt
-        $GIT_ROOT/dev_scripts/test/TestRunNotebook1.test1/tmp.scratch/result_0/run_notebook.0.log
-        $GIT_ROOT/dev_scripts/test/TestRunNotebook1.test1/tmp.scratch/result_1
-        $GIT_ROOT/dev_scripts/test/TestRunNotebook1.test1/tmp.scratch/result_1/config.pkl
-        $GIT_ROOT/dev_scripts/test/TestRunNotebook1.test1/tmp.scratch/result_1/config.txt
-        $GIT_ROOT/dev_scripts/test/TestRunNotebook1.test1/tmp.scratch/result_1/run_notebook.1.log
-        """
+        exp = r"""# Dir structure
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test1/tmp.scratch
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test1/tmp.scratch/result_0
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test1/tmp.scratch/result_0/config.pkl
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test1/tmp.scratch/result_0/config.txt
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test1/tmp.scratch/result_0/run_notebook.0.log
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test1/tmp.scratch/result_0/simple_notebook.0.ipynb
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test1/tmp.scratch/result_0/success.txt
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test1/tmp.scratch/result_1
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test1/tmp.scratch/result_1/config.pkl
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test1/tmp.scratch/result_1/config.txt
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test1/tmp.scratch/result_1/run_notebook.1.log
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test1/tmp.scratch/result_1/simple_notebook.1.ipynb
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test1/tmp.scratch/result_1/success.txt"""
         # pylint: disable=line-too-long
         rc = self._run_notebook_helper(cmd, exp)
         self.assertEqual(rc, 0)
@@ -50,17 +53,20 @@ class TestRunNotebook1(hut.TestCase):
             "--num_threads 2"
         ]
         # pylint: enable=line-too-long
-        exp = r"""
-        $GIT_ROOT/dev_scripts/test/TestRunNotebook1.test2/tmp.scratch
-        $GIT_ROOT/dev_scripts/test/TestRunNotebook1.test2/tmp.scratch/result_0
-        $GIT_ROOT/dev_scripts/test/TestRunNotebook1.test2/tmp.scratch/result_0/config.pkl
-        $GIT_ROOT/dev_scripts/test/TestRunNotebook1.test2/tmp.scratch/result_0/config.txt
-        $GIT_ROOT/dev_scripts/test/TestRunNotebook1.test2/tmp.scratch/result_0/run_notebook.0.log
-        $GIT_ROOT/dev_scripts/test/TestRunNotebook1.test2/tmp.scratch/result_1
-        $GIT_ROOT/dev_scripts/test/TestRunNotebook1.test2/tmp.scratch/result_1/config.pkl
-        $GIT_ROOT/dev_scripts/test/TestRunNotebook1.test2/tmp.scratch/result_1/config.txt
-        $GIT_ROOT/dev_scripts/test/TestRunNotebook1.test2/tmp.scratch/result_1/run_notebook.1.log
-        """
+        exp = r"""# Dir structure
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test2/tmp.scratch
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test2/tmp.scratch/result_0
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test2/tmp.scratch/result_0/config.pkl
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test2/tmp.scratch/result_0/config.txt
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test2/tmp.scratch/result_0/run_notebook.0.log
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test2/tmp.scratch/result_0/simple_notebook.0.ipynb
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test2/tmp.scratch/result_0/success.txt
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test2/tmp.scratch/result_1
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test2/tmp.scratch/result_1/config.pkl
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test2/tmp.scratch/result_1/config.txt
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test2/tmp.scratch/result_1/run_notebook.1.log
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test2/tmp.scratch/result_1/simple_notebook.1.ipynb
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test2/tmp.scratch/result_1/success.txt"""
         # pylint: disable=line-too-long
         rc = self._run_notebook_helper(cmd, exp)
         self.assertEqual(rc, 0)
@@ -76,7 +82,24 @@ class TestRunNotebook1(hut.TestCase):
         ]
         _LOG.warning("This command is supposed to fail")
         # pylint: enable=line-too-long
-        exp = ""
+        exp = r"""# Dir structure
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test3/tmp.scratch
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test3/tmp.scratch/result_0
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test3/tmp.scratch/result_0/config.pkl
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test3/tmp.scratch/result_0/config.txt
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test3/tmp.scratch/result_0/run_notebook.0.log
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test3/tmp.scratch/result_0/simple_notebook.0.ipynb
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test3/tmp.scratch/result_0/success.txt
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test3/tmp.scratch/result_1
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test3/tmp.scratch/result_1/config.pkl
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test3/tmp.scratch/result_1/config.txt
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test3/tmp.scratch/result_1/run_notebook.1.log
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test3/tmp.scratch/result_1/simple_notebook.1.ipynb
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test3/tmp.scratch/result_1/success.txt
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test3/tmp.scratch/result_2
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test3/tmp.scratch/result_2/config.pkl
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test3/tmp.scratch/result_2/config.txt
+$GIT_ROOT/dev_scripts/test/TestRunNotebook1.test3/tmp.scratch/result_2/run_notebook.2.log"""
         # pylint: disable=line-too-long
         rc = self._run_notebook_helper(cmd, exp)
         self.assertNotEqual(rc, 0)

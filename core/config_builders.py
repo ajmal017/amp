@@ -285,8 +285,7 @@ def get_config_from_params(idx: int, params: Dict[str, str]) -> cfg.Config:
 
 def get_config_from_env() -> Optional[cfg.Config]:
     """
-    Build a config passed through environment vars, if possible, or return
-    None.
+    Build a config passed through environment vars, if possible, or return `None`.
     """
     config_vars = ["__CONFIG_BUILDER__", "__CONFIG_IDX__", "__CONFIG_DST_DIR__"]
     # Check the existence of any config var in env.
@@ -308,10 +307,11 @@ def get_config_from_env() -> Optional[cfg.Config]:
     config_builder = os.environ["__CONFIG_BUILDER__"]
     _LOG.info("config_builder=%s", config_builder)
     params["config_builder"] = config_builder
-    # TODO(gp): Make the env var name mimic the var name.
-    experiment_result_dir = os.environ["__CONFIG_EXPERIMENT_DST_DIR__"]
-    _LOG.info("experiment_result_dir=%s", experiment_result_dir)
-    params["experiment_result_dir"] = experiment_result_dir
+    #
+    # TODO(gp): -> config_dst_dir?
+    dst_dir = os.environ["__CONFIG_DST_DIR__"]
+    _LOG.info("dst_dir=%s", dst_dir)
+    params["dst_dir"] = dst_dir
     #
     config = get_config_from_params(config_idx, params)
     #

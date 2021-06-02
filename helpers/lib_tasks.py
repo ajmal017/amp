@@ -1604,7 +1604,7 @@ def find_test_class(ctx, class_name, dir_name=".", pbcopy=True):  # type: ignore
     :param dir_name: the dir from which to search (default: .)
     :param pbcopy: save the result into the system clipboard (only on macOS)
     """
-    _report_task()
+    _report_task("class_name dir_name pbcopy")
     dbg.dassert(class_name != "", "You need to specify a class name")
     _ = ctx
     file_names = _find_test_files(dir_name)

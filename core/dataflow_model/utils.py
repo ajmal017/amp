@@ -83,7 +83,7 @@ def add_experiment_arg(
         action="store_true",
         help="Print configs and exit without running",
     )
-    # TODO(gp): Run a short experiment to sanity check the flow.
+    # TODO(gp): Add an option to run a short experiment to sanity check the flow.
     parser.add_argument(
         "--num_attempts",
         default=1,
@@ -103,6 +103,9 @@ def add_experiment_arg(
 def skip_configs_already_executed(
     configs: List[cfg.Config], incremental: bool
 ) -> Tuple[List[cfg.Config], int]:
+    """
+
+    """
     configs_out = []
     num_skipped = 0
     for config in configs:

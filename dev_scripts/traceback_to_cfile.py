@@ -6,12 +6,12 @@ navigate the stack trace.
 
 # Run pytest and save the output on a file:
 > pytest helpers/test/test_traceback.py 2>&1 | tee tmp.pytest.log
-# This is equivalent to :
-> pyt helpers/test/test_traceback.py
-
 # Navigate the stacktrace with vim:
 > dev_scripts/traceback_to_cfile.py -i log.txt
 > vim -c "cfile cfile"
+
+# Navigate the stacktrace from the sytem clipboard:
+> pbpaste | traceback_to_cfile.py -i -
 """
 
 import argparse
@@ -82,9 +82,9 @@ def _main(parser: argparse.ArgumentParser) -> None:
     if traceback is None:
         _LOG.error("Can't find traceback in the file")
         sys.exit(-1)
-    print(hprint.frame("traceback") + "\n" + traceback)
+    print(hprint.frame("traceback", "-") + "\n" + traceback)
     cfile_as_str = htrace.cfile_to_str(cfile)
-    print(hprint.frame("cfile") + "\n" + cfile_as_str)
+    print(hprint.frame("cfile", "-") + "\n" + cfile_as_str)
     # Write file.
     prsr.write_file(cfile_as_str.split("\n"), out_file_name)
 

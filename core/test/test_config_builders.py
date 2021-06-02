@@ -103,7 +103,7 @@ class TestGetConfigFromEnv(hut.TestCase):
         """
         # Test that no config is created.
         actual_config = cfgb.get_config_from_env()
-        self.assertTrue(actual_config is None)
+        self.assertIs(actual_config, None)
 
 
 # #############################################################################
@@ -208,12 +208,11 @@ class TestCheckSameConfigs(hut.TestCase):
             _get_test_config_1(),
             _get_test_config_2(),
         ]
-        # Make sure fnction raises an error.
+        # Make sure function raises an error.
         with self.assertRaises(AssertionError) as cm:
             cfgb.validate_configs(configs)
         act = str(cm.exception)
-        exp = ""
-        self.assert_equal(act, exp)
+        self.check_string(act, fuzzy_match=True)
 
 
 class TestConfigIntersection(hut.TestCase):
