@@ -108,7 +108,7 @@ class TestTestCase1(hut.TestCase):
         tmp_dir = tempfile.mkdtemp()
         self.assert_equal(actual, expected, abort_on_error=False, dst_dir=tmp_dir)
         # Compute the signature from the dir.
-        act = hut.get_dir_signature(tmp_dir)
+        act = hut.get_dir_signature(tmp_dir, include_file_content=True, num_lines=None)
         act = hut.purify_txt_from_client(act)
         act = act.replace(tmp_dir, "$TMP_DIR")
         # pylint: disable=line-too-long
@@ -781,8 +781,6 @@ class Test_get_dir_signature1(hut.TestCase):
 
     def _helper(self, include_file_content: bool) -> str:
         in_dir = self.get_input_dir()
-        num_lines = None
-        act = hut.get_dir_signature(in_dir, num_lines=num_lines,
-                                    include_file_content=include_file_content)
+        act = hut.get_dir_signature(in_dir, include_file_content, num_lines=None)
         act = hut.purify_txt_from_client(act)
         return act

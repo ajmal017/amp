@@ -350,10 +350,10 @@ def generate_default_config_variants(
 
     TODO(*): What experiments? What is a KOTH-generating function?
 
-    This is the base function to be wrapped into specific config-generating functions.
-    It is assumed that for each research purpose there will be a KOTH-generating
-    function. At the moment, the only such function is `ncfgbld.get_KOTH_config`, which
-    accepts no parameters.
+    This is the base function to be wrapped into specific config-generating
+    functions. It is assumed that for each research purpose there will be a
+    KOTH-generating function. At the moment, the only such function is
+    `ncfgbld.get_KOTH_config`, which accepts no parameters.
 
     :param template_config_builder: Function used to generate default config.
     :param params_variants: Config paths to variable parameters and their values

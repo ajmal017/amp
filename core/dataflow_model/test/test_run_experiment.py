@@ -29,7 +29,21 @@ class TestRunExperiment1(hut.TestCase):
             "--skip_on_error",
             "--num_threads 'serial'",
         ]
-        exp = ""
+        # pylint: enable=line-too-long
+        exp = r"""
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test1/tmp.scratch
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test1/tmp.scratch/result_0
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test1/tmp.scratch/result_0/config.pkl
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test1/tmp.scratch/result_0/config.txt
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test1/tmp.scratch/result_0/run_experiment.0.log
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test1/tmp.scratch/result_0/success.txt
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test1/tmp.scratch/result_1
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test1/tmp.scratch/result_1/config.pkl
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test1/tmp.scratch/result_1/config.txt
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test1/tmp.scratch/result_1/run_experiment.1.log
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test1/tmp.scratch/result_1/success.txt
+        """
+        # pylint: disable=line-too-long
         rc = self._run_experiment_helper(cmd, exp)
         self.assertEqual(rc, 0)
 
@@ -42,7 +56,21 @@ class TestRunExperiment1(hut.TestCase):
             "--config_builder 'dev_scripts.test.test_run_notebook.build_configs1()'",
             "--num_threads 2"
         ]
-        exp = ""
+        # pylint: enable=line-too-long
+        exp = """
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test2/tmp.scratch
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test2/tmp.scratch/result_0
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test2/tmp.scratch/result_0/config.pkl
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test2/tmp.scratch/result_0/config.txt
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test2/tmp.scratch/result_0/run_experiment.0.log
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test2/tmp.scratch/result_0/success.txt
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test2/tmp.scratch/result_1
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test2/tmp.scratch/result_1/config.pkl
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test2/tmp.scratch/result_1/config.txt
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test2/tmp.scratch/result_1/run_experiment.1.log
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test2/tmp.scratch/result_1/success.txt
+        """
+        # pylint: disable=line-too-long
         rc = self._run_experiment_helper(cmd, exp)
         self.assertEqual(rc, 0)
 
@@ -56,7 +84,25 @@ class TestRunExperiment1(hut.TestCase):
             "--num_threads 3",
         ]
         _LOG.warning("This command is supposed to fail")
-        exp = ""
+        # pylint: enable=line-too-long
+        exp = r"""
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test3/tmp.scratch
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test3/tmp.scratch/result_0
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test3/tmp.scratch/result_0/config.pkl
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test3/tmp.scratch/result_0/config.txt
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test3/tmp.scratch/result_0/run_experiment.0.log
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test3/tmp.scratch/result_0/success.txt
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test3/tmp.scratch/result_1
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test3/tmp.scratch/result_1/config.pkl
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test3/tmp.scratch/result_1/config.txt
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test3/tmp.scratch/result_1/run_experiment.1.log
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test3/tmp.scratch/result_1/success.txt
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test3/tmp.scratch/result_2
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test3/tmp.scratch/result_2/config.pkl
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test3/tmp.scratch/result_2/config.txt
+        $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test3/tmp.scratch/result_2/run_experiment.2.log
+        """
+        # pylint: disable=line-too-long
         rc = self._run_experiment_helper(cmd, exp)
         self.assertNotEqual(rc, 0)
 
@@ -78,6 +124,7 @@ class TestRunExperiment1(hut.TestCase):
         # Run command.
         rc = si.system(cmd, abort_on_error=False)
         # Compute and compare the dir signature.
-        act = hut.get_dir_signature(dst_dir)
-        self.assert_equal(act, exp)
+        act = hut.get_dir_signature(dst_dir, include_file_content=False, num_lines=None)
+        act = hut.purify_txt_from_client(act)
+        self.assert_equal(act, exp, fuzzy_match=True)
         return rc

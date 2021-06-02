@@ -64,35 +64,36 @@ def _run_notebook(
     # Export config function and its `id` to the notebook.
     config_builder = config[("meta", "config_builder")]
     dst_dir = config[("meta", "dst_dir")]
-    cmd = (
-        f'export __CONFIG_BUILDER__="{config_builder}"; '
-        + f'export __CONFIG_IDX__="{idx}"; '
-        + f'export __CONFIG_DST_DIR__="{dst_dir}"'
-    )
-    cmd += (
-        f"; jupyter nbconvert {notebook_file} "
-        + " --execute"
-        + " --to notebook"
-        + f" --output {dst_file}"
-        + " --ExecutePreprocessor.kernel_name=python"
+    cmd = [
+        f'export __CONFIG_BUILDER__="{config_builder}";',
+        f'export __CONFIG_IDX__="{idx}";',
+        f'export __CONFIG_DST_DIR__="{dst_dir}"',
+        f"; jupyter nbconvert {notebook_file}",
+        "--execute",
+        "--to notebook",
+        f"--output {dst_file}",
+        "--ExecutePreprocessor.kernel_name=python",
         # From https://github.com/ContinuumIO/anaconda-issues/issues/877
-        + " --ExecutePreprocessor.timeout=-1"
-    )
+        "--ExecutePreprocessor.timeout=-1"
+    ]
+    cmd = " ".join(cmd)
     # Prepare the log file.
     log_file = os.path.join(experiment_result_dir, "run_notebook.%s.log" % idx)
     log_file = os.path.abspath(os.path.abspath(log_file))
-    # TODO(gp): Repeating a command n-times is an idiom that we could
-    #  move to system_interaction.
+    _LOG.info("log_file=%s", log_file)
+    # TODO(gp): Repeating a command n-times is an idiom that we could move to
+    #  system_interaction.
     # Try running the notebook up to `num_attempts` times.
     dbg.dassert_lte(1, num_attempts)
     rc = None
     for n in range(1, num_attempts + 1):
         if n > 1:
             _LOG.warning(
-                "Attempting to run the notebook for the %d / %d time",
+                "Run the notebook: %d / %d attempt",
                 n,
                 num_attempts,
             )
+        _LOG.info("cmd='%s'", cmd)
         rc = si.system(cmd, output_file=log_file, abort_on_error=False)
         if rc == 0:
             _LOG.info("Running notebook was successful")
@@ -103,7 +104,7 @@ def _run_notebook(
         if abort_on_error:
             dbg.dfatal("Aborting")
         else:
-            _LOG.error("Continuing execution for next experiments")
+            _LOG.error("Continuing execution of next experiments")
     else:
         # Mark as success.
         cdtfut.mark_config_as_success(experiment_result_dir)

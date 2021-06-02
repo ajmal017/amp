@@ -303,10 +303,12 @@ def create_test_dir(
         hio.to_file(dst_file_name, file_content)
 
 
-def get_dir_signature(dir_name: str, num_lines: Optional[int] = None, include_file_content: bool = True) -> str:
+def get_dir_signature(dir_name: str, include_file_content: bool, num_lines: Optional[int]) -> str:
     """
     Compute a string with the content of the files in `dir_name`.
 
+    :param include_file_content: include the content of the files, besides the
+        name of files and directories
     :param num_lines: number of lines to print for each file
     """
     # Find all the files under `dir_name`.

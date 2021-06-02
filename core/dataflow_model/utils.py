@@ -135,10 +135,9 @@ def setup_experiment_dir(config: cfg.Config) -> None:
     :return: whether we need to run this config or not
     """
     dbg.dassert_isinstance(config, cfg.Config)
-    _LOG.info("Creating experiment dir")
     # Create subdirectory structure for experiment results.
     experiment_result_dir = config[("meta", "experiment_result_dir")]
-    # TODO(gp): Create dir.
+    _LOG.info("Creating experiment dir '%s'", experiment_result_dir)
     io_.create_dir(experiment_result_dir, incremental=True)
     # Prepare book-keeping files.
     file_name = os.path.join(experiment_result_dir, "config.pkl")
