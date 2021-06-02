@@ -63,7 +63,7 @@ _LOG.setLevel(logging.INFO)
 # Global setter / getter for updating test.
 
 # This controls whether the output of a test is updated or not.
-# Set by conftest.py.
+# Set by `conftest.py`.
 _UPDATE_TESTS = False
 
 
@@ -106,7 +106,7 @@ def in_unit_test_mode() -> bool:
     """
     Return True if we are inside a pytest run.
 
-    This is set by conftest.py.
+    This is set by `conftest.py`.
     """
     return _CONFTEST_IN_PYTEST
 
@@ -126,15 +126,15 @@ def pytest_print(txt: str) -> None:
         sys.stdout.write(txt)
 
 
-def pytest_warning(txt: str, prepend_new_line: bool = False) -> None:
+def pytest_warning(txt: str, prefix: str = "") -> None:
     """
     Print a warning bypassing `pytest` output capture.
 
-    :param prepend_new_line: start the warning with a new line to make it visibile
+    :param prefix: prepend the message with a string
     """
     txt_tmp = ""
-    if prepend_new_line:
-        txt_tmp += "\n"
+    if prefix:
+        txt_tmp += prefix
     txt_tmp += hprint.color_highlight("WARNING", "yellow") + f": {txt}"
     pytest_print(txt_tmp)
 
@@ -679,7 +679,7 @@ def _fuzzy_clean(txt: str) -> str:
     return txt
 
 
-# TODO(gp): Use the one in hprint.
+# TODO(gp): Use the one in hprint. Is it even needed?
 def _to_pretty_string(obj: str) -> str:
     if isinstance(obj, dict):
         ret = pprint.pformat(obj)
@@ -807,7 +807,6 @@ class TestCase(unittest.TestCase):
         _LOG.debug("base_dir_name=%s", self._base_dir_name)
         # Store whether a test needs to be updated or not.
         self._update_tests = get_update_tests()
-        print("Setting to %s", get_update_tests())
         self._overriden_update_tests = False
         # Store whether the golden outcome of this test was updated.
         self._test_was_updated = False
@@ -829,7 +828,7 @@ class TestCase(unittest.TestCase):
         # Report if the test was updated
         if self._test_was_updated:
             if not self._overriden_update_tests:
-                pytest_warning("Test was updated) ")
+                pytest_warning("Test was updated) ", prefix="(")
             else:
                 # We forced an update from the unit test itself, so no need
                 # to report an update.
@@ -1129,7 +1128,10 @@ class TestCase(unittest.TestCase):
         """
         Add to git repo `file_name`, if needed.
         """
+        return
         if self._git_add:
+            # We need to find where the file should go in the
+            # /app/amp/core/test/TestCheckSameConfigs.test_check_same_configs_error/output/test.txt
             super_module = None
             file_name_tmp = git.purify_docker_file_from_git_client(file_name, super_module)
             _LOG.debug(hprint.to_str("file_name file_name_tmp"))
@@ -1138,7 +1140,7 @@ class TestCase(unittest.TestCase):
             rc = hsinte.system(cmd, abort_on_error=False)
             if rc:
                 pytest_warning(f"Can't git add file: git add the file manually",
-                               prepend_new_line=True)
+                               prefix="\n")
 
     def _check_string_update_outcome(
         self, file_name: str, actual: str, use_gzip: bool
@@ -1158,7 +1160,7 @@ class TestCase(unittest.TestCase):
         _LOG.debug(hprint.to_str("file_name"))
         hio.create_enclosing_dir(file_name)
         actual.to_csv(file_name)
-        pytest_warning(f"Update golden outcome file '{file_name}'")
+        pytest_warning(f"Update golden outcome file '{file_name}'", prefix="\n")
         # Add to git repo.
         self._git_add_file(file_name)
 

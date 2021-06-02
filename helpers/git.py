@@ -541,11 +541,11 @@ def purify_docker_file_from_git_client(
     file_name: str, super_module: Optional[bool]
 ) -> str:
     """
-    Convert a file that was generated inside Docker to a file in the current
-    dir.
+    Convert a file or dir that was generated inside Docker to a file in the current
+    Git client.
 
-    This operation is best effort since it might not be able to find a file in the
-    current repo. E.g., a file in Docker under a super-module is not in a sub-module.
+    This operation is best effort since it might not be able to find the
+    corresponding file in the current repo.
 
     E.g.,
     - A file like '/app/amp/core/dataflow_model/utils.py', in a Docker container with
