@@ -525,7 +525,7 @@ def find_file_with_dir(
     _LOG.debug("files=\n%s", "\n".join(candidate_files))
     matching_files = []
     for file in sorted(candidate_files):
-        signature1 = _compute_file_signature(file, dir_depth
+        signature1 = _compute_file_signature(file, dir_depth)
         signature2 = _compute_file_signature(file_name, dir_depth)
         is_equal = signature1 == signature2
         _LOG.debug("found_file=%s -> is_equal=%s", file, is_equal)
