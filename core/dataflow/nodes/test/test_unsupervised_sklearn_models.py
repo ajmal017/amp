@@ -7,6 +7,7 @@ import sklearn.decomposition as sdecom
 import core.artificial_signal_generators as casgen
 import core.config as cfg
 import core.config_builders as ccbuild
+import core.dataflow.nodes.test.helpers as cdnth
 import helpers.unit_test as hut
 from core.dataflow.core import Node
 from core.dataflow.nodes.unsupervised_sklearn_models import (
@@ -60,7 +61,7 @@ class TestUnsupervisedSkLearnModel(hut.TestCase):
 
     def test3(self) -> None:
         """
-        Test `get_fit_state()` and `set_fit_state()`
+        Test `get_fit_state()` and `set_fit_state()`.
         """
         data = self._get_data()
         config = ccbuild.get_config_from_nested_dict(
@@ -72,7 +73,7 @@ class TestUnsupervisedSkLearnModel(hut.TestCase):
         )
         fit_df = data.loc["2000-01-03":"2000-01-31"]
         predict_df = data.loc["2000-02-01":"2000-02-25"]
-        expected, actual = _test_get_set_state(
+        expected, actual = cdnth.test_get_set_state(
             fit_df, predict_df, config, UnsupervisedSkLearnModel
         )
         self.assert_equal(actual, expected)
@@ -130,7 +131,7 @@ class TestMultiindexUnsupervisedSkLearnModel(hut.TestCase):
 
     def test3(self) -> None:
         """
-        Test `get_fit_state()` and `set_fit_state()`
+        Test `get_fit_state()` and `set_fit_state()`.
         """
         data = self._get_data()
         config = ccbuild.get_config_from_nested_dict(
@@ -143,7 +144,7 @@ class TestMultiindexUnsupervisedSkLearnModel(hut.TestCase):
         )
         fit_df = data.loc["2000-01-03":"2000-01-31"]
         predict_df = data.loc["2000-02-01":"2000-02-25"]
-        expected, actual = _test_get_set_state(
+        expected, actual = cdnth.test_get_set_state(
             fit_df, predict_df, config, MultiindexUnsupervisedSkLearnModel
         )
         self.assert_equal(actual, expected)
@@ -211,7 +212,7 @@ class TestResidualizer(hut.TestCase):
 
     def test3(self) -> None:
         """
-        Test `get_fit_state()` and `set_fit_state()`
+        Test `get_fit_state()` and `set_fit_state()`.
         """
         data = self._get_data()
         config = ccbuild.get_config_from_nested_dict(
@@ -224,7 +225,7 @@ class TestResidualizer(hut.TestCase):
         )
         fit_df = data.loc["2000-01-03":"2000-01-31"]
         predict_df = data.loc["2000-02-01":"2000-02-25"]
-        expected, actual = _test_get_set_state(
+        expected, actual = cdnth.test_get_set_state(
             fit_df, predict_df, config, Residualizer
         )
         self.assert_equal(actual, expected)
