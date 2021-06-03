@@ -1128,19 +1128,29 @@ class TestCase(unittest.TestCase):
         """
         Add to git repo `file_name`, if needed.
         """
-        return
         if self._git_add:
-            # We need to find where the file should go in the
-            # /app/amp/core/test/TestCheckSameConfigs.test_check_same_configs_error/output/test.txt
+            # We need at least two dir to disambiguate.
+            dir_depth = 2
+            # Find the file relative to here.
             super_module = None
-            file_name_tmp = git.purify_docker_file_from_git_client(file_name, super_module)
+            file_name_tmp = git.purify_docker_file_from_git_client(file_name, super_module,
+                                                                   dir_depth=dir_depth)
             _LOG.debug(hprint.to_str("file_name file_name_tmp"))
-            cmd = "git add -u %s" % file_name_tmp
-            _LOG.debug("> %s", cmd)
+            if file_name_tmp.startswith("amp"):
+                # To add a file like
+                # amp/core/test/TestCheckSameConfigs.test_check_same_configs_error/output/test.txt
+                # we need to descend into `amp`.
+                file_name_in_amp = os.path.relpath(file_name_tmp, "amp")
+                cmd = "cd amp; git add -u %s" % file_name_in_amp
+            else:
+                cmd = "git add -u %s" % file_name_tmp
             rc = hsinte.system(cmd, abort_on_error=False)
             if rc:
-                pytest_warning(f"Can't git add file: git add the file manually",
-                               prefix="\n")
+                pytest_warning(
+                    f"Can't git add file\n'{file_name}' -> '{file_name_tmp}'\n"
+                    "You need to git add the file manually\n",
+                    prefix="\n")
+                pytest_print(f"> {cmd}\n")
 
     def _check_string_update_outcome(
         self, file_name: str, actual: str, use_gzip: bool

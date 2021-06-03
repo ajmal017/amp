@@ -588,7 +588,7 @@ def select_result_file_from_list(files: List[str], mode: str) -> List[str]:
     if mode == "assert_unless_one_result":
         # Expect to have a single result and return that.
         if len(files) != 1:
-            dbg.dfatal("Found multiple files:\n%s", "\n".join(files))
+            dbg.dfatal("Found multiple files:\n%s" % "\n".join(files))
         res = [files[0]]
     elif mode == "return_all_results":
         # Return all files.
@@ -596,7 +596,6 @@ def select_result_file_from_list(files: List[str], mode: str) -> List[str]:
     else:
         dbg.dfatal("Invalid mode='%s'" % mode)
     return res
-
 
 
 def system_to_files(
