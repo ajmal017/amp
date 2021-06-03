@@ -1,11 +1,9 @@
 import logging
 import os
-from typing import List, Tuple
+from typing import List
 
 import pytest
 
-import core.config as cfg
-import core.config_builders as cfgb
 import helpers.dbg as dbg
 import helpers.git as git
 import helpers.system_interaction as si
@@ -16,8 +14,8 @@ _LOG = logging.getLogger(__name__)
 
 class TestRunExperiment1(hut.TestCase):
     """
-    These tests are equivalent to `TestRunNotebook1` but using the `run_experiment.py`
-    flow instead of `run_notebook.py`.
+    These tests are equivalent to `TestRunNotebook1` but using the
+    `run_experiment.py` flow instead of `run_notebook.py`.
     """
 
     def test1(self) -> None:
@@ -53,7 +51,7 @@ $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test1/tmp.scratch/result_1
         """
         cmd = [
             "--config_builder 'dev_scripts.test.test_run_notebook.build_configs1()'",
-            "--num_threads 2"
+            "--num_threads 2",
         ]
         # pylint: enable=line-too-long
         exp = r"""# Dir structure
@@ -113,15 +111,18 @@ $GIT_ROOT/core/dataflow_model/test/TestRunExperiment1.test3/tmp.scratch/result_2
         # Build command line.
         dst_dir = self.get_scratch_space()
         cmd_tmp = [
-                f"{exec_file}",
-                "--experiment_builder core.dataflow_model.test.simple_experiment.run_experiment",
-                f"--dst_dir {dst_dir}"]
+            f"{exec_file}",
+            "--experiment_builder core.dataflow_model.test.simple_experiment.run_experiment",
+            f"--dst_dir {dst_dir}",
+        ]
         cmd_tmp.extend(cmd)
         cmd = " ".join(cmd_tmp)
         # Run command.
         rc = si.system(cmd, abort_on_error=False)
         # Compute and compare the dir signature.
-        act = hut.get_dir_signature(dst_dir, include_file_content=False, num_lines=None)
+        act = hut.get_dir_signature(
+            dst_dir, include_file_content=False, num_lines=None
+        )
         act = hut.purify_txt_from_client(act)
         self.assert_equal(act, exp, fuzzy_match=True)
         return rc

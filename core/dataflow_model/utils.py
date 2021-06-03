@@ -104,7 +104,7 @@ def skip_configs_already_executed(
     configs: List[cfg.Config], incremental: bool
 ) -> Tuple[List[cfg.Config], int]:
     """
-
+    Remove from the list the configs that have already been executed.
     """
     configs_out = []
     num_skipped = 0
@@ -192,8 +192,8 @@ def get_configs_from_command_line(args: argparse.Namespace) -> List[cfg.Config]:
     Return all the configs to run given the command line interface.
 
     The configs are patched with all the information from the command
-    line (e.g., `idx`, `config_builder`, `experiment_builder`, `dst_dir`,
-    `experiment_result_dir`).
+    line (e.g., `idx`, `config_builder`, `experiment_builder`,
+    `dst_dir`, `experiment_result_dir`).
     """
     # Build the map with the config parameters.
     config_builder = args.config_builder

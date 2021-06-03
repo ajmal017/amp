@@ -317,7 +317,8 @@ def create_test_dir(
 
 
 def get_dir_signature(
-    dir_name: str, include_file_content: bool, num_lines: Optional[int]) -> str:
+    dir_name: str, include_file_content: bool, num_lines: Optional[int]
+) -> str:
     """
     Compute a string with the content of the files in `dir_name`.
 
@@ -328,7 +329,7 @@ def get_dir_signature(
     # Find all the files under `dir_name`.
     _LOG.debug("dir_name=%s", dir_name)
     dbg.dassert_exists(dir_name)
-    #file_names = glob.glob(os.path.join(dir_name, "*"), recursive=True)
+    # file_names = glob.glob(os.path.join(dir_name, "*"), recursive=True)
     cmd = f'find {dir_name} -name "*"'
     remove_files_non_present = False
     file_names = hsinte.system_to_files(cmd, dir_name, remove_files_non_present)
@@ -416,7 +417,8 @@ def purify_app_references(txt: str) -> str:
 
 def purify_file_names(file_names: List[str]) -> List[str]:
     """
-    Express file names in terms of the root of git repo, removing reference to `amp`.
+    Express file names in terms of the root of git repo, removing reference to
+    `amp`.
     """
     git_root = git.get_client_root(super_module=True)
     file_names = [os.path.relpath(f, git_root) for f in file_names]
@@ -1133,8 +1135,9 @@ class TestCase(unittest.TestCase):
             dir_depth = 2
             # Find the file relative to here.
             super_module = None
-            file_name_tmp = git.purify_docker_file_from_git_client(file_name, super_module,
-                                                                   dir_depth=dir_depth)
+            file_name_tmp = git.purify_docker_file_from_git_client(
+                file_name, super_module, dir_depth=dir_depth
+            )
             _LOG.debug(hprint.to_str("file_name file_name_tmp"))
             if file_name_tmp.startswith("amp"):
                 # To add a file like
@@ -1149,7 +1152,8 @@ class TestCase(unittest.TestCase):
                 pytest_warning(
                     f"Can't git add file\n'{file_name}' -> '{file_name_tmp}'\n"
                     "You need to git add the file manually\n",
-                    prefix="\n")
+                    prefix="\n",
+                )
                 pytest_print(f"> {cmd}\n")
 
     def _check_string_update_outcome(

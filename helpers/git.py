@@ -538,11 +538,13 @@ def get_repo_dirs() -> List[str]:
 
 
 def purify_docker_file_from_git_client(
-    file_name: str, super_module: Optional[bool], dir_depth : int =1,
+    file_name: str,
+    super_module: Optional[bool],
+    dir_depth: int = 1,
 ) -> str:
     """
-    Convert a file or dir that was generated inside Docker to a file in the current
-    Git client.
+    Convert a file or dir that was generated inside Docker to a file in the
+    current Git client.
 
     This operation is best effort since it might not be able to find the
     corresponding file in the current repo.
@@ -565,7 +567,9 @@ def purify_docker_file_from_git_client(
     file_name = os.path.normpath(file_name)
     _LOG.debug("file_name=%s", file_name)
     mode = "assert_unless_one_result"
-    file_name_tmp = hsinte.find_file_with_dir(file_name, ".", dir_depth=dir_depth, mode=mode)[0]
+    file_name_tmp = hsinte.find_file_with_dir(
+        file_name, ".", dir_depth=dir_depth, mode=mode
+    )[0]
     _LOG.debug("file_name_tmp=%s", file_name_tmp)
     if file_name_tmp is None:
         # We didn't find the file in the current client: leave the file as it was.

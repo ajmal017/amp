@@ -475,7 +475,8 @@ def create_executable_script(file_name: str, content: str) -> None:
 
 def _compute_file_signature(file_name: str, dir_depth: int) -> Tuple:
     """
-    Compute a signature for files using basename and `dir_depth` enclosing dirs.
+    Compute a signature for files using basename and `dir_depth` enclosing
+    dirs.
     """
     # Split a file like:
     # /app/amp/core/test/TestCheckSameConfigs.test_check_same_configs_error/output/test.txt
@@ -486,12 +487,16 @@ def _compute_file_signature(file_name: str, dir_depth: int) -> Tuple:
     paths = path.split(os.sep)
     dbg.dassert_lte(1, dir_depth)
     dbg.dassert_lte(dir_depth + 1, len(paths))
-    signature = paths[-(dir_depth + 1):]
+    signature = paths[-(dir_depth + 1) :]
     return signature
 
 
-def find_file_with_dir(file_name: str, root_dir: str = ".", dir_depth: int = 1,
-                       mode: str ="return_all_results") -> List[str]:
+def find_file_with_dir(
+    file_name: str,
+    root_dir: str = ".",
+    dir_depth: int = 1,
+    mode: str = "return_all_results",
+) -> List[str]:
     """
     Find a file matching basename and several enclosing dir name starting from
     `root_dir`.
@@ -520,9 +525,9 @@ def find_file_with_dir(file_name: str, root_dir: str = ".", dir_depth: int = 1,
     _LOG.debug("files=\n%s", "\n".join(candidate_files))
     matching_files = []
     for file in sorted(candidate_files):
-        is_equal = _compute_file_signature(file, dir_depth) == _compute_file_signature(
-            file_name, dir_depth
-        )
+        signature1 = _compute_file_signature(file, dir_depth
+        signature2 = _compute_file_signature(file_name, dir_depth)
+        is_equal = signature1 == signature2
         _LOG.debug("found_file=%s -> is_equal=%s", file, is_equal)
         if is_equal:
             matching_files.append(file)
@@ -576,7 +581,8 @@ def remove_dirs(files: List[str]) -> List[str]:
 
 def select_result_file_from_list(files: List[str], mode: str) -> List[str]:
     """
-    Select a file from a list according to various approaches encoded in `mode`.
+    Select a file from a list according to various approaches encoded in
+    `mode`.
 
     :param mode:
         - "return_all_results": return the list of files, whatever it is

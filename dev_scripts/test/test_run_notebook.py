@@ -22,7 +22,7 @@ class TestRunNotebook1(hut.TestCase):
         cmd = [
             "--config_builder 'dev_scripts.test.test_run_notebook.build_configs1()'",
             "--skip_on_error",
-            "--num_threads 'serial'"
+            "--num_threads 'serial'",
         ]
         # pylint: enable=line-too-long
         exp = r"""# Dir structure
@@ -46,11 +46,12 @@ $GIT_ROOT/dev_scripts/test/TestRunNotebook1.test1/tmp.scratch/result_1/success.t
     @pytest.mark.slow
     def test2(self) -> None:
         """
-        Run an experiment with 2 notebooks (without any failure) with 2 threads.
+        Run an experiment with 2 notebooks (without any failure) with 2
+        threads.
         """
         cmd = [
             "--config_builder 'dev_scripts.test.test_run_notebook.build_configs1()'",
-            "--num_threads 2"
+            "--num_threads 2",
         ]
         # pylint: enable=line-too-long
         exp = r"""# Dir structure
@@ -78,7 +79,7 @@ $GIT_ROOT/dev_scripts/test/TestRunNotebook1.test2/tmp.scratch/result_1/success.t
         """
         cmd = [
             "--config_builder 'dev_scripts.test.test_run_notebook.build_configs2()'",
-            "--num_threads 3"
+            "--num_threads 3",
         ]
         _LOG.warning("This command is supposed to fail")
         # pylint: enable=line-too-long
@@ -127,13 +128,16 @@ $GIT_ROOT/dev_scripts/test/TestRunNotebook1.test3/tmp.scratch/result_2/run_noteb
         cmd_tmp = [
             f"{exec_file}",
             f"--dst_dir {dst_dir}",
-            f"--notebook {notebook_file}"]
+            f"--notebook {notebook_file}",
+        ]
         cmd_tmp.extend(cmd)
         cmd = " ".join(cmd_tmp)
         # Run command.
         rc = si.system(cmd, abort_on_error=False)
         # Compute and compare the dir signature.
-        act = hut.get_dir_signature(dst_dir, include_file_content=False, num_lines=None)
+        act = hut.get_dir_signature(
+            dst_dir, include_file_content=False, num_lines=None
+        )
         act = hut.purify_txt_from_client(act)
         self.assert_equal(act, exp, fuzzy_match=True)
         return rc
@@ -142,9 +146,7 @@ $GIT_ROOT/dev_scripts/test/TestRunNotebook1.test3/tmp.scratch/result_2/run_noteb
 def _build_config(values: List[bool]) -> List[cfg.Config]:
     config_template = cfg.Config()
     config_template["fail"] = None
-    configs = cfgb.build_multiple_configs(
-        config_template, {("fail",): values}
-    )
+    configs = cfgb.build_multiple_configs(config_template, {("fail",): values})
     # Duplicate configs are not allowed, so we need to add identifiers to make
     # each config unique.
     for i, config in enumerate(configs):

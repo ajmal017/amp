@@ -8,9 +8,11 @@ import helpers.pickle_ as hpickl
 
 _LOG = logging.getLogger(__name__)
 
+
 def run_experiment(config: cfg.Config) -> None:
     """
     Implement the master experiment to:
+
     - create a DAG
     - run it
     - save the generated `ResultBundle`

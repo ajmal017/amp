@@ -74,7 +74,7 @@ def _run_notebook(
         f"--output {dst_file}",
         "--ExecutePreprocessor.kernel_name=python",
         # From https://github.com/ContinuumIO/anaconda-issues/issues/877
-        "--ExecutePreprocessor.timeout=-1"
+        "--ExecutePreprocessor.timeout=-1",
     ]
     cmd = " ".join(cmd)
     # Prepare the log file.

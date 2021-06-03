@@ -31,9 +31,9 @@ import helpers.pickle_ as hpickle
 
 _LOG = logging.getLogger(__name__)
 
-# #####################
+# #############################################################################
 # Utilities
-# #####################
+# #############################################################################
 
 # TODO(gp): Move these functions to `config_utils.py` or even better
 #  `config/utils.py`.
@@ -76,8 +76,7 @@ def validate_configs(configs: List[cfg.Config]) -> None:
     """
     dbg.dassert_container_type(configs, List, cfg.Config)
     dbg.dassert_no_duplicates(
-        list(map(str, configs)),
-        "There are duplicate configs in passed list"
+        list(map(str, configs)), "There are duplicate configs in passed list"
     )
 
 
@@ -168,8 +167,8 @@ def get_config_difference(configs: List[cfg.Config]) -> Dict[str, List[Any]]:
 # amp/core/test/test_config_builders.py:326:        actual_result = cfgb.get_configs_dataframe(
 # amp/core/config_builders.py:233:def get_configs_dataframe(
 def get_configs_dataframe(
-        configs: List[cfg.Config],
-        params_subset: Optional[Union[str, List[str]]] = None,
+    configs: List[cfg.Config],
+    params_subset: Optional[Union[str, List[str]]] = None,
 ) -> pd.DataFrame:
     """
     Convert the configs into a df with full nested names.
@@ -231,7 +230,7 @@ def get_configs_from_builder(config_builder: str) -> List[cfg.Config]:
     dbg.dassert_is_not(configs, None)
     # Cast to the right type.
     # TODO(gp): Is this needed?
-    #configs = cast(List[cfg.Config], configs)
+    # configs = cast(List[cfg.Config], configs)
     validate_configs(configs)
     return configs
 
@@ -242,8 +241,8 @@ def patch_configs(
     """
     Patch the configs with information needed to run.
 
-    This function is used by `run_notebook.py` and `run_experiment.py` to
-    pass information through the `Config` to the process running the
+    This function is used by `run_notebook.py` and `run_experiment.py`
+    to pass information through the `Config` to the process running the
     experiment.
     """
     configs_out = []
@@ -268,7 +267,8 @@ def patch_configs(
 
 def get_config_from_params(idx: int, params: Dict[str, str]) -> cfg.Config:
     """
-    Get the `idx`-th config built from the params, which includes `config_builder`.
+    Get the `idx`-th config built from the params, which includes
+    `config_builder`.
     """
     config_builder = params["config_builder"]
     # Build all the configs.
@@ -285,7 +285,8 @@ def get_config_from_params(idx: int, params: Dict[str, str]) -> cfg.Config:
 
 def get_config_from_env() -> Optional[cfg.Config]:
     """
-    Build a config passed through environment vars, if possible, or return `None`.
+    Build a config passed through environment vars, if possible, or return
+    `None`.
     """
     config_vars = ["__CONFIG_BUILDER__", "__CONFIG_IDX__", "__CONFIG_DST_DIR__"]
     # Check the existence of any config var in env.
@@ -321,6 +322,7 @@ def get_config_from_env() -> Optional[cfg.Config]:
 # #############################################################################
 
 # TODO(gp): Not clear what this does and if it's needed.
+
 
 def _generate_template_config(
     config: cfg.Config,
