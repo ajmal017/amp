@@ -1012,7 +1012,7 @@ class TestCase(unittest.TestCase):
         _LOG.debug("file_name=%s", file_name)
         # Remove reference from the current environment.
         if purify_text:
-            _LOG.debug("Purifying actual")
+            _LOG.debug("Purifying actual outcome")
             actual = purify_txt_from_client(actual)
         _LOG.debug("actual=\n%s", actual)
         outcome_updated = False
@@ -1020,7 +1020,7 @@ class TestCase(unittest.TestCase):
         _LOG.debug("file_exists=%s", file_exists)
         is_equal: Optional[bool] = None
         if self._update_tests:
-            _LOG.debug("Update golden outcomes")
+            _LOG.debug("# Update golden outcomes")
             # Determine whether outcome needs to be updated.
             if file_exists:
                 expected = hio.from_file(file_name, use_gzip=use_gzip)
@@ -1036,7 +1036,7 @@ class TestCase(unittest.TestCase):
                 self._check_string_update_outcome(file_name, actual, use_gzip)
         else:
             # Check the test result.
-            _LOG.debug("Check golden outcomes")
+            _LOG.debug("# Check golden outcomes")
             if file_exists:
                 # Golden outcome is available: check the actual outcome against
                 # the golden outcome.
@@ -1064,7 +1064,7 @@ class TestCase(unittest.TestCase):
                     msg = ("The golden outcome doesn't exist: saved the actual "
                         f"output in '{file_name}'")
                     _LOG.error(msg)
-                    if not abort_on_error:
+                    if abort_on_error:
                         dbg.dfatal(msg)
                 elif action_on_missing_golden == "update":
                     # Create golden file and add it to the repo.
@@ -1089,10 +1089,6 @@ class TestCase(unittest.TestCase):
     ) -> Tuple[bool, bool, Optional[bool]]:
         """
         Like `check_string()` but for pandas dataframes, instead of strings.
-
-        :return: outcome_updated, file_exists, is_equal
-        :raises: RuntimeError if there is an error unless `about_on_error` is
-            False, which should be used only for unit testing
         """
         _LOG.debug(hprint.to_str("err_threshold tag abort_on_error"))
         dbg.dassert_isinstance(actual, pd.DataFrame)
@@ -1122,6 +1118,7 @@ class TestCase(unittest.TestCase):
                 self._check_df_update_outcome(file_name, actual)
         else:
             # Check the test result.
+            _LOG.debug("# Check golden outcomes")
             if file_exists:
                 # Golden outcome is available: check the actual outcome against
                 # the golden outcome.
@@ -1171,6 +1168,7 @@ class TestCase(unittest.TestCase):
 
     # #########################################################################
 
+    # TODO(gp): This needs to be moved to `helper.git` and generalized.
     def _git_add_file(self, file_name: str) -> None:
         """
         Add to git repo `file_name`, if needed.
@@ -1188,6 +1186,8 @@ class TestCase(unittest.TestCase):
                 # To add a file like
                 # amp/core/test/TestCheckSameConfigs.test_check_same_configs_error/output/test.txt
                 # we need to descend into `amp`.
+                # TODO(gp): This needs to be generalized to lemonade. We should
+                #  `cd` in the dir of the repo that includes the file.
                 file_name_in_amp = os.path.relpath(file_name_tmp, "amp")
                 cmd = "cd amp; git add -u %s" % file_name_in_amp
             else:

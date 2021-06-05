@@ -1,1 +1,0 @@
-['helpers/test/Test_find_file_with_dir1.test2/output/test.txt']

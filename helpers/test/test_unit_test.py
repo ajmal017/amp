@@ -38,6 +38,23 @@ def _git_add(file_name: str) -> None:
         )
 
 
+def _to_skip_on_update_outcomes() -> bool:
+    """
+    Some tests can't pass with `--update_outcomes`, since they exercise the
+    logic in `--update_outcomes` itself.
+
+    We can't always use `@pytest.mark.skipif(hut.get_update_tests)` since pytest
+    decides which tests need to be run before the variable is actually set.
+    """
+    to_skip = False
+    if hut.get_update_tests():
+        _LOG.warning(
+            "Skip this test since it exercises the logic for --update_outcomes"
+        )
+        to_skip = True
+    return to_skip
+
+
 # #############################################################################
 
 
@@ -298,7 +315,7 @@ class TestCheckString1(hut.TestCase):
         """
         Compare the actual value to a matching golden outcome.
         """
-        if self._to_skip():
+        if _to_skip_on_update_outcomes():
             return
         act = "hello world"
         golden_outcome = "hello world"
@@ -323,7 +340,7 @@ class TestCheckString1(hut.TestCase):
         """
         Compare the actual value to a mismatching golden outcome.
         """
-        if self._to_skip():
+        if _to_skip_on_update_outcomes():
             return
         act = "hello world"
         golden_outcome = "hello world2"
@@ -350,7 +367,7 @@ class TestCheckString1(hut.TestCase):
         """
         Compare the actual value to a mismatching golden outcome and udpate it.
         """
-        if self._to_skip():
+        if _to_skip_on_update_outcomes():
             return
         act = "hello world"
         golden_outcome = "hello world2"
@@ -383,7 +400,7 @@ class TestCheckString1(hut.TestCase):
         """
         Like test_check_string_not_equal1() but raising the exception.
         """
-        if self._to_skip():
+        if _to_skip_on_update_outcomes():
             return
         act = "hello world"
         golden_outcome = "hello world2"
@@ -403,9 +420,12 @@ class TestCheckString1(hut.TestCase):
 
     def test_check_string_missing1(self) -> None:
         """
-        The golden outcome was missing and was added.
+        When running with --update_outcomes, the golden outcome was missing and so
+        it was added.
+
+        This tests the code path when action_on_missing_golden="update".
         """
-        if self._to_skip():
+        if _to_skip_on_update_outcomes():
             return
         act = "hello world"
         # Force updating the golden outcomes.
@@ -419,6 +439,7 @@ class TestCheckString1(hut.TestCase):
             outcome_updated, file_exists, is_equal = self.check_string(
                 act, abort_on_error=False
             )
+            dbg.dassert_file_exists(file_name)
             new_golden = hio.from_file(file_name)
         finally:
             # Clean up.
@@ -431,19 +452,64 @@ class TestCheckString1(hut.TestCase):
         #
         self.assertEqual(new_golden, "hello world")
 
-    @staticmethod
-    def _to_skip() -> bool:
+    def test_check_string_missing2(self) -> None:
         """
-        We can't use @pytest.mark.skipif(hut.get_update_tests) since pytest
-        decides which tests need to be run before the variable is actually set.
+        Without running with --update_outcomes, the golden outcome was missing,
+        action_on_missing_golden="assert", and the unit test framework asserted.
         """
-        to_skip = False
-        if hut.get_update_tests():
-            _LOG.warning(
-                "Skip this test since it exercises the logic for --update_outcomes"
+        if _to_skip_on_update_outcomes():
+            return
+        act = "hello world"
+        tag = "test"
+        _, file_name = self._get_golden_outcome_file_name(tag)
+        try:
+            # Remove the golden.
+            hio.delete_file(file_name)
+            # Check.
+            outcome_updated, file_exists, is_equal = self.check_string(
+                act, abort_on_error=False, action_on_missing_golden="assert"
             )
-            to_skip = True
-        return to_skip
+            dbg.dassert_file_exists(file_name + ".tmp")
+            new_golden = hio.from_file(file_name + ".tmp")
+        finally:
+            # Clean up.
+            hio.delete_file(file_name)
+        # Actual doesn't match the golden outcome and it was updated.
+        self.assertFalse(outcome_updated)
+        self.assertFalse(file_exists)
+        self.assertFalse(is_equal)
+        #
+        self.assertEqual(new_golden, "hello world")
+
+    def test_check_string_missing3(self) -> None:
+        """
+        Without running with --update_outcomes, the golden outcome was missing,
+        action_on_missing_golden="update", and the unit test framework updates
+        the golden.
+        """
+        if _to_skip_on_update_outcomes():
+            return
+        act = "hello world"
+        tag = "test"
+        _, file_name = self._get_golden_outcome_file_name(tag)
+        try:
+            # Remove the golden.
+            hio.delete_file(file_name)
+            # Check.
+            outcome_updated, file_exists, is_equal = self.check_string(
+                act, abort_on_error=False, action_on_missing_golden="update"
+            )
+            dbg.dassert_file_exists(file_name)
+            new_golden = hio.from_file(file_name)
+        finally:
+            # Clean up.
+            hio.delete_file(file_name)
+        # Actual doesn't match the golden outcome and it was updated.
+        self.assertTrue(outcome_updated)
+        self.assertFalse(file_exists)
+        self.assertFalse(is_equal)
+        #
+        self.assertEqual(new_golden, "hello world")
 
 
 # #############################################################################
@@ -453,23 +519,14 @@ class TestCheckDataFrame1(hut.TestCase):
     """
     Some of these tests can't pass with `--update_outcomes`, since they
     exercise the logic in `--update_outcomes` itself.
-
-    We can't use the standard way to make tests conditional:
-    ```
-    @pytest.mark.skipif(hut.get_update_tests())
-    ```
-    since the variable might not be set when pytest decides which tests to run. So
-    we use a not elegant but effective:
-    ```
-    if hut.get_update_tests():
-        return
-    ```
     """
 
     def test_check_df_equal1(self) -> None:
         """
         Compare the actual value of a df to a matching golden outcome.
         """
+        if _to_skip_on_update_outcomes():
+            return
         act = pd.DataFrame([[0, 1, 2], [3, 4, 5]], columns="a b c".split())
         abort_on_error = True
         err_threshold = 0.0001
@@ -485,6 +542,8 @@ class TestCheckDataFrame1(hut.TestCase):
         """
         Compare the actual value of a df to a matching golden outcome.
         """
+        if _to_skip_on_update_outcomes():
+            return
         act = pd.DataFrame([[0, 1.01, 2], [3, 4, 5]], columns="a b c".split())
         abort_on_error = True
         err_threshold = 0.05
@@ -500,6 +559,8 @@ class TestCheckDataFrame1(hut.TestCase):
         """
         Compare the actual value of a df to a matching golden outcome.
         """
+        if _to_skip_on_update_outcomes():
+            return
         act = pd.DataFrame([[0, 1.05, 2], [3, 4, 5]], columns="a b c".split())
         abort_on_error = True
         err_threshold = 0.05
@@ -511,14 +572,11 @@ class TestCheckDataFrame1(hut.TestCase):
         self.assertTrue(file_exists)
         self.assertTrue(is_equal)
 
-    @pytest.mark.skipif(hut.get_update_tests(), reason="")
     def test_check_df_not_equal1(self) -> None:
         """
         Compare the actual value of a df to a non-matching golden outcome.
         """
-        # This test can't pass with `--update_outcomes`, since it exercises the
-        # logic in `--update_outcomes` itself.
-        if hut.get_update_tests():
+        if _to_skip_on_update_outcomes():
             return
         act = pd.DataFrame([[0, 1.06, 2], [3, 4, 5]], columns="a b c".split())
         abort_on_error = False
@@ -552,14 +610,11 @@ class TestCheckDataFrame1(hut.TestCase):
         """
         self.assert_equal(self._error_msg, exp_error_msg, fuzzy_match=True)
 
-    @pytest.mark.skipif(hut.get_update_tests(), reason="")
     def test_check_df_not_equal2(self) -> None:
         """
         Compare the actual value of a df to a not matching golden outcome.
         """
-        # This test can't pass with `--update_outcomes`, since it exercises the
-        # logic in `--update_outcomes` itself.
-        if hut.get_update_tests():
+        if _to_skip_on_update_outcomes():
             return
         act = pd.DataFrame([[0, 1, 2], [3, 4, 5]], columns="a d c".split())
         abort_on_error = False
@@ -576,6 +631,8 @@ class TestCheckDataFrame1(hut.TestCase):
         """
         Compare the actual value to a mismatching golden outcome and update it.
         """
+        if _to_skip_on_update_outcomes():
+            return
         act = pd.DataFrame([[0, 1, 2], [3, 4, 5]], columns="a b c".split())
         golden_outcome = pd.DataFrame(
             [[0, 2, 2], [3, 4, 5]], columns="a b c".split()
@@ -609,9 +666,7 @@ class TestCheckDataFrame1(hut.TestCase):
         """
         Like `test_check_df_not_equal1()` but raising the exception.
         """
-        # This test can't pass with `--update_outcomes`, since it exercises the
-        # logic in `--update_outcomes` itself.
-        if hut.get_update_tests():
+        if _to_skip_on_update_outcomes():
             return
         act = pd.DataFrame([[0, 1.06, 2], [3, 4, 5]], columns="a b c".split())
         abort_on_error = True
@@ -626,6 +681,8 @@ class TestCheckDataFrame1(hut.TestCase):
 
         This tests the code path when action_on_missing_golden="update".
         """
+        if _to_skip_on_update_outcomes():
+            return
         act = pd.DataFrame([[0, 1, 2], [3, 4, 5]], columns="a b c".split())
         # Force updating the golden outcomes.
         self.mock_update_tests()
@@ -657,6 +714,8 @@ class TestCheckDataFrame1(hut.TestCase):
         Without running with --update_outcomes, the golden outcome was missing,
         action_on_missing_golden="assert", and the unit test framework asserted.
         """
+        if _to_skip_on_update_outcomes():
+            return
         act = pd.DataFrame([[0, 1, 2], [3, 4, 5]], columns="a b c".split())
         tag = "test_df"
         _, file_name = self._get_golden_outcome_file_name(tag)
@@ -668,6 +727,7 @@ class TestCheckDataFrame1(hut.TestCase):
                 act, abort_on_error=False, action_on_missing_golden="assert"
             )
             dbg.dassert_file_exists(file_name + ".tmp")
+            new_golden = pd.read_csv(file_name + ".tmp", index_col=0)
             dbg.dassert_not_exists(file_name)
         finally:
             # Clean up.
@@ -676,13 +736,17 @@ class TestCheckDataFrame1(hut.TestCase):
         self.assertFalse(outcome_updated)
         self.assertFalse(file_exists)
         self.assertIs(is_equal, None)
+        # Check golden.
+        self.assert_equal(str(new_golden), str(act))
 
     def test_check_df_missing3(self) -> None:
-        """"
+        """
         Without running with --update_outcomes, the golden outcome was missing,
         action_on_missing_golden="update", and the unit test framework updates
         the golden.
         """
+        if _to_skip_on_update_outcomes():
+            return
         act = pd.DataFrame([[0, 1, 2], [3, 4, 5]], columns="a b c".split())
         tag = "test_df"
         _, file_name = self._get_golden_outcome_file_name(tag)
@@ -726,6 +790,23 @@ class TestCheckDataFrame1(hut.TestCase):
             golden_outcomes.to_csv(file_name)
             _git_add(file_name)
         return outcome_updated, file_exists, is_equal
+
+
+# #############################################################################
+
+
+class Test_check_string_debug1(hut.TestCase):
+    def test1(self) -> None:
+        act = "hello"
+        #action_on_missing_golden = "assert"
+        action_on_missing_golden = "update"
+        self.check_string(act, action_on_missing_golden=action_on_missing_golden)
+
+    def test2(self) -> None:
+        act = pd.DataFrame([[0, 1, 2], [3, 4, 5]], columns="a b c".split())
+        #action_on_missing_golden = "assert"
+        action_on_missing_golden = "update"
+        self.check_dataframe(act, action_on_missing_golden=action_on_missing_golden)
 
 
 # #############################################################################
@@ -893,12 +974,3 @@ class Test_get_dir_signature1(hut.TestCase):
         act = hut.get_dir_signature(in_dir, include_file_content, num_lines=None)
         act = hut.purify_txt_from_client(act)
         return act  # type: ignore[no-any-return]
-
-
-# #############################################################################
-
-
-class Test_debug1(hut.TestCase):
-    def test1(self) -> None:
-        act = "hello"
-        self.check_string(act)

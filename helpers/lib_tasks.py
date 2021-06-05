@@ -409,6 +409,7 @@ def git_clean(ctx, dry_run=False):  # type: ignore
         "__pycache__",
         "cfile",
         "tmp.*",
+        "*.tmp",
     ]
     opts = [f"-name '{opt}'" for opt in to_delete]
     opts = " -o ".join(opts)
