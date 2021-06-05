@@ -68,10 +68,10 @@ class Test_dassert1(hut.TestCase):
         """
         Common error of calling `dassert()` instead of `dassert_eq()`.
 
-        According to the user's intention the assertion should trigger,
-        but, because of using `dassert()` instead of `dassert_eq()`, the
-        assertion will not trigger. We notice that the user passed a
-        list instead of a string as `msg` and raise.
+        According to the user's intention the assertion should trigger, but, because
+        of using `dassert()` instead of `dassert_eq()`, the assertion will not
+        trigger. We notice that the user passed a list instead of a string as `msg`
+        and raise.
         """
         with self.assertRaises(AssertionError) as cm:
             y = ["world"]

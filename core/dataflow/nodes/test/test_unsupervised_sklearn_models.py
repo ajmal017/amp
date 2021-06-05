@@ -1,15 +1,12 @@
 import logging
-from typing import Tuple
 
 import pandas as pd
 import sklearn.decomposition as sdecom
 
 import core.artificial_signal_generators as casgen
-import core.config as cfg
 import core.config_builders as ccbuild
 import core.dataflow.nodes.test.helpers as cdnth
 import helpers.unit_test as hut
-from core.dataflow.core import Node
 from core.dataflow.nodes.unsupervised_sklearn_models import (
     MultiindexUnsupervisedSkLearnModel,
     Residualizer,
@@ -245,31 +242,3 @@ class TestResidualizer(hut.TestCase):
         )
         data = pd.concat([realization, volume], axis=1, keys=["ret_0", "volume"])
         return data
-
-
-def _test_get_set_state(
-    fit_df: pd.DataFrame, predict_df: pd.DataFrame, config: cfg.Config, node: Node
-) -> Tuple[str, str]:
-    """
-    Helper for testing `get_fit_state()` and `set_fit_state()` methods.
-
-    :param fit_df: dataframe used for fitting a node
-    :param predict_df: dataframe used as node input for `predict()`
-    :param config: config for initializing `node`
-    :param node: dataflow node class
-    :return: expected (generated from trained node), actual (generated from
-        node initialized from state)
-    """
-    node1 = node("sklearn", **config.to_dict())
-    # Fit model and get state.
-    node1.fit(fit_df)
-    state = node1.get_fit_state()
-    # Predict using fitted node.
-    df_out1 = node1.predict(predict_df)["df_out"]
-    expected = hut.convert_df_to_string(df_out1.round(3), index=True)
-    # Create a new node, set state, and predict.
-    node2 = node("sklearn", **config.to_dict())
-    node2.set_fit_state(state)
-    df_out2 = node2.predict(predict_df)["df_out"]
-    actual = hut.convert_df_to_string(df_out2.round(3), index=True)
-    return expected, actual

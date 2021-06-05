@@ -419,7 +419,7 @@ def git_clean(ctx, dry_run=False):  # type: ignore
     _run(ctx, cmd)
 
 
-def _delete_branches(tag: str) -> None:
+def _delete_branches(tag: str, confirm_delete: bool) -> None:
     _, txt = hsinte.system_to_string(find_cmd, abort_on_error=False)
     branches = hsinte.text_to_list(txt)
     # Print info.
@@ -462,14 +462,14 @@ def git_delete_merged_branches(ctx, confirm_delete=True):  # type: ignore
     # * AmpTask1251_Update_GH_actions_for_amp_02
     find_cmd = r"git branch --merged master | grep -v master | grep -v \*"
     delete_cmd = "git branch -d"
-    _delete_branches("local")
+    _delete_branches("local", confirm_delete)
     # Get the branches to delete.
     find_cmd = (
         "git branch -r --merged origin/master"
         + r" | grep -v master | sed 's/origin\///'"
     )
     delete_cmd = "git push origin --delete"
-    _delete_branches("remote")
+    _delete_branches("remote", confirm_delete)
     #
     cmd = "git fetch --all --prune"
     _run(ctx, cmd)
@@ -567,8 +567,11 @@ def git_create_patch(  # type: ignore
     """
     _report_task(hprint.to_str("mode modified branch last_commit files"))
     _ = ctx
+    # TODO(gp): Check that the current branch is up to date with master to avoid
+    #  failures when we try to merge the patch.
     dbg.dassert_in(mode, ("tar", "diff"))
     # For now we just create a patch for the current submodule.
+    # TODO(gp): Extend this to handle also nested repos.
     super_module = False
     git_client_root = git.get_client_root(super_module)
     hash_ = git.get_head_hash(git_client_root, short_hash=True)
