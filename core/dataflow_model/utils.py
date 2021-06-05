@@ -229,9 +229,11 @@ def get_configs_from_command_line(args: argparse.Namespace) -> List[cfg.Config]:
     return configs
 
 
-def report_failed_experiments(configs: List[cfg.Config], rcs: List[int]) -> None:
+def report_failed_experiments(configs: List[cfg.Config], rcs: List[int]) -> int:
     """
     Report failing experiments.
+
+    :return: return code
     """
     # Get the experiment idxs.
     experiment_ids = [int(config[("meta", "id")]) for config in configs]
@@ -242,8 +244,12 @@ def report_failed_experiments(configs: List[cfg.Config], rcs: List[int]) -> None
     # Report.
     if failed_experiment_ids:
         _LOG.error(
-            "There are %d failed experiments are: %s",
+            "There are %d failed experiments: %s",
             len(failed_experiment_ids),
             failed_experiment_ids,
         )
+        rc = -1
+    else:
+        rc = 0
     # TODO(gp): Save on a file the failed experiments' configs.
+    return rc

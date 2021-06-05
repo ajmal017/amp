@@ -7,7 +7,7 @@
 
 <!--te-->
 
-#
+# Definitions
 
 - An experiment in this context is simply code that is parametrized by `Config`s
   - The code contained in an experiment can be anything

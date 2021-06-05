@@ -200,7 +200,8 @@ def _main(parser: argparse.ArgumentParser) -> None:
             for config in configs
         )
     # Report failing experiments.
-    cdtfut.report_failed_experiments(configs, rcs)
+    rc = cdtfut.report_failed_experiments(configs, rcs)
+    sys.exit(rc)
 
 
 if __name__ == "__main__":
