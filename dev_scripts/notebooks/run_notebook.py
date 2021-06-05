@@ -13,7 +13,7 @@ Run a notebook given a config or a list of configs.
 import argparse
 import logging
 import os
-from typing import cast, Optional
+from typing import Optional, cast
 
 import joblib
 import tqdm
@@ -145,8 +145,9 @@ def _parse() -> argparse.ArgumentParser:
         help="Publish each notebook after it executes",
     )
     parser = prsr.add_verbosity_arg(parser)
-    cast(argparse.ArgumentParser, parser)
-    return parser
+    # TODO(gp): For some reason, not even this makes mypy happy.
+    # cast(argparse.ArgumentParser, parser)
+    return parser  # type: ignore
 
 
 # TODO(gp): Make the notebook save the config that it sees. This might
