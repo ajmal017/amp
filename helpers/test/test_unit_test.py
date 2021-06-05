@@ -15,6 +15,7 @@ from typing import Optional, Tuple
 import pandas as pd
 import pytest
 
+import helpers.dbg as dbg
 import helpers.git as git
 import helpers.io_ as hio
 import helpers.printing as hprint
@@ -25,6 +26,8 @@ _LOG = logging.getLogger(__name__)
 
 
 def _git_add(file_name: str) -> None:
+    # TODO(gp): Not sure this is needed. If not, delete the calls to this.
+    return
     cmd = "git add -u %s" % file_name
     _LOG.debug("> %s", cmd)
     rc = hsinte.system(cmd, abort_on_error=False)
@@ -264,7 +267,7 @@ completed       success Lint    Slow_tests
         # so we use a trusted function.
         self.assertEqual(act, exp)
 
-    # For debugging: don't check this enabled.
+    # For debugging: don't commit code with this test enabled.
     @pytest.mark.skip(
         reason="This is only used to debug the debugging the infrastructure"
     )
@@ -411,8 +414,7 @@ class TestCheckString1(hut.TestCase):
         _, file_name = self._get_golden_outcome_file_name(tag)
         try:
             # Remove the golden.
-            if os.path.exists(file_name):
-                hio.delete_file(file_name)
+            hio.delete_file(file_name)
             # Check.
             outcome_updated, file_exists, is_equal = self.check_string(
                 act, abort_on_error=False
@@ -420,8 +422,7 @@ class TestCheckString1(hut.TestCase):
             new_golden = hio.from_file(file_name)
         finally:
             # Clean up.
-            if os.path.exists(file_name):
-                hio.delete_file(file_name)
+            hio.delete_file(file_name)
             _git_add(file_name)
         # Actual doesn't match the golden outcome and it was updated.
         self.assertTrue(outcome_updated)
@@ -573,7 +574,7 @@ class TestCheckDataFrame1(hut.TestCase):
 
     def test_check_df_not_equal3(self) -> None:
         """
-        Compare the actual value to a mismatching golden outcome and udpate it.
+        Compare the actual value to a mismatching golden outcome and update it.
         """
         act = pd.DataFrame([[0, 1, 2], [3, 4, 5]], columns="a b c".split())
         golden_outcome = pd.DataFrame(
@@ -620,31 +621,87 @@ class TestCheckDataFrame1(hut.TestCase):
 
     def test_check_df_missing1(self) -> None:
         """
-        The golden outcome was missing and was added.
+        When running with --update_outcomes, the golden outcome was missing and so
+        it was added.
+
+        This tests the code path when action_on_missing_golden="update".
         """
         act = pd.DataFrame([[0, 1, 2], [3, 4, 5]], columns="a b c".split())
         # Force updating the golden outcomes.
         self.mock_update_tests()
         tag = "test_df"
         _, file_name = self._get_golden_outcome_file_name(tag)
+        _LOG.debug(hprint.to_str("file_name"))
         try:
             # Remove the golden.
-            if os.path.exists(file_name):
-                hio.delete_file(file_name)
+            hio.delete_file(file_name)
             # Check.
             outcome_updated, file_exists, is_equal = self.check_dataframe(
                 act, abort_on_error=False
             )
+            dbg.dassert_file_exists(file_name)
             new_golden = pd.read_csv(file_name, index_col=0)
         finally:
             # Clean up.
-            if os.path.exists(file_name):
-                hio.delete_file(file_name)
+            hio.delete_file(file_name)
             _git_add(file_name)
-        # Actual doesn't match the golden outcome and it was updated.
+        # Expected outcome doesn't exists and it was updated.
         self.assertTrue(outcome_updated)
         self.assertFalse(file_exists)
         self.assertFalse(is_equal)
+        # Check golden.
+        self.assert_equal(str(new_golden), str(act))
+
+    def test_check_df_missing2(self) -> None:
+        """
+        Without running with --update_outcomes, the golden outcome was missing,
+        action_on_missing_golden="assert", and the unit test framework asserted.
+        """
+        act = pd.DataFrame([[0, 1, 2], [3, 4, 5]], columns="a b c".split())
+        tag = "test_df"
+        _, file_name = self._get_golden_outcome_file_name(tag)
+        try:
+            # Remove the golden.
+            hio.delete_file(file_name)
+            # Check.
+            outcome_updated, file_exists, is_equal = self.check_dataframe(
+                act, abort_on_error=False, action_on_missing_golden="assert"
+            )
+            dbg.dassert_file_exists(file_name + ".tmp")
+            dbg.dassert_not_exists(file_name)
+        finally:
+            # Clean up.
+            hio.delete_file(file_name)
+        # Expected outcome doesn't exists and it was not updated.
+        self.assertFalse(outcome_updated)
+        self.assertFalse(file_exists)
+        self.assertIs(is_equal, None)
+
+    def test_check_df_missing3(self) -> None:
+        """"
+        Without running with --update_outcomes, the golden outcome was missing,
+        action_on_missing_golden="update", and the unit test framework updates
+        the golden.
+        """
+        act = pd.DataFrame([[0, 1, 2], [3, 4, 5]], columns="a b c".split())
+        tag = "test_df"
+        _, file_name = self._get_golden_outcome_file_name(tag)
+        try:
+            # Remove the golden.
+            hio.delete_file(file_name)
+            # Check.
+            outcome_updated, file_exists, is_equal = self.check_dataframe(
+                act, abort_on_error=False, action_on_missing_golden="update"
+            )
+            dbg.dassert_file_exists(file_name)
+            new_golden = pd.read_csv(file_name, index_col=0)
+        finally:
+            # Clean up.
+            hio.delete_file(file_name)
+        # Expected outcome doesn't exists and it was not updated.
+        self.assertTrue(outcome_updated)
+        self.assertFalse(file_exists)
+        self.assertIs(is_equal, None)
         # Check golden.
         self.assert_equal(str(new_golden), str(act))
 
@@ -836,3 +893,12 @@ class Test_get_dir_signature1(hut.TestCase):
         act = hut.get_dir_signature(in_dir, include_file_content, num_lines=None)
         act = hut.purify_txt_from_client(act)
         return act  # type: ignore[no-any-return]
+
+
+# #############################################################################
+
+
+class Test_debug1(hut.TestCase):
+    def test1(self) -> None:
+        act = "hello"
+        self.check_string(act)

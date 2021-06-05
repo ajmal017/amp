@@ -58,6 +58,30 @@ def _build_mock_context_returning_ok() -> invoke.MockContext:
     return ctx
 
 
+# TODO(gp): These two functions could be a mixin.
+def _check_calls(self_, ctx: invoke.MockContext) -> None:
+    """
+    `check_string()` the sequence of commands issued in the context.
+    """
+    act = "\n".join(map(str, ctx.run.mock_calls))
+    act = hprint.remove_non_printable_chars(act)
+    self_.check_string(act)
+
+
+def _check_output(self_, target: str, check: bool = True) -> None:
+    """
+    Dry run target checking that the sequence of commands issued is the
+    expected one.
+    """
+    ctx = _build_mock_context_returning_ok()
+    # pylint: disable=exec-used
+    exec(f"ltasks.{target}")
+    # pylint: enable=exec-used
+    # Check the outcome.
+    if check:
+        _check_calls(self_, ctx)
+
+
 def _gh_login() -> None:
     """
     Log in inside GitHub.
@@ -78,7 +102,7 @@ def _gh_login() -> None:
 # #############################################################################
 
 
-# TODO(gp): We should introspect lib_tasks.py and find all the functions decorated
+# TODO(gp): We should introspect `lib_tasks.py` and find all the functions decorated
 #  with `@tasks`, instead of maintaining a (incomplete) list of tasks.
 class TestDryRunTasks1(hut.TestCase):
     """
@@ -137,14 +161,15 @@ class TestDryRunTasks1(hut.TestCase):
         target = "docker_kill --all"
         self._dry_run(target)
 
-    def _dry_run(self, target: str) -> None:
+    def _dry_run(self, target: str, dry_run: bool = True) -> None:
         """
         Invoke the given target with dry run.
 
         This is used to test the commands that we can't actually
         execute.
         """
-        cmd = f"invoke --dry {target} | grep -v INFO | grep -v 'code_version='"
+        opts = "--dry" if dry_run else ""
+        cmd = f"invoke {opts} {target} | grep -v INFO | grep -v 'code_version='"
         _, act = hsinte.system_to_string(cmd)
         act = hprint.remove_non_printable_chars(act)
         self.check_string(act)
@@ -174,6 +199,10 @@ class TestDryRunTasks2(_TestClassHandlingLibTasksSingleton):
 
     def test_git_clean(self) -> None:
         target = "git_clean(ctx)"
+        self._check_output(target)
+
+    def test_git_clean2(self) -> None:
+        target = "git_clean(ctx, dry_run=False)"
         self._check_output(target)
 
     def test_docker_images_ls_repo(self) -> None:
@@ -335,29 +364,20 @@ class TestDryRunTasks2(_TestClassHandlingLibTasksSingleton):
         # Check the outcome.
         self._check_calls(ctx)
 
-    # #########################################################################
 
-    def _check_calls(self, ctx: invoke.MockContext) -> None:
-        """
-        check_string() the sequence of commands issued in the context.
-        """
-        act = "\n".join(map(str, ctx.run.mock_calls))
-        act = hprint.remove_non_printable_chars(act)
-        self.check_string(act)
+# #############################################################################
 
-    def _check_output(self, target: str, check: bool = True) -> None:
-        """
-        Dry run target checking that the sequence of commands issued is the
-        expected one.
-        """
-        ctx = _build_mock_context_returning_ok()
-        # pylint: disable=exec-used
-        exec(f"ltasks.{target}")
-        # pylint: enable=exec-used
-        # Check the outcome.
-        if check:
-            self._check_calls(ctx)
 
+class TestDryRunTasks3(_TestClassHandlingLibTasksSingleton):
+    """
+    - Call invoke tasks directly from Python
+    - Test only tasks that are non-destructive so that we can actually execute
+      them
+    """
+
+    def test_clean_dry_run1(self) -> None:
+        target = "git_clean(ctx, dry_run=True)"
+        self._check_output(target)
 
 # #############################################################################
 

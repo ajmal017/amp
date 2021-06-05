@@ -56,7 +56,7 @@ except ImportError as e:
 
 
 _LOG = logging.getLogger(__name__)
-_LOG.setLevel(logging.INFO)
+#_LOG.setLevel(logging.INFO)
 
 # #############################################################################
 
@@ -714,8 +714,8 @@ def _assert_equal(
     )
     #
     _LOG.debug("Before any transformation:")
-    _LOG.debug("act=\n'%s'", actual)
-    _LOG.debug("exp=\n'%s'", expected)
+    _LOG.debug("act='\n%s'", actual)
+    _LOG.debug("exp='\n%s'", expected)
     #
     if purify_text:
         _LOG.debug("Purifying actual")
@@ -729,8 +729,8 @@ def _assert_equal(
         expected = _fuzzy_clean(expected)
     # Check.
     _LOG.debug("The values being compared are:")
-    _LOG.debug("act=\n'%s'", actual)
-    _LOG.debug("exp=\n'%s'", expected)
+    _LOG.debug("act='\n%s'", actual)
+    _LOG.debug("exp='\n%s'", expected)
     is_equal = expected == actual
     if not is_equal:
         _LOG.error(
@@ -784,6 +784,10 @@ def _assert_equal(
 
 
 # #############################################################################
+
+# If a golden outcome is missing asserts (instead of updating golden and adding
+# it to Git repo, corresponding to "update").
+_ACTION_ON_MISSING_GOLDEN = "assert"
 
 
 class TestCase(unittest.TestCase):
@@ -970,6 +974,9 @@ class TestCase(unittest.TestCase):
         )
         return is_equal
 
+    # TODO(gp): There is a lot of similarity between `check_string()` and
+    #  `check_df_string()` that can be factored out if we extract the code that
+    #  reads and saves the golden file.
     def check_string(
         self,
         actual: str,
@@ -978,6 +985,7 @@ class TestCase(unittest.TestCase):
         use_gzip: bool = False,
         tag: str = "test",
         abort_on_error: bool = True,
+        action_on_missing_golden=_ACTION_ON_MISSING_GOLDEN,
     ) -> Tuple[bool, bool, Optional[bool]]:
         """
         Check the actual outcome of a test against the expected outcome
@@ -988,6 +996,8 @@ class TestCase(unittest.TestCase):
           `_to_single_line_cmd`)
         :param: purify_text: remove some artifacts (e.g., user names,
             directories, reference to Git client)
+        :param action_on_missing_golden: what to do (e.g., "assert" or "update" when
+            the golden outcome is missing)
         :return: outcome_updated, file_exists, is_equal
         :raises: `RuntimeError` if there is a mismatch. If `about_on_error` is False
             (which should be used only for unit testing) return the result but do not
@@ -1043,13 +1053,28 @@ class TestCase(unittest.TestCase):
                     abort_on_error=abort_on_error,
                 )
             else:
-                # No golden outcome available: save the result.
+                # No golden outcome available.
                 _LOG.warning(
-                    "Can't find golden outcome file '%s': updating it", file_name
+                    "Can't find golden outcome file '%s'", file_name
                 )
-                outcome_updated = True
-                self._check_string_update_outcome(file_name, actual, use_gzip)
-                is_equal = None
+                if action_on_missing_golden == "assert":
+                    # Save the result to a temporary file and assert.
+                    file_name += ".tmp"
+                    hio.to_file(file_name, actual, use_gzip=use_gzip)
+                    msg = ("The golden outcome doesn't exist: saved the actual "
+                        f"output in '{file_name}'")
+                    _LOG.error(msg)
+                    if not abort_on_error:
+                        dbg.dfatal(msg)
+                elif action_on_missing_golden == "update":
+                    # Create golden file and add it to the repo.
+                    _LOG.warning("Creating the golden outcome")
+                    outcome_updated = True
+                    self._check_string_update_outcome(file_name, actual, use_gzip)
+                    is_equal = None
+                else:
+                    dbg.dfatal("Invalid action_on_missing_golden=" +
+                               f"'{action_on_missing_golden}'")
         self._test_was_updated = outcome_updated
         _LOG.debug(hprint.to_str("outcome_updated file_exists is_equal"))
         return outcome_updated, file_exists, is_equal
@@ -1060,9 +1085,10 @@ class TestCase(unittest.TestCase):
         err_threshold: float = 0.05,
         tag: str = "test_df",
         abort_on_error: bool = True,
+        action_on_missing_golden=_ACTION_ON_MISSING_GOLDEN,
     ) -> Tuple[bool, bool, Optional[bool]]:
         """
-        Like check_string() but for pandas dataframes, instead of strings.
+        Like `check_string()` but for pandas dataframes, instead of strings.
 
         :return: outcome_updated, file_exists, is_equal
         :raises: RuntimeError if there is an error unless `about_on_error` is
@@ -1078,7 +1104,7 @@ class TestCase(unittest.TestCase):
         _LOG.debug(hprint.to_str("file_exists"))
         is_equal: Optional[bool] = None
         if self._update_tests:
-            _LOG.debug("Update golden outcomes")
+            _LOG.debug("# Update golden outcomes")
             # Determine whether outcome needs to be updated.
             if file_exists:
                 is_equal, _ = self._check_df_compare_outcome(
@@ -1116,10 +1142,29 @@ class TestCase(unittest.TestCase):
                         error_msg=self._error_msg,
                     )
             else:
-                # No golden outcome available: save the result.
-                outcome_updated = True
-                self._check_df_update_outcome(file_name, actual)
-                is_equal = None
+                # No golden outcome available.
+                _LOG.warning(
+                    "Can't find golden outcome file '%s'", file_name
+                )
+                if action_on_missing_golden == "assert":
+                    # Save the result to a temporary file and assert.
+                    file_name += ".tmp"
+                    hio.create_enclosing_dir(file_name)
+                    actual.to_csv(file_name)
+                    msg = ("The golden outcome doesn't exist: saved the actual "
+                           f"output in '{file_name}'")
+                    _LOG.error(msg)
+                    if abort_on_error:
+                        dbg.dfatal(msg)
+                elif action_on_missing_golden == "update":
+                    # Create golden file and add it to the repo.
+                    _LOG.warning("Creating the golden outcome")
+                    outcome_updated = True
+                    self._check_df_update_outcome(file_name, actual)
+                    is_equal = None
+                else:
+                    dbg.dfatal("Invalid action_on_missing_golden=" +
+                               f"'{action_on_missing_golden}'")
         self._test_was_updated = outcome_updated
         _LOG.debug(hprint.to_str("outcome_updated file_exists is_equal"))
         return outcome_updated, file_exists, is_equal
