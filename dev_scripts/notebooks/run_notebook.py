@@ -13,6 +13,7 @@ Run a notebook given a config or a list of configs.
 import argparse
 import logging
 import os
+import sys
 from typing import Optional, cast
 
 import joblib
