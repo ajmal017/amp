@@ -205,7 +205,7 @@ class Test_dedent1(hut.TestCase):
 
         class TestHelloWorld(hut.TestCase):
             bar
-        """
+"""
         act = hprint.dedent(txt)
         exp = """foo
 
@@ -220,8 +220,27 @@ class TestHelloWorld(hut.TestCase):
         txt1 = """foo
 
 class TestHelloWorld(hut.TestCase):
-    bar
-"""
+    bar"""
         txt2 = hprint.indent(txt1, 3)
         txt3 = hprint.dedent(txt2)
-        self.assert_equal(txt, txt3, fuzzy_match=False)
+        self.assert_equal(txt1, txt3, fuzzy_match=False)
+
+
+# ################################################################################
+
+
+class Test_align_on_left1(hut.TestCase):
+
+    def test1(self) -> None:
+        txt = """foo
+
+class TestHelloWorld(hut.TestCase):
+    bar
+"""
+        act = hprint.align_on_left(txt)
+        exp = """foo
+
+class TestHelloWorld(hut.TestCase):
+bar
+"""
+        self.assert_equal(act, exp, fuzzy_match=False)

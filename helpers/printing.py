@@ -88,6 +88,15 @@ def frame(
     return ret
 
 
+def prepend(txt: str, prefix: str) -> str:
+    """
+    Add `prefix` before each line of the string `txt`.
+    """
+    lines = [prefix + curr_line for curr_line in txt.split("\n")]
+    res = "\n".join(lines)
+    return res
+
+
 def indent(txt: str, num_spaces: int = 2) -> str:
     """
     Add `num_spaces` spaces before each line of the passed string.
@@ -100,18 +109,6 @@ def indent(txt: str, num_spaces: int = 2) -> str:
             txt_out.append("")
             continue
         txt_out.append(spaces + curr_line)
-    res = "\n".join(txt_out)
-    return res
-
-
-def align_on_left(txt: str) -> str:
-    """
-    Remove all leading/trailing spaces for each line.
-    """
-    txt_out = []
-    for curr_line in txt.split("\n"):
-        curr_line = curr_line.rstrip(" ").lstrip(" ")
-        txt_out.append(curr_line)
     res = "\n".join(txt_out)
     return res
 
@@ -131,34 +128,41 @@ def dedent(txt: str, remove_empty_leading_trailing_lines: bool = True) -> str:
     # Find the minimum number of leading spaces.
     min_num_spaces = None
     for curr_line in txt.split("\n"):
+        _LOG.debug("min_num_spaces=%s: curr_line='%s'", min_num_spaces, curr_line)
         # Skip empty lines.
         if curr_line.lstrip().rstrip() == "":
+            _LOG.debug("  -> Skipping empty line")
             continue
-        m = re.search("^(\S*)", curr_line)
+        m = re.search("^(\s*)", curr_line)
         dbg.dassert(m)
         curr_num_spaces = len(m.group(1))
+        _LOG.debug("  -> curr_num_spaces=%s", curr_num_spaces)
         if min_num_spaces is None or curr_num_spaces < min_num_spaces:
             min_num_spaces = curr_num_spaces
     _LOG.debug("min_num_spaces=%s", min_num_spaces)
     #
     txt_out = []
     for curr_line in txt.split("\n"):
+        _LOG.debug("curr_line='%s'", curr_line)
         # Skip empty lines.
-        if curr_line.lstrip().rstrip() != "":
+        if curr_line.lstrip().rstrip() == "":
             txt_out.append("")
             continue
         dbg.dassert_lte(min_num_spaces, len(curr_line))
-        txt_out.append(curr_line[:min_num_spaces])
+        txt_out.append(curr_line[min_num_spaces:])
     res = "\n".join(txt_out)
     return res
 
 
-def prepend(txt: str, prefix: str) -> str:
+def align_on_left(txt: str) -> str:
     """
-    Add `prefix` before each line of the string `txt`.
+    Remove all leading/trailing spaces for each line.
     """
-    lines = [prefix + curr_line for curr_line in txt.split("\n")]
-    res = "\n".join(lines)
+    txt_out = []
+    for curr_line in txt.split("\n"):
+        curr_line = curr_line.rstrip(" ").lstrip(" ")
+        txt_out.append(curr_line)
+    res = "\n".join(txt_out)
     return res
 
 
