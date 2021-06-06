@@ -45,7 +45,7 @@ def make_hashable(obj: Any) -> collections.abc.Hashable:
 
 
 # TODO(gp): Add unit tests.
-def intersect_configs(configs: Iterable[Config]) -> Config:
+def intersect_configs(configs: Iterable[cfg.Config]) -> cfg.Config:
     """
     Return a config formed by taking the intersection of configs.
 
@@ -76,7 +76,7 @@ def intersect_configs(configs: Iterable[Config]) -> Config:
     return intersection
 
 
-def subtract_config(minuend: Config, subtrahend: Config) -> Config:
+def subtract_config(minuend: cfg.Config, subtrahend: cfg.Config) -> cfg.Config:
     """
     Return a `Config` defined via minuend - subtrahend.
 
@@ -96,7 +96,7 @@ def subtract_config(minuend: Config, subtrahend: Config) -> Config:
 
 
 # TODO(gp): Add unit tests.
-def diff_configs(configs: Iterable[Config]) -> List[Config]:
+def diff_configs(configs: Iterable[cfg.Config]) -> List[cfg.Config]:
     """
     Diff `Config`s with respect to their common intersection.
 
@@ -115,7 +115,7 @@ def diff_configs(configs: Iterable[Config]) -> List[Config]:
 
 
 # TODO(gp): Add unit tests.
-def convert_to_series(config: Config) -> pd.Series:
+def convert_to_series(config: cfg.Config) -> pd.Series:
     """
     Convert config into a flattened series representation.
 
@@ -123,7 +123,7 @@ def convert_to_series(config: Config) -> pd.Series:
     - `str` tuple paths are joined on "."
     - Empty leaf configs are converted to an empty tuple
     """
-    dbg.dassert_isinstance(config, Config)
+    dbg.dassert_isinstance(config, cfg.Config)
     dbg.dassert(config, msg="`config` is empty")
     flat = config.flatten()
     keys: List[str] = []
@@ -131,7 +131,7 @@ def convert_to_series(config: Config) -> pd.Series:
     for k, v in flat.items():
         key = ".".join(k)
         keys.append(key)
-        if isinstance(v, Config):
+        if isinstance(v, cfg.Config):
             vals.append(tuple())
         else:
             vals.append(v)
@@ -141,7 +141,7 @@ def convert_to_series(config: Config) -> pd.Series:
 
 
 # TODO(gp): Add unit tests.
-def convert_to_dataframe(configs: Iterable[Config]) -> pd.DataFrame:
+def convert_to_dataframe(configs: Iterable[cfg.Config]) -> pd.DataFrame:
     """
     Convert multiple configs into flattened dataframe representation.
 
