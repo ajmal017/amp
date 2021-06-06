@@ -1,5 +1,4 @@
-"""
-Import as:
+""" Import as:
 
 import helpers.unit_test as hut
 """
@@ -399,11 +398,16 @@ def purify_amp_references(txt: str) -> str:
     """
     Remove references to amp.
     """
+    # E.g., `amp/helpers/test/...`
     txt = re.sub(r"^\s*amp\/", "", txt, flags=re.MULTILINE)
+    # E.g., `['amp/helpers/test/...`
+    txt = re.sub(r"'amp\/", "'", txt, flags=re.MULTILINE)
     txt = re.sub(r"\/amp\/", "/", txt, flags=re.MULTILINE)
-    txt = re.sub(r"\s*amp\/", "", txt, flags=re.MULTILINE)
+    # E.g., `vimdiff helpers/test/...`
+    txt = re.sub(r"\s+amp\/", " ", txt, flags=re.MULTILINE)
     txt = re.sub(r"\/amp:", ":", txt, flags=re.MULTILINE)
     txt = re.sub(r"^\./", "", txt, flags=re.MULTILINE)
+    _LOG.debug("After purify_amp_references: txt='\n%s'", txt)
     return txt
 
 
