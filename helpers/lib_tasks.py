@@ -257,10 +257,12 @@ def _get_files_to_process(
     # Convert into a list.
     dbg.dassert_isinstance(files, list)
     files_to_process = [f for f in files if f != ""]
+    # We need to remove `amp` to avoid copying the entire tree.
+    files_to_process = [f for f in files_to_process if f != "amp"]
     _LOG.debug("files_to_process='%s'", str(files_to_process))
     # Remove dirs, if needed.
     if remove_dirs:
-        hsinte.remove_dirs(files_to_process)
+        files_to_process = hsinte.remove_dirs(files_to_process)
     _LOG.debug("files_to_process='%s'", str(files_to_process))
     # Ensure that there are files to process.
     if not files_to_process:
