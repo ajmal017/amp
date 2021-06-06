@@ -10,10 +10,15 @@ import core.dataflow_model.utils as cdtfut
 # TODO(gp): experiment_utils.py
 
 import argparse
+import collections
+import glob
 import logging
 import os
+import re
 import sys
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Iterable, Optional, Tuple
+
+import pandas as pd
 
 import core.config as cfg
 import core.config_builders as cfgb
@@ -236,9 +241,9 @@ def report_failed_experiments(configs: List[cfg.Config], rcs: List[int]) -> int:
 
     :return: return code
     """
-    # Get the experiment idxs.
+    # Get the experiment selected_idxs.
     experiment_ids = [int(config[("meta", "id")]) for config in configs]
-    # Match experiment idxs with their return codes.
+    # Match experiment selected_idxs with their return codes.
     failed_experiment_ids = [
         i for i, rc in zip(experiment_ids, rcs) if rc is not None and rc != 0
     ]
@@ -259,7 +264,7 @@ def report_failed_experiments(configs: List[cfg.Config], rcs: List[int]) -> int:
 # ########################################################################
 
 
-def save_result_bundle(config: cfg.Config, result_bundle: dtg.ResultBundle) -> None:
+def save_experiment_result_bundle(config: cfg.Config, result_bundle: dtg.ResultBundle) -> None:
     """
     Save the `ResultBundle` from running `Config`.
     """
@@ -268,20 +273,22 @@ def save_result_bundle(config: cfg.Config, result_bundle: dtg.ResultBundle) -> N
     )
     # TODO(gp): This should be a method of `ResultBundle`.
     obj = result_bundle.to_config().to_dict()
-    hpickl.to_pickle(obj, path)
+    hpickle.to_pickle(obj, path)
 
 
 # TODO(gp): dst_dir -> src_dir
 # TODO(gp): We might want also to compare to the original experiments Configs.
-def load_experiment_result_bundles(
-    dst_dir: str, file_name: str, idxs: Optional[Iterable[int]] = None
+def load_experiment_artifacts(
+    dst_dir: str, file_name: str, selected_idxs: Optional[Iterable[int]] = None
 ) -> Dict[int, Any]:
     """
     Load according to `file_name` extension.
 
     Assumes subdirectories withing `dst_dir` have the following structure:
-        > /dst_dir/{$RESULT_DIR_NAME}_%i/file_name
-    Here `%i` denotes an integer encoded in the subdirectory name.
+    ```
+    {dst_dir}/result_{idx}/{file_name}
+    ```
+    where `idx` denotes an integer encoded in the subdirectory name.
 
     The function returns the contents of the files, indexed by the integer
     extracted from the subdirectory index name.
@@ -291,54 +298,55 @@ def load_experiment_result_bundles(
         and `run_notebook.py`
     :param file_name: the file name within each run results subdirectory to load
         E.g., `result_bundle.pkl`
-    :param idxs: specific experiment indices to load
+    :param selected_idxs: specific experiment indices to load
         - `None` (default) loads all available indices
     """
+    _LOG.info("# Load artifacts '%s' from '%s'", file_name, dst_dir)
     # Retrieve all the subdirectories in `dst_dir`.
-    p = pathlib.Path(dst_dir)
-    subdirs = [f for f in p.iterdir() if f.is_dir()]
-    # Order experiment subdirs by number of experiment.
-    subdirs_num = {}
-    keys = []
+    subdirs = [d for d in glob.glob(f"{dst_dir}/result_*") if os.path.isdir(d)]
+    _LOG.info("Found %d experiment subdirs in '%s'", len(subdirs), dst_dir)
+    # Build a mapping from "config_idx" to "experiment_dir".
+    config_idx_to_dir = {}
     for subdir in subdirs:
+        _LOG.debug("subdir='%s'", subdir)
         # E.g., `result_123"
-        key = int(subdir.parts[-1].split("_")[-1])
-        subdirs_num[key] = subdir
-        keys.append(key)
-    # Ensure there are no duplicate integer keys (e.g., due to an inconsistent
-    # subdirectory naming scheme).
-    dbg.dassert_no_duplicates(
-        keys, "Duplicate keys detected! Check subdirectory names."
-    )
-    # Specify indices of files to load.
-    if idxs is None:
-        iter_keys = sorted(keys)
+        m = re.match("^result_(\d+)$", os.path.basename(subdir))
+        dbg.dassert(m)
+        key = int(m.group(1))
+        dbg.dassert_not_in(key, config_idx_to_dir)
+        config_idx_to_dir[key] = subdir
+    # Specify the indices of files to load.
+    config_idxs = config_idx_to_dir.keys()
+    if selected_idxs is None:
+        selected_keys = sorted(config_idxs)
     else:
-        idxs_l = set(idxs)
-        dbg.dassert_is_subset(idxs_l, set(keys))
-        iter_keys = [key for key in sorted(keys) if key in idxs_l]
-    # Iterate over experiment subdirs.
+        idxs_l = set(selected_idxs)
+        dbg.dassert_is_subset(idxs_l, set(config_idxs))
+        selected_keys = [key for key in sorted(config_idxs) if key in idxs_l]
+    # Iterate over experiment directories.
     results = collections.OrderedDict()
-    for key in tqdm(iter_keys):
-        subdir = subdirs_num[key]
-        path_to_file = os.path.join(dst_dir, subdir, file_name)
-        if not os.path.exists(path_to_file):
-            _LOG.warning("File `%s` does not exist.", path_to_file)
+    for key in selected_keys:
+        subdir = config_idx_to_dir[key]
+        dbg.dassert_dir_exists(subdir)
+        file_name_tmp = os.path.join(dst_dir, subdir, file_name)
+        _LOG.info("Loading '%s'", file_name_tmp)
+        if not os.path.exists(file_name_tmp):
+            _LOG.warning("Can't find '{file_name_tmp}': skipping")
             continue
-        # Load pickle files.
-        if file_name.endswith(".pkl"):
-            res = hpickl.from_pickle(
-                path_to_file, log_level=logging.DEBUG, verbose=False
+        if file_name_tmp.endswith(".pkl"):
+            # Load pickle files.
+            res = hpickle.from_pickle(
+                file_name_tmp, log_level=logging.DEBUG, verbose=False
             )
-        # Load json files.
-        elif file_name.endswith(".json"):
-            with open(path_to_file, "r") as file:
+        elif file_name_tmp.endswith(".json"):
+            # Load JSON files.
+            with open(file_name_tmp, "r") as file:
                 res = json.load(file)
-        # Load txt files.
-        elif file_name.endswith(".txt"):
-            res = hio.from_file(path_to_file)
+        elif file_name_tmp.endswith(".txt"):
+            # Load txt files.
+            res = hio.from_file(file_name_tmp)
         else:
-            raise ValueError(f"Unsupported file type='{file_name}'")
+            raise ValueError(f"Unsupported file type='{file_name_tmp}'")
         results[key] = res
     return results
 
