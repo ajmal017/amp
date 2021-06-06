@@ -42,8 +42,8 @@ class Config:
         ] = None,
     ) -> None:
         """
-        :param array: array of (key, value), where value can be a Python
-            type or a `Config` in case of a nested config.
+        :param array: array of (key, value), where value can be a Python type or a
+            `Config` in case of a nested config.
         """
         # pylint: disable=unsubscriptable-object
         # TODO(gp): MutableMapping instead of disabling the lint?
@@ -58,8 +58,8 @@ class Config:
         """
         Set/update `key` to `val`.
 
-        If `key` is an iterable of keys, then the key hierarchy is
-        navigated/created and the leaf value added/updated with `val`.
+        If `key` is an iterable of keys, then the key hierarchy is navigated/created
+        and the leaf value added/updated with `val`.
         """
         if intr.is_iterable(key):
             head_key, tail_key = key[0], key[1:]  # type: ignore
@@ -88,10 +88,9 @@ class Config:
         """
         Get value for `key` or assert, if it doesn't exist.
 
-        If `key` is an iterable of keys (e.g., `("read_data",
-        "file_name")`, then the hierarchy is navigated until the
-        corresponding element is found or we assert if the element
-        doesn't exist.
+        If `key` is an iterable of keys (e.g., `("read_data", "file_name")`, then
+        the hierarchy is navigated until the corresponding element is found or we
+        assert if the element doesn't exist.
         """
         if intr.is_iterable(key):
             head_key, tail_key = key[0], key[1:]  # type: ignore
@@ -149,8 +148,8 @@ class Config:
         """
         Return len of underlying dict.
 
-        This enables calculating `len()` as with a dict and also enables
-        bool evaluation of a `Config` object for truth value testing.
+        This enables calculating `len()` as with a dict and also enables bool
+        evaluation of a `Config` object for truth value testing.
         """
         return len(self._config)
 
@@ -177,8 +176,8 @@ class Config:
         """
         Equivalent to `dict.get(key, default_val)`.
 
-        It has the same functionality as `__getitem__` but returning
-        `val` if the value corresponding to `key` doesn't exist.
+        It has the same functionality as `__getitem__` but returning `val` if the
+        value corresponding to `key` doesn't exist.
         """
         try:
             ret = self.__getitem__(key)
@@ -229,8 +228,7 @@ class Config:
         """
         Convert the Config to nested ordered dicts.
 
-        In other words, it replaces the `Config` class with simple
-        ordered dicts.
+        In other words, it replaces the `Config` class with simple ordered dicts.
         """
         # pylint: disable=unsubscriptable-object
         dict_: collections.OrderedDict[str, Any] = collections.OrderedDict()
@@ -251,8 +249,7 @@ class Config:
 
     def check_params(self, keys: Iterable[str]) -> None:
         """
-        Check whether all the `keys` are present in the object, otherwise
-        raise.
+        Check whether all the `keys` are present in the object, otherwise raise.
         """
         missing_keys = []
         for key in keys:

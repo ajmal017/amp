@@ -17,6 +17,7 @@ from typing import List, Optional, Tuple
 
 import core.config as cfg
 import core.config_builders as cfgb
+import core.dataflow as dtg
 import helpers.dbg as dbg
 import helpers.io_ as io_
 import helpers.pickle_ as hpickle
@@ -253,3 +254,116 @@ def report_failed_experiments(configs: List[cfg.Config], rcs: List[int]) -> int:
         rc = 0
     # TODO(gp): Save on a file the failed experiments' configs.
     return rc
+
+
+# ########################################################################
+
+
+def save_result_bundle(config: cfg.Config, result_bundle: dtg.ResultBundle) -> None:
+    """
+    Save the `ResultBundle` from running `Config`.
+    """
+    path = os.path.join(
+        config["meta", "experiment_result_dir"], "result_bundle.pkl"
+    )
+    # TODO(gp): This should be a method of `ResultBundle`.
+    obj = result_bundle.to_config().to_dict()
+    hpickl.to_pickle(obj, path)
+
+
+# TODO(gp): dst_dir -> src_dir
+# TODO(gp): We might want also to compare to the original experiments Configs.
+def load_experiment_result_bundles(
+    dst_dir: str, file_name: str, idxs: Optional[Iterable[int]] = None
+) -> Dict[int, Any]:
+    """
+    Load according to `file_name` extension.
+
+    Assumes subdirectories withing `dst_dir` have the following structure:
+        > /dst_dir/{$RESULT_DIR_NAME}_%i/file_name
+    Here `%i` denotes an integer encoded in the subdirectory name.
+
+    The function returns the contents of the files, indexed by the integer
+    extracted from the subdirectory index name.
+
+    :param dst_dir: directory containing subdirectories of experiment results
+        It is the directory that was specified as `--dst_dir` in `run_experiment.py`
+        and `run_notebook.py`
+    :param file_name: the file name within each run results subdirectory to load
+        E.g., `result_bundle.pkl`
+    :param idxs: specific experiment indices to load
+        - `None` (default) loads all available indices
+    """
+    # Retrieve all the subdirectories in `dst_dir`.
+    p = pathlib.Path(dst_dir)
+    subdirs = [f for f in p.iterdir() if f.is_dir()]
+    # Order experiment subdirs by number of experiment.
+    subdirs_num = {}
+    keys = []
+    for subdir in subdirs:
+        # E.g., `result_123"
+        key = int(subdir.parts[-1].split("_")[-1])
+        subdirs_num[key] = subdir
+        keys.append(key)
+    # Ensure there are no duplicate integer keys (e.g., due to an inconsistent
+    # subdirectory naming scheme).
+    dbg.dassert_no_duplicates(
+        keys, "Duplicate keys detected! Check subdirectory names."
+    )
+    # Specify indices of files to load.
+    if idxs is None:
+        iter_keys = sorted(keys)
+    else:
+        idxs_l = set(idxs)
+        dbg.dassert_is_subset(idxs_l, set(keys))
+        iter_keys = [key for key in sorted(keys) if key in idxs_l]
+    # Iterate over experiment subdirs.
+    results = collections.OrderedDict()
+    for key in tqdm(iter_keys):
+        subdir = subdirs_num[key]
+        path_to_file = os.path.join(dst_dir, subdir, file_name)
+        if not os.path.exists(path_to_file):
+            _LOG.warning("File `%s` does not exist.", path_to_file)
+            continue
+        # Load pickle files.
+        if file_name.endswith(".pkl"):
+            res = hpickl.from_pickle(
+                path_to_file, log_level=logging.DEBUG, verbose=False
+            )
+        # Load json files.
+        elif file_name.endswith(".json"):
+            with open(path_to_file, "r") as file:
+                res = json.load(file)
+        # Load txt files.
+        elif file_name.endswith(".txt"):
+            res = hio.from_file(path_to_file)
+        else:
+            raise ValueError(f"Unsupported file type='{file_name}'")
+        results[key] = res
+    return results
+
+
+def get_config_diffs(
+        config_dict: collections.OrderedDict, tag_col: Optional[str] = None
+) -> pd.DataFrame:
+    """
+    Create a dataframe of config diffs.
+
+    :param config_dict: dictionary of configs
+    :param tag_col: name of the tag col. If tags are the same for all configs
+        and `tag_col` is not None, add tags to config diffs dataframe
+    :return: config diffs dataframe
+    """
+    diffs = cconfi.diff_configs(config_dict.values())
+    non_empty_diffs = [diff for diff in diffs if len(diff) > 1]
+    if non_empty_diffs:
+        config_diffs = cconfi.convert_to_dataframe(diffs).dropna(
+            how="all", axis=1
+        )
+    else:
+        config_diffs = pd.DataFrame(index=range(len(diffs)))
+    # If tags are the same, still add them to `config_diffs`.
+    if tag_col is not None and tag_col not in config_diffs.columns:
+        tags = [config[tag_col] for config in config_dict.values()]
+        config_diffs[tag_col] = tags
+    return config_diffs

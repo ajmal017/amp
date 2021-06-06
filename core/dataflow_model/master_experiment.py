@@ -4,11 +4,14 @@ import os
 import core.config as cfg
 import core.config_builders as cfgb
 import core.dataflow as cdataf
+import core.dataflow_model.utils as cdtfut
 import helpers.pickle_ as hpickl
 
 _LOG = logging.getLogger(__name__)
 
 
+# TODO(gp): We could return a `ResultBundle` and have `run_experiment_stub.py`
+#  save it.
 def run_experiment(config: cfg.Config) -> None:
     """
     Implement the master experiment to:
@@ -51,11 +54,13 @@ def run_experiment(config: cfg.Config) -> None:
 
     result_bundle.payload = payload
 
-    # TODO(gp): We could pass the payload back and let _run_experiment take
-    # care of that.
-    # TODO(gp): Make sure that the meta part has the right info. E.g.,
-    # dbg.dassert_
-    path = os.path.join(
-        config["meta", "experiment_result_dir"], "result_bundle.pkl"
-    )
-    hpickl.to_pickle(result_bundle.to_config().to_dict(), path)
+    # # TODO(gp): We could pass the payload back and let _run_experiment take
+    # # care of that.
+    # # TODO(gp): Make sure that the meta part has the right info. E.g.,
+    # # dbg.dassert_
+    # path = os.path.join(
+    #     config["meta", "experiment_result_dir"], "result_bundle.pkl"
+    # )
+    # hpickl.to_pickle(result_bundle.to_config().to_dict(), path)
+
+    cdtfut.save_result_bundle(result_bundle)
