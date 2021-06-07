@@ -69,7 +69,7 @@ def get_config_from_nested_dict(nested: Dict[str, Any]) -> cfg.Config:
     dbg.dassert(nested)
     iter_ = dct.get_nested_dict_iterator(nested)
     flattened = collections.OrderedDict(iter_)
-    return get_config_from_flattened(flattened)
+    return get_config_from_flattened_dict(flattened)
 
 
 # ################################################################################
@@ -112,7 +112,7 @@ def intersect_configs(configs: Iterable[cfg.Config]) -> cfg.Config:
     intersection_of_flattened = set.intersection(*sets)
     # Create intersection.
     # Rely on the fact that Config keys are of type `str`.
-    intersection = Config()
+    intersection = cfg.Config()
     for k, v in reference_config.items():
         if (k, make_hashable(v)) in intersection_of_flattened:
             intersection[k] = v
@@ -123,7 +123,7 @@ def subtract_config(minuend: cfg.Config, subtrahend: cfg.Config) -> cfg.Config:
     """
     Return a `Config` defined via minuend - subtrahend.
 
-    :return: return a `Config` with path, val pairs in `minuend` that are not in
+    :return: return a `Config` with (path, val pairs) in `minuend` that are not in
         `subtrahend` (like a set difference). Equivalently, return a `Config`-like
         `minuend` but with the intersection of `minuend` and `subtrahend`
         removed.
@@ -138,23 +138,27 @@ def subtract_config(minuend: cfg.Config, subtrahend: cfg.Config) -> cfg.Config:
     return diff
 
 
-# TODO(gp): Add unit tests.
 def diff_configs(configs: Iterable[cfg.Config]) -> List[cfg.Config]:
     """
     Diff `Config`s with respect to their common intersection.
 
     :return: for each config `config` in `configs`, return a new `Config` consisting
-        of the part of `config` not in the intersection of the configs in `configs`
+        of the part of `config` not in the intersection of the configs
     """
-    # Convert `configs` to a list for convenience.
+    # Convert the configs to a list for convenience.
     configs = list(configs)
+    # Find the intersection of all the configs.
     intersection = intersect_configs(configs)
+    # For each config, compute the diff between the config and the intersection.
     config_diffs = []
     for config in configs:
         config_diff = subtract_config(config, intersection)
         config_diffs.append(config_diff)
     dbg.dassert_eq(len(config_diffs), len(configs))
     return config_diffs
+
+
+# # #############################################################################
 
 
 # TODO(gp): Add unit tests.
