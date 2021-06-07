@@ -161,10 +161,9 @@ def diff_configs(configs: Iterable[cfg.Config]) -> List[cfg.Config]:
 # # #############################################################################
 
 
-# TODO(gp): Add unit tests.
 def convert_to_series(config: cfg.Config) -> pd.Series:
     """
-    Convert config into a flattened series representation.
+    Convert a config into a flattened series representation.
 
     - This is lossy but useful for comparing multiple configs
     - `str` tuple paths are joined on "."
@@ -187,7 +186,6 @@ def convert_to_series(config: cfg.Config) -> pd.Series:
     return srs
 
 
-# TODO(gp): Add unit tests.
 def convert_to_dataframe(configs: Iterable[cfg.Config]) -> pd.DataFrame:
     """
     Convert multiple configs into flattened dataframe representation.
@@ -278,40 +276,40 @@ def convert_to_dataframe(configs: Iterable[cfg.Config]) -> pd.DataFrame:
 #     return config_difference
 
 
-# TODO(*): Deprecate. Switch to `cfg.convert_to_dataframe()`.
-# > jackpy get_configs_dataframe
-# amp/core/test/test_config_builders.py:275:    `cfgb.get_configs_dataframe` using `pd.DataFrame.equals()`
-# amp/core/test/test_config_builders.py:286:        actual_result = cfgb.get_configs_dataframe([config_1, config_2])
-# amp/core/test/test_config_builders.py:309:        actual_result = cfgb.get_configs_dataframe(
-# amp/core/test/test_config_builders.py:326:        actual_result = cfgb.get_configs_dataframe(
-# amp/core/config_builders.py:233:def get_configs_dataframe(
-def get_configs_dataframe(
-        configs: List[cfg.Config],
-        params_subset: Optional[Union[str, List[str]]] = None,
-) -> pd.DataFrame:
-    """
-    Convert the configs into a df with full nested names.
-
-    The column names should correspond to `subconfig1.subconfig2.parameter`
-    format, e.g.: `build_targets.target_asset`.
-
-    :param configs: Configs used to run experiments. TODO(*): What experiments?
-    :param params_subset: Parameters to include as table columns.
-    :return: Table of configs.
-    """
-    # Convert configs to flattened dicts.
-    flattened_configs = _flatten_configs(configs)
-    # Convert dicts to pd.Series and create a df.
-    config_df = map(pd.Series, flattened_configs)
-    config_df = pd.concat(config_df, axis=1).T
-    # Process the config_df by keeping only a subset of keys.
-    if params_subset is not None:
-        if params_subset == "difference":
-            config_difference = get_config_difference(configs)
-            params_subset = list(config_difference.keys())
-        # Filter config_df for the desired columns.
-        dbg.dassert_is_subset(params_subset, config_df.columns)
-        config_df = config_df[params_subset]
-    return config_df
-
-
+# # TODO(*): Deprecate. Switch to `cfg.convert_to_dataframe()`.
+# # > jackpy get_configs_dataframe
+# # amp/core/test/test_config_builders.py:275:    `cfgb.get_configs_dataframe` using `pd.DataFrame.equals()`
+# # amp/core/test/test_config_builders.py:286:        actual_result = cfgb.get_configs_dataframe([config_1, config_2])
+# # amp/core/test/test_config_builders.py:309:        actual_result = cfgb.get_configs_dataframe(
+# # amp/core/test/test_config_builders.py:326:        actual_result = cfgb.get_configs_dataframe(
+# # amp/core/config_builders.py:233:def get_configs_dataframe(
+# def get_configs_dataframe(
+#         configs: List[cfg.Config],
+#         params_subset: Optional[Union[str, List[str]]] = None,
+# ) -> pd.DataFrame:
+#     """
+#     Convert the configs into a df with full nested names.
+#
+#     The column names should correspond to `subconfig1.subconfig2.parameter`
+#     format, e.g.: `build_targets.target_asset`.
+#
+#     :param configs: Configs used to run experiments. TODO(*): What experiments?
+#     :param params_subset: Parameters to include as table columns.
+#     :return: Table of configs.
+#     """
+#     # Convert configs to flattened dicts.
+#     flattened_configs = _flatten_configs(configs)
+#     # Convert dicts to pd.Series and create a df.
+#     config_df = map(pd.Series, flattened_configs)
+#     config_df = pd.concat(config_df, axis=1).T
+#     # Process the config_df by keeping only a subset of keys.
+#     if params_subset is not None:
+#         if params_subset == "difference":
+#             config_difference = get_config_difference(configs)
+#             params_subset = list(config_difference.keys())
+#         # Filter config_df for the desired columns.
+#         dbg.dassert_is_subset(params_subset, config_df.columns)
+#         config_df = config_df[params_subset]
+#     return config_df
+#
+#

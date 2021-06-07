@@ -32,7 +32,7 @@ def _get_test_config2() -> cfg.Config:
     asset.
     """
     config = _get_test_config1().copy()
-    config["target_asset"] = "Gold"
+    config[("build_targets", "target_asset")] = "Gold"
     return config
 
 
@@ -132,9 +132,6 @@ class Test_get_config_from_flattened_dict1(hut.TestCase):
 
 
 class Test_get_config_from_nested_dict1(hut.TestCase):
-    """
-    Test `get_config_from_nested_dict()`.
-    """
 
     def test1(self) -> None:
         nested = {
@@ -157,8 +154,8 @@ class Test_get_config_from_nested_dict1(hut.TestCase):
         single_val: hello
         zscore:
           style: gaz
-          com: 28
-        """.lstrip().rstrip()
+          com: 28"""
+        exp = hprint.dedent(exp)
         self.assert_equal(act, exp, fuzzy_match=False)
 
     def test2(self) -> None:
@@ -178,7 +175,8 @@ class Test_get_config_from_nested_dict1(hut.TestCase):
           nrows: 999
         single_val: hello
         zscore:
-        """.lstrip().rstrip()
+        """
+        exp = hprint.dedent(exp)
         self.assert_equal(act, exp, fuzzy_match=False)
 
 
@@ -213,8 +211,8 @@ class Test_intersect_configs1(hut.TestCase):
           preprocessing:
             preprocessor: tokenizer
         meta:
-          experiment_result_dir: results.pkl
-        """.lstrip().rstrip()
+          experiment_result_dir: results.pkl"""
+        exp = hprint.dedent(exp)
         self.assert_equal(act, exp, fuzzy_match=False)
 
 
@@ -240,11 +238,14 @@ class Test_subtract_configs1(hut.TestCase):
         config1 = _get_test_config1()
         config2 = _get_test_config2()
         act = cfgut.subtract_config(config1, config2)
-        # ??????
-        exp = {
-            "build_targets.target_asset": ["Crude Oil", "Gold"]
-        }
+        exp = """
+        build_targets:
+          target_asset: Crude Oil"""
+        exp = hprint.dedent(exp)
         self.assert_equal(str(act), str(exp))
+
+
+# ################################################################################
 
 
 class Test_diff_configs1(hut.TestCase):
@@ -277,17 +278,24 @@ class Test_diff_configs1(hut.TestCase):
         build_model:
           activation: sigmoid
         build_targets:
-          target_asset: Crude Oil
+          target_asset: Gold
           preprocessing:
             preprocessor: tokenizer
         meta:
-          experiment_result_dir: results.pkl
-        target_asset: Gold"""
+          experiment_result_dir: results.pkl"""
         exp = hprint.dedent(exp)
         self.assert_equal(str(config2), exp)
         #
         act = cfgut.diff_configs([config1, config2])
-        exp = [cfg.Config(), cfgut.get_config_from_nested_dict({"target_asset": "Gold"})]
+        exp = [
+            #
+            cfgut.get_config_from_nested_dict(
+            {"build_targets":
+            {"target_asset": "Crude Oil"}}),
+            #
+               cfgut.get_config_from_nested_dict(
+                   {"build_targets":
+                   {"target_asset": "Gold"}})]
         self.assert_equal(str(act), str(exp))
 
     def test2(self) -> None:
@@ -296,75 +304,51 @@ class Test_diff_configs1(hut.TestCase):
         config3 = _get_test_config3()
         #
         act = cfgut.diff_configs([config1, config2, config3])
-        exp = [cfg.Config(),
-               cfgut.get_config_from_nested_dict({"target_asset": "Gold"}),
-               cfgut.get_config_from_nested_dict({"hello": "world"})]
+        act = "\n".join(map(str, act))
+        #
+        exp = [
+            #
+            cfgut.get_config_from_nested_dict(
+            {"build_targets":
+                 {"target_asset": "Crude Oil"}}),
+            #
+            cfgut.get_config_from_nested_dict(
+                {"build_targets":
+                     {"target_asset": "Gold"}}),
+            #
+            cfgut.get_config_from_nested_dict(
+                {"build_targets":
+                     {"target_asset": "Crude Oil"},
+                 "hello": "world"})]
+        exp = "\n".join(map(str, exp))
         self.assert_equal(str(act), str(exp))
 
 
-# # ################################################################################
-#
-#
-# # TODO(gp): Test_get_configs_dataframe1
-# class TestGetConfigDataframe(hut.TestCase):
-#     """
-#     Compare manually constructed dfs and dfs created by
-#     `cfgut.get_configs_dataframe` using `pd.DataFrame.equals()`
-#     """
-#
-#     def test_all_params(self) -> None:
-#         """
-#         Compute and verify dataframe with all config parameters.
-#         """
-#         # Get two test configs.
-#         config1 = _get_test_config1()
-#         config2 = _get_test_config2()
-#         # Convert configs to dataframe.
-#         actual_result = cfgut.get_configs_dataframe([config1, config2])
-#         # Create expected dataframe and one with function.
-#         expected_result = pd.DataFrame(
-#             {
-#                 "build_model.activation": ["sigmoid", "sigmoid"],
-#                 "build_targets.target_asset": ["Crude Oil", "Gold"],
-#                 "build_targets.preprocessing.preprocessor": [
-#                     "tokenizer",
-#                     "tokenizer",
-#                 ],
-#                 "meta.experiment_result_dir": ["results.pkl", "results.pkl"],
-#             }
-#         )
-#         self.assertTrue(expected_result.equals(actual_result))
-#
-#     def test_different_params_subset(self) -> None:
-#         """
-#         Compute and verify dataframe with all only varying config parameters.
-#         """
-#         # Get two test configs.
-#         config1 = _get_test_config1()
-#         config2 = _get_test_config2()
-#         # Convert configs to df, keeping only varying params.
-#         actual_result = cfgut.get_configs_dataframe(
-#             [config1, config2], params_subset="difference"
-#         )
-#         # Create expected dataframe and one with function.
-#         expected_result = pd.DataFrame(
-#             {"build_targets.target_asset": ["Crude Oil", "Gold"]}
-#         )
-#         self.assertTrue(expected_result.equals(actual_result))
-#
-#     def test_custom_params_subset(self) -> None:
-#         """
-#         Compute and verify dataframe with arbitrary config parameters.
-#         """
-#         # Get two test configs.
-#         config1 = _get_test_config1()
-#         config2 = _get_test_config2()
-#         # Convert configs to df, keeping arbitrary parameter.
-#         actual_result = cfgut.get_configs_dataframe(
-#             [config1, config2], params_subset=["build_model.activation"]
-#         )
-#         # Create expected dataframe and one with function.
-#         expected_result = pd.DataFrame(
-#             {"build_model.activation": ["sigmoid", "sigmoid"]}
-#         )
-#         self.assertTrue(expected_result.equals(actual_result))
+# ################################################################################
+
+
+class Test_convert_to_dataframe1(hut.TestCase):
+
+    def test1(self) -> None:
+        """
+        Compute and verify dataframe with all config parameters.
+        """
+        config1 = _get_test_config1()
+        config2 = _get_test_config2()
+        # Convert configs to dataframe.
+        act = cfgut.convert_to_dataframe([config1, config2])
+        act = hut.convert_df_to_string(act, index=True)
+        #
+        exp = pd.DataFrame(
+            {
+                "build_model.activation": ["sigmoid", "sigmoid"],
+                "build_targets.target_asset": ["Crude Oil", "Gold"],
+                "build_targets.preprocessing.preprocessor": [
+                    "tokenizer",
+                    "tokenizer",
+                ],
+                "meta.experiment_result_dir": ["results.pkl", "results.pkl"],
+            }
+        )
+        exp = hut.convert_df_to_string(exp, index=True)
+        self.assert_equal(str(act), str(exp))
