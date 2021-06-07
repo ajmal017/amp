@@ -1,8 +1,5 @@
-import collections
 import pprint
 from typing import List, Optional, cast
-
-import pandas as pd
 
 import core.config as cfg
 import core.config_builders as cfgb
@@ -96,7 +93,7 @@ def _get_test_config_2() -> cfg.Config:
     return config
 
 
-# ################################################################################
+# #############################################################################
 
 
 # TODO(gp): -> Test_generate_default_config_variants1
@@ -124,7 +121,8 @@ class TestGenerateDefaultConfigVariants(hut.TestCase):
         # Compare config lists element-wise.
         self.assertEqual(expected_configs, actual_configs)
 
-# ################################################################################
+
+# #############################################################################
 
 
 # TODO(gp): -> Test_build_multiple_configs1
@@ -178,6 +176,3 @@ class TestBuildMultipleConfigs(hut.TestCase):
         # Check the results.
         with self.assertRaises(ValueError):
             _ = cfgb.build_multiple_configs(config_template, params_variants)
-
-
-

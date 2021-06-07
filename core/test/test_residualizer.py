@@ -22,7 +22,8 @@ class TestPcaFactorComputer1(hut.TestCase):
     def get_ex1() -> Tuple[
         pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame
     ]:
-        df_str = pri.dedent("""
+        df_str = pri.dedent(
+            """
         ,0,1,2
         0,0.68637724274453,0.34344509725064354,0.6410395820984168
         1,-0.7208890365507423,0.205021903910637,0.6620309780499695

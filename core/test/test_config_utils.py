@@ -1,6 +1,4 @@
 import collections
-import pprint
-from typing import List, Optional, cast
 
 import pandas as pd
 
@@ -28,8 +26,8 @@ def _get_test_config1() -> cfg.Config:
 
 def _get_test_config2() -> cfg.Config:
     """
-    Same as `_get_test_config1()` but with "Gold" instead of "Crude Oil" for target
-    asset.
+    Same as `_get_test_config1()` but with "Gold" instead of "Crude Oil" for
+    target asset.
     """
     config = _get_test_config1().copy()
     config[("build_targets", "target_asset")] = "Gold"
@@ -45,10 +43,10 @@ def _get_test_config3() -> cfg.Config:
     return config
 
 
-# ################################################################################
+# #############################################################################
+
 
 class Test_validate_configs1(hut.TestCase):
-
     def test_check_same_configs_error(self) -> None:
         """
         Verify that an error is raised when duplicated configs are encountered.
@@ -77,11 +75,10 @@ class Test_validate_configs1(hut.TestCase):
         cfgut.validate_configs(configs)
 
 
-# ################################################################################
+# #############################################################################
 
 
 class Test_get_config_from_flattened_dict1(hut.TestCase):
-
     def test1(self) -> None:
         flattened = collections.OrderedDict(
             [
@@ -105,7 +102,6 @@ class Test_get_config_from_flattened_dict1(hut.TestCase):
         exp = hprint.dedent(exp)
         self.assert_equal(act, exp, fuzzy_match=False)
 
-
     def test2(self) -> None:
         flattened = collections.OrderedDict(
             [
@@ -128,11 +124,10 @@ class Test_get_config_from_flattened_dict1(hut.TestCase):
         self.assert_equal(act, exp, fuzzy_match=False)
 
 
-# ################################################################################
+# #############################################################################
 
 
 class Test_get_config_from_nested_dict1(hut.TestCase):
-
     def test1(self) -> None:
         nested = {
             "read_data": {
@@ -180,11 +175,10 @@ class Test_get_config_from_nested_dict1(hut.TestCase):
         self.assert_equal(act, exp, fuzzy_match=False)
 
 
-# ################################################################################
+# #############################################################################
 
 
 class Test_intersect_configs1(hut.TestCase):
-
     def test_same_config(self) -> None:
         """
         Verify that intersection of two same configs equals those configs.
@@ -216,11 +210,10 @@ class Test_intersect_configs1(hut.TestCase):
         self.assert_equal(act, exp, fuzzy_match=False)
 
 
-# ################################################################################
+# #############################################################################
 
 
 class Test_subtract_configs1(hut.TestCase):
-
     def test_same_config(self) -> None:
         """
         Verify that the difference of two configs is empty.
@@ -245,11 +238,10 @@ class Test_subtract_configs1(hut.TestCase):
         self.assert_equal(str(act), str(exp))
 
 
-# ################################################################################
+# #############################################################################
 
 
 class Test_diff_configs1(hut.TestCase):
-
     def test_same_config(self) -> None:
         """
         Verify that the difference of two configs is empty.
@@ -290,12 +282,13 @@ class Test_diff_configs1(hut.TestCase):
         exp = [
             #
             cfgut.get_config_from_nested_dict(
-            {"build_targets":
-            {"target_asset": "Crude Oil"}}),
+                {"build_targets": {"target_asset": "Crude Oil"}}
+            ),
             #
-               cfgut.get_config_from_nested_dict(
-                   {"build_targets":
-                   {"target_asset": "Gold"}})]
+            cfgut.get_config_from_nested_dict(
+                {"build_targets": {"target_asset": "Gold"}}
+            ),
+        ]
         self.assert_equal(str(act), str(exp))
 
     def test2(self) -> None:
@@ -309,26 +302,25 @@ class Test_diff_configs1(hut.TestCase):
         exp = [
             #
             cfgut.get_config_from_nested_dict(
-            {"build_targets":
-                 {"target_asset": "Crude Oil"}}),
+                {"build_targets": {"target_asset": "Crude Oil"}}
+            ),
             #
             cfgut.get_config_from_nested_dict(
-                {"build_targets":
-                     {"target_asset": "Gold"}}),
+                {"build_targets": {"target_asset": "Gold"}}
+            ),
             #
             cfgut.get_config_from_nested_dict(
-                {"build_targets":
-                     {"target_asset": "Crude Oil"},
-                 "hello": "world"})]
+                {"build_targets": {"target_asset": "Crude Oil"}, "hello": "world"}
+            ),
+        ]
         exp = "\n".join(map(str, exp))
         self.assert_equal(str(act), str(exp))
 
 
-# ################################################################################
+# #############################################################################
 
 
 class Test_convert_to_dataframe1(hut.TestCase):
-
     def test1(self) -> None:
         """
         Compute and verify dataframe with all config parameters.

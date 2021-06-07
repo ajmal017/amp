@@ -4,7 +4,6 @@ Import as:
 import core.config_builders as cfgb
 """
 
-import collections
 import importlib
 import itertools
 import logging
@@ -22,11 +21,8 @@ from typing import (
     cast,
 )
 
-import pandas as pd
-
 import core.config as cfg
 import helpers.dbg as dbg
-import helpers.dict as dct
 import helpers.pickle_ as hpickle
 
 _LOG = logging.getLogger(__name__)
@@ -103,7 +99,8 @@ def patch_configs(
 
 def get_config_from_params(idx: int, params: Dict[str, str]) -> cfg.Config:
     """
-    Get the `idx`-th config built from the params, which includes `config_builder`.
+    Get the `idx`-th config built from the params, which includes
+    `config_builder`.
     """
     config_builder = params["config_builder"]
     # Build all the configs.

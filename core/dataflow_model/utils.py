@@ -16,7 +16,7 @@ import logging
 import os
 import re
 import sys
-from typing import Any, Dict, List, Iterable, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import pandas as pd
 
@@ -261,10 +261,12 @@ def report_failed_experiments(configs: List[cfg.Config], rcs: List[int]) -> int:
     return rc
 
 
-# ########################################################################
+# #############################################################################
 
 
-def save_experiment_result_bundle(config: cfg.Config, result_bundle: dtg.ResultBundle) -> None:
+def save_experiment_result_bundle(
+    config: cfg.Config, result_bundle: dtg.ResultBundle
+) -> None:
     """
     Save the `ResultBundle` from running `Config`.
     """
@@ -352,7 +354,7 @@ def load_experiment_artifacts(
 
 
 def get_config_diffs(
-        config_dict: collections.OrderedDict, tag_col: Optional[str] = None
+    config_dict: collections.OrderedDict, tag_col: Optional[str] = None
 ) -> pd.DataFrame:
     """
     Create a dataframe of config diffs.

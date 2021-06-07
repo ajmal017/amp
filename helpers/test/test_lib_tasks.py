@@ -379,6 +379,7 @@ class TestDryRunTasks3(_TestClassHandlingLibTasksSingleton):
         target = "git_clean(ctx, dry_run=True)"
         self._check_output(target)
 
+
 # #############################################################################
 
 
@@ -1144,7 +1145,6 @@ core/dataflow/builders.py:195:[pylint] [W0221(arguments-differ), ArmaReturnsBuil
 
 
 class Test_find_check_string_output1(hut.TestCase):
-
     def test1(self) -> None:
         """
         Test `find_check_string_output()` by searching the `check_string` of

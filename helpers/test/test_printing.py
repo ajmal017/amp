@@ -14,7 +14,7 @@ class Test_printing1(hut.TestCase):
             _LOG.debug(hprint.color_highlight(c, c))
 
 
-# ################################################################################
+# #############################################################################
 
 
 class Test_to_str1(hut.TestCase):
@@ -78,7 +78,7 @@ class Test_to_str1(hut.TestCase):
         self.assertEqual(act, exp)
 
 
-# ################################################################################
+# #############################################################################
 
 
 class Test_log(hut.TestCase):
@@ -120,7 +120,7 @@ class Test_log(hut.TestCase):
             hprint.log(_LOG, verb, "x y z")
 
 
-# ################################################################################
+# #############################################################################
 
 
 class Test_sort_dictionary(hut.TestCase):
@@ -174,11 +174,10 @@ class Test_sort_dictionary(hut.TestCase):
         self.check_string(pprint.pformat(act))
 
 
-# ################################################################################
+# #############################################################################
 
 
 class Test_indent1(hut.TestCase):
-
     def test1(self) -> None:
         txt = """foo
 
@@ -194,11 +193,10 @@ class TestHelloWorld(hut.TestCase):
         self.assert_equal(act, exp, fuzzy_match=False)
 
 
-# ################################################################################
+# #############################################################################
 
 
 class Test_dedent1(hut.TestCase):
-
     def test1(self) -> None:
         txt = """
         foo
@@ -246,11 +244,10 @@ class TestHelloWorld(hut.TestCase):
         self.assert_equal(txt1, txt3, fuzzy_match=False)
 
 
-# ################################################################################
+# #############################################################################
 
 
 class Test_align_on_left1(hut.TestCase):
-
     def test1(self) -> None:
         txt = """foo
 

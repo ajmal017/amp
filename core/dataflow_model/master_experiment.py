@@ -1,5 +1,4 @@
 import logging
-import os
 
 import core.config as cfg
 import core.config_builders as cfgb
