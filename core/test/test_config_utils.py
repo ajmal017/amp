@@ -344,3 +344,64 @@ class Test_convert_to_dataframe1(hut.TestCase):
         )
         exp = hut.convert_df_to_string(exp, index=True)
         self.assert_equal(str(act), str(exp))
+
+
+# #############################################################################
+
+
+class Test_build_config_diff_dataframe1(hut.TestCase):
+    def test1(self) -> None:
+        """
+        Summarize differences between two different configs.
+        """
+        config1 = _get_test_config1()
+        config2 = _get_test_config2()
+        #
+        act = cfgut.build_config_diff_dataframe(
+            {"1": config1, "2": config2})
+        act = hut.convert_df_to_string(act, index=True)
+        #
+        exp = pd.DataFrame(
+            {
+                "build_targets.target_asset": ["Crude Oil", "Gold"],
+            }
+        )
+        exp = hut.convert_df_to_string(exp, index=True)
+        self.assert_equal(str(act), str(exp))
+
+    def test2(self) -> None:
+        """
+        Same config.
+        """
+        config1 = _get_test_config1()
+        #
+        act = cfgut.build_config_diff_dataframe(
+            {"1": config1, "2": config1})
+        act = hut.convert_df_to_string(act, index=True)
+        #
+        exp = """
+        Empty DataFrame
+        Columns: []
+        Index: [0, 1]
+        """
+        self.assert_equal(str(act), exp, fuzzy_match=True)
+
+    def test3(self) -> None:
+        """
+        Three different configs.
+        """
+        config1 = _get_test_config1()
+        config2 = _get_test_config2()
+        config3 = _get_test_config3()
+        #
+        act = cfgut.build_config_diff_dataframe(
+            {"1": config1, "2": config2, "3": config3})
+        act = hut.convert_df_to_string(act, index=True)
+        #
+        exp = """
+          build_targets.target_asset  hello
+        0                  Crude Oil    NaN
+        1                       Gold    NaN
+        2                  Crude Oil  world
+        """
+        self.assert_equal(str(act), exp, fuzzy_match=True)

@@ -6,7 +6,7 @@ import core.config_utils as cfgut
 
 import collections
 import logging
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import pandas as pd
 
@@ -25,6 +25,15 @@ def validate_configs(configs: List[cfg.Config]) -> None:
     dbg.dassert_no_duplicates(
         list(map(str, configs)), "There are duplicate configs in passed list"
     )
+
+
+def configs_to_str(configs: List[cfg.Config]) -> str:
+    txt = []
+    for i, config in enumerate(configs):
+        txt.append("# %s/%s" % (i + 1, len(configs)))
+        txt.append(str(config))
+    res = "\n".join(txt)
+    return res
 
 
 def get_config_from_flattened_dict(
@@ -176,13 +185,6 @@ def convert_to_series(config: cfg.Config) -> pd.Series:
 def convert_to_dataframe(configs: Iterable[cfg.Config]) -> pd.DataFrame:
     """
     Convert multiple configs into flattened dataframe representation.
-
-    E.g., to highlight config differences in a dataframe, for an iterable
-    `configs`, do
-        ```
-        diffs = diff_configs(configs)
-        df = convert_to_dataframe(diffs)
-        ```
     """
     dbg.dassert_isinstance(configs, Iterable)
     srs = list(map(convert_to_series, configs))
@@ -191,112 +193,30 @@ def convert_to_dataframe(configs: Iterable[cfg.Config]) -> pd.DataFrame:
     return df
 
 
-# # #############################################################################
-# # Utilities
-# # #############################################################################
-#
-#
-# # TODO(*): Deprecate.
-# def _flatten_config(config: cfg.Config) -> Dict[str, collections.abc.Hashable]:
-#     """
-#     Flatten configs, join tuples of strings with "." and make vals hashable.
-#
-#     Someday you may realize that you want to use "." in the strings of
-#     your keys. That likely won't be a very fun day.
-#     """
-#     flattened = config.flatten()
-#     normalized = {}
-#     for k, v in flattened.items():
-#         val = cfg.make_hashable(v)
-#         normalized[".".join(k)] = val
-#     return normalized
-#
-#
-# # TODO(*): Deprecate.
-# def _flatten_configs(configs: Iterable[cfg.Config]) -> List[Dict[str, Any]]:
-#     """
-#     Flatten configs, squash the str keys, and make vals hashable.
-#
-#     :param configs: configs
-#     :return: flattened config dicts
-#     """
-#     return list(map(_flatten_config, configs))
-#
-#
-# # TODO(*): Are the values of this ever used anywhere?
-# # TODO(*): Try to deprecate. If needed, compose with `cfg.diff_configs()`.
-# # It's not used but unit tested
-# def get_config_difference(configs: List[cfg.Config]) -> Dict[str, List[Any]]:
-#     """
-#     Find parameters in configs that are different and provide the varying
-#     values.
-#
-#     :param configs: A list of configs.
-#     :return: A dictionary of varying params and lists of their values.
-#     """
-#     # Flatten configs into dicts.
-#     flattened_configs = _flatten_configs(configs)
-#     # Convert dicts into sets of items for comparison.
-#     flattened_configs = [set(config.items()) for config in flattened_configs]
-#     # Build a dictionary of common config values.
-#     union = set.union(*flattened_configs)
-#     intersection = set.intersection(*flattened_configs)
-#     config_varying_params = union - intersection
-#     # Compute params that vary among different configs.
-#     config_varying_params = dict(config_varying_params).keys()
-#     # Remove `meta` params that always vary.
-#     # TODO(*): Where do these come from?
-#     redundant_params = ["meta.id", "meta.experiment_result_dir"]
-#     config_varying_params = [
-#         param for param in config_varying_params if param not in redundant_params
-#     ]
-#     # Build the difference of configs by considering the parts that vary.
-#     config_difference = dict()
-#     for param in config_varying_params:
-#         param_values = []
-#         for flattened_config in flattened_configs:
-#             try:
-#                 param_values.append(dict(flattened_config)[param])
-#             except KeyError:
-#                 param_values.append(None)
-#         config_difference[param] = param_values
-#     return config_difference
+def build_config_diff_dataframe(
+    config_dict: collections.OrderedDict, tag_col: Optional[str] = None
+) -> pd.DataFrame:
+    """
+    Create a dataframe of config diffs.
 
-
-# # TODO(*): Deprecate. Switch to `cfg.convert_to_dataframe()`.
-# # > jackpy get_configs_dataframe
-# # amp/core/test/test_config_builders.py:275:    `cfgb.get_configs_dataframe` using `pd.DataFrame.equals()`
-# # amp/core/test/test_config_builders.py:286:        actual_result = cfgb.get_configs_dataframe([config_1, config_2])
-# # amp/core/test/test_config_builders.py:309:        actual_result = cfgb.get_configs_dataframe(
-# # amp/core/test/test_config_builders.py:326:        actual_result = cfgb.get_configs_dataframe(
-# # amp/core/config_builders.py:233:def get_configs_dataframe(
-# def get_configs_dataframe(
-#         configs: List[cfg.Config],
-#         params_subset: Optional[Union[str, List[str]]] = None,
-# ) -> pd.DataFrame:
-#     """
-#     Convert the configs into a df with full nested names.
-#
-#     The column names should correspond to `subconfig1.subconfig2.parameter`
-#     format, e.g.: `build_targets.target_asset`.
-#
-#     :param configs: Configs used to run experiments. TODO(*): What experiments?
-#     :param params_subset: Parameters to include as table columns.
-#     :return: Table of configs.
-#     """
-#     # Convert configs to flattened dicts.
-#     flattened_configs = _flatten_configs(configs)
-#     # Convert dicts to pd.Series and create a df.
-#     config_df = map(pd.Series, flattened_configs)
-#     config_df = pd.concat(config_df, axis=1).T
-#     # Process the config_df by keeping only a subset of keys.
-#     if params_subset is not None:
-#         if params_subset == "difference":
-#             config_difference = get_config_difference(configs)
-#             params_subset = list(config_difference.keys())
-#         # Filter config_df for the desired columns.
-#         dbg.dassert_is_subset(params_subset, config_df.columns)
-#         config_df = config_df[params_subset]
-#     return config_df
-#
-#
+    :param config_dict: dictionary of configs
+    :param tag_col: name of the tag col. If tags are the same for all configs
+        and `tag_col` is not None, add tags to config diffs dataframe
+    :return: config diffs dataframe
+    """
+    # Convert the dict into a list of tuples (key, value).
+    diffs = diff_configs(config_dict.values())
+    _LOG.debug("diffs=\n%s", configs_to_str(diffs))
+    # Remove empty configs.
+    non_empty_diffs = [(k, v) for (diff, k, v) in zip(diffs, config_dict.keys(), config_dict.values()) if len(diff) > 0]
+    if non_empty_diffs:
+        config_diffs = convert_to_dataframe(diffs).dropna(
+            how="all", axis=1
+        )
+    else:
+        config_diffs = pd.DataFrame(index=range(len(diffs)))
+    # If tags are the same, still add them to `config_diffs`.
+    if tag_col is not None and tag_col not in config_diffs.columns:
+        tags = [config[tag_col] for config in config_dict.values()]
+        config_diffs[tag_col] = tags
+    return config_diffs

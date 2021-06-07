@@ -351,29 +351,3 @@ def load_experiment_artifacts(
             raise ValueError(f"Unsupported file type='{file_name_tmp}'")
         results[key] = res
     return results
-
-
-def get_config_diffs(
-    config_dict: collections.OrderedDict, tag_col: Optional[str] = None
-) -> pd.DataFrame:
-    """
-    Create a dataframe of config diffs.
-
-    :param config_dict: dictionary of configs
-    :param tag_col: name of the tag col. If tags are the same for all configs
-        and `tag_col` is not None, add tags to config diffs dataframe
-    :return: config diffs dataframe
-    """
-    diffs = cconfi.diff_configs(config_dict.values())
-    non_empty_diffs = [diff for diff in diffs if len(diff) > 1]
-    if non_empty_diffs:
-        config_diffs = cconfi.convert_to_dataframe(diffs).dropna(
-            how="all", axis=1
-        )
-    else:
-        config_diffs = pd.DataFrame(index=range(len(diffs)))
-    # If tags are the same, still add them to `config_diffs`.
-    if tag_col is not None and tag_col not in config_diffs.columns:
-        tags = [config[tag_col] for config in config_dict.values()]
-        config_diffs[tag_col] = tags
-    return config_diffs
