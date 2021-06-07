@@ -48,6 +48,30 @@ def _get_test_config_2() -> cfg.Config:
 
 # ################################################################################
 
+class Test_validate_configs1(hut.TestCase):
+    """
+    Test `validate_configs()`.
+    """
+
+    def test_check_same_configs_error(self) -> None:
+        """
+        Verify that an error is raised when same configs are encountered.
+        """
+        # Create list of configs with duplicates.
+        configs = [
+            _get_test_config_1(),
+            _get_test_config_1(),
+            _get_test_config_2(),
+        ]
+        # Make sure function raises an error.
+        with self.assertRaises(AssertionError) as cm:
+            cfgut.validate_configs(configs)
+        act = str(cm.exception)
+        self.check_string(act, fuzzy_match=True)
+
+
+# ################################################################################
+
 
 class Test_get_config_from_flattened_dict1(hut.TestCase):
     """
@@ -64,7 +88,7 @@ class Test_get_config_from_flattened_dict1(hut.TestCase):
                 (("zscore", "com"), 28),
             ]
         )
-        config = cfgut.get_config_from_flattened(flattened)
+        config = cfgut.get_config_from_flattened_dict(flattened)
         act = str(config)
         exp = r"""
         read_data:
@@ -73,9 +97,7 @@ class Test_get_config_from_flattened_dict1(hut.TestCase):
         single_val: hello
         zscore:
           style: gaz
-          com: 28
-        """
-        exp = exp.lstrip().rstrip()
+          com: 28"""
         exp = hprint.dedent(exp)
         self.assert_equal(act, exp, fuzzy_match=False)
 
@@ -89,7 +111,62 @@ class Test_get_config_from_flattened_dict1(hut.TestCase):
                 (("zscore",), cfg.Config()),
             ]
         )
-        config = cfgut.get_config_from_flattened(flattened)
+        config = cfgut.get_config_from_flattened_dict(flattened)
+        act = str(config)
+        exp = r"""
+        read_data:
+          file_name: foo_bar.txt
+          nrows: 999
+        single_val: hello
+        zscore:
+        """
+        exp = hprint.dedent(exp)
+        self.assert_equal(act, exp, fuzzy_match=False)
+
+
+# ################################################################################
+
+
+class Test_get_config_from_nested_dict1(hut.TestCase):
+    """
+    Test `get_config_from_nested_dict()`.
+    """
+
+    def test1(self) -> None:
+        nested = {
+            "read_data": {
+                "file_name": "foo_bar.txt",
+                "nrows": 999,
+            },
+            "single_val": "hello",
+            "zscore": {
+                "style": "gaz",
+                "com": 28,
+            },
+        }
+        config = cfgut.get_config_from_nested_dict(nested)
+        act = str(config)
+        exp = r"""
+        read_data:
+          file_name: foo_bar.txt
+          nrows: 999
+        single_val: hello
+        zscore:
+          style: gaz
+          com: 28
+        """.lstrip().rstrip()
+        self.assert_equal(act, exp, fuzzy_match=False)
+
+    def test2(self) -> None:
+        nested = {
+            "read_data": {
+                "file_name": "foo_bar.txt",
+                "nrows": 999,
+            },
+            "single_val": "hello",
+            "zscore": cfg.Config(),
+        }
+        config = cfgut.get_config_from_nested_dict(nested)
         act = str(config)
         exp = r"""
         read_data:
@@ -101,136 +178,78 @@ class Test_get_config_from_flattened_dict1(hut.TestCase):
         self.assert_equal(act, exp, fuzzy_match=False)
 
 
-# # ################################################################################
-#
-#
-# # TODO(gp): -> Test_get_config_intersection1
-# class TestGetConfigFromNestedDict1(hut.TestCase):
-#     """
-#     Test `get_config_from_nested_dict()`.
-#     """
-#
-#     def test1(self) -> None:
-#         nested = {
-#             "read_data": {
-#                 "file_name": "foo_bar.txt",
-#                 "nrows": 999,
-#             },
-#             "single_val": "hello",
-#             "zscore": {
-#                 "style": "gaz",
-#                 "com": 28,
-#             },
-#         }
-#         config = cfgut.get_config_from_nested_dict(nested)
-#         self.check_string(str(config))
-#
-#     def test2(self) -> None:
-#         nested = {
-#             "read_data": {
-#                 "file_name": "foo_bar.txt",
-#                 "nrows": 999,
-#             },
-#             "single_val": "hello",
-#             "zscore": cfg.Config(),
-#         }
-#         config = cfgut.get_config_from_nested_dict(nested)
-#         self.check_string(str(config))
-#
-#
-# # ################################################################################
-#
-#
-# # TODO(gp): -> Test_get_config_intersection1
-# class TestConfigIntersection(hut.TestCase):
-#     """
-#     Test `get_config_intersection()`.
-#     """
-#
-#     def test_different_config_intersection(self) -> None:
-#         """
-#         Verify that intersection of two different configs is what expected.
-#         """
-#         # Prepare actual output of intersection function.
-#         # TODO(*): Bad unit testing fomr! What are these configs?
-#         config_1 = _get_test_config_1()
-#         config_2 = _get_test_config_2()
-#         intersection = cfgut.get_config_intersection([config_1, config_2])
-#         self.check_string(str(intersection))
-#
-#     def test_same_config_intersection(self) -> None:
-#         """
-#         Verify that intersection of two same configs equals those configs.
-#         """
-#         # Prepare test config.
-#         # TODO(*): Bad unit testing form! What is this config?
-#         test_config = _get_test_config_1()
-#         # FInd intersection of two same configs.
-#         actual_intersection = cfgut.get_config_intersection(
-#             [test_config, test_config]
-#         )
-#         # Verify that intersection is equal to initial config.
-#         self.assertEqual(str(test_config), str(actual_intersection))
-#
-#
-# # ################################################################################
-#
-#
-# # TODO(gp): -> Test_validate_configs1.
-# class TestCheckSameConfigs(hut.TestCase):
-#     """
-#     Test `validate_configs()`.
-#     """
-#     def test_check_same_configs_error(self) -> None:
-#         """
-#         Verify that an error is raised when same configs are encountered.
-#         """
-#         # Create list of configs with duplicates.
-#         configs = [
-#             _get_test_config_1(),
-#             _get_test_config_1(),
-#             _get_test_config_2(),
-#         ]
-#         # Make sure function raises an error.
-#         with self.assertRaises(AssertionError) as cm:
-#             cfgut.validate_configs(configs)
-#         act = str(cm.exception)
-#         self.check_string(act, fuzzy_match=True)
-#
-#
-# # ################################################################################
-#
-#
-# # TODO(gp): -> Test_get_config_difference1
-# class TestConfigDifference(hut.TestCase):
-#     def test_varying_config_difference(self) -> None:
-#         """
-#         Verify that differing parameters of different configs are what
-#         expected.
-#         """
-#         # Create two different configs.
-#         config_1 = _get_test_config_1()
-#         config_2 = _get_test_config_2()
-#         # Compute variation between configs.
-#         actual_difference = cfgut.get_config_difference([config_1, config_2])
-#         # Define expected variation.
-#         expected_difference = {
-#             "build_targets.target_asset": ["Crude Oil", "Gold"]
-#         }
-#         self.assertEqual(expected_difference, actual_difference)
-#
-#     def test_same_config_difference(self) -> None:
-#         """
-#         Verify that the difference of two configs is empty.
-#         """
-#         # Create test config.
-#         config = _get_test_config_1()
-#         # Compute difference between two instances of same config.
-#         actual_difference = cfgut.get_config_difference([config, config])
-#         # Verify that the difference is empty.
-#         self.assertFalse(actual_difference)
-#
-#
+# ################################################################################
+
+
+class Test_intersect_configs1(hut.TestCase):
+    """
+    Test `get_config_intersection()`.
+    """
+
+    def test_same_config(self) -> None:
+        """
+        Verify that intersection of two same configs equals those configs.
+        """
+        # Prepare test config.
+        test_config = _get_test_config_1()
+        # FInd intersection of two same configs.
+        actual_intersection = cfgut.get_config_intersection(
+            [test_config, test_config]
+        )
+        # Verify that intersection is equal to initial config.
+        self.assertEqual(str(test_config), str(actual_intersection))
+
+    def test1(self) -> None:
+        """
+        Verify that intersection of two different configs is what is expected.
+        """
+        config_1 = _get_test_config_1()
+        config_2 = _get_test_config_2()
+        intersection = cfgut.get_config_intersection([config_1, config_2])
+        act = str(intersection)
+        exp = r"""
+        build_model:
+          activation: sigmoid
+        build_targets:
+          preprocessing:
+            preprocessor: tokenizer
+        meta:
+          experiment_result_dir: results.pkl
+        """.lstrip().rstrip()
+        self.assert_equal(act, exp, fuzzy_match=False)
+
+
+# ################################################################################
+
+
+class Test_subtract_configs1(hut.TestCase):
+
+    def test_same_config(self) -> None:
+        """
+        Verify that the difference of two configs is empty.
+        """
+        config = _get_test_config_1()
+        actual_difference = cfgut.subtract_config(config, config)
+        # Verify that the difference is empty.
+        self.assertFalse(actual_difference)
+
+    def test1(self) -> None:
+        """
+        Verify that differing parameters of different configs are what
+        expected.
+        """
+        # Create two different configs.
+        config_1 = _get_test_config_1()
+        config_2 = _get_test_config_2()
+        # Compute variation between configs.
+        actual_difference = cfgut.subtract_config(config_1, config_2)
+        # Define expected variation.
+        expected_difference = {
+            "build_targets.target_asset": ["Crude Oil", "Gold"]
+        }
+        self.assertEqual(expected_difference, actual_difference)
+
+
 # # ################################################################################
 #
 #

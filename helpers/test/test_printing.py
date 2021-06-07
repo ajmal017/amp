@@ -214,6 +214,26 @@ class TestHelloWorld(hut.TestCase):
         self.assert_equal(act, exp, fuzzy_match=False)
 
     def test2(self) -> None:
+        txt = r"""
+        read_data:
+          file_name: foo_bar.txt
+          nrows: 999
+        single_val: hello
+        zscore:
+          style: gaz
+          com: 28
+        """
+        act = hprint.dedent(txt)
+        exp = """read_data:
+  file_name: foo_bar.txt
+  nrows: 999
+single_val: hello
+zscore:
+  style: gaz
+  com: 28"""
+        self.assert_equal(act, exp, fuzzy_match=False)
+
+    def test_roundtrip1(self) -> None:
         """
         Verify that `indent` and `dedent` are inverse of each other.
         """

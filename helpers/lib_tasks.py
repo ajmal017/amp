@@ -1746,6 +1746,7 @@ def find_check_string_output(  # type: ignore
             num_spaces = 8
             txt = hprint.indent(txt, num_spaces=num_spaces)
         output = f"""
+        act =
         exp = r\"\"\"
 {txt}
         \"\"\".lstrip().rstrip()

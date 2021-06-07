@@ -32,7 +32,49 @@ import helpers.pickle_ as hpickle
 _LOG = logging.getLogger(__name__)
 
 
-# TODO(gp): -> _make_hashable
+def validate_configs(configs: List[cfg.Config]) -> None:
+    """
+    Assert if the list of configs contains duplicates.
+    """
+    dbg.dassert_container_type(configs, List, cfg.Config)
+    dbg.dassert_no_duplicates(
+        list(map(str, configs)), "There are duplicate configs in passed list"
+    )
+
+
+def get_config_from_flattened_dict(flattened: Dict[Tuple[str], Any]) -> cfg.Config:
+    """
+    Build a config from the flattened config representation.
+
+    :param flattened: flattened config like result from `config.flatten()`
+    :return: `Config` object initialized from flattened representation
+    """
+    dbg.dassert_isinstance(flattened, dict)
+    dbg.dassert(flattened)
+    config = cfg.Config()
+    for k, v in flattened.items():
+        config[k] = v
+    return config
+
+
+def get_config_from_nested_dict(nested: Dict[str, Any]) -> cfg.Config:
+    """
+    Build a `Config` from a nested dict.
+
+    :param nested: nested dict, with certain restrictions:
+      - only leaf nodes may not be a dict
+      - every nonempty dict must only have keys of type `str`
+    """
+    dbg.dassert_isinstance(nested, dict)
+    dbg.dassert(nested)
+    iter_ = dct.get_nested_dict_iterator(nested)
+    flattened = collections.OrderedDict(iter_)
+    return get_config_from_flattened(flattened)
+
+
+# ################################################################################
+
+
 def make_hashable(obj: Any) -> collections.abc.Hashable:
     """
     Coerce `obj` to a hashable type if not already hashable.
@@ -44,31 +86,32 @@ def make_hashable(obj: Any) -> collections.abc.Hashable:
     return tuple(obj)
 
 
-# TODO(gp): Add unit tests.
 def intersect_configs(configs: Iterable[cfg.Config]) -> cfg.Config:
     """
     Return a config formed by taking the intersection of configs.
 
     - Key insertion order is not taken into consideration for the purpose of
-      calculating the config intersection.
+      calculating the config intersection
     - The key insertion order of the returned config will respect the key
-      insertion order of the first config passed in.
+      insertion order of the first config passed in
     """
     # Flatten configs and convert to sets for intersection.
     # We create a list so that we can reference a flattened config later.
     flattened = [c.flatten() for c in configs]
     dbg.dassert(flattened, "Empty iterable `configs` received.")
-    # Obtain a reference config. The purpose of this is to ensure that the
-    # config intersection respects a key ordering. We also make this copy
-    # so as to maintain the original (not necessarily hashable) values.
+    # Obtain a reference config.
+    # The purpose of this is to ensure that the config intersection respects a key
+    # ordering. We also make this copy so as to maintain the original (not
+    # necessarily hashable) values.
     reference_config = flattened[0].copy()
-    # Make vals hashable.
+    # Make values hashable.
     for flat in flattened:
         for k, v in flat.items():
             flat[k] = make_hashable(v)
     sets = [set(c.items()) for c in flattened]
     intersection_of_flattened = set.intersection(*sets)
-    # Create intersection. Rely on the fact that Config keys are of type `str`.
+    # Create intersection.
+    # Rely on the fact that Config keys are of type `str`.
     intersection = Config()
     for k, v in reference_config.items():
         if (k, make_hashable(v)) in intersection_of_flattened:
@@ -88,7 +131,7 @@ def subtract_config(minuend: cfg.Config, subtrahend: cfg.Config) -> cfg.Config:
     dbg.dassert(minuend)
     flat_m = minuend.flatten()
     flat_s = subtrahend.flatten()
-    diff = Config()
+    diff = cfg.Config()
     for k, v in flat_m.items():
         if (k not in flat_s) or (flat_m[k] != flat_s[k]):
             diff[k] = v
@@ -159,129 +202,76 @@ def convert_to_dataframe(configs: Iterable[cfg.Config]) -> pd.DataFrame:
     return df
 
 
-# #############################################################################
-# Utilities
-# #############################################################################
-
-
-# TODO(gp): -> get_config_from_flattened_dict?
-def get_config_from_flattened(flattened: Dict[Tuple[str], Any]) -> cfg.Config:
-    """
-    Build a config from the flattened config representation.
-
-    :param flattened: flattened config like result from `config.flatten()`
-    :return: `Config` object initialized from flattened representation
-    """
-    dbg.dassert_isinstance(flattened, dict)
-    dbg.dassert(flattened)
-    config = cfg.Config()
-    for k, v in flattened.items():
-        config[k] = v
-    return config
-
-
-def get_config_from_nested_dict(nested: Dict[str, Any]) -> cfg.Config:
-    """
-    Build a `Config` from a nested dict.
-
-    :param nested: nested dict, with certain restrictions:
-      - only leaf nodes may not be a dict
-      - every nonempty dict must only have keys of type `str`
-    """
-    dbg.dassert_isinstance(nested, dict)
-    dbg.dassert(nested)
-    iter_ = dct.get_nested_dict_iterator(nested)
-    flattened = collections.OrderedDict(iter_)
-    return get_config_from_flattened(flattened)
-
-
-def validate_configs(configs: List[cfg.Config]) -> None:
-    """
-    Assert if the list of configs contains duplicates.
-    """
-    dbg.dassert_container_type(configs, List, cfg.Config)
-    dbg.dassert_no_duplicates(
-        list(map(str, configs)), "There are duplicate configs in passed list"
-    )
-
-
-# TODO(*): Deprecate.
-def _flatten_config(config: cfg.Config) -> Dict[str, collections.abc.Hashable]:
-    """
-    Flatten configs, join tuples of strings with "." and make vals hashable.
-
-    Someday you may realize that you want to use "." in the strings of
-    your keys. That likely won't be a very fun day.
-    """
-    flattened = config.flatten()
-    normalized = {}
-    for k, v in flattened.items():
-        val = cfg.make_hashable(v)
-        normalized[".".join(k)] = val
-    return normalized
-
-
-# TODO(*): Deprecate.
-def _flatten_configs(configs: Iterable[cfg.Config]) -> List[Dict[str, Any]]:
-    """
-    Flatten configs, squash the str keys, and make vals hashable.
-
-    :param configs: configs
-    :return: flattened config dicts
-    """
-    return list(map(_flatten_config, configs))
-
-
-# TODO(*): Deprecate.
-# This is not unit tested.
-def get_config_intersection(configs: List[cfg.Config]) -> cfg.Config:
-    """
-    Compare configs from list to find the common part.
-
-    :param configs: A list of configs
-    :return: A config with common part of all input configs.
-    """
-    return cfg.intersect_configs(configs)
-
-
-# TODO(*): Are the values of this ever used anywhere?
-# TODO(*): Try to deprecate. If needed, compose with `cfg.diff_configs()`.
-# It's not used but unit tested
-def get_config_difference(configs: List[cfg.Config]) -> Dict[str, List[Any]]:
-    """
-    Find parameters in configs that are different and provide the varying
-    values.
-
-    :param configs: A list of configs.
-    :return: A dictionary of varying params and lists of their values.
-    """
-    # Flatten configs into dicts.
-    flattened_configs = _flatten_configs(configs)
-    # Convert dicts into sets of items for comparison.
-    flattened_configs = [set(config.items()) for config in flattened_configs]
-    # Build a dictionary of common config values.
-    union = set.union(*flattened_configs)
-    intersection = set.intersection(*flattened_configs)
-    config_varying_params = union - intersection
-    # Compute params that vary among different configs.
-    config_varying_params = dict(config_varying_params).keys()
-    # Remove `meta` params that always vary.
-    # TODO(*): Where do these come from?
-    redundant_params = ["meta.id", "meta.experiment_result_dir"]
-    config_varying_params = [
-        param for param in config_varying_params if param not in redundant_params
-    ]
-    # Build the difference of configs by considering the parts that vary.
-    config_difference = dict()
-    for param in config_varying_params:
-        param_values = []
-        for flattened_config in flattened_configs:
-            try:
-                param_values.append(dict(flattened_config)[param])
-            except KeyError:
-                param_values.append(None)
-        config_difference[param] = param_values
-    return config_difference
+# # #############################################################################
+# # Utilities
+# # #############################################################################
+#
+#
+# # TODO(*): Deprecate.
+# def _flatten_config(config: cfg.Config) -> Dict[str, collections.abc.Hashable]:
+#     """
+#     Flatten configs, join tuples of strings with "." and make vals hashable.
+#
+#     Someday you may realize that you want to use "." in the strings of
+#     your keys. That likely won't be a very fun day.
+#     """
+#     flattened = config.flatten()
+#     normalized = {}
+#     for k, v in flattened.items():
+#         val = cfg.make_hashable(v)
+#         normalized[".".join(k)] = val
+#     return normalized
+#
+#
+# # TODO(*): Deprecate.
+# def _flatten_configs(configs: Iterable[cfg.Config]) -> List[Dict[str, Any]]:
+#     """
+#     Flatten configs, squash the str keys, and make vals hashable.
+#
+#     :param configs: configs
+#     :return: flattened config dicts
+#     """
+#     return list(map(_flatten_config, configs))
+#
+#
+# # TODO(*): Are the values of this ever used anywhere?
+# # TODO(*): Try to deprecate. If needed, compose with `cfg.diff_configs()`.
+# # It's not used but unit tested
+# def get_config_difference(configs: List[cfg.Config]) -> Dict[str, List[Any]]:
+#     """
+#     Find parameters in configs that are different and provide the varying
+#     values.
+#
+#     :param configs: A list of configs.
+#     :return: A dictionary of varying params and lists of their values.
+#     """
+#     # Flatten configs into dicts.
+#     flattened_configs = _flatten_configs(configs)
+#     # Convert dicts into sets of items for comparison.
+#     flattened_configs = [set(config.items()) for config in flattened_configs]
+#     # Build a dictionary of common config values.
+#     union = set.union(*flattened_configs)
+#     intersection = set.intersection(*flattened_configs)
+#     config_varying_params = union - intersection
+#     # Compute params that vary among different configs.
+#     config_varying_params = dict(config_varying_params).keys()
+#     # Remove `meta` params that always vary.
+#     # TODO(*): Where do these come from?
+#     redundant_params = ["meta.id", "meta.experiment_result_dir"]
+#     config_varying_params = [
+#         param for param in config_varying_params if param not in redundant_params
+#     ]
+#     # Build the difference of configs by considering the parts that vary.
+#     config_difference = dict()
+#     for param in config_varying_params:
+#         param_values = []
+#         for flattened_config in flattened_configs:
+#             try:
+#                 param_values.append(dict(flattened_config)[param])
+#             except KeyError:
+#                 param_values.append(None)
+#         config_difference[param] = param_values
+#     return config_difference
 
 
 # TODO(*): Deprecate. Switch to `cfg.convert_to_dataframe()`.
