@@ -1,14 +1,13 @@
 import logging
 
-import core.config as cfg
-import core.config_builders as cfgb
+import core.config as cconfig
 import core.dataflow as cdataf
 import core.dataflow_model.utils as cdtfut
 
 _LOG = logging.getLogger(__name__)
 
 
-def run_experiment(config: cfg.Config) -> None:
+def run_experiment(config: cconfig.Config) -> None:
     """
     Implement the master experiment to:
 
@@ -36,7 +35,7 @@ def run_experiment(config: cfg.Config) -> None:
         )
     fit_result_bundle = dag_runner.fit()
     # Process paylod.
-    payload = cfgb.get_config_from_nested_dict({"config": config})
+    payload = cconfig.get_config_from_nested_dict({"config": config})
     if "run_oos" in config["meta"].to_dict().keys() and config["meta"]:
         result_bundle = dag_runner.predict()
         payload["fit_result_bundle"] = fit_result_bundle.to_config()

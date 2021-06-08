@@ -1,15 +1,14 @@
 import pprint
 from typing import List, Optional, cast
 
-import core.config as cfg
-import core.config_builders as cfgb
+import core.config as cconfig
 import helpers.unit_test as hut
 
 
 def _build_test_configs(
     symbols: Optional[List[str]] = None,
-) -> List[cfg.Config]:
-    config_template = cfg.Config()
+) -> List[cconfig.Config]:
+    config_template = cconfig.Config()
     config_tmp = config_template.add_subconfig("read_data")
     config_tmp["symbol"] = None
     config_tmp = config_template.add_subconfig("resample")
@@ -35,7 +34,7 @@ class TestGetConfigsFromBuilder1(hut.TestCase):
         Build a config from.
         """
         config_builder = "core.test.test_config_builders._build_test_configs()"
-        configs = cfgb.get_configs_from_builder(config_builder)
+        configs = cconfig.get_configs_from_builder(config_builder)
         txt = pprint.pformat(configs)
         self.check_string(txt)
 
@@ -49,7 +48,7 @@ class TestGetConfigFromEnv(hut.TestCase):
         Verify that if there are no config env variables, no config is created.
         """
         # Test that no config is created.
-        actual_config = cfgb.get_config_from_env()
+        actual_config = cconfig.get_config_from_env()
         self.assertIs(actual_config, None)
 
 
@@ -63,7 +62,7 @@ def _get_test_config_1() -> cfg.Config:
 
     :return: Test config.
     """
-    config = cfg.Config()
+    config = cconfig.Config()
     tmp_config = config.add_subconfig("build_model")
     tmp_config["activation"] = "sigmoid"
     tmp_config = config.add_subconfig("build_targets")
@@ -75,13 +74,13 @@ def _get_test_config_1() -> cfg.Config:
     return config
 
 
-def _get_test_config_2() -> cfg.Config:
+def _get_test_config_2() -> cconfig.Config:
     """
     Build a test config for Gold asset.
 
     :return: Test config.
     """
-    config = cfg.Config()
+    config = cconfig.Config()
     tmp_config = config.add_subconfig("build_model")
     tmp_config["activation"] = "sigmoid"
     tmp_config = config.add_subconfig("build_targets")
@@ -105,7 +104,7 @@ class Test_generate_default_config_variants1(hut.TestCase):
         # Prepare varying parameters.
         params_variants = {("build_targets", "target_asset"): ["Gasoil", "Soy"]}
         # Pass test config builder to generating function.
-        actual_configs = cfgb.generate_default_config_variants(
+        actual_configs = cconfig.generate_default_config_variants(
             _get_test_config_1, params_variants
         )
         # Convert configs to string for comparison.

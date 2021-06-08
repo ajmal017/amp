@@ -32,11 +32,11 @@ config = cconfig.get_config_from_env()
 
 # %%
 if config is None:
-    raise ValueError("No config provided")
+    raise ValueError("No config provided.")
 
 # %%
 if config["fail"]:
-    raise ValueError("Failure")
-print("Success")
+    raise ValueError("Fail.")
+print("success")
 
 # %%

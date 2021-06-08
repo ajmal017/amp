@@ -5,11 +5,11 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.11.2
+#       jupytext_version: 1.4.2
 #   kernelspec:
-#     display_name: Python 3
+#     display_name: Python [conda env:.conda-p1_develop] *
 #     language: python
-#     name: python3
+#     name: conda-env-.conda-p1_develop-py
 # ---
 
 # %%
