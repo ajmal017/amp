@@ -22,6 +22,7 @@ from typing import (
 )
 
 import core.config as cfg
+import core.config_utils as cfgut
 import helpers.dbg as dbg
 import helpers.pickle_ as hpickle
 
@@ -63,7 +64,7 @@ def get_configs_from_builder(config_builder: str) -> List[cfg.Config]:
     # Cast to the right type.
     # TODO(gp): Is this needed?
     # configs = cast(List[cfg.Config], configs)
-    validate_configs(configs)
+    cfgut.validate_configs(configs)
     return configs
 
 
