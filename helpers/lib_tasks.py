@@ -2008,14 +2008,15 @@ def traceback(ctx, log_name="", purify=True):  # type: ignore
     """
     Parse the traceback from pytest and navigate it with vim.
 
-    > pyt helpers/test/test_traceback.py
-    > invoke traceback
-    # There is a also an alias `it` for the previous command line.
-
-    > devops/debug/compare.sh 2>&1 | tee log.txt
-    > ie -l log.txt
+    ```
+    # Run a unit test.
+    > pytest helpers/test/test_traceback.py 2>&1 | tee log.txt
+    # Parse the traceback
+    > invoke traceback -i log.txt
+    ```
 
     :param log_name: the file with the traceback
+    :param purify: purify the filenames from client (e.g., from running inside Docker)
     """
     _report_task()
     #
@@ -2027,6 +2028,7 @@ def traceback(ctx, log_name="", purify=True):  # type: ignore
     if log_name:
         cmd.append(f"-i {log_name}")
     cmd.append(f"-o {dst_cfile}")
+    # Purify the file names.
     if purify:
         cmd.append("--purify_from_client")
     else:
@@ -2063,6 +2065,7 @@ def pytest_freeze_failed_test_list(  # type: ignore
     Copy last list of failed tests so as not overwrite with successive pytest runs.
     """
     _report_task()
+    dir_name = "."
     pytest_failed_tests_file = os.path.join(dir_name, ".pytest_cache/v/cache/lastfailed")
     frozen_failed_tests_file = "tmp.pytest_cache.lastfailed"
     if os.path.exists(frozen_failed_tests_file) and not confirm:
@@ -2089,7 +2092,7 @@ def _get_failed_tests(file_name: str) -> List[str]:
 
 @task
 def pytest_failed(  # type: ignore
-        ctx, use_frozen_list=True, report="tests", file_name="",
+        ctx, use_frozen_list=True, target_type="tests", file_name="",
     pbcopy=True):
     """
     Process the list of failed tests from a pytest run.
@@ -2115,6 +2118,7 @@ def pytest_failed(  # type: ignore
     _ = ctx
     # Read file.
     if not file_name:
+        dir_name = "."
         pytest_failed_tests_file = os.path.join(dir_name, ".pytest_cache/v/cache/lastfailed")
         frozen_failed_tests_file = "tmp.pytest_cache.lastfailed"
         if use_frozen_list:
@@ -2140,18 +2144,18 @@ def pytest_failed(  # type: ignore
         _LOG.debug("test=%s -> (%s, %s, %s)", test, file_name, test_class, test_method)
         if not os.path.exists(file_name):
             _LOG.warning("Can't find file '%s'", file_name)
-        if report == "tests":
+        if target_type == "tests":
             targets.append(test)
-        elif report == "files":
+        elif target_type == "files":
             targets.append(file_name)
-        elif report == "classes":
+        elif target_type == "classes":
             targets.append(f"{file_name}::{test_class}")
         else:
-            dbg.dfatal(f"Invalid report='{report}'")
+            dbg.dfatal(f"Invalid target_type='{target_type}'")
     # Package the output.
     _LOG.debug("res=%s", str(targets))
     targets = hlist.remove_duplicates(targets)
-    _LOG.info("Found %d pytest targets", len(targets))
+    _LOG.info("Found %d pytest '%s' targets", len(targets), target_type)
     dbg.dassert_isinstance(targets, list)
     res = " ".join(targets)
     _LOG.debug("res=%s", str(res))
