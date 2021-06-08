@@ -28,6 +28,9 @@ def validate_configs(configs: List[cfg.Config]) -> None:
 
 
 def configs_to_str(configs: List[cfg.Config]) -> str:
+    """
+    Print a list of configs into a readable string.
+    """
     txt = []
     for i, config in enumerate(configs):
         txt.append("# %s/%s" % (i + 1, len(configs)))
