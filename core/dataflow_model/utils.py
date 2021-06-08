@@ -38,7 +38,7 @@ def add_experiment_arg(
     Add common command line options to run the experiments.
     """
     parser.add_argument(
-        "--dst_dir",
+        "--src_dir",
         action="store",
         required=True,
         help="Directory storing the results",
@@ -199,14 +199,14 @@ def get_configs_from_command_line(args: argparse.Namespace) -> List[cfg.Config]:
 
     The configs are patched with all the information from the command
     line (e.g., `idx`, `config_builder`, `experiment_builder`,
-    `dst_dir`, `experiment_result_dir`).
+    `src_dir`, `experiment_result_dir`).
     """
     # Build the map with the config parameters.
     config_builder = args.config_builder
     configs = cfgb.get_configs_from_builder(config_builder)
     params = {
         "config_builder": args.config_builder,
-        "dst_dir": args.dst_dir,
+        "src_dir": args.dst_dir,
     }
     if hasattr(args, "experiment_builder"):
         params["experiment_builder"] = args.experiment_builder
@@ -278,24 +278,24 @@ def save_experiment_result_bundle(
     hpickle.to_pickle(obj, path)
 
 
-# TODO(gp): dst_dir -> src_dir
 # TODO(gp): We might want also to compare to the original experiments Configs.
 def load_experiment_artifacts(
-    dst_dir: str, file_name: str, selected_idxs: Optional[Iterable[int]] = None
+    src_dir: str, file_name: str, selected_idxs: Optional[Iterable[int]] = None
 ) -> Dict[int, Any]:
     """
-    Load according to `file_name` extension.
+    Load all the files in dirs under `src_dir` that match `file_name`.
 
-    Assumes subdirectories withing `dst_dir` have the following structure:
+    This function assumes subdirectories withing `dst_dir` have the following
+    structure:
     ```
     {dst_dir}/result_{idx}/{file_name}
     ```
     where `idx` denotes an integer encoded in the subdirectory name.
 
-    The function returns the contents of the files, indexed by the integer
-    extracted from the subdirectory index name.
+    The function returns the contents of the files, indexed by the integer extracted
+    from the subdirectory index name.
 
-    :param dst_dir: directory containing subdirectories of experiment results
+    :param src_dir: directory containing subdirectories of experiment results
         It is the directory that was specified as `--dst_dir` in `run_experiment.py`
         and `run_notebook.py`
     :param file_name: the file name within each run results subdirectory to load
@@ -303,16 +303,16 @@ def load_experiment_artifacts(
     :param selected_idxs: specific experiment indices to load
         - `None` (default) loads all available indices
     """
-    _LOG.info("# Load artifacts '%s' from '%s'", file_name, dst_dir)
-    # Retrieve all the subdirectories in `dst_dir`.
-    subdirs = [d for d in glob.glob(f"{dst_dir}/result_*") if os.path.isdir(d)]
-    _LOG.info("Found %d experiment subdirs in '%s'", len(subdirs), dst_dir)
+    _LOG.info("# Load artifacts '%s' from '%s'", file_name, src_dir)
+    # Retrieve all the subdirectories in `src_dir`.
+    subdirs = [d for d in glob.glob(f"{src_dir}/result_*") if os.path.isdir(d)]
+    _LOG.info("Found %d experiment subdirs in '%s'", len(subdirs), src_dir)
     # Build a mapping from "config_idx" to "experiment_dir".
     config_idx_to_dir = {}
     for subdir in subdirs:
         _LOG.debug("subdir='%s'", subdir)
         # E.g., `result_123"
-        m = re.match("^result_(\d+)$", os.path.basename(subdir))
+        m = re.match(r"^result_(\d+)$", os.path.basename(subdir))
         dbg.dassert(m)
         key = int(m.group(1))
         dbg.dassert_not_in(key, config_idx_to_dir)
@@ -330,7 +330,7 @@ def load_experiment_artifacts(
     for key in selected_keys:
         subdir = config_idx_to_dir[key]
         dbg.dassert_dir_exists(subdir)
-        file_name_tmp = os.path.join(dst_dir, subdir, file_name)
+        file_name_tmp = os.path.join(src_dir, subdir, file_name)
         _LOG.info("Loading '%s'", file_name_tmp)
         if not os.path.exists(file_name_tmp):
             _LOG.warning("Can't find '{file_name_tmp}': skipping")

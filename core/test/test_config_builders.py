@@ -96,8 +96,7 @@ def _get_test_config_2() -> cfg.Config:
 # #############################################################################
 
 
-# TODO(gp): -> Test_generate_default_config_variants1
-class TestGenerateDefaultConfigVariants(hut.TestCase):
+class Test_generate_default_config_variants1(hut.TestCase):
     def test_add_var_params(self) -> None:
         """
         Verify that Cartesian product of configs with varying parameters is
