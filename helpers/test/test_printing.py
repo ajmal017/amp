@@ -124,7 +124,7 @@ class Test_log(hut.TestCase):
 
 
 class Test_sort_dictionary(hut.TestCase):
-    def test1(self):
+    def test1(self) -> None:
         dict_ = {
             "tool": {
                 "poetry": {
@@ -219,8 +219,7 @@ class TestHelloWorld(hut.TestCase):
         single_val: hello
         zscore:
           style: gaz
-          com: 28
-        """
+          com: 28"""
         act = hprint.dedent(txt)
         exp = """read_data:
   file_name: foo_bar.txt

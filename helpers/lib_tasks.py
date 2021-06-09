@@ -1734,7 +1734,7 @@ def find_check_string_output(  # type: ignore
     dir_name = file_names[0]
     # Find the only file underneath that dir.
     dbg.dassert_dir_exists(dir_name)
-    cmd = f"find {dir_name} -name '*.txt' -type f"
+    cmd = f"find {dir_name} -name 'test.txt' -type f"
     _, file_name = hsinte.system_to_one_line(cmd)
     dbg.dassert_file_exists(file_name)
     # Read the content of the file.
@@ -2082,18 +2082,24 @@ def pytest_clean(ctx):  # type: ignore
 
 
 @task
-def pytest_freeze_failed_test_list(  # type: ignore
-        ctx, confirm=False):
+def pytest_freeze_failed_test_list(ctx, confirm=False):  # type: ignore
     """
-    Copy last list of failed tests so as not overwrite with successive pytest runs.
+    Copy last list of failed tests so as not overwrite with successive pytest
+    runs.
     """
     _report_task()
     dir_name = "."
-    pytest_failed_tests_file = os.path.join(dir_name, ".pytest_cache/v/cache/lastfailed")
+    pytest_failed_tests_file = os.path.join(
+        dir_name, ".pytest_cache/v/cache/lastfailed"
+    )
     frozen_failed_tests_file = "tmp.pytest_cache.lastfailed"
     if os.path.exists(frozen_failed_tests_file) and not confirm:
-        dbg.dfatal("File {frozen_failed_tests_file} already exists. Re-run with --confirm to overwrite")
-    _LOG.info(f"Copying '{pytest_failed_tests_file}' to '{frozen_failed_tests_file}'")
+        dbg.dfatal(
+            "File {frozen_failed_tests_file} already exists. Re-run with --confirm to overwrite"
+        )
+    _LOG.info(
+        "Copying '%s' to '%s'", pytest_failed_tests_file, frozen_failed_tests_file
+    )
     # Make a copy of the pytest file.
     dbg.dassert_file_exists(pytest_failed_tests_file)
     cmd = f"cp {pytest_failed_tests_file} {frozen_failed_tests_file}"
@@ -2115,8 +2121,13 @@ def _get_failed_tests(file_name: str) -> List[str]:
 
 @task
 def pytest_failed(  # type: ignore
-        ctx, use_frozen_list=True, target_type="tests", file_name="",
-        refresh=False, pbcopy=True):
+    ctx,
+    use_frozen_list=True,
+    target_type="tests",
+    file_name="",
+    refresh=False,
+    pbcopy=True,
+):
     """
     Process the list of failed tests from a pytest run.
 
@@ -2146,10 +2157,14 @@ def pytest_failed(  # type: ignore
     # Read file.
     if not file_name:
         dir_name = "."
-        pytest_failed_tests_file = os.path.join(dir_name, ".pytest_cache/v/cache/lastfailed")
+        pytest_failed_tests_file = os.path.join(
+            dir_name, ".pytest_cache/v/cache/lastfailed"
+        )
         frozen_failed_tests_file = "tmp.pytest_cache.lastfailed"
         if use_frozen_list:
-            if os.path.exists(pytest_failed_tests_file) and not os.path.exists(frozen_failed_tests_file):
+            if os.path.exists(pytest_failed_tests_file) and not os.path.exists(
+                frozen_failed_tests_file
+            ):
                 _LOG.warning("Freezing the pytest outcomes")
                 pytest_freeze_failed_test_list(ctx)
             file_name = frozen_failed_tests_file
@@ -2175,18 +2190,30 @@ def pytest_failed(  # type: ignore
             test_class = data[1]
         if len(data) >= 3:
             test_method = data[2]
-        _LOG.debug("test=%s -> (%s, %s, %s)", test, file_name, test_class, test_method)
+        _LOG.debug(
+            "test=%s -> (%s, %s, %s)", test, file_name, test_class, test_method
+        )
         if not os.path.exists(file_name):
             _LOG.warning("Can't find file '%s'", file_name)
         if target_type == "tests":
             targets.append(test)
         elif target_type == "files":
-            dbg.dassert_ne(file_name, "")
-            targets.append(file_name)
+            if file_name != "":
+                targets.append(file_name)
+            else:
+                _LOG.warning(
+                    "Skipping test='%s' since file_name='%s'", test, file_name
+                )
         elif target_type == "classes":
-            dbg.dassert_ne(file_name, "")
-            dbg.dassert_ne(test_class, "")
-            targets.append(f"{file_name}::{test_class}")
+            if file_name != "" and test_class != "":
+                targets.append(f"{file_name}::{test_class}")
+            else:
+                _LOG.warning(
+                    "Skipping test='%s' since file_name='%s', test_class='%s'",
+                    test,
+                    file_name,
+                    test_class,
+                )
         else:
             dbg.dfatal(f"Invalid target_type='{target_type}'")
     # Package the output.

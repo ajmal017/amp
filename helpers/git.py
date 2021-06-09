@@ -541,7 +541,7 @@ def purify_docker_file_from_git_client(
     file_name: str,
     super_module: Optional[bool],
     dir_depth: int = 1,
-    mode: str = "return_all_results"
+    mode: str = "return_all_results",
 ) -> Tuple[bool, str]:
     """
     Convert a file or dir that was generated inside Docker to a file in the
