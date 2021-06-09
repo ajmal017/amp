@@ -610,10 +610,7 @@ class TestLibTasksGetDockerCmd1(_LibTasksTestCase):
 # #############################################################################
 
 
-class TestLibRunTests1(hut.TestCase):
-    """
-    Test `_build_run_command_line()`.
-    """
+class Test_build_run_command_line1(hut.TestCase):
 
     def test_run_fast_tests1(self) -> None:
         """
@@ -625,6 +622,7 @@ class TestLibRunTests1(hut.TestCase):
         skip_submodules = False
         coverage = False
         collect_only = False
+        tee_to_file = False
         #
         skipped_tests = "not slow and not superslow"
         act = ltasks._build_run_command_line(
@@ -634,6 +632,8 @@ class TestLibRunTests1(hut.TestCase):
             skip_submodules,
             coverage,
             collect_only,
+            tee_to_file,
+            #
             skipped_tests,
         )
         exp = 'pytest -m "not slow and not superslow"'
@@ -649,6 +649,7 @@ class TestLibRunTests1(hut.TestCase):
         skip_submodules = False
         coverage = True
         collect_only = True
+        tee_to_file = False
         #
         skipped_tests = "not slow and not superslow"
         act = ltasks._build_run_command_line(
@@ -658,6 +659,8 @@ class TestLibRunTests1(hut.TestCase):
             skip_submodules,
             coverage,
             collect_only,
+            tee_to_file,
+            #
             skipped_tests,
         )
         exp = (
@@ -727,6 +730,7 @@ class TestLibRunTests1(hut.TestCase):
         skip_submodules = True
         coverage = False
         collect_only = False
+        tee_to_file = False
         #
         skipped_tests = ""
         act = ltasks._build_run_command_line(
@@ -736,12 +740,40 @@ class TestLibRunTests1(hut.TestCase):
             skip_submodules,
             coverage,
             collect_only,
+            tee_to_file,
             skipped_tests,
         )
         exp = (
-            "pytest TestLibRunTests1.test_run_fast_tests4/tmp.scratch/"
+            "pytest Test_build_run_command_line1.test_run_fast_tests4/tmp.scratch/"
             "test/test_that.py"
         )
+        self.assert_equal(act, exp)
+
+    def test_run_fast_tests5(self) -> None:
+        """
+        Basic run fast tests tee-ing to a file.
+        """
+        pytest_opts = ""
+        pytest_mark = ""
+        dir_name = ""
+        skip_submodules = False
+        coverage = False
+        collect_only = False
+        tee_to_file = True
+        #
+        skipped_tests = "not slow and not superslow"
+        act = ltasks._build_run_command_line(
+            pytest_opts,
+            pytest_mark,
+            dir_name,
+            skip_submodules,
+            coverage,
+            collect_only,
+            tee_to_file,
+            #
+            skipped_tests,
+        )
+        exp = 'pytest -m "not slow and not superslow" 2>&1 | tee tmp.pytest.log'
         self.assert_equal(act, exp)
 
 

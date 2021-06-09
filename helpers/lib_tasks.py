@@ -1770,11 +1770,14 @@ def _build_run_command_line(
     skip_submodules: bool,
     coverage: bool,
     collect_only: bool,
-    #
+    tee_to_file: bool,
+    # Different params than the `run_*_tests()`.
     skipped_tests: str,
 ) -> str:
     """
-    Same params as run_fast_tests().
+    Build the pytest run command.
+
+    Same params as `run_fast_tests()`.
 
     :param skipped_tests: -m option for pytest
     """
@@ -1811,6 +1814,8 @@ def _build_run_command_line(
     # TODO(gp): Use _to_multi_line_cmd()
     pytest_opts = " ".join([po.rstrip().lstrip() for po in pytest_opts_tmp])
     cmd = f"pytest {pytest_opts}"
+    if tee_to_file:
+        cmd += " 2>&1 | tee tmp.pytest.log"
     return cmd
 
 
@@ -1861,6 +1866,7 @@ def _run_tests(
     skip_submodules: bool,
     coverage: bool,
     collect_only: bool,
+    tee_to_file: bool,
     skipped_tests: str,
     start_coverage_script: bool = True,
 ) -> None:
@@ -1872,6 +1878,7 @@ def _run_tests(
         skip_submodules,
         coverage,
         collect_only,
+        tee_to_file,
         skipped_tests,
     )
     # Execute the command line.
@@ -1889,6 +1896,7 @@ def run_fast_tests(  # type: ignore
     skip_submodules=False,
     coverage=False,
     collect_only=False,
+    tee_to_file=False,
 ):
     """
     Run fast tests.
@@ -1900,6 +1908,7 @@ def run_fast_tests(  # type: ignore
     :param skip_submodules: ignore all the dir inside a submodule
     :param coverage: enable coverage computation
     :param collect_only: do not run tests but show what will be executed
+    :param tee_to_file: save output of pytest in `tmp.pytest.log`
     """
     _report_task()
     skipped_tests = "not slow and not superslow"
@@ -1912,6 +1921,7 @@ def run_fast_tests(  # type: ignore
         skip_submodules,
         coverage,
         collect_only,
+        tee_to_file,
         skipped_tests,
     )
 
@@ -1926,9 +1936,12 @@ def run_slow_tests(  # type: ignore
     skip_submodules=False,
     coverage=False,
     collect_only=False,
+    tee_to_file=False,
 ):
     """
     Run slow tests.
+
+    Same params as `invoke run_fast_tests`.
     """
     _report_task()
     skipped_tests = "slow and not superslow"
@@ -1941,6 +1954,7 @@ def run_slow_tests(  # type: ignore
         skip_submodules,
         coverage,
         collect_only,
+        tee_to_file,
         skipped_tests,
     )
 
@@ -1955,9 +1969,12 @@ def run_superslow_tests(  # type: ignore
     skip_submodules=False,
     coverage=False,
     collect_only=False,
+    tee_to_file=False,
 ):
     """
     Run superslow tests.
+
+    Same params as `invoke run_fast_tests`.
     """
     _report_task()
     skipped_tests = "not slow and superslow"
@@ -1970,6 +1987,7 @@ def run_superslow_tests(  # type: ignore
         skip_submodules,
         coverage,
         collect_only,
+        tee_to_file,
         skipped_tests,
     )
 
@@ -1984,9 +2002,12 @@ def run_fast_slow_tests(  # type: ignore
     skip_submodules=False,
     coverage=False,
     collect_only=False,
+    tee_to_file=False,
 ):
     """
     Run fast and slow tests.
+
+    Same params as `invoke run_fast_tests`.
     """
     _report_task()
     skipped_tests = "not superslow"
@@ -1999,6 +2020,7 @@ def run_fast_slow_tests(  # type: ignore
         skip_submodules,
         coverage,
         collect_only,
+        tee_to_file,
         skipped_tests,
     )
 
@@ -2010,9 +2032,10 @@ def traceback(ctx, log_name="", purify=True):  # type: ignore
 
     ```
     # Run a unit test.
-    > pytest helpers/test/test_traceback.py 2>&1 | tee log.txt
+    > pytest helpers/test/test_traceback.py 2>&1 | tee tmp.pytest.log
+    > pytest.sh helpers/test/test_traceback.py
     # Parse the traceback
-    > invoke traceback -i log.txt
+    > invoke traceback -i tmp.pytest.log
     ```
 
     :param log_name: the file with the traceback
