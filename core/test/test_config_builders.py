@@ -56,7 +56,7 @@ class TestGetConfigFromEnv(hut.TestCase):
 
 
 # TODO(gp): This is repeated code. Consider unifying it.
-def _get_test_config_1() -> cfg.Config:
+def _get_test_config_1() -> cconfig.Config:
     """
     Build a test config for Crude Oil asset.
 
@@ -127,7 +127,7 @@ class Test_generate_default_config_variants1(hut.TestCase):
 class TestBuildMultipleConfigs(hut.TestCase):
     def test_existing_path(self) -> None:
         # Create config template.
-        config_template = cfg.Config()
+        config_template = cconfig.Config()
         config_tmp = config_template.add_subconfig("read_data")
         config_tmp["symbol"] = None
         config_tmp = config_template.add_subconfig("resample")
@@ -138,14 +138,14 @@ class TestBuildMultipleConfigs(hut.TestCase):
             ("resample", "rule"): ["5T", "7T", "10T"],
         }
         # Check the results.
-        actual_result = cfgb.build_multiple_configs(
+        actual_result = cconfig.build_multiple_configs(
             config_template, params_variants
         )
         self.check_string(str(actual_result))
 
     def test_non_existent_path(self) -> None:
         # Create config template.
-        config_template = cfg.Config()
+        config_template = cconfig.Config()
         config_tmp = config_template.add_subconfig("read_data")
         config_tmp["symbol"] = None
         config_tmp = config_template.add_subconfig("resample")
@@ -157,11 +157,11 @@ class TestBuildMultipleConfigs(hut.TestCase):
         }
         # Check the results.
         with self.assertRaises(ValueError):
-            _ = cfgb.build_multiple_configs(config_template, params_variants)
+            _ = cconfig.build_multiple_configs(config_template, params_variants)
 
     def test_not_nan_parameter(self) -> None:
         # Create config template.
-        config_template = cfg.Config()
+        config_template = cconfig.Config()
         config_tmp = config_template.add_subconfig("read_data")
         config_tmp["symbol"] = "CL"
         config_tmp = config_template.add_subconfig("resample")
@@ -173,4 +173,4 @@ class TestBuildMultipleConfigs(hut.TestCase):
         }
         # Check the results.
         with self.assertRaises(ValueError):
-            _ = cfgb.build_multiple_configs(config_template, params_variants)
+            _ = cconfig.build_multiple_configs(config_template, params_variants)

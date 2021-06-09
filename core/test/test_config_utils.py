@@ -2,17 +2,16 @@ import collections
 
 import pandas as pd
 
-import core.config as cfg
-import core.config_utils as cfgut
+import core.config as cconfig
 import helpers.printing as hprint
 import helpers.unit_test as hut
 
 
-def _get_test_config1() -> cfg.Config:
+def _get_test_config1() -> cconfig.Config:
     """
     Build a test config for Crude Oil asset.
     """
-    config = cfg.Config()
+    config = cconfig.Config()
     tmp_config = config.add_subconfig("build_model")
     tmp_config["activation"] = "sigmoid"
     tmp_config = config.add_subconfig("build_targets")
@@ -24,7 +23,7 @@ def _get_test_config1() -> cfg.Config:
     return config
 
 
-def _get_test_config2() -> cfg.Config:
+def _get_test_config2() -> cconfig.Config:
     """
     Same as `_get_test_config1()` but with "Gold" instead of "Crude Oil" for
     target asset.
@@ -34,7 +33,7 @@ def _get_test_config2() -> cfg.Config:
     return config
 
 
-def _get_test_config3() -> cfg.Config:
+def _get_test_config3() -> cconfig.Config:
     """
     :return: Test config.
     """
@@ -59,7 +58,7 @@ class Test_validate_configs1(hut.TestCase):
         ]
         # Make sure function raises an error.
         with self.assertRaises(AssertionError) as cm:
-            cfgut.validate_configs(configs)
+            cconfig.validate_configs(configs)
         act = str(cm.exception)
         self.check_string(act, fuzzy_match=True)
 
@@ -72,7 +71,7 @@ class Test_validate_configs1(hut.TestCase):
             _get_test_config2(),
             _get_test_config3(),
         ]
-        cfgut.validate_configs(configs)
+        cconfig.validate_configs(configs)
 
 
 # #############################################################################
@@ -89,7 +88,7 @@ class Test_get_config_from_flattened_dict1(hut.TestCase):
                 (("zscore", "com"), 28),
             ]
         )
-        config = cfgut.get_config_from_flattened_dict(flattened)
+        config = cconfig.get_config_from_flattened_dict(flattened)
         act = str(config)
         exp = r"""
         read_data:
@@ -108,10 +107,10 @@ class Test_get_config_from_flattened_dict1(hut.TestCase):
                 (("read_data", "file_name"), "foo_bar.txt"),
                 (("read_data", "nrows"), 999),
                 (("single_val",), "hello"),
-                (("zscore",), cfg.Config()),
+                (("zscore",), cconfig.Config()),
             ]
         )
-        config = cfgut.get_config_from_flattened_dict(flattened)
+        config = cconfig.get_config_from_flattened_dict(flattened)
         act = str(config)
         exp = r"""
         read_data:
@@ -140,7 +139,7 @@ class Test_get_config_from_nested_dict1(hut.TestCase):
                 "com": 28,
             },
         }
-        config = cfgut.get_config_from_nested_dict(nested)
+        config = cconfig.get_config_from_nested_dict(nested)
         act = str(config)
         exp = r"""
         read_data:
@@ -160,9 +159,9 @@ class Test_get_config_from_nested_dict1(hut.TestCase):
                 "nrows": 999,
             },
             "single_val": "hello",
-            "zscore": cfg.Config(),
+            "zscore": cconfig.Config(),
         }
-        config = cfgut.get_config_from_nested_dict(nested)
+        config = cconfig.get_config_from_nested_dict(nested)
         act = str(config)
         exp = r"""
         read_data:
@@ -186,7 +185,7 @@ class Test_intersect_configs1(hut.TestCase):
         # Prepare test config.
         config = _get_test_config1()
         # FInd intersection of two same configs.
-        actual = cfgut.intersect_configs([config, config])
+        actual = cconfig.intersect_configs([config, config])
         # Verify that intersection is equal to initial config.
         self.assertEqual(str(actual), str(config))
 
@@ -196,7 +195,7 @@ class Test_intersect_configs1(hut.TestCase):
         """
         config1 = _get_test_config1()
         config2 = _get_test_config2()
-        intersection = cfgut.intersect_configs([config1, config2])
+        intersection = cconfig.intersect_configs([config1, config2])
         act = str(intersection)
         exp = r"""
         build_model:
@@ -219,7 +218,7 @@ class Test_subtract_configs1(hut.TestCase):
         Verify that the difference of two configs is empty.
         """
         config = _get_test_config1()
-        diff = cfgut.subtract_config(config, config)
+        diff = cconfig.subtract_config(config, config)
         # The difference should be empty.
         self.assertFalse(diff)
 
@@ -230,7 +229,7 @@ class Test_subtract_configs1(hut.TestCase):
         """
         config1 = _get_test_config1()
         config2 = _get_test_config2()
-        act = cfgut.subtract_config(config1, config2)
+        act = cconfig.subtract_config(config1, config2)
         exp = """
         build_targets:
           target_asset: Crude Oil"""
@@ -247,8 +246,8 @@ class Test_diff_configs1(hut.TestCase):
         Verify that the difference of two configs is empty.
         """
         config = _get_test_config1()
-        act = cfgut.diff_configs([config, config])
-        exp = [cfg.Config(), cfg.Config()]
+        act = cconfig.diff_configs([config, config])
+        exp = [cconfig.Config(), cconfig.Config()]
         self.assert_equal(str(act), str(exp))
 
     def test1(self) -> None:
@@ -278,14 +277,14 @@ class Test_diff_configs1(hut.TestCase):
         exp = hprint.dedent(exp)
         self.assert_equal(str(config2), exp)
         #
-        act = cfgut.diff_configs([config1, config2])
+        act = cconfig.diff_configs([config1, config2])
         exp = [
             #
-            cfgut.get_config_from_nested_dict(
+            cconfig.get_config_from_nested_dict(
                 {"build_targets": {"target_asset": "Crude Oil"}}
             ),
             #
-            cfgut.get_config_from_nested_dict(
+            cconfig.get_config_from_nested_dict(
                 {"build_targets": {"target_asset": "Gold"}}
             ),
         ]
@@ -296,20 +295,20 @@ class Test_diff_configs1(hut.TestCase):
         config2 = _get_test_config2()
         config3 = _get_test_config3()
         #
-        act = cfgut.diff_configs([config1, config2, config3])
+        act = cconfig.diff_configs([config1, config2, config3])
         act = "\n".join(map(str, act))
         #
         exp = [
             #
-            cfgut.get_config_from_nested_dict(
+            cconfig.get_config_from_nested_dict(
                 {"build_targets": {"target_asset": "Crude Oil"}}
             ),
             #
-            cfgut.get_config_from_nested_dict(
+            cconfig.get_config_from_nested_dict(
                 {"build_targets": {"target_asset": "Gold"}}
             ),
             #
-            cfgut.get_config_from_nested_dict(
+            cconfig.get_config_from_nested_dict(
                 {"build_targets": {"target_asset": "Crude Oil"}, "hello": "world"}
             ),
         ]
@@ -328,7 +327,7 @@ class Test_convert_to_dataframe1(hut.TestCase):
         config1 = _get_test_config1()
         config2 = _get_test_config2()
         # Convert configs to dataframe.
-        act = cfgut.convert_to_dataframe([config1, config2])
+        act = cconfig.convert_to_dataframe([config1, config2])
         act = hut.convert_df_to_string(act, index=True)
         #
         exp = pd.DataFrame(
@@ -357,7 +356,7 @@ class Test_build_config_diff_dataframe1(hut.TestCase):
         config1 = _get_test_config1()
         config2 = _get_test_config2()
         #
-        act = cfgut.build_config_diff_dataframe(
+        act = cconfig.build_config_diff_dataframe(
             {"1": config1, "2": config2})
         act = hut.convert_df_to_string(act, index=True)
         #
@@ -375,7 +374,7 @@ class Test_build_config_diff_dataframe1(hut.TestCase):
         """
         config1 = _get_test_config1()
         #
-        act = cfgut.build_config_diff_dataframe(
+        act = cconfig.build_config_diff_dataframe(
             {"1": config1, "2": config1})
         act = hut.convert_df_to_string(act, index=True)
         #
@@ -394,7 +393,7 @@ class Test_build_config_diff_dataframe1(hut.TestCase):
         config2 = _get_test_config2()
         config3 = _get_test_config3()
         #
-        act = cfgut.build_config_diff_dataframe(
+        act = cconfig.build_config_diff_dataframe(
             {"1": config1, "2": config2, "3": config3})
         act = hut.convert_df_to_string(act, index=True)
         #

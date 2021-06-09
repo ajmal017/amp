@@ -1,7 +1,7 @@
 """
 Import as:
 
-import core.config_builders as cfgb
+import core.config.builder as cfgb
 """
 
 import collections
@@ -22,8 +22,8 @@ from typing import (
     cast,
 )
 
-import core.config as cfg
-import core.config_utils as cfgut
+import core.config.config_ as cconfig
+import core.config.utils as cfgut
 import helpers.dbg as dbg
 import helpers.pickle_ as hpickle
 

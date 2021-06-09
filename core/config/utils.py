@@ -10,7 +10,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import pandas as pd
 
-import core.config.config_ as cfg
+import core.config.config_ as cconfig
 import helpers.dbg as dbg
 import helpers.dict as dct
 
