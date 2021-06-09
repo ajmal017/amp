@@ -2136,8 +2136,15 @@ def pytest_failed(  # type: ignore
     # Process the tests.
     targets = []
     for test in tests:
-        m = re.match("^(\S+)::(\S+)::(\S+)$", test)
-        dbg.dassert(m, "Invalid test='%s'", test)
+        data = test.split("::")
+        if len(data) < 3:
+            # E.g., dev_scripts/testing/test/test_run_tests.py
+            # E.g., helpers/test/helpers/test/test_list.py::Test_list_1
+            _LOG.debug("Found test='%s': skipping", test)
+            continue
+        # E.g., core/dataflow/nodes/test/test_volatility_models.py::TestSmaModel::test5
+        m = re.match("^(\S+.py)::(\S+)::(\S+)$", test)
+        dbg.dassert(m, "Can't parse test='%s'", test)
         file_name = m.group(1)
         test_class = m.group(2)
         test_method = m.group(3)

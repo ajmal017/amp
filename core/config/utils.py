@@ -1,7 +1,7 @@
 """
 Import as:
 
-import core.config_utils as cfgut
+import core.config.utils as cfgut
 """
 
 import collections
@@ -10,24 +10,24 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import pandas as pd
 
-import core.config as cfg
+import core.config.config_ as cfg
 import helpers.dbg as dbg
 import helpers.dict as dct
 
 _LOG = logging.getLogger(__name__)
 
 
-def validate_configs(configs: List[cfg.Config]) -> None:
+def validate_configs(configs: List[cconfig.Config]) -> None:
     """
     Assert if the list of configs contains duplicates.
     """
-    dbg.dassert_container_type(configs, List, cfg.Config)
+    dbg.dassert_container_type(configs, List, cconfig.Config)
     dbg.dassert_no_duplicates(
         list(map(str, configs)), "There are duplicate configs in passed list"
     )
 
 
-def configs_to_str(configs: List[cfg.Config]) -> str:
+def configs_to_str(configs: List[cconfig.Config]) -> str:
     """
     Print a list of configs into a readable string.
     """
@@ -41,7 +41,7 @@ def configs_to_str(configs: List[cfg.Config]) -> str:
 
 def get_config_from_flattened_dict(
     flattened: Dict[Tuple[str], Any]
-) -> cfg.Config:
+) -> cconfig.Config:
     """
     Build a config from the flattened config representation.
 
@@ -50,13 +50,13 @@ def get_config_from_flattened_dict(
     """
     dbg.dassert_isinstance(flattened, dict)
     dbg.dassert(flattened)
-    config = cfg.Config()
+    config = cconfig.Config()
     for k, v in flattened.items():
         config[k] = v
     return config
 
 
-def get_config_from_nested_dict(nested: Dict[str, Any]) -> cfg.Config:
+def get_config_from_nested_dict(nested: Dict[str, Any]) -> cconfig.Config:
     """
     Build a `Config` from a nested dict.
 
@@ -85,7 +85,7 @@ def make_hashable(obj: Any) -> collections.abc.Hashable:
     return tuple(obj)
 
 
-def intersect_configs(configs: Iterable[cfg.Config]) -> cfg.Config:
+def intersect_configs(configs: Iterable[cconfig.Config]) -> cconfig.Config:
     """
     Return a config formed by taking the intersection of configs.
 
@@ -111,14 +111,14 @@ def intersect_configs(configs: Iterable[cfg.Config]) -> cfg.Config:
     intersection_of_flattened = set.intersection(*sets)
     # Create intersection.
     # Rely on the fact that Config keys are of type `str`.
-    intersection = cfg.Config()
+    intersection = cconfig.Config()
     for k, v in reference_config.items():
         if (k, make_hashable(v)) in intersection_of_flattened:
             intersection[k] = v
     return intersection
 
 
-def subtract_config(minuend: cfg.Config, subtrahend: cfg.Config) -> cfg.Config:
+def subtract_config(minuend: cconfig.Config, subtrahend: cconfig.Config) -> cconfig.Config:
     """
     Return a `Config` defined via minuend - subtrahend.
 
@@ -130,14 +130,14 @@ def subtract_config(minuend: cfg.Config, subtrahend: cfg.Config) -> cfg.Config:
     dbg.dassert(minuend)
     flat_m = minuend.flatten()
     flat_s = subtrahend.flatten()
-    diff = cfg.Config()
+    diff = cconfig.Config()
     for k, v in flat_m.items():
         if (k not in flat_s) or (flat_m[k] != flat_s[k]):
             diff[k] = v
     return diff
 
 
-def diff_configs(configs: Iterable[cfg.Config]) -> List[cfg.Config]:
+def diff_configs(configs: Iterable[cconfig.Config]) -> List[cconfig.Config]:
     """
     Diff `Config`s with respect to their common intersection.
 
@@ -160,7 +160,7 @@ def diff_configs(configs: Iterable[cfg.Config]) -> List[cfg.Config]:
 # # #############################################################################
 
 
-def convert_to_series(config: cfg.Config) -> pd.Series:
+def convert_to_series(config: cconfig.Config) -> pd.Series:
     """
     Convert a config into a flattened series representation.
 
@@ -168,7 +168,7 @@ def convert_to_series(config: cfg.Config) -> pd.Series:
     - `str` tuple paths are joined on "."
     - Empty leaf configs are converted to an empty tuple
     """
-    dbg.dassert_isinstance(config, cfg.Config)
+    dbg.dassert_isinstance(config, cconfig.Config)
     dbg.dassert(config, msg="`config` is empty")
     flat = config.flatten()
     keys: List[str] = []
@@ -176,7 +176,7 @@ def convert_to_series(config: cfg.Config) -> pd.Series:
     for k, v in flat.items():
         key = ".".join(k)
         keys.append(key)
-        if isinstance(v, cfg.Config):
+        if isinstance(v, cconfig.Config):
             vals.append(tuple())
         else:
             vals.append(v)
@@ -185,7 +185,7 @@ def convert_to_series(config: cfg.Config) -> pd.Series:
     return srs
 
 
-def convert_to_dataframe(configs: Iterable[cfg.Config]) -> pd.DataFrame:
+def convert_to_dataframe(configs: Iterable[cconfig.Config]) -> pd.DataFrame:
     """
     Convert multiple configs into flattened dataframe representation.
     """
