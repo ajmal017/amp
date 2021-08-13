@@ -37,26 +37,26 @@ def solipsism_context() -> Iterator:
     Context manager to isolate an `asyncio_solipsism` event loop.
     """
     # Use the variation of solipsistic `EventLoop` above.
-    loop = _EventLoop()
-    asyncio.set_event_loop(loop)
+    event_loop = _EventLoop()
+    asyncio.set_event_loop(event_loop)
     try:
-        yield loop
+        yield event_loop
     finally:
         asyncio.set_event_loop(None)
 
 
 # TODO(gp): For some reason `asyncio.run()` doesn't seem to pick up the set event
 #  loop. So we use a re-implementation of `run` that does that.
-def run(coroutine, loop: Optional[asyncio.AbstractEventLoop] = None) -> Any:
+def run(coroutine, *, event_loop: Optional[asyncio.AbstractEventLoop] = None) -> Any:
     """
     `asyncio.run()` wrapper that allows to use a specified `EventLoop`.
     """
-    if loop is None:
+    if event_loop is None:
         # Use a normal `asyncio` EventLoop.
-        loop = asyncio.new_event_loop()
-    dbg.dassert_issubclass(loop, asyncio.AbstractEventLoop)
+        event_loop = asyncio.new_event_loop()
+    dbg.dassert_issubclass(event_loop, asyncio.AbstractEventLoop)
     try:
-        ret = loop.run_until_complete(coroutine)
+        ret = event_loop.run_until_complete(coroutine)
     finally:
-        loop.close()
+        event_loop.close()
     return ret

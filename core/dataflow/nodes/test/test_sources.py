@@ -259,7 +259,6 @@ class TestRealTimeDataSource1(hut.TestCase):
         # Execute.
         self._helper(rtds)
 
-
     def _helper(self, rtds: dtf.AbstractRealTimeDataSource) -> None:
         # Execute.
         dict_ = rtds.fit()

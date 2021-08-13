@@ -188,8 +188,8 @@ class DiskDataSource(cdnb.DataSource):
         """
         if self.df is not None:  # type: ignore[has-type]
             return
-        df = load_data_from_disk(  # type: ignore[arg-type]
-            **self._load_data_from_disk_kwargs
+        df = load_data_from_disk(
+            **self._load_data_from_disk_kwargs  # type: ignore[arg-type]
         )
         self.df = df
 
@@ -488,23 +488,26 @@ class ReplayedTimeDataSource(AbstractRealTimeDataSource):
     """
     Implement a "replayed" time behavior (see `real_time.py` for details).
 
-    This node is different from `RealTimeDataSource` because the data is computed
-    once and cached, instead of being queried at every invocation.
+    This node is different from `RealTimeDataSource` because the data is
+    computed once and cached, instead of being queried at every
+    invocation.
     """
 
-    def __init__(self, nid: cdtfc.NodeId,
-                 initial_replayed_dt: pd.Timestamp,
-                 get_wall_clock_time: hdatetime.GetWallClockTime,
-                 speed_up_factor: float = 1.0,
-                 **kwargs: Dict[str, Any]) -> None:
-        super().__init__(nid, **kwargs)
+    def __init__(
+        self,
+        nid: cdtfc.NodeId,
+        initial_replayed_dt: pd.Timestamp,
+        get_wall_clock_time: hdatetime.GetWallClockTime,
+        speed_up_factor: float = 1.0,
+        **kwargs: Dict[str, Any]
+    ) -> None:
+        super().__init__(nid, **kwargs)  # type: ignore[arg-type]
         # Store the entire history of the data.
         self._entire_df: Optional[pd.DataFrame] = None
         # Build a ReplayedTime object and extract its wall clock.
         self._replayed_time = cdtfrt.ReplayedTime(
-            initial_replayed_dt,
-            get_wall_clock_time,
-            speed_up_factor)
+            initial_replayed_dt, get_wall_clock_time, speed_up_factor
+        )
         self._get_wall_clock_time = self._replayed_time.get_wall_clock_time
 
     def _get_current_time(self) -> pd.Timestamp:

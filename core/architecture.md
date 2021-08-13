@@ -1,3 +1,9 @@
+<!--ts-->
+   * [Real-time dataflow execution](#real-time-dataflow-execution)
+
+
+
+<!--te-->
 # Real-time dataflow execution
 
 - We have several semantics for "real-time" depending if it's simulated or real,
@@ -27,9 +33,8 @@
     with real-time semantic
 
 - To run a real-time DAG, one needs to:
-  - build a DAG whose data source is a real-time node
+  - Build a DAG whose data source is a real-time node
     - E.g., inject a `RealTimeDataSource` inside `ReturnsPipeline`
-  - create a configuration for the real-time loop (e.g., the period of time
-    to sleep between DAG executions)
-  - run the DAG through the `RealTimeDagRunner`
-
+  - Create a configuration for the real-time loop (e.g., the period of time to
+    sleep between DAG executions)
+  - Run the DAG through the `RealTimeDagRunner`

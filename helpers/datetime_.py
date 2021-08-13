@@ -6,6 +6,7 @@ import helpers.datetime_ as hdatet
 
 # TODO(gp): -> hdatetime
 
+import asyncio
 import calendar
 import datetime
 import logging
@@ -216,7 +217,7 @@ GetWallClockTime = Callable[[], pd.Timestamp]
 
 
 # TODO(gp): -> get_wall_clock_time
-def get_current_time(tz: str, loop=None) -> pd.Timestamp:
+def get_current_time(tz: str, event_loop: Optional[asyncio.AbstractEventLoop]=None) -> pd.Timestamp:
     """
     Return current time in UTC / ET timezone or as a naive time.
 
@@ -224,13 +225,11 @@ def get_current_time(tz: str, loop=None) -> pd.Timestamp:
     since it handles both wall-clock time and "simulated" wall-clock
     time through async-
     """
-    if loop is not None:
+    if event_loop is not None:
         # We accept only hasyncio.EventLoop here. If we are using asyncio
         # EventLoop we rely on wall-clock time instead of `loop.time()`.
-        import asyncio
-
-        dbg.dassert_isinstance(loop, asyncio.AbstractEventLoop)
-        timestamp = loop.get_current_time()
+        dbg.dassert_isinstance(event_loop, asyncio.AbstractEventLoop)
+        timestamp = event_loop.get_current_time()
     else:
         timestamp = datetime.datetime.utcnow()
     timestamp = pd.Timestamp(timestamp, tz=get_UTC_tz())

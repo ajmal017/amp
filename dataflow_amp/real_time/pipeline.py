@@ -6,8 +6,6 @@ import dataflow_amp.real_time.pipeline as dtfartp
 
 import logging
 
-import pandas as pd
-
 import core.config as cconfig
 import core.dataflow as dtf
 import dataflow_amp.returns.pipeline as darp
