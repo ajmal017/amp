@@ -81,6 +81,14 @@ class TestIncrementalDagRunner1(hut.TestCase):
 
 
 class TestRealTimeDagRunner1(hut.TestCase):
+    def test_simulated_replayed_time1(self) -> None:
+        """
+        Use simulated replayed time.
+        """
+        with hasyncio.solipsism_context() as loop:
+            events, result_bundles = self._helper(loop)
+        self._check(events, result_bundles)
+
     def test_replayed_time1(self) -> None:
         """
         Use replayed real-time.
@@ -90,14 +98,6 @@ class TestRealTimeDagRunner1(hut.TestCase):
         events, result_bundles = self._helper(loop)
         # It's difficult to check the output of any real-time test.
         _ = events, result_bundles
-
-    def test_simulated_replayed_time1(self) -> None:
-        """
-        Use simulated replayed time.
-        """
-        with hasyncio.solipsism_context() as loop:
-            events, result_bundles = self._helper(loop)
-        self._check(events, result_bundles)
 
     @staticmethod
     def _helper(
@@ -117,9 +117,7 @@ class TestRealTimeDagRunner1(hut.TestCase):
             "config": config,
             "dag_builder": dag_builder,
             "fit_state": None,
-            #
             "execute_rt_loop_kwargs": execute_rt_loop_kwargs,
-            #
             "dst_dir": None,
         }
         # Run.

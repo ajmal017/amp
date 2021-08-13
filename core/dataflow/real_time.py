@@ -72,7 +72,7 @@ def generate_synthetic_data(
 
 
 # #############################################################################
-# Time generator
+# Replayed and simulated time.
 # #############################################################################
 
 
@@ -174,6 +174,8 @@ def get_data_as_of_datetime(
 
 
 # #############################################################################
+# Real time.
+# #############################################################################
 
 
 def execute_every_2_seconds(datetime_: pd.Timestamp) -> bool:
@@ -192,11 +194,6 @@ def execute_every_5_minutes(datetime_: pd.Timestamp) -> bool:
     ret = datetime_.minute % 5 == 0
     ret = cast(bool, ret)
     return ret
-
-
-# #############################################################################
-# Real time loop.
-# #############################################################################
 
 
 def align_on_even_second(use_time_sleep: bool = False) -> None:
