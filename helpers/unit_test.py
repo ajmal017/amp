@@ -991,8 +991,12 @@ class TestCase(unittest.TestCase):
         :return: dir name
         """
         # Get the dir of the test.
-        dir_name = self._get_current_path(use_only_test_class, test_class_name, test_method_name,
-                                          use_absolute_path)
+        dir_name = self._get_current_path(
+            use_only_test_class,
+            test_class_name,
+            test_method_name,
+            use_absolute_path,
+        )
         # Add `input` to the dir.
         dir_name = os.path.join(dir_name, "input")
         return dir_name
@@ -1009,8 +1013,12 @@ class TestCase(unittest.TestCase):
         test_class_name = None
         test_method_name = None
         use_absolute_path = True
-        dir_name = self._get_current_path(use_only_test_class, test_class_name, test_method_name,
-                                          use_absolute_path)
+        dir_name = self._get_current_path(
+            use_only_test_class,
+            test_class_name,
+            test_method_name,
+            use_absolute_path,
+        )
         # Add `output` to the dir.
         dir_name = os.path.join(dir_name, "output")
         return dir_name
@@ -1106,8 +1114,12 @@ class TestCase(unittest.TestCase):
         test_class_name = None
         test_method_name = None
         use_absolute_path = True
-        dir_name = self._get_current_path(use_only_test_class, test_class_name, test_method_name,
-                                          use_absolute_path)
+        dir_name = self._get_current_path(
+            use_only_test_class,
+            test_class_name,
+            test_method_name,
+            use_absolute_path,
+        )
         _LOG.debug("dir_name=%s", dir_name)
         hio.create_dir(dir_name, incremental=True)
         dbg.dassert_exists(dir_name)
@@ -1461,8 +1473,12 @@ class TestCase(unittest.TestCase):
         test_class_name = None
         test_method_name = None
         use_absolute_path = True
-        dir_name = self._get_current_path(use_only_test_class, test_class_name, test_method_name,
-                                          use_absolute_path)
+        dir_name = self._get_current_path(
+            use_only_test_class,
+            test_class_name,
+            test_method_name,
+            use_absolute_path,
+        )
         _LOG.debug("dir_name=%s", dir_name)
         hio.create_dir(dir_name, incremental=True)
         dbg.dassert_exists(dir_name)

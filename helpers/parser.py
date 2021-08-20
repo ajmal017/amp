@@ -405,7 +405,7 @@ def process_json_output_metadata_args(
     dbg.dassert_isinstance(output_metadata, dict)
     if args.json_output_metadata is None:
         return None
-    file_name = args.json_output_metadata
+    file_name: str = args.json_output_metadata
     _LOG.info("Saving output metadata into file '%s'", file_name)
     if not file_name.endswith(".json"):
         _LOG.warning(
@@ -422,5 +422,5 @@ def read_output_metadata(output_metadata_file: str) -> OutputMetadata:
     """
     Read the output metdata.
     """
-    output_metadata = hio.from_json(output_metadata_file)
+    output_metadata: OutputMetadata = hio.from_json(output_metadata_file)
     return output_metadata

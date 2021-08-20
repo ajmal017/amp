@@ -54,11 +54,8 @@ def get_engine_version(connection: DbConnection) -> str:
     """
     Report information on the SQL engine.
 
-    E.g.,
-    ```
-    PostgreSQL 11.5 on x86_64-pc-linux-gnu
-    compiled by gcc (GCC) 4.8.3 20140911 (Red Hat 4.8.3-9), 64-bit
-    ```
+    E.g., ``` PostgreSQL 11.5 on x86_64-pc-linux-gnu compiled by gcc
+    (GCC) 4.8.3 20140911 (Red Hat 4.8.3-9), 64-bit ```
     """
     query = "SELECT version();"
     df = pd.read_sql_query(query, connection)
@@ -69,7 +66,7 @@ def get_engine_version(connection: DbConnection) -> str:
 
 def get_db_names(connection: DbConnection) -> List[str]:
     """
-  DbConnection  Return the names of the available DBs.
+    DbConnection  Return the names of the available DBs.
 
     E.g., ['postgres', 'rdsadmin', 'template0', 'template1']
     """
@@ -172,9 +169,7 @@ def get_indexes(connection: DbConnection) -> pd.DataFrame:
     return tmp
 
 
-def get_columns(
-    connection: DbConnection, table_name: str
-) -> list:
+def get_columns(connection: DbConnection, table_name: str) -> list:
     query = (
         """SELECT column_name
             FROM information_schema.columns

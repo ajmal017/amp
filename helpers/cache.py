@@ -29,7 +29,7 @@ import helpers.system_interaction as hsyste
 _LOG = logging.getLogger(__name__)
 
 # TODO(gp): Do not commit this.
-#_LOG.debug = _LOG.info
+# _LOG.debug = _LOG.info
 
 
 # #############################################################################
@@ -488,15 +488,14 @@ class _Cached:
             self._disk_cached_func,
         ) = self._create_function_disk_cache()
 
-    def set_function_cache_read_only(self, value=True) -> None:
+        def set_function_cache_read_only(self, value: bool =True) -> None:
         """
         Force the cache to be read-only.
 
-        If the function needs to be executed because the value is not cached, then
-        we assert.
+        If the function needs to be executed because the value is not
+        cached, then we assert.
         """
         # Write a value in the cache directory and then use it to
-        pass
 
     # ///////////////////////////////////////////////////////////////////////////
 
@@ -601,7 +600,9 @@ class _Cached:
             "Cache backend not initialized for %s",
             cache_type,
         )
-        func_id, args_id = memorized_result._get_output_identifiers(*args, **kwargs)
+        func_id, args_id = memorized_result._get_output_identifiers(
+            *args, **kwargs
+        )
         return func_id, args_id
 
     def _has_cached_version(
