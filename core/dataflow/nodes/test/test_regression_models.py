@@ -67,8 +67,8 @@ class TestLinearRegression(hut.TestCase):
         # Generate node config.
         config = cconfig.get_config_from_nested_dict(
             {
-                "x_vars": [1, 2, 3, 4],
-                "y_vars": [0],
+                "x_vars": ["x1", "x2", "x3", "x4"],
+                "y_vars": ["y"],
                 "steps_ahead": 1,
                 "col_mode": "merge_all",
             }
@@ -88,8 +88,8 @@ class TestLinearRegression(hut.TestCase):
         # Generate node config.
         config = cconfig.get_config_from_nested_dict(
             {
-                "x_vars": [1, 2, 3, 4],
-                "y_vars": [0],
+                "x_vars": ["x1", "x2", "x3", "x4"],
+                "y_vars": ["y"],
                 "steps_ahead": 1,
                 "smoothing": 2,
                 "col_mode": "merge_all",
@@ -107,13 +107,13 @@ class TestLinearRegression(hut.TestCase):
     def test3(self) -> None:
         # Load test data.
         data = self._get_data_from_disk()
-        data_fit = data.loc[:"2000-01-31"]  # type: error[misc]
-        data_predict = data.loc["2000-01-31":]  # type: error[misc]
+        data_fit = data.loc[:"2000-01-10"]  # type: error[misc]
+        data_predict = data.loc["2000-01-10":]  # type: error[misc]
         # Generate node config.
         config = cconfig.get_config_from_nested_dict(
             {
-                "x_vars": [1, 2, 3, 4],
-                "y_vars": [0],
+                "x_vars": ["x1", "x2", "x3", "x4"],
+                "y_vars": ["y"],
                 "steps_ahead": 1,
                 "smoothing": 2,
                 "col_mode": "merge_all",
@@ -148,7 +148,6 @@ class TestLinearRegression(hut.TestCase):
         # Unfortunately CSV is a lousy serialization format and loses metadata so
         # we need to patch it up to make it look exactly the original one.
         df = pd.read_csv(file_name, index_col=0, parse_dates=True)
-        df.columns = map(int, df.columns)
         df = df.asfreq("B")
         return df
 
@@ -169,6 +168,7 @@ class TestLinearRegression(hut.TestCase):
         )
         mn_process = casgen.MultivariateNormalProcess(cov=cov)
         data = mn_process.generate_sample(
-            {"start": "2000-01-01", "periods": 40, "freq": "B"}, seed=seed
+            {"start": "2000-01-01", "periods": 10, "freq": "B"}, seed=seed
         )
+        data.columns = ["y", "x1", "x2", "x3", "x4"]
         return data
