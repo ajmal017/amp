@@ -971,18 +971,31 @@ class TestCase(unittest.TestCase):
 
     def get_input_dir(
         self,
-        test_class_name: Optional[str] = None,
-        test_method_name: Optional[str] = None,
+        use_only_test_class: bool = False,
+        test_class_name: Optional[str],
+        test_method_name: Optional[str],
     ) -> str:
         """
         Return the path of the directory storing input data for this test
         class.
 
+        :param use_only_test_class: use only the name on the test class and not of
+            the method. E.g., when one wants all the test methods to use a single
+            file for testing
+        :param test_class_name: `None` uses the current test class name
+        :param test_method_name: `None` uses the current test method name
+        :param use_absolute_path: use the path from the file containing the test
+
         :return: dir name
         """
-        dir_name = os.path.join(
-            self._get_current_path(test_class_name, test_method_name), "input"
-        )
+        if use_only_test_class:
+            dir_name = os.path.join(
+                self._get_current_path(use_only_test_class, test_class_name, test_method_name), "input"
+            )
+        else:
+            dir_name = os.path.join(
+                self._get_current_path(test_class_name, test_method_name), "input"
+            )
         return dir_name
 
     def get_output_dir(self) -> str:
@@ -1438,6 +1451,7 @@ class TestCase(unittest.TestCase):
 
     def _get_current_path(
         self,
+        use_only_
         test_class_name: Optional[str] = None,
         test_method_name: Optional[str] = None,
         use_absolute_path: bool = True,
@@ -1445,6 +1459,9 @@ class TestCase(unittest.TestCase):
         """
         Return the name of the directory containing the input / output data
         (e.g., ./core/dataflow/test/TestContinuousSarimaxModel.test_compare)
+
+        The parameters have the same meaning as in `get_input_dir()`.
+
         """
         if test_class_name is None:
             test_class_name = self.__class__.__name__
