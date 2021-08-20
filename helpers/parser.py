@@ -148,7 +148,7 @@ def parse_dst_dir_arg(args: argparse.Namespace) -> Tuple[str, bool]:
 def add_action_arg(
     parser: argparse.ArgumentParser,
     valid_actions: List[str],
-    default_actions: List[str],
+    default_actions: Optional[List[str]],
 ) -> argparse.ArgumentParser:
     group = parser.add_mutually_exclusive_group(required=False)
     group.add_argument(
@@ -163,11 +163,12 @@ def add_action_arg(
         choices=valid_actions,
         help="Actions to skip",
     )
-    parser.add_argument(
-        "--all",
-        action="store_true",
-        help="Run all the actions (%s)" % (" ".join(default_actions)),
-    )
+    if default_actions is not None:
+        parser.add_argument(
+            "--all",
+            action="store_true",
+            help="Run all the actions (%s)" % (" ".join(default_actions)),
+        )
     return parser
 
 
