@@ -458,7 +458,7 @@ class _Cached:
             # For now we only allow to delete caches under the unit test path.
             bucket, abs_path = hs3.split_path(cache_path)
             dbg.dassert(
-                abs_path.startswith("/tmp/cache.unit_test/"),
+                abs_path.startswith("/tmp/"),
                 "The path '%s' is not valid",
                 abs_path,
             )
