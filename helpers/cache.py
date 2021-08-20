@@ -488,6 +488,16 @@ class _Cached:
             self._disk_cached_func,
         ) = self._create_function_disk_cache()
 
+    def set_function_cache_read_only(self, value=True) -> None:
+        """
+        Force the cache to be read-only.
+
+        If the function needs to be executed because the value is not cached, then
+        we assert.
+        """
+        # Write a value in the cache directory and then use it to
+        pass
+
     # ///////////////////////////////////////////////////////////////////////////
 
     def _create_function_memory_cache(self) -> joblib.Memory:
@@ -556,19 +566,22 @@ class _Cached:
         disk_cached_func = disk_cache.cache(self._func)
         return disk_cache, disk_cached_func
 
-    def _get_function_cache(self, cache_type: str) -> joblib.MemorizedResult:
+    def _get_memorized_result(self, cache_type: str) -> joblib.MemorizedResult:
         """
         Get the instance of a cache by type.
+
+        From https://github.com/joblib/joblib/blob/master/joblib/memory.py
+        A MemorizedResult is an object representing a cached value
 
         :param cache_type: type of a cache
         :return: instance of the Joblib cache
         """
         _dassert_is_valid_cache_type(cache_type)
         if cache_type == "mem":
-            cache_backend = self._memory_cached_func
+            memorized_result = self._memory_cached_func
         elif cache_type == "disk":
-            cache_backend = self._disk_cached_func
-        return cache_backend
+            memorized_result = self._disk_cached_func
+        return memorized_result
 
     def _get_identifiers(
         self, cache_type: str, *args: Any, **kwargs: Dict[str, Any]
@@ -581,14 +594,14 @@ class _Cached:
         :param kwargs: original kw-arguments of the call
         :return: digests of the function and current arguments
         """
-        cache_backend = self._get_function_cache(cache_type)
+        memorized_result = self._get_memorized_result(cache_type)
         dbg.dassert_is_not(
-            cache_backend,
+            memorized_result,
             None,
             "Cache backend not initialized for %s",
             cache_type,
         )
-        func_id, args_id = cache_backend._get_output_identifiers(*args, **kwargs)
+        func_id, args_id = memorized_result._get_output_identifiers(*args, **kwargs)
         return func_id, args_id
 
     def _has_cached_version(
@@ -603,8 +616,8 @@ class _Cached:
         :param args_id: digest of arguments obtained from _get_identifiers
         :return: whether there is an entry in a cache
         """
-        cache_backend = self._get_function_cache(cache_type)
-        has_cached_version = cache_backend.store_backend.contains_item(
+        memorized_result = self._get_memorized_result(cache_type)
+        has_cached_version = memorized_result.store_backend.contains_item(
             [func_id, args_id]
         )
         if has_cached_version:
@@ -612,13 +625,13 @@ class _Cached:
             # cache tracing will not be correct.
             # First, try faster check via joblib hash.
             if self._func in jmemor._FUNCTION_HASHES:
-                func_hash = cache_backend._hash_func()
+                func_hash = memorized_result._hash_func()
                 if func_hash == jmemor._FUNCTION_HASHES[self._func]:
                     return True
             # Otherwise, check the the source of the function is still the same.
             func_code, _, _ = jmemor.get_func_code(self._func)
             old_func_code_cache = (
-                cache_backend.store_backend.get_cached_func_code([func_id])
+                memorized_result.store_backend.get_cached_func_code([func_id])
             )
             old_func_code, _ = jmemor.extract_first_line(old_func_code_cache)
             if func_code == old_func_code:
@@ -636,12 +649,14 @@ class _Cached:
         :param args_id: digest of arguments obtained from `_get_identifiers()`
         :param obj: return value of the intrinsic function
         """
-        cache_backend = self._get_function_cache(cache_type)
+        memorized_result = self._get_memorized_result(cache_type)
+        # TODO(gp): Make sure we can write in this cache.
+        #  E.g., memorized_result.store_backend.location
         # Write out function code to the cache.
-        func_code, _, first_line = jfunci.get_func_code(cache_backend.func)
-        cache_backend._write_func_code(func_code, first_line)
+        func_code, _, first_line = jfunci.get_func_code(memorized_result.func)
+        memorized_result._write_func_code(func_code, first_line)
         # Store the returned value into the cache.
-        cache_backend.store_backend.dump_item([func_id, args_id], obj)
+        memorized_result.store_backend.dump_item([func_id, args_id], obj)
 
     # ///////////////////////////////////////////////////////////////////////////
 
@@ -698,6 +713,9 @@ class _Cached:
                 args,
                 kwargs,
             )
+        else:
+            # If the cache was read-only asserts.
+            pass
         obj = self._disk_cached_func(*args, **kwargs)
         return obj
 
