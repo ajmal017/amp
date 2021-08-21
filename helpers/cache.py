@@ -488,7 +488,7 @@ class _Cached:
             self._disk_cached_func,
         ) = self._create_function_disk_cache()
 
-        def set_function_cache_read_only(self, value: bool =True) -> None:
+    def set_function_cache_read_only(self, value: bool =True) -> None:
         """
         Force the cache to be read-only.
 
@@ -496,6 +496,7 @@ class _Cached:
         cached, then we assert.
         """
         # Write a value in the cache directory and then use it to
+        pass
 
     # ///////////////////////////////////////////////////////////////////////////
 

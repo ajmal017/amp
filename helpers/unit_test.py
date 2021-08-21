@@ -279,6 +279,8 @@ def to_string(var: str) -> str:
     return """f"%s={%s}""" % (var, var)
 
 
+# TODO(gp): Maybe we should move it to hpandas.py so we can limit the dependencies
+#  from pandas.
 def get_random_df(
     num_cols: int,
     seed: Optional[int] = None,
@@ -308,8 +310,31 @@ def get_df_signature(df: "pd.DataFrame", num_rows: int = 3) -> str:
     return txt
 
 
+def compare_df(df1: pd.DataFrame, df2: pd.DataFrame) -> None:
+    """
+    Compare two dfs including their metadata.
+    """
+    if not df1.equals(df2):
+        print(df1.compare(df2))
+        raise ValueError("Dfs are different")
+
+    def _compute_df_signature(df: pd.DataFrame) -> str:
+        txt = []
+        txt.append("df1=\n%s" % str(df))
+        txt.append("df1.dtypes=\n%s" % str(df.dtypes))
+        txt.append("df1.index.freq=\n%s" % str(df.index.freq))
+        return "\n".join(txt)
+
+    self.assert_equal(
+        _compute_df_signature(df1), _compute_df_signature(df2)
+    )
+
+
+# ################################################################################
+
+
 def create_test_dir(
-    dir_name: str, incremental: bool, file_dict: Dict[str, str]
+        dir_name: str, incremental: bool, file_dict: Dict[str, str]
 ) -> None:
     """
     Create a directory `dir_name` with the files from `file_dict`.
