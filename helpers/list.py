@@ -6,7 +6,7 @@ import helpers.list as hlist
 
 # TODO(gp): -> `hlist.py`
 
-from typing import Any, List, Set
+from typing import Any, List, Optional, Set
 
 import helpers.dbg as dbg
 
@@ -66,3 +66,10 @@ def extract(list_: List[Any], start_idx: Optional[int], end_idx: Optional[int]) 
         dbg.dassert_lt(start_idx, end_idx)
         list_ = list_[start_idx:end_idx]
     return list_
+
+
+def chunk(list_: List[Any], n: int) -> List[Any]:
+    dbg.dassert_lte(1, n)
+    dbg.dassert_lte(n, len(list_))
+    k, m = divmod(len(list_), n)
+    return list(list_[i*k+min(i, m):(i+1)*k+min(i+1, m)] for i in range(n))

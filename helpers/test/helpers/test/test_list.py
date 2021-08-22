@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Optional
+from typing import List, Optional
 
 import numpy as np
 import pandas as pd
@@ -48,7 +48,7 @@ class Test_list_remove_duplicates1(hut.TestCase):
 
 
 class Test_list_extract1(hut.TestCase):
-    def _helper1(self, start_idx: Optional[int], end_idx: Optional[int], expected_list: List[str]) -> None:
+    def _helper(self, start_idx: Optional[int], end_idx: Optional[int], expected_list: List[str]) -> None:
         list_ = "a b c d".split()
         actual_list = hlist.extract(list_, start_idx, end_idx)
         self.assertEqual(actual_list, expected_list)
@@ -82,3 +82,47 @@ class Test_list_extract1(hut.TestCase):
         end_idx = 2
         expected_list = "a b".split()
         self._helper(start_idx, end_idx, expected_list)
+
+    def test6(self) -> None:
+        start_idx = 0
+        end_idx = 4
+        expected_list = "a b c d".split()
+        self._helper(start_idx, end_idx, expected_list)
+
+    def test7(self) -> None:
+        start_idx = 0
+        end_idx = 3
+        expected_list = "a b c".split()
+        self._helper(start_idx, end_idx, expected_list)
+
+
+class Test_list_chunk1(hut.TestCase):
+    def _helper(self, n: int, expected_list: List[str]) -> None:
+        list_ = "a b c d e f".split()
+        actual_list = hlist.chunk(list_, n)
+        self.assertEqual(actual_list, expected_list)
+
+    def test1(self) -> None:
+        n = 1
+        expected_list = ["a b c d e f".split()]
+        self._helper(n, expected_list)
+
+    def test2(self) -> None:
+        n = 2
+        expected_list = [["a", "b", "c"], ["d", "e", "f"]]
+        self._helper(n, expected_list)
+
+    def test3(self) -> None:
+        n = 3
+        expected_list = [["a", "b"], ["c", "d"], ["e", "f"]]
+        self._helper(n, expected_list)
+
+    def test4(self) -> None:
+        n = 4
+        expected_list = [["a", "b"], ["c", "d"], ["e"], ["f"]]
+        self._helper(n, expected_list)
+
+    def test5(self) -> None:
+        n = 6
+        expected_list = [["a"], ["b"], ["c"], ["d"], ["e"], ["f"]]
+        self._helper(n, expected_list)
