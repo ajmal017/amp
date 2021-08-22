@@ -4,8 +4,7 @@ Import as:
 import helpers.list as hlist
 """
 
-# TODO(gp): -> `list_helpers.py` or maybe `python_helpers` with all code about
-#  general Python functions.
+# TODO(gp): -> `hlist.py`
 
 from typing import Any, List, Set
 
@@ -49,3 +48,21 @@ def remove_duplicates(list_: List[Any]) -> List[Any]:
             set_l.add(v)
             list_out.append(v)
     return list_out
+
+
+def extract(list_: List[Any], start_idx: Optional[int], end_idx: Optional[int]) -> List[Any]:
+    """
+    Filter the list using [start_idx, end_idx).
+    """
+    if start_idx is not None:
+        dbg.dassert_lte(0, start_idx)
+    else:
+        start_idx = 0
+    if end_idx is not None:
+        dbg.dassert_lte(end_idx, len(list_))
+    else:
+        end_idx = len(list_)
+    if list_:
+        dbg.dassert_lt(start_idx, end_idx)
+        list_ = list_[start_idx:end_idx]
+    return list_
