@@ -418,9 +418,7 @@ class _Cached:
     # Function-specific cache.
     # ///////////////////////////////////////////////////////////////////////////
 
-    # TODO(gp): In the end, only disk cache makes sense for function-specific cache.
-    #  The memory one is always in memory.
-
+    # TODO(gp): -> has_function_cache
     def has_function_specific_cache(self) -> bool:
         """
         Return whether this function has a function-specific cache or uses the
@@ -737,7 +735,12 @@ class _Cached:
             )
             obj = self._execute_func_from_mem_cache(*args, **kwargs)
         else:
-            _LOG.warning("Skipping memory cache")
+            if self.has_function_specific_cache():
+                # For function-specific cache, skipping the memory cache
+                # is the normal behavior.
+                pass
+            else:
+                _LOG.warning("Skipping memory cache")
             self._last_used_mem_cache = False
             if self._use_disk_cache:
                 obj = self._execute_func_from_disk_cache(*args, **kwargs)
