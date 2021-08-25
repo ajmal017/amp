@@ -37,9 +37,7 @@ _LOG = logging.getLogger(__name__)
 
 _IS_CACHE_ENABLED: bool = True
 
-# Global switch to avoid deleting the cache.
-_IS_CLEAR_CACHE_ENABLED: bool = False
-
+# TODO(gp): -> enable_caching
 def set_caching(val: bool) -> None:
     """
     Enable or disable all caching, i.e., global, tagged global, function-
@@ -57,6 +55,19 @@ def is_caching_enabled() -> bool:
     :return: whether the cache is enabled or not
     """
     return _IS_CACHE_ENABLED
+
+
+# Global switch to allow or prevent clearing the cache.
+_IS_CLEAR_CACHE_ENABLED: bool = True
+
+
+def enable_clear_cache(val: bool) -> None:
+    """
+    Enable or disable clearing a cache (both global and function-specific).
+    """
+    global _IS_CLEAR_CACHE_ENABLED
+    _LOG.warning("Enabling clear cache to %s -> %s", _IS_CLEAR_CACHE_ENABLED, val)
+    _IS_CLEAR_CACHE_ENABLED = val
 
 
 def get_global_cache_info(
