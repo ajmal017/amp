@@ -159,7 +159,7 @@ def convert_df_to_string(
     Convert DataFrame or Series to string for verifying test results.
 
     :param df: DataFrame to be verified
-    :param n_rows: number of rows in expected output
+    :param n_rows: number of rows in expected output. If `None` all rows are shown.
     :param title: title for test output
     :param decimals: number of decimal points
     :return: string representation of input
@@ -167,7 +167,6 @@ def convert_df_to_string(
     if isinstance(df, pd.Series):
         df = df.to_frame()
     dbg.dassert_isinstance(df, pd.DataFrame)
-    n_rows = n_rows or len(df)
     output = []
     # Add title in the beginning if provided.
     if title is not None:
@@ -183,6 +182,7 @@ def convert_df_to_string(
         "display.precision",
         decimals,
     ):
+        n_rows = n_rows or len(df)
         # Add N top rows.
         output.append(df.head(n_rows).to_string(index=index))
     # Convert into string.
@@ -332,11 +332,15 @@ def compare_df(df1: pd.DataFrame, df2: pd.DataFrame) -> None:
         txt = []
         txt.append("df1=\n%s" % str(df))
         txt.append("df1.dtypes=\n%s" % str(df.dtypes))
-        txt.append("df1.index.freq=\n%s" % str(df.index.freq))
+        if hasattr(df.index, "freq"):
+            txt.append("df1.index.freq=\n%s" % str(df.index.freq))
         return "\n".join(txt)
 
-    self.assert_equal(
-        _compute_df_signature(df1), _compute_df_signature(df2)
+    full_test_name = "dummy"
+    test_dir = "."
+    _assert_equal(
+        _compute_df_signature(df1), _compute_df_signature(df2), full_test_name,
+        test_dir
     )
 
 
