@@ -37,6 +37,8 @@ _LOG = logging.getLogger(__name__)
 
 _IS_CACHE_ENABLED: bool = True
 
+# Global switch to avoid deleting the cache.
+_IS_CLEAR_CACHE_ENABLED: bool = False
 
 def set_caching(val: bool) -> None:
     """
@@ -232,6 +234,8 @@ def clear_global_cache(
     :param tag: optional unique tag of the cache, empty by default
     :param destroy: remove physical directory
     """
+    if not _IS_CLEAR_CACHE_ENABLED:
+        dbg.dfatal("Trying to delete cache")
     if cache_type == "all":
         for cache_type_tmp in _get_cache_types():
             clear_global_cache(cache_type_tmp, tag=tag, destroy=destroy)
@@ -432,6 +436,8 @@ class _Cached:
         """
         Clear a function-specific cache.
         """
+        if not _IS_CLEAR_CACHE_ENABLED:
+            dbg.dfatal("Trying to delete function cache")
         dbg.dassert(
             self.has_function_specific_cache(),
             "This function has no function-specific cache",
