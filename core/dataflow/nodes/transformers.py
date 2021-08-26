@@ -740,32 +740,36 @@ class MultiindexTwapVwapComputer(cdnb.Transformer):
 # #############################################################################
 
 
-class Divider(cdnb.Transformer):
+class Calculator(cdnb.Transformer):
     def __init__(
         self,
         nid: cdtfc.NodeId,
-        numerator: cdtfu.NodeColumn,
-        denominator: cdtfu.NodeColumn,
+        term1: cdtfu.NodeColumn,
+        term2: cdtfu.NodeColumn,
         out_col_name: cdtfu.NodeColumn,
-        divide_kwargs: Optional[Dict[str, Any]] = None,
+        operation: str,
+        arithmetic_kwargs: Optional[Dict[str, Any]] = None,
     ) -> None:
         super().__init__(nid)
-        self._numerator = numerator
-        self._denominator = denominator
+        self._term1 = term1
+        self._term2 = term2
         self._out_col_name = out_col_name
-        self._divide_kwargs = divide_kwargs or {}
+        dbg.dassert_in(operation, ["multiply", "divide", "add", "subtract"],
+                       "Operation %s not supported.")
+        self._operation = operation
+        self._arithmetic_kwargs = arithmetic_kwargs or {}
 
     def _transform(
         self, df: pd.DataFrame
     ) -> Tuple[pd.DataFrame, collections.OrderedDict]:
-        dbg.dassert_in(self._numerator, df.columns.to_list())
-        dbg.dassert_in(self._denominator, df.columns.to_list())
+        dbg.dassert_in(self._term1, df.columns.to_list())
+        dbg.dassert_in(self._term2, df.columns.to_list())
         dbg.dassert_not_in(self._out_col_name, df.columns.to_list())
         df_out = df.copy()
-        div = df[self._numerator].divide(
-            df[self._denominator], **self._divide_kwargs
+        result = getattr(df[self._term1], self._operation)(
+            df[self._term2], **self._arithmetic_kwargs
         )
-        df_out[self._out_col_name] = div
+        df_out[self._out_col_name] = result
         # Update `info`.
         info: collections.OrderedDict[str, Any] = collections.OrderedDict()
         info["df_transformed_info"] = cdtfu.get_df_info_as_string(df_out)
