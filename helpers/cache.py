@@ -280,6 +280,13 @@ def clear_global_cache(
 # #############################################################################
 
 
+class NotCachedValueException(RuntimeError):
+    """
+    A cached function is run for a value not present in the cache.
+    """
+    pass
+
+
 class _Cached:
     # pylint: disable=protected-access
     """
@@ -350,6 +357,9 @@ class _Cached:
             self._disk_cache,
             self._disk_cached_func,
         ) = self._create_function_disk_cache()
+        # Enable the read-only mode where an exception is thrown if the value is
+        # not in the cache.
+        self._enable_read_only = False
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """
@@ -429,6 +439,19 @@ class _Cached:
             ret = "no_cache"
         return ret
 
+    def enable_read_only(self, val: bool) -> None:
+        """
+        If set to True this function can only read from the cache but not execute
+        new code.
+
+        This can be used for two goals:
+        - determine what was cached after the fact;
+        - avoid to run if the cache is not completely populated (e.g., for
+          function-specific cache)
+        """
+        _LOG.warning("Setting read_only to %s -> %s", self._enable_read_only, val)
+        self._enable_read_only = val
+
     # ///////////////////////////////////////////////////////////////////////////
     # Function-specific cache.
     # ///////////////////////////////////////////////////////////////////////////
@@ -502,16 +525,6 @@ class _Cached:
             self._disk_cache,
             self._disk_cached_func,
         ) = self._create_function_disk_cache()
-
-    def set_function_cache_read_only(self, value: bool =True) -> None:
-        """
-        Force the cache to be read-only.
-
-        If the function needs to be executed because the value is not
-        cached, then we assert.
-        """
-        # Write a value in the cache directory and then use it to
-        pass
 
     # ///////////////////////////////////////////////////////////////////////////
 
@@ -686,75 +699,94 @@ class _Cached:
         self._last_used_disk_cache = self._use_disk_cache
         self._last_used_mem_cache = self._use_mem_cache
 
+    def _execute_func_from_disk_cache(self, *args: Any, **kwargs: Any) -> Any:
+        func_info = "%s(args=%s kwargs=%s)" % (
+            self._func.__name__,
+            str(args),
+            str(kwargs))
+        # Get the function signature.
+        func_id, args_id = self._get_identifiers("disk", *args, **kwargs)
+        if not self._has_cached_version("disk", func_id, args_id):
+            # INV: we didn't hit neither memory nor the disk cache.
+            self._last_used_disk_cache = False
+            #
+            _LOG.debug(
+                "%s: execute the intrinsic function",
+                func_info,
+            )
+        else:
+            # If the cache was read-only, then assert.
+            if self._enable_read_only:
+                raise NotCachedValueException(func_info)
+        obj = self._disk_cached_func(*args, **kwargs)
+        return obj
+
     def _execute_func_from_mem_cache(self, *args: Any, **kwargs: Any) -> Any:
         """
-        Execute the function.
+        Execute the function from memory cache and if not possible try the lower
+        cache levels.
         """
+        func_info = "%s(args=%s kwargs=%s)" % (
+            self._func.__name__,
+            str(args),
+            str(kwargs))
         # Get the function signature.
         func_id, args_id = self._get_identifiers("mem", *args, **kwargs)
         if self._has_cached_version("mem", func_id, args_id):
+            _LOG.debug("There is a mem cached version")
             # The function execution was cached in the mem cache.
             obj = self._memory_cached_func(*args, **kwargs)
         else:
-            # If we get here, we know that we didn't hit the memory cache,
-            # but we don't know about the disk cache.
+            # INV: we know that we didn't hit the memory cache, but we don't know
+            # about the disk cache.
+            _LOG.debug("There is not a mem cached version")
             self._last_used_mem_cache = False
             #
             if self._use_disk_cache:
                 # Try the disk cache.
                 _LOG.debug(
-                    "%s(args=%s kwargs=%s): trying to retrieve from disk",
-                    self._func.__name__,
-                    args,
-                    kwargs,
+                    "Trying to retrieve from disk",
                 )
                 obj = self._execute_func_from_disk_cache(*args, **kwargs)
             else:
                 _LOG.warning("Skipping disk cache")
-                obj = self._memory_cached_func(*args, **kwargs)
+                self._execute_intrinsic_function(args, kwargs)
             # The function was not cached in memory, so now we need to update the
             # memory cache.
             self._store_cached_version("mem", func_id, args_id, obj)
         return obj
 
-    def _execute_func_from_disk_cache(self, *args: Any, **kwargs: Any) -> Any:
-        # Get the function signature.
-        func_id, args_id = self._get_identifiers("disk", *args, **kwargs)
-        if not self._has_cached_version("disk", func_id, args_id):
-            # If we get here, we didn't hit neither memory nor the disk cache.
-            self._last_used_disk_cache = False
-            #
-            _LOG.debug(
-                "%s(args=%s kwargs=%s): execute the intrinsic function",
-                self._func.__name__,
-                args,
-                kwargs,
-            )
-        else:
-            # If the cache was read-only asserts.
-            pass
-        obj = self._disk_cached_func(*args, **kwargs)
+    def _execute_intrinsic_function(self, *args: Any, **kwargs: Any) -> Any:
+        # We shouldn't use either the mem or the disk cache: in practice
+        # we have disabled caching completely. Thus we just call the
+        # intrinsic function.
+        if self._enable_read_only:
+            msg = f"{func_info}: trying to execute"
+            raise NotCachedValueException(msg)
+        obj = self._func(*args, **kwargs)
         return obj
 
     def _execute_func(self, *args: Any, **kwargs: Any) -> Any:
+        func_info = "%s(args=%s kwargs=%s)" % (
+            self._func.__name__,
+            str(args),
+            str(kwargs))
         _LOG.debug(
             "%s: use_mem_cache=%s use_disk_cache=%s",
-            self._func.__name__,
+            func_info,
             self._use_mem_cache,
             self._use_disk_cache,
         )
         if self._use_mem_cache:
-            _LOG.debug(
-                "%s(args=%s kwargs=%s): trying to retrieve from memory",
-                self._func.__name__,
-                args,
-                kwargs,
-            )
+            _LOG.debug("Trying to retrieve from memory")
             obj = self._execute_func_from_mem_cache(*args, **kwargs)
         else:
             if self.has_function_specific_cache():
-                # For function-specific cache, skipping the memory cache
-                # is the normal behavior.
+                # For function-specific cache, skipping the memory cache is the
+                # normal behavior.
+                _LOG.debug(
+                    "Function has function-specific cache: skipping memory cache"
+                )
                 pass
             else:
                 _LOG.warning("Skipping memory cache")
@@ -764,10 +796,7 @@ class _Cached:
             else:
                 _LOG.warning("Skipping disk cache")
                 self._last_used_disk_cache = False
-                # We shouldn't use either the mem or the disk cache: in practice
-                # we have disabled caching completely. Thus we just call the
-                # intrinsic function.
-                obj = self._func(*args, **kwargs)
+                self._execute_intrinsic_function(args, kwargs)
         return obj
 
 

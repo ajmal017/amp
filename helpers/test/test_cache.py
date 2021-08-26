@@ -16,6 +16,12 @@ _LOG = logging.getLogger(__name__)
 # TODO(gp): Do not commit this.
 #_LOG.debug = _LOG.info
 
+
+# TODO(gp): Use this everywhere.
+def _LOG_frame(txt: str) -> None:
+    _LOG.debug("\n%s", hprint.frame(txt))
+
+
 # #############################################################################
 
 
@@ -88,7 +94,6 @@ class _ResetGlobalCacheHelper(hut.TestCase):
         # _LOG.debug(
         #     "disk_cache_path=%s", hcache._get_global_cache_path("disk", self.cache_tag)
         # )
-
         # TODO(gp): Add an assertion.
         # Create the intrinsic function.
         f = _get_add_function()
@@ -117,13 +122,14 @@ class _ResetGlobalCacheHelper(hut.TestCase):
             exp_f_state = True
         else:
             exp_f_state = False
-        _LOG.debug(
-            "val1=%s, val2=%s, exp_f_state=%s, exp_cf_state=%s",
+        _LOG.debug("\n%s", hprint.frame(
+            "val1=%s, val2=%s, exp_f_state=%s, exp_cf_state=%s" % (
             val1,
             val2,
             exp_f_state,
-            exp_cf_state,
-        )
+            exp_cf_state),
+            char1="<"
+        ))
         # Reset the intrinsic function since we want to verify if it was called
         # or not when we call the cached function.
         _reset_add_function(f)
@@ -760,6 +766,50 @@ class TestCachingOnS3(_ResetFunctionSpecificCacheHelper):
         _LOG.debug("\n%s", hprint.frame("Execute the 5th time"))
         self._execute_and_check_state(f, cf, 3, 4, exp_cf_state="disk")
 
+
+# #############################################################################
+
+
+class TestCacheEnableReadOnly1(_ResetGlobalCacheHelper):
+
+    def _helper(self, **kwargs) -> None:
+        """
+        Test that
+        """
+        # Both memory and disk cache enabled, although we use only memory.
+        f, cf = self._get_f_cf_functions(**kwargs)
+        # Execute and verify that it is executed, since it was not cached.
+        _LOG_frame("Execute the 1st time")
+        self._execute_and_check_state(f, cf, 3, 4, exp_cf_state="no_cache")
+        # Execute and verify that it is not executed, since it's cached in memory.
+        _LOG_frame("Execute the 2nd time")
+        self._execute_and_check_state(f, cf, 3, 4, exp_cf_state="mem")
+        #
+        # Enable the read-only mode.
+        #
+        _LOG_frame("Enable read-only mode")
+        cf.enable_read_only(True)
+        # This is cached so it doesn't raise.
+        self._execute_and_check_state(f, cf, 3, 4, exp_cf_state="mem")
+        # This is not cached so it should raise.
+        with self.assertRaises(hcache.NotCachedValueException):
+            self._execute_and_check_state(f, cf, 4, 4, exp_cf_state="no_cache")
+        #
+        # Disable the read-only mode.
+        #
+        _LOG_frame("Disable read-only mode")
+        cf.enable_read_only(False)
+        # Now this doesn't assert even if it's not in the cache.
+        self._execute_and_check_state(f, cf, 4, 4, exp_cf_state="no_cache")
+
+    def test_mem_cache1(self) -> None:
+        self._helper(use_mem_cache=True, use_disk_cache=False)
+
+    #def test_disk_cache1(self) -> None:
+    #    self._helper(use_mem_cache=False, use_disk_cache=True)
+
+    #def test_mem_disk_cache1(self) -> None:
+    #    self._helper(use_mem_cache=True, use_disk_cache=True)
 
 # TODO(gp): Add a test for verbose mode in __call__
 # TODO(gp): get_function_cache_info
