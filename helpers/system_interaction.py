@@ -210,6 +210,7 @@ def _system(
     try:
         stdout = subprocess.PIPE
         stderr = subprocess.STDOUT
+        print("  ==> cmd=%s" % cmd)
         with subprocess.Popen(
             cmd, shell=True, executable="/bin/bash", stdout=stdout, stderr=stderr
         ) as p:

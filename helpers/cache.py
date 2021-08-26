@@ -19,6 +19,7 @@ import joblib.func_inspect as jfunci
 import joblib.memory as jmemor
 
 import helpers.dbg as dbg
+import helpers.datetime_ as hdatetime
 import helpers.git as git
 import helpers.introspection as hintro
 import helpers.io_ as hio
@@ -412,7 +413,7 @@ class _Cached:
         txt = []
         if add_banner:
             txt.append(hprint.frame("get_global_cache_info()", char1="<"))
-        has_func_cache = self.has_function_specific_cache()
+        has_func_cache = self.has_function_cache()
         txt.append("has function-specific cache=%s" % has_func_cache)
         if has_func_cache:
             # Function-specific cache: print the paths of the local cache.
@@ -452,12 +453,54 @@ class _Cached:
         _LOG.warning("Setting read_only to %s -> %s", self._enable_read_only, val)
         self._enable_read_only = val
 
+    def _get_function_specific_code_path(self) -> str:
+        # Get the store backend.
+        cache_type = "disk"
+        memorized_result = self._get_memorized_result(cache_type)
+        store_backend = memorized_result.store_backend
+        # Get the function id (which is the full path).
+        func_id = jmemor._build_func_identifier(self._func)
+        # Assemble the path.
+        func_path = os.path.join(store_backend.location, func_id, "func_code.py")
+        _LOG.debug("func_path='%s'", func_path)
+        dbg.dassert(store_backend._item_exists(func_path),
+                    "Can't find '%s'", func_path)
+        return func_path
+
+    def update_func_code_without_invalidating_cache(self) -> None:
+        """
+        Update the Python code stored in the cache.
+
+        This is used when we make changes to the cached function but we don't want
+        to invalidate the cache.
+
+        NOTE: here the caller must guarantee that the new function yields exactly
+        the same results than the previous ones. Use carefully.
+        """
+        dbg.dassert(self.has_function_cache(), "This is used only for function-specific caches")
+        # From `store_cached_func_code` in
+        # https://github.com/joblib/joblib/tree/master/joblib/_store_backends.py
+        func_path = self._get_function_specific_code_path()
+        # Archive old code.
+        new_func_path = func_path + "." + hdatetime.get_timestamp(tz="ET")
+        _LOG.debug("new_func_path='%s'", new_func_path)
+        # Get the store backend.
+        cache_type = "disk"
+        memorized_result = self._get_memorized_result(cache_type)
+        store_backend = memorized_result.store_backend
+        dbg.dassert(not store_backend._item_exists(new_func_path),
+                    "'%s' already exists", new_func_path)
+        store_backend._move_item(func_path, new_func_path)
+        # Write out function code to the cache.
+        func_code, _, first_line = jfunci.get_func_code(memorized_result.func)
+        memorized_result._write_func_code(func_code, first_line)
+        _LOG.debug("Updated func_path='%s'", func_path)
+
     # ///////////////////////////////////////////////////////////////////////////
     # Function-specific cache.
     # ///////////////////////////////////////////////////////////////////////////
 
-    # TODO(gp): -> has_function_cache
-    def has_function_specific_cache(self) -> bool:
+    def has_function_cache(self) -> bool:
         """
         Return whether this function has a function-specific cache or uses the
         global cache.
@@ -473,7 +516,7 @@ class _Cached:
         if not _IS_CLEAR_CACHE_ENABLED:
             dbg.dfatal("Trying to delete function cache")
         dbg.dassert(
-            self.has_function_specific_cache(),
+            self.has_function_cache(),
             "This function has no function-specific cache",
         )
         # Get the path for the disk cache.
@@ -679,9 +722,9 @@ class _Cached:
         :param args_id: digest of arguments obtained from `_get_identifiers()`
         :param obj: return value of the intrinsic function
         """
+        if self._enable_read_only:
+            raise NotCachedValueException
         memorized_result = self._get_memorized_result(cache_type)
-        # TODO(gp): Make sure we can write in this cache.
-        #  E.g., memorized_result.store_backend.location
         # Write out function code to the cache.
         func_code, _, first_line = jfunci.get_func_code(memorized_result.func)
         memorized_result._write_func_code(func_code, first_line)
@@ -706,7 +749,10 @@ class _Cached:
             str(kwargs))
         # Get the function signature.
         func_id, args_id = self._get_identifiers("disk", *args, **kwargs)
-        if not self._has_cached_version("disk", func_id, args_id):
+        if self._has_cached_version("disk", func_id, args_id):
+            _LOG.debug("There is a disk cached version")
+            obj = self._disk_cached_func(*args, **kwargs)
+        else:
             # INV: we didn't hit neither memory nor the disk cache.
             self._last_used_disk_cache = False
             #
@@ -714,11 +760,14 @@ class _Cached:
                 "%s: execute the intrinsic function",
                 func_info,
             )
-        else:
             # If the cache was read-only, then assert.
             if self._enable_read_only:
-                raise NotCachedValueException(func_info)
-        obj = self._disk_cached_func(*args, **kwargs)
+                msg = f"{func_info}: trying to execute"
+                raise NotCachedValueException(msg)
+            obj = self._execute_intrinsic_function(*args, **kwargs)
+            # The function was not cached in disk, so now we need to update the
+            # memory cache.
+            self._store_cached_version("disk", func_id, args_id, obj)
         return obj
 
     def _execute_func_from_mem_cache(self, *args: Any, **kwargs: Any) -> Any:
@@ -726,10 +775,6 @@ class _Cached:
         Execute the function from memory cache and if not possible try the lower
         cache levels.
         """
-        func_info = "%s(args=%s kwargs=%s)" % (
-            self._func.__name__,
-            str(args),
-            str(kwargs))
         # Get the function signature.
         func_id, args_id = self._get_identifiers("mem", *args, **kwargs)
         if self._has_cached_version("mem", func_id, args_id):
@@ -750,16 +795,18 @@ class _Cached:
                 obj = self._execute_func_from_disk_cache(*args, **kwargs)
             else:
                 _LOG.warning("Skipping disk cache")
-                self._execute_intrinsic_function(args, kwargs)
+                obj = self._execute_intrinsic_function(*args, **kwargs)
             # The function was not cached in memory, so now we need to update the
             # memory cache.
             self._store_cached_version("mem", func_id, args_id, obj)
         return obj
 
     def _execute_intrinsic_function(self, *args: Any, **kwargs: Any) -> Any:
-        # We shouldn't use either the mem or the disk cache: in practice
-        # we have disabled caching completely. Thus we just call the
-        # intrinsic function.
+        func_info = "%s(args=%s kwargs=%s)" % (
+            self._func.__name__,
+            str(args),
+            str(kwargs))
+        _LOG.debug("%s: execute intrinsic function", func_info)
         if self._enable_read_only:
             msg = f"{func_info}: trying to execute"
             raise NotCachedValueException(msg)
@@ -781,7 +828,7 @@ class _Cached:
             _LOG.debug("Trying to retrieve from memory")
             obj = self._execute_func_from_mem_cache(*args, **kwargs)
         else:
-            if self.has_function_specific_cache():
+            if self.has_function_cache():
                 # For function-specific cache, skipping the memory cache is the
                 # normal behavior.
                 _LOG.debug(
@@ -796,7 +843,7 @@ class _Cached:
             else:
                 _LOG.warning("Skipping disk cache")
                 self._last_used_disk_cache = False
-                self._execute_intrinsic_function(args, kwargs)
+                obj = self._execute_intrinsic_function(*args, **kwargs)
         return obj
 
 

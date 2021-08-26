@@ -8,6 +8,7 @@ import pandas as pd
 
 import helpers.cache as hcache
 import helpers.dbg as dbg
+import helpers.io_ as hio
 import helpers.printing as hprint
 import helpers.unit_test as hut
 
@@ -772,9 +773,10 @@ class TestCachingOnS3(_ResetFunctionSpecificCacheHelper):
 
 class TestCacheEnableReadOnly1(_ResetGlobalCacheHelper):
 
-    def _helper(self, **kwargs) -> None:
+    def _helper(self, cache_from: str, **kwargs: Any) -> None:
         """
-        Test that
+        Test that when enabling read-only mode we get an assertion only if the
+        function invocation was not cached.
         """
         # Both memory and disk cache enabled, although we use only memory.
         f, cf = self._get_f_cf_functions(**kwargs)
@@ -783,14 +785,16 @@ class TestCacheEnableReadOnly1(_ResetGlobalCacheHelper):
         self._execute_and_check_state(f, cf, 3, 4, exp_cf_state="no_cache")
         # Execute and verify that it is not executed, since it's cached in memory.
         _LOG_frame("Execute the 2nd time")
-        self._execute_and_check_state(f, cf, 3, 4, exp_cf_state="mem")
+        self._execute_and_check_state(f, cf, 3, 4, exp_cf_state=cache_from)
+        _LOG_frame("Execute the 3rd time")
+        self._execute_and_check_state(f, cf, 3, 4, exp_cf_state=cache_from)
         #
         # Enable the read-only mode.
         #
         _LOG_frame("Enable read-only mode")
         cf.enable_read_only(True)
         # This is cached so it doesn't raise.
-        self._execute_and_check_state(f, cf, 3, 4, exp_cf_state="mem")
+        self._execute_and_check_state(f, cf, 3, 4, exp_cf_state=cache_from)
         # This is not cached so it should raise.
         with self.assertRaises(hcache.NotCachedValueException):
             self._execute_and_check_state(f, cf, 4, 4, exp_cf_state="no_cache")
@@ -803,13 +807,60 @@ class TestCacheEnableReadOnly1(_ResetGlobalCacheHelper):
         self._execute_and_check_state(f, cf, 4, 4, exp_cf_state="no_cache")
 
     def test_mem_cache1(self) -> None:
-        self._helper(use_mem_cache=True, use_disk_cache=False)
+        self._helper(cache_from="mem", use_mem_cache=True, use_disk_cache=False)
 
-    #def test_disk_cache1(self) -> None:
-    #    self._helper(use_mem_cache=False, use_disk_cache=True)
+    def test_disk_cache1(self) -> None:
+        self._helper(cache_from="disk", use_mem_cache=False, use_disk_cache=True)
 
-    #def test_mem_disk_cache1(self) -> None:
-    #    self._helper(use_mem_cache=True, use_disk_cache=True)
+    def test_mem_disk_cache1(self) -> None:
+        self._helper(cache_from="mem", use_mem_cache=True, use_disk_cache=True)
+
+
+# #############################################################################
+
+
+class TestCacheUpdateFunction1(_ResetGlobalCacheHelper):
+    def test1(self) -> None:
+        # Define the function imitating working in a notebook.
+        _LOG.debug("\n%s", hprint.frame("Define function"))
+
+        def add(x: int, y: int) -> int:
+            add.executed = True  # type: ignore[attr-defined]
+            return x + y
+
+        disk_cache_dir = self.get_scratch_space()
+        _LOG.debug("disk_cache_dir=%s", disk_cache_dir)
+        cached_add = hcache._Cached(add,
+                                    use_mem_cache=False,
+                                    use_disk_cache=True,
+                                    disk_cache_path=disk_cache_dir)
+        # 1) Execute the first time.
+        _LOG.debug("\n%s", hprint.frame("Execute the 1st time"))
+        self._execute_and_check_state(
+            add, cached_add, 1, 2, exp_cf_state="no_cache"
+        )
+        # 2) Execute the second time. Must use memory cache.
+        _LOG.debug("\n%s", hprint.frame("Execute the 2nd time"))
+        func_path = cached_add._get_function_specific_code_path()
+        code_before = hio.from_file(func_path)
+        _LOG.debug("code_before=\n%s", code_before)
+        self._execute_and_check_state(add, cached_add, 1, 2, exp_cf_state="disk")
+        # 3) Redefine the function with different code while running.
+        _LOG.debug("\n%s", hprint.frame("Update function"))
+        def add(x: int, y: int) -> int:
+            add.executed = True  # type: ignore[attr-defined]
+            return x * y
+        cached_add._func = add
+        cached_add._disk_cached_func.func = add
+        cached_add.update_func_code_without_invalidating_cache()
+        #
+        code_after = hio.from_file(func_path)
+        _LOG.debug("code_after=\n%s", code_after)
+        self.assertNotEqual(code_before, code_after)
+        # 4) Execute the second time. Must use memory cache.
+        _LOG.debug("\n%s", hprint.frame("Execute the 3rd time"))
+        self._execute_and_check_state(add, cached_add, 1, 2, exp_cf_state="disk")
+
 
 # TODO(gp): Add a test for verbose mode in __call__
 # TODO(gp): get_function_cache_info
