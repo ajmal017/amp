@@ -159,7 +159,7 @@ def convert_df_to_string(
     Convert DataFrame or Series to string for verifying test results.
 
     :param df: DataFrame to be verified
-    :param n_rows: number of rows in expected output
+    :param n_rows: number of rows in expected output. If `None` all rows are shown.
     :param title: title for test output
     :param decimals: number of decimal points
     :return: string representation of input
@@ -167,7 +167,6 @@ def convert_df_to_string(
     if isinstance(df, pd.Series):
         df = df.to_frame()
     dbg.dassert_isinstance(df, pd.DataFrame)
-    n_rows = n_rows or len(df)
     output = []
     # Add title in the beginning if provided.
     if title is not None:
@@ -183,6 +182,7 @@ def convert_df_to_string(
         "display.precision",
         decimals,
     ):
+        n_rows = n_rows or len(df)
         # Add N top rows.
         output.append(df.head(n_rows).to_string(index=index))
     # Convert into string.
@@ -289,6 +289,8 @@ def to_string(var: str) -> str:
     return """f"%s={%s}""" % (var, var)
 
 
+# TODO(gp): Maybe we should move it to hpandas.py so we can limit the dependencies
+#  from pandas.
 def get_random_df(
     num_cols: int,
     seed: Optional[int] = None,
@@ -318,8 +320,35 @@ def get_df_signature(df: "pd.DataFrame", num_rows: int = 3) -> str:
     return txt
 
 
+def compare_df(df1: pd.DataFrame, df2: pd.DataFrame) -> None:
+    """
+    Compare two dfs including their metadata.
+    """
+    if not df1.equals(df2):
+        print(df1.compare(df2))
+        raise ValueError("Dfs are different")
+
+    def _compute_df_signature(df: pd.DataFrame) -> str:
+        txt = []
+        txt.append("df1=\n%s" % str(df))
+        txt.append("df1.dtypes=\n%s" % str(df.dtypes))
+        if hasattr(df.index, "freq"):
+            txt.append("df1.index.freq=\n%s" % str(df.index.freq))
+        return "\n".join(txt)
+
+    full_test_name = "dummy"
+    test_dir = "."
+    _assert_equal(
+        _compute_df_signature(df1), _compute_df_signature(df2), full_test_name,
+        test_dir
+    )
+
+
+# ################################################################################
+
+
 def create_test_dir(
-    dir_name: str, incremental: bool, file_dict: Dict[str, str]
+        dir_name: str, incremental: bool, file_dict: Dict[str, str]
 ) -> None:
     """
     Create a directory `dir_name` with the files from `file_dict`.
