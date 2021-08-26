@@ -4,7 +4,6 @@ Import as:
 import core.dataflow.nodes.transformers as cdtfnt
 """
 import collections
-import datetime
 import inspect
 import logging
 from typing import (
@@ -734,3 +733,39 @@ class MultiindexTwapVwapComputer(cdnb.Transformer):
         info: collections.OrderedDict[str, Any] = collections.OrderedDict()
         info["df_transformed_info"] = cdtfu.get_df_info_as_string(df)
         return df, info
+
+
+# #############################################################################
+# Column Arithmetic
+# #############################################################################
+
+
+class Divider(cdnb.Transformer):
+    def __init__(
+        self,
+        nid: cdtfc.NodeId,
+        numerator: cdtfu.NodeColumn,
+        denominator: cdtfu.NodeColumn,
+        out_col_name: cdtfu.NodeColumn,
+        divide_kwargs: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        super().__init__(nid)
+        self._numerator = numerator
+        self._denominator = denominator
+        self._out_col_name = out_col_name
+        self._divide_kwargs = divide_kwargs or {}
+
+    def _transform(
+        self, df: pd.DataFrame
+    ) -> Tuple[pd.DataFrame, collections.OrderedDict]:
+        dbg.dassert_in(self._numerator, df.columns.to_list())
+        dbg.dassert_in(self._denominator, df.columns.to_list())
+        dbg.dassert_not_in(self._out_col_name, df.columns.to_list())
+        df_out = df.copy()
+        div = df[self._numerator].divide(df[self._denominator], **self._divide_kwargs)
+        df_out[self._out_col_name] = div
+        # Update `info`.
+        info: collections.OrderedDict[str, Any] = collections.OrderedDict()
+        info["df_transformed_info"] = cdtfu.get_df_info_as_string(df_out)
+        return df_out, info
+
