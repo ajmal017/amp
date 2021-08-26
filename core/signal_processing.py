@@ -706,12 +706,15 @@ def compute_rolling_norm(
     min_depth: int = 1,
     max_depth: int = 1,
     p_moment: float = 2,
+    delay: float = 0,
 ) -> Union[pd.DataFrame, pd.Series]:
     """
     Implement smooth moving average norm (when p_moment >= 1).
 
     Moving average corresponds to compute_ema when min_depth = max_depth = 1.
     """
+    dbg.dassert_lte(0, delay, "Requested delay=%i is non-causal.", delay)
+    signal = signal.shift(delay)
     signal_p = compute_rolling_moment(
         signal, tau, min_periods, min_depth, max_depth, p_moment
     )
