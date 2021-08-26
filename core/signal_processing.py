@@ -398,8 +398,11 @@ def sign_normalize(
     if isinstance(signal, pd.DataFrame):
         signal = signal.squeeze()
         convert_to_frame = True
-    dbg.dassert_isinstance(signal, pd.Series,
-                           msg="Only series and 1-dimensional dataframes are admissible")
+    dbg.dassert_isinstance(
+        signal,
+        pd.Series,
+        msg="Only series and 1-dimensional dataframes are admissible",
+    )
     # Force small values to zero.
     atol_mask = signal.abs() < atol
     normalized_signal = signal.copy()
@@ -421,8 +424,10 @@ def normalize(
     Normalize `signal` by dividing it by its l2 norm.
     """
     dbg.dassert_isinstance(signal, pd.Series)
-    dbg.dassert(not signal.isna().any(), msg="NaNs detected at %s" %
-                signal[signal.isna()].index)
+    dbg.dassert(
+        not signal.isna().any(),
+        msg="NaNs detected at %s" % signal[signal.isna()].index,
+    )
     norm = np.linalg.norm(signal)
     _LOG.debug("l2 norm=%f", norm)
     normalized = signal / norm
