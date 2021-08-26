@@ -762,10 +762,11 @@ class Divider(cdnb.Transformer):
         dbg.dassert_in(self._denominator, df.columns.to_list())
         dbg.dassert_not_in(self._out_col_name, df.columns.to_list())
         df_out = df.copy()
-        div = df[self._numerator].divide(df[self._denominator], **self._divide_kwargs)
+        div = df[self._numerator].divide(
+            df[self._denominator], **self._divide_kwargs
+        )
         df_out[self._out_col_name] = div
         # Update `info`.
         info: collections.OrderedDict[str, Any] = collections.OrderedDict()
         info["df_transformed_info"] = cdtfu.get_df_info_as_string(df_out)
         return df_out, info
-
