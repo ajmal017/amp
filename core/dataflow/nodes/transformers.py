@@ -754,8 +754,11 @@ class Calculator(cdnb.Transformer):
         self._term1 = term1
         self._term2 = term2
         self._out_col_name = out_col_name
-        dbg.dassert_in(operation, ["multiply", "divide", "add", "subtract"],
-                       "Operation %s not supported.")
+        dbg.dassert_in(
+            operation,
+            ["multiply", "divide", "add", "subtract"],
+            "Operation %s not supported.",
+        )
         self._operation = operation
         self._arithmetic_kwargs = arithmetic_kwargs or {}
 
