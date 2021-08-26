@@ -398,8 +398,11 @@ def sign_normalize(
     if isinstance(signal, pd.DataFrame):
         signal = signal.squeeze()
         convert_to_frame = True
-    dbg.dassert_isinstance(signal, pd.Series,
-                           msg="Only series and 1-dimensional dataframes are admissible")
+    dbg.dassert_isinstance(
+        signal,
+        pd.Series,
+        msg="Only series and 1-dimensional dataframes are admissible",
+    )
     # Force small values to zero.
     atol_mask = signal.abs() < atol
     normalized_signal = signal.copy()
@@ -421,8 +424,10 @@ def normalize(
     Normalize `signal` by dividing it by its l2 norm.
     """
     dbg.dassert_isinstance(signal, pd.Series)
-    dbg.dassert(not signal.isna().any(), msg="NaNs detected at %s" %
-                signal[signal.isna()].index)
+    dbg.dassert(
+        not signal.isna().any(),
+        msg="NaNs detected at %s" % signal[signal.isna()].index,
+    )
     norm = np.linalg.norm(signal)
     _LOG.debug("l2 norm=%f", norm)
     normalized = signal / norm
@@ -706,12 +711,15 @@ def compute_rolling_norm(
     min_depth: int = 1,
     max_depth: int = 1,
     p_moment: float = 2,
+    delay: float = 0,
 ) -> Union[pd.DataFrame, pd.Series]:
     """
     Implement smooth moving average norm (when p_moment >= 1).
 
     Moving average corresponds to compute_ema when min_depth = max_depth = 1.
     """
+    dbg.dassert_lte(0, delay, "Requested delay=%i is non-causal.", delay)
+    signal = signal.shift(delay)
     signal_p = compute_rolling_moment(
         signal, tau, min_periods, min_depth, max_depth, p_moment
     )
