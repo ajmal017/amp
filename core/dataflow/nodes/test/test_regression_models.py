@@ -132,7 +132,9 @@ class TestLinearRegression(hut.TestCase):
         """
         # Load test data.
         data = self._get_frozen_input()
-        data["weight"] = pd.Series(index=data.index, data=range(1, data.shape[0] + 1))
+        data["weight"] = pd.Series(
+            index=data.index, data=range(1, data.shape[0] + 1)
+        )
         # Generate node config.
         config = cconfig.get_config_from_nested_dict(
             {
