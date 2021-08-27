@@ -18,8 +18,8 @@ import joblib
 import joblib.func_inspect as jfunci
 import joblib.memory as jmemor
 
-import helpers.dbg as dbg
 import helpers.datetime_ as hdatetime
+import helpers.dbg as dbg
 import helpers.git as git
 import helpers.introspection as hintro
 import helpers.io_ as hio
@@ -38,8 +38,8 @@ _LOG = logging.getLogger(__name__)
 
 _IS_CACHE_ENABLED: bool = True
 
-# TODO(gp): -> enable_caching
-def set_caching(val: bool) -> None:
+
+def enable_caching(val: bool) -> None:
     """
     Enable or disable all caching, i.e., global, tagged global, function-
     specific.
@@ -285,9 +285,9 @@ class CachedValueException(RuntimeError):
     """
     A cached function is run for a value present in the cache.
 
-    This exception is thrown when the `check_only_if_present` mode is used.
+    This exception is thrown when the `check_only_if_present` mode is
+    used.
     """
-    pass
 
 
 class NotCachedValueException(RuntimeError):
@@ -296,7 +296,6 @@ class NotCachedValueException(RuntimeError):
 
     This exception is thrown when the `enable_read_only` mode is used.
     """
-    pass
 
 
 class _Cached:
@@ -456,37 +455,31 @@ class _Cached:
 
     def enable_read_only(self, val: bool) -> None:
         """
-        If set to True, the cached function can only read from the cache but not
-        execute for new values. Otherwise a `NotCachedValueException` is thrown.
+        If set to True, the cached function can only read from the cache but
+        not execute for new values.
+
+        Otherwise a `NotCachedValueException` is thrown.
         """
-        _LOG.warning("Setting enable_read_only to %s -> %s", self._enable_read_only, val)
+        _LOG.warning(
+            "Setting enable_read_only to %s -> %s", self._enable_read_only, val
+        )
         self._enable_read_only = val
 
     def enable_check_only_if_present(self, val: bool) -> None:
         """
-        If set to True, the cached function a `CachedValueException` is thrown if a
-        function invocation was cached, instead of executing it.
+        If set to True, the cached function a `CachedValueException` is thrown
+        if a function invocation was cached, instead of executing it.
 
-        This can be used to check if a value was already cached without triggering
-        retrieving the value from the cache, e.g., when probing the content of the
-        cache.
+        This can be used to check if a value was already cached without
+        triggering retrieving the value from the cache, e.g., when
+        probing the content of the cache.
         """
-        _LOG.warning("Setting check_only_if_present to %s -> %s", self._check_only_if_present, val)
+        _LOG.warning(
+            "Setting check_only_if_present to %s -> %s",
+            self._check_only_if_present,
+            val,
+        )
         self._check_only_if_present = val
-
-    def _get_function_specific_code_path(self) -> str:
-        # Get the store backend.
-        cache_type = "disk"
-        memorized_result = self._get_memorized_result(cache_type)
-        store_backend = memorized_result.store_backend
-        # Get the function id (which is the full path).
-        func_id = jmemor._build_func_identifier(self._func)
-        # Assemble the path.
-        func_path = os.path.join(store_backend.location, func_id, "func_code.py")
-        _LOG.debug("func_path='%s'", func_path)
-        dbg.dassert(store_backend._item_exists(func_path),
-                    "Can't find '%s'", func_path)
-        return func_path
 
     def update_func_code_without_invalidating_cache(self) -> None:
         """
@@ -498,7 +491,10 @@ class _Cached:
         NOTE: here the caller must guarantee that the new function yields exactly
         the same results than the previous ones. Use carefully.
         """
-        dbg.dassert(self.has_function_cache(), "This is used only for function-specific caches")
+        dbg.dassert(
+            self.has_function_cache(),
+            "This is used only for function-specific caches",
+        )
         # From `store_cached_func_code` in
         # https://github.com/joblib/joblib/tree/master/joblib/_store_backends.py
         func_path = self._get_function_specific_code_path()
@@ -509,8 +505,11 @@ class _Cached:
         cache_type = "disk"
         memorized_result = self._get_memorized_result(cache_type)
         store_backend = memorized_result.store_backend
-        dbg.dassert(not store_backend._item_exists(new_func_path),
-                    "'%s' already exists", new_func_path)
+        dbg.dassert(
+            not store_backend._item_exists(new_func_path),
+            "'%s' already exists",
+            new_func_path,
+        )
         store_backend._move_item(func_path, new_func_path)
         # Write out function code to the cache.
         func_code, _, first_line = jfunci.get_func_code(memorized_result.func)
@@ -589,6 +588,21 @@ class _Cached:
             self._disk_cache,
             self._disk_cached_func,
         ) = self._create_function_disk_cache()
+
+    def _get_function_specific_code_path(self) -> str:
+        # Get the store backend.
+        cache_type = "disk"
+        memorized_result = self._get_memorized_result(cache_type)
+        store_backend = memorized_result.store_backend
+        # Get the function id (which is the full path).
+        func_id = jmemor._build_func_identifier(self._func)
+        # Assemble the path.
+        func_path = os.path.join(store_backend.location, func_id, "func_code.py")
+        _LOG.debug("func_path='%s'", func_path)
+        dbg.dassert(
+            store_backend._item_exists(func_path), "Can't find '%s'", func_path
+        )
+        return func_path
 
     # ///////////////////////////////////////////////////////////////////////////
 
@@ -767,7 +781,8 @@ class _Cached:
         func_info = "%s(args=%s kwargs=%s)" % (
             self._func.__name__,
             str(args),
-            str(kwargs))
+            str(kwargs),
+        )
         # Get the function signature.
         func_id, args_id = self._get_identifiers("disk", *args, **kwargs)
         if self._has_cached_version("disk", func_id, args_id):
@@ -795,13 +810,14 @@ class _Cached:
 
     def _execute_func_from_mem_cache(self, *args: Any, **kwargs: Any) -> Any:
         """
-        Execute the function from memory cache and if not possible try the lower
-        cache levels.
+        Execute the function from memory cache and if not possible try the
+        lower cache levels.
         """
         func_info = "%s(args=%s kwargs=%s)" % (
             self._func.__name__,
             str(args),
-            str(kwargs))
+            str(kwargs),
+        )
         # Get the function signature.
         func_id, args_id = self._get_identifiers("mem", *args, **kwargs)
         if self._has_cached_version("mem", func_id, args_id):
@@ -834,7 +850,8 @@ class _Cached:
         func_info = "%s(args=%s kwargs=%s)" % (
             self._func.__name__,
             str(args),
-            str(kwargs))
+            str(kwargs),
+        )
         _LOG.debug("%s: execute intrinsic function", func_info)
         if self._enable_read_only:
             msg = f"{func_info}: trying to execute"
@@ -846,7 +863,8 @@ class _Cached:
         func_info = "%s(args=%s kwargs=%s)" % (
             self._func.__name__,
             str(args),
-            str(kwargs))
+            str(kwargs),
+        )
         _LOG.debug(
             "%s: use_mem_cache=%s use_disk_cache=%s",
             func_info,
@@ -863,7 +881,6 @@ class _Cached:
                 _LOG.debug(
                     "Function has function-specific cache: skipping memory cache"
                 )
-                pass
             else:
                 _LOG.warning("Skipping memory cache")
             self._last_used_mem_cache = False

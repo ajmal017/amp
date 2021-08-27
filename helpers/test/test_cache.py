@@ -15,7 +15,7 @@ import helpers.unit_test as hut
 _LOG = logging.getLogger(__name__)
 
 # TODO(gp): Do not commit this.
-#_LOG.debug = _LOG.info
+# _LOG.debug = _LOG.info
 
 
 # TODO(gp): Use this everywhere.
@@ -123,14 +123,14 @@ class _ResetGlobalCacheHelper(hut.TestCase):
             exp_f_state = True
         else:
             exp_f_state = False
-        _LOG.debug("\n%s", hprint.frame(
-            "val1=%s, val2=%s, exp_f_state=%s, exp_cf_state=%s" % (
-            val1,
-            val2,
-            exp_f_state,
-            exp_cf_state),
-            char1="<"
-        ))
+        _LOG.debug(
+            "\n%s",
+            hprint.frame(
+                "val1=%s, val2=%s, exp_f_state=%s, exp_cf_state=%s"
+                % (val1, val2, exp_f_state, exp_cf_state),
+                char1="<",
+            ),
+        )
         # Reset the intrinsic function since we want to verify if it was called
         # or not when we call the cached function.
         _reset_add_function(f)
@@ -773,6 +773,15 @@ class TestCachingOnS3(_ResetFunctionSpecificCacheHelper):
 
 class TestCacheEnableReadOnly1(_ResetGlobalCacheHelper):
 
+    def test_mem_cache1(self) -> None:
+        self._helper(cache_from="mem", use_mem_cache=True, use_disk_cache=False)
+
+    def test_disk_cache1(self) -> None:
+        self._helper(cache_from="disk", use_mem_cache=False, use_disk_cache=True)
+
+    def test_mem_disk_cache1(self) -> None:
+        self._helper(cache_from="mem", use_mem_cache=True, use_disk_cache=True)
+
     def _helper(self, cache_from: str, **kwargs: Any) -> None:
         """
         Test that when enabling read-only mode we get an assertion only if the
@@ -808,21 +817,11 @@ class TestCacheEnableReadOnly1(_ResetGlobalCacheHelper):
         # Now this doesn't assert even if it's not in the cache.
         self._execute_and_check_state(f, cf, 4, 4, exp_cf_state="no_cache")
 
-    def test_mem_cache1(self) -> None:
-        self._helper(cache_from="mem", use_mem_cache=True, use_disk_cache=False)
-
-    def test_disk_cache1(self) -> None:
-        self._helper(cache_from="disk", use_mem_cache=False, use_disk_cache=True)
-
-    def test_mem_disk_cache1(self) -> None:
-        self._helper(cache_from="mem", use_mem_cache=True, use_disk_cache=True)
-
 
 # #############################################################################
 
 
 class TestCacheUpdateFunction1(_ResetGlobalCacheHelper):
-
     def test1(self) -> None:
         # Define the function imitating working in a notebook.
         _LOG.debug("\n%s", hprint.frame("Define function"))
@@ -833,10 +832,12 @@ class TestCacheUpdateFunction1(_ResetGlobalCacheHelper):
 
         disk_cache_dir = self.get_scratch_space()
         _LOG.debug("disk_cache_dir=%s", disk_cache_dir)
-        cached_add = hcache._Cached(add,
-                                    use_mem_cache=False,
-                                    use_disk_cache=True,
-                                    disk_cache_path=disk_cache_dir)
+        cached_add = hcache._Cached(
+            add,
+            use_mem_cache=False,
+            use_disk_cache=True,
+            disk_cache_path=disk_cache_dir,
+        )
         # 1) Execute the first time.
         _LOG.debug("\n%s", hprint.frame("Execute the 1st time"))
         self._execute_and_check_state(
@@ -850,9 +851,11 @@ class TestCacheUpdateFunction1(_ResetGlobalCacheHelper):
         self._execute_and_check_state(add, cached_add, 1, 2, exp_cf_state="disk")
         # 3) Redefine the function with different code while running.
         _LOG.debug("\n%s", hprint.frame("Update function"))
-        def add(x: int, y: int) -> int:
+
+        def add(x: int, y: int) -> int:  # type: ignore[no-redef]
             add.executed = True  # type: ignore[attr-defined]
             return x * y
+
         cached_add._func = add
         cached_add._disk_cached_func.func = add
         cached_add.update_func_code_without_invalidating_cache()
@@ -870,14 +873,21 @@ class TestCacheUpdateFunction1(_ResetGlobalCacheHelper):
 
 class TestCacheEnableCheckOnlyIfPresent1(_ResetGlobalCacheHelper):
 
+    def test_mem_cache1(self) -> None:
+        self._helper(cache_from="mem", use_mem_cache=True, use_disk_cache=False)
+
+    def test_disk_cache1(self) -> None:
+        self._helper(cache_from="disk", use_mem_cache=False, use_disk_cache=True)
+
+    def test_mem_disk_cache1(self) -> None:
+        self._helper(cache_from="mem", use_mem_cache=True, use_disk_cache=True)
+
     def _helper(self, cache_from: str, **kwargs: Any) -> None:
         # Both memory and disk cache enabled.
         f, cf = self._get_f_cf_functions(**kwargs)
         # 1) Execute the first time.
         _LOG.debug("\n%s", hprint.frame("Execute the 1st time"))
-        self._execute_and_check_state(
-            f, cf, 1, 2, exp_cf_state="no_cache"
-        )
+        self._execute_and_check_state(f, cf, 1, 2, exp_cf_state="no_cache")
         # 2) Execute the second time. Must use memory cache.
         _LOG.debug("\n%s", hprint.frame("Execute the 2nd time"))
         self._execute_and_check_state(f, cf, 1, 2, exp_cf_state=cache_from)
@@ -902,14 +912,6 @@ class TestCacheEnableCheckOnlyIfPresent1(_ResetGlobalCacheHelper):
         _LOG.debug("\n%s", hprint.frame("Execute the 5th time"))
         self._execute_and_check_state(f, cf, 2, 2, exp_cf_state=cache_from)
 
-    def test_mem_cache1(self) -> None:
-        self._helper(cache_from="mem", use_mem_cache=True, use_disk_cache=False)
-
-    def test_disk_cache1(self) -> None:
-        self._helper(cache_from="disk", use_mem_cache=False, use_disk_cache=True)
-
-    def test_mem_disk_cache1(self) -> None:
-        self._helper(cache_from="mem", use_mem_cache=True, use_disk_cache=True)
 
 # TODO(gp): Add a test for verbose mode in __call__
 # TODO(gp): get_function_cache_info
