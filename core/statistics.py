@@ -2035,6 +2035,9 @@ def compute_regression_coefficients(
     :param df: data dataframe
     :param x_cols: x variable columns
     :param y_col: y variable column
+    :param sample_weight_col: optional nonnegative sample observation weights.
+        If `None`, then equal weights are used. Weights do not need to be
+        normalized.
     :return: dataframe of regression coefficients and related stats
     """
     dbg.dassert(not df.empty, msg="Dataframe must be nonempty")
@@ -2042,6 +2045,8 @@ def compute_regression_coefficients(
     dbg.dassert_is_subset(x_cols, df.columns)
     dbg.dassert_isinstance(y_col, (int, str))
     dbg.dassert_in(y_col, df.columns)
+    # Sanity check weight column, if available. Set weights uniformly to 1 if
+    # not specified.
     if sample_weight_col is not None:
         dbg.dassert_in(sample_weight_col, df.columns)
         weights = df[sample_weight_col].rename("weight")
@@ -2059,10 +2064,15 @@ def compute_regression_coefficients(
     # Extract x variables.
     x_vars = df[x_cols]
     x_var_counts = x_vars.count().rename("count")
+    # Create a per-`x_col` weight dataframe to reflect possibly different NaN
+    # positions. This is used to generate accurate weighted sums and effective
+    # sample sizes.
     weight_df = pd.DataFrame(index=x_vars.index, columns=x_cols)
     for col in x_cols:
         weight_df[col] = weights.reindex(x_vars[col].dropna().index)
     weight_sums = weight_df.sum(axis=0)
+    # We use the 2-cardinality of the weights. This is equivalent to using
+    # Kish's effective sample size.
     x_var_eff_counts = weight_df.apply(
         lambda x: compute_cardinality(x.dropna(), 2)
     ).rename("eff_count")
@@ -2083,6 +2093,10 @@ def compute_regression_coefficients(
         .rename("covar")
     )
     # Calculate y variance assuming variable is centered.
+    # NOTE: We calculate only one estimate of the variance of y, using all
+    #     available data (regardless of whether a particular `x_col` is NaN or
+    #     not). If samples of `x_cols` are not substantially aligned, then this
+    #     may be undesirable.
     y_variance = df[y_col].pow(2).multiply(weights).sum() / weights.sum()
     _LOG.debug("y_col=`%s` variance=%f", y_col, y_variance)
     # Calculate correlation from covariances and variances.
@@ -2091,9 +2105,12 @@ def compute_regression_coefficients(
     )
     # Calculate beta coefficients and associated statistics.
     beta = covariance.divide(x_variance).rename("beta")
-    beta_se = np.sqrt(y_variance / x_variance.multiply(x_var_eff_counts)).rename(
-        "SE(beta)"
-    )
+    # The `x_var_eff_counts` term makes this invariant with respect to
+    # rescalings of the weight column.
+    beta_se = np.sqrt(y_variance / (x_variance.multiply(x_var_eff_counts)))\
+        .rename(
+            "SE(beta)"
+        )
     z_scores = beta.divide(beta_se).rename("beta_z_scored")
     # Calculate autocovariance-related stats of x variables.
     autocovariance = (
@@ -2103,6 +2120,7 @@ def compute_regression_coefficients(
         .divide(weight_sums)
         .rename("autocovar")
     )
+    # Normalize autocovariance to get autocorrelation.
     autocorrelation = autocovariance.divide(x_variance).rename("autocorr")
     turn = np.sqrt(2 * (1 - autocorrelation)).rename("turn")
     # Consolidate stats.
