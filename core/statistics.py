@@ -2063,7 +2063,9 @@ def compute_regression_coefficients(
     for col in x_cols:
         weight_df[col] = weights.reindex(x_vars[col].dropna().index)
     weight_sums = weight_df.sum(axis=0)
-    x_var_eff_counts = weight_df.apply(lambda x: compute_cardinality(x.dropna(), 2)).rename("eff_count")
+    x_var_eff_counts = weight_df.apply(
+        lambda x: compute_cardinality(x.dropna(), 2)
+    ).rename("eff_count")
     # Calculate variance assuming x variables are centered at zero.
     x_variance = (
         x_vars.pow(2)
@@ -2081,11 +2083,7 @@ def compute_regression_coefficients(
         .rename("covar")
     )
     # Calculate y variance assuming variable is centered.
-    y_variance = (
-        df[y_col].pow(2)
-        .multiply(weights)
-        .sum() / weights.sum()
-    )
+    y_variance = df[y_col].pow(2).multiply(weights).sum() / weights.sum()
     _LOG.debug("y_col=`%s` variance=%f", y_col, y_variance)
     # Calculate correlation from covariances and variances.
     rho = covariance.divide(np.sqrt(x_variance) * np.sqrt(y_variance)).rename(
