@@ -29,8 +29,7 @@ class LinearRegression(cdnb.FitPredictNode, cdnb.ColModeMixin):
         smoothing: float = 0,
         col_mode: Optional[str] = None,
         nan_mode: Optional[str] = None,
-        # TODO(*): Add support for weighted data.
-        # sample_weight_col: Optional[cdtfu.NodeColumnList] = None,
+        sample_weight_col: Optional[cdtfu.NodeColumnList] = None,
     ) -> None:
         super().__init__(nid)
         self._x_vars = x_vars
@@ -44,6 +43,7 @@ class LinearRegression(cdnb.FitPredictNode, cdnb.ColModeMixin):
         self._col_mode = col_mode or "replace_all"
         dbg.dassert_in(self._col_mode, ["replace_all", "merge_all"])
         self._nan_mode = nan_mode or "raise"
+        self._sample_weight_col = sample_weight_col
 
     def fit(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
         return self._fit_predict_helper(df_in, fit=True)
@@ -68,28 +68,33 @@ class LinearRegression(cdnb.FitPredictNode, cdnb.ColModeMixin):
         # Materialize names of x and y vars.
         x_vars = cdtfu.convert_to_list(self._x_vars)
         y_vars = cdtfu.convert_to_list(self._y_vars)
+        if self._sample_weight_col is not None:
+            x_vars_and_maybe_weight = x_vars + [self._sample_weight_col]
+        else:
+            x_vars_and_maybe_weight = x_vars
         # Get x and forward y df.
         if fit:
             # This df has no NaNs.
             df = cdtfu.get_x_and_forward_y_fit_df(
-                df_in, x_vars, y_vars, self._steps_ahead
+                df_in, x_vars_and_maybe_weight, y_vars, self._steps_ahead
             )
         else:
             # This df has no `x_vars` NaNs.
             df = cdtfu.get_x_and_forward_y_predict_df(
-                df_in, x_vars, y_vars, self._steps_ahead
+                df_in, x_vars_and_maybe_weight, y_vars, self._steps_ahead
             )
         # Handle presence of NaNs according to `nan_mode`.
         idx = df_in.index[: -self._steps_ahead] if fit else df_in.index
         self._handle_nans(idx, df.index)
         # Get the name of the forward y column.
-        forward_y_cols = df.drop(x_vars, axis=1).columns.to_list()
+        forward_y_cols = df.drop(x_vars_and_maybe_weight, axis=1).columns.to_list()
         dbg.dassert_eq(1, len(forward_y_cols))
         forward_y_col = forward_y_cols[0]
         coefficients = cstati.compute_regression_coefficients(
             df,
             x_vars,
             forward_y_col,
+            self._sample_weight_col
         )
         if fit:
             self._fit_coefficients = coefficients.copy()
@@ -123,6 +128,7 @@ class LinearRegression(cdnb.FitPredictNode, cdnb.ColModeMixin):
             df_out,
             [forward_y_hat_col],
             forward_y_col,
+            self._sample_weight_col
         )
         info["hat_coefficients"] = hat_coefficients
         df_out = df_out.reindex(idx)
