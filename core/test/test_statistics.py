@@ -2041,7 +2041,7 @@ class TestComputeRegressionCoefficients2(hut.TestCase):
             df_uniform_weights,
             x_cols=list(range(1, 5)),
             y_col=0,
-            sample_weight_col="weight"
+            sample_weight_col="weight",
         )
         hut.compare_df(unweighted_actual, weighted_actual)
 
@@ -2050,14 +2050,15 @@ class TestComputeRegressionCoefficients2(hut.TestCase):
         Ensure that rescaling weights does not affect the result
         """
         df_weights1 = self._get_data_from_disk()
-        weights = pd.Series(index=df_weights1.index,
-                            data=list(range(1, df_weights1.shape[0] + 1)))
+        weights = pd.Series(
+            index=df_weights1.index, data=list(range(1, df_weights1.shape[0] + 1))
+        )
         df_weights1["weight"] = weights
         weights1_actual = cstati.compute_regression_coefficients(
             df_weights1,
             x_cols=list(range(1, 5)),
             y_col=0,
-            sample_weight_col="weight"
+            sample_weight_col="weight",
         )
         df_weights2 = self._get_data_from_disk()
         # Multiply the weights by a constant factor.
@@ -2066,12 +2067,14 @@ class TestComputeRegressionCoefficients2(hut.TestCase):
             df_weights2,
             x_cols=list(range(1, 5)),
             y_col=0,
-            sample_weight_col="weight"
+            sample_weight_col="weight",
         )
         # This fails, though the values agree to at least six decimal places.
         # The failure appears to be due to floating point error.
         # hut.compare_df(weights1_actual, weights2_actual)
-        np.testing.assert_allclose(weights1_actual, weights2_actual, equal_nan=True)
+        np.testing.assert_allclose(
+            weights1_actual, weights2_actual, equal_nan=True
+        )
 
     def _get_test_data_file_name(self) -> str:
         """
