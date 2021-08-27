@@ -2091,7 +2091,7 @@ def compute_regression_coefficients(
     )
     # Calculate beta coefficients and associated statistics.
     beta = covariance.divide(x_variance).rename("beta")
-    beta_se = np.sqrt(y_variance / x_variance.multiply(x_var_counts)).rename(
+    beta_se = np.sqrt(y_variance / x_variance.multiply(x_var_eff_counts)).rename(
         "SE(beta)"
     )
     z_scores = beta.divide(beta_se).rename("beta_z_scored")
@@ -2108,7 +2108,7 @@ def compute_regression_coefficients(
     # Consolidate stats.
     coefficients = [
         x_var_counts,
-        # x_var_eff_counts,
+        x_var_eff_counts,
         x_variance,
         covariance,
         rho,
