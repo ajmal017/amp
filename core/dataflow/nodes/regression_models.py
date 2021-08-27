@@ -123,10 +123,13 @@ class LinearRegression(cdnb.FitPredictNode, cdnb.ColModeMixin):
         df_out = df[[forward_y_col]].merge(
             forward_y_hat, how="outer", left_index=True, right_index=True
         )
+        # Compute coefficients of forward y against its prediction.
+        # NOTE: This does not use the sample weights.
         hat_coefficients = cstati.compute_regression_coefficients(
-            df_out, [forward_y_hat_col], forward_y_col, self._sample_weight_col
+            df_out, [forward_y_hat_col], forward_y_col
         )
         info["hat_coefficients"] = hat_coefficients
+        #
         df_out = df_out.reindex(idx)
         df_out = self._apply_col_mode(
             df_in,
