@@ -2047,7 +2047,7 @@ class TestComputeRegressionCoefficients2(hut.TestCase):
 
     def test3(self) -> None:
         """
-        Ensure that rescaling weights does not affect the result
+        Ensure that rescaling weights does not affect the result.
         """
         df_weights1 = self._get_data_from_disk()
         weights = pd.Series(
