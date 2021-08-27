@@ -283,6 +283,9 @@ def clear_global_cache(
 
 class CachedValueException(RuntimeError):
     """
+    A cached function is run for a value present in the cache.
+
+    This exception is thrown when the `check_only_if_present` mode is used.
     """
     pass
 
@@ -290,6 +293,8 @@ class CachedValueException(RuntimeError):
 class NotCachedValueException(RuntimeError):
     """
     A cached function is run for a value not present in the cache.
+
+    This exception is thrown when the `enable_read_only` mode is used.
     """
     pass
 
@@ -364,10 +369,11 @@ class _Cached:
             self._disk_cache,
             self._disk_cached_func,
         ) = self._create_function_disk_cache()
-        # Enable the read-only mode where an exception is thrown if the value is
-        # not in the cache.
+        # Enable a mode where an exception `NotCachedValueException` is thrown if
+        # the value is not in the cache.
         self._enable_read_only = False
-        #
+        # Enable a mode where an exception `NotCachedValueException` is thrown if
+        # the value is in the cache, instead of accessing the value.
         self._check_only_if_present = False
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
@@ -450,18 +456,20 @@ class _Cached:
 
     def enable_read_only(self, val: bool) -> None:
         """
-        If set to True this function can only read from the cache but not execute
-        new code.
-
-        This can be used for two goals:
-        - avoid to run if the cache is not completely populated (e.g., for
-          function-specific cache)
+        If set to True, the cached function can only read from the cache but not
+        execute for new values. Otherwise a `NotCachedValueException` is thrown.
         """
         _LOG.warning("Setting enable_read_only to %s -> %s", self._enable_read_only, val)
         self._enable_read_only = val
 
     def enable_check_only_if_present(self, val: bool) -> None:
         """
+        If set to True, the cached function a `CachedValueException` is thrown if a
+        function invocation was cached, instead of executing it.
+
+        This can be used to check if a value was already cached without triggering
+        retrieving the value from the cache, e.g., when probing the content of the
+        cache.
         """
         _LOG.warning("Setting check_only_if_present to %s -> %s", self._check_only_if_present, val)
         self._check_only_if_present = val

@@ -796,8 +796,10 @@ class TestCacheEnableReadOnly1(_ResetGlobalCacheHelper):
         # This is cached so it doesn't raise.
         self._execute_and_check_state(f, cf, 3, 4, exp_cf_state=cache_from)
         # This is not cached so it should raise.
-        with self.assertRaises(hcache.NotCachedValueException):
+        with self.assertRaises(hcache.NotCachedValueException) as cm:
             self._execute_and_check_state(f, cf, 4, 4, exp_cf_state="no_cache")
+        act = str(cm.exception)
+        self.check_string(act)
         #
         # Disable the read-only mode.
         #
@@ -820,6 +822,7 @@ class TestCacheEnableReadOnly1(_ResetGlobalCacheHelper):
 
 
 class TestCacheUpdateFunction1(_ResetGlobalCacheHelper):
+
     def test1(self) -> None:
         # Define the function imitating working in a notebook.
         _LOG.debug("\n%s", hprint.frame("Define function"))
@@ -861,6 +864,52 @@ class TestCacheUpdateFunction1(_ResetGlobalCacheHelper):
         _LOG.debug("\n%s", hprint.frame("Execute the 3rd time"))
         self._execute_and_check_state(add, cached_add, 1, 2, exp_cf_state="disk")
 
+
+# #############################################################################
+
+
+class TestCacheEnableCheckOnlyIfPresent1(_ResetGlobalCacheHelper):
+
+    def _helper(self, cache_from: str, **kwargs: Any) -> None:
+        # Both memory and disk cache enabled.
+        f, cf = self._get_f_cf_functions(**kwargs)
+        # 1) Execute the first time.
+        _LOG.debug("\n%s", hprint.frame("Execute the 1st time"))
+        self._execute_and_check_state(
+            f, cf, 1, 2, exp_cf_state="no_cache"
+        )
+        # 2) Execute the second time. Must use memory cache.
+        _LOG.debug("\n%s", hprint.frame("Execute the 2nd time"))
+        self._execute_and_check_state(f, cf, 1, 2, exp_cf_state=cache_from)
+        # 3) Enable the `check_only_if_present` mode.
+        _LOG.debug("\n%s", hprint.frame("Enable check_only_if_present"))
+        cf.enable_check_only_if_present(True)
+        # Since the value was cached, we should get an assertion.
+        with self.assertRaises(hcache.CachedValueException) as cm:
+            self._execute_and_check_state(f, cf, 1, 2, exp_cf_state=cache_from)
+        act = str(cm.exception)
+        self.check_string(act)
+        # 4) Try with a new value.
+        _LOG.debug("\n%s", hprint.frame("Execute the 3rd time"))
+        self._execute_and_check_state(f, cf, 2, 2, exp_cf_state="no_cache")
+        # 5) Disable the `check_only_if_present` mode.
+        _LOG.debug("\n%s", hprint.frame("Disable check_only_if_present"))
+        cf.enable_check_only_if_present(False)
+        # 6) Execute a value: we should get a cache hit.
+        _LOG.debug("\n%s", hprint.frame("Execute the 4rd time"))
+        self._execute_and_check_state(f, cf, 1, 2, exp_cf_state=cache_from)
+        # 7) Execute a value: we should get a cache hit.
+        _LOG.debug("\n%s", hprint.frame("Execute the 5th time"))
+        self._execute_and_check_state(f, cf, 2, 2, exp_cf_state=cache_from)
+
+    def test_mem_cache1(self) -> None:
+        self._helper(cache_from="mem", use_mem_cache=True, use_disk_cache=False)
+
+    def test_disk_cache1(self) -> None:
+        self._helper(cache_from="disk", use_mem_cache=False, use_disk_cache=True)
+
+    def test_mem_disk_cache1(self) -> None:
+        self._helper(cache_from="mem", use_mem_cache=True, use_disk_cache=True)
 
 # TODO(gp): Add a test for verbose mode in __call__
 # TODO(gp): get_function_cache_info
