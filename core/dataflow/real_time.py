@@ -37,7 +37,7 @@ _LOG = logging.getLogger(__name__)
 #      depending on the actual wall-clock time
 # 2) Simulated real-time
 #   - The advancing of time is simulated through calling a method (e.g.,
-#     `set_current_time(simulated_time)`) or through a simulted version of the
+#     `set_current_time(simulated_time)`) or through a simulated version of the
 #     `asyncio` `EventLoop`
 # 3) Replayed time
 #    - The wall-clock time is transformed in a historical wall-clock time (e.g.,
@@ -333,8 +333,9 @@ async def execute_all_with_real_time_loop(
     """
     Execute the entire event loop until the end.
     """
-    vals = zip(*[v async for v in
-        execute_with_real_time_loop(*args, **kwargs)])  # type: error[arg-type]
+    vals = zip(
+        *[v async for v in execute_with_real_time_loop(*args, **kwargs)]
+    )  # type: ignore[arg-type]
     events, results = list(vals)
     events = Events(events)
     results = list(results)
