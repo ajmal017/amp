@@ -58,12 +58,12 @@ class LinearRegression(cdnb.FitPredictNode, cdnb.ColModeMixin):
         }
         return fit_state
 
-    def set_fit_state(self, fit_state: Dict[str, Any]):
+    def set_fit_state(self, fit_state: Dict[str, Any]) -> None:
         self._fit_coefficients = fit_state["_fit_coefficients"]
         self._info["fit"] = fit_state["_info['fit']"]
 
     def _fit_predict_helper(
-        self, df_in: pd.DataFrame, fit: True
+        self, df_in: pd.DataFrame, fit: bool = True
     ) -> Dict[str, pd.DataFrame]:
         # Materialize names of x and y vars.
         x_vars = cdtfu.convert_to_list(self._x_vars)
