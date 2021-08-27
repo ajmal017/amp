@@ -246,8 +246,6 @@ def clear_global_cache(
     :param tag: optional unique tag of the cache, empty by default
     :param destroy: remove physical directory
     """
-    if not _IS_CLEAR_CACHE_ENABLED:
-        dbg.dfatal("Trying to delete cache")
     if cache_type == "all":
         for cache_type_tmp in _get_cache_types():
             clear_global_cache(cache_type_tmp, tag=tag, destroy=destroy)
@@ -255,6 +253,8 @@ def clear_global_cache(
     _dassert_is_valid_cache_type(cache_type)
     # Clear and / or destroy the cache `cache_type` with the given `tag`.
     cache_path = _get_global_cache_path(cache_type, tag)
+    if not _IS_CLEAR_CACHE_ENABLED:
+        dbg.dfatal("Trying to delete cache '%s'" % cache_path)
     description = f"global {cache_type}"
     info_before = _get_cache_size(cache_path, description)
     _LOG.info("Before clear_global_cache: %s", info_before)
@@ -279,6 +279,12 @@ def clear_global_cache(
 
 
 # #############################################################################
+
+
+class CachedValueException(RuntimeError):
+    """
+    """
+    pass
 
 
 class NotCachedValueException(RuntimeError):
@@ -361,6 +367,8 @@ class _Cached:
         # Enable the read-only mode where an exception is thrown if the value is
         # not in the cache.
         self._enable_read_only = False
+        #
+        self._check_only_if_present = False
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """
@@ -446,12 +454,17 @@ class _Cached:
         new code.
 
         This can be used for two goals:
-        - determine what was cached after the fact;
         - avoid to run if the cache is not completely populated (e.g., for
           function-specific cache)
         """
-        _LOG.warning("Setting read_only to %s -> %s", self._enable_read_only, val)
+        _LOG.warning("Setting enable_read_only to %s -> %s", self._enable_read_only, val)
         self._enable_read_only = val
+
+    def enable_check_only_if_present(self, val: bool) -> None:
+        """
+        """
+        _LOG.warning("Setting check_only_if_present to %s -> %s", self._check_only_if_present, val)
+        self._check_only_if_present = val
 
     def _get_function_specific_code_path(self) -> str:
         # Get the store backend.
@@ -513,8 +526,6 @@ class _Cached:
         """
         Clear a function-specific cache.
         """
-        if not _IS_CLEAR_CACHE_ENABLED:
-            dbg.dfatal("Trying to delete function cache")
         dbg.dassert(
             self.has_function_cache(),
             "This function has no function-specific cache",
@@ -523,6 +534,8 @@ class _Cached:
         cache_path = self._disk_cache_path
         dbg.dassert_is_not(cache_path, None)
         cache_path = cast(str, cache_path)
+        if not _IS_CLEAR_CACHE_ENABLED:
+            dbg.dfatal("Trying to delete function cache '%s'" % cache_path)
         # Collect info before.
         cache_type = "disk"
         description = f"function {cache_type}"
@@ -752,6 +765,8 @@ class _Cached:
         if self._has_cached_version("disk", func_id, args_id):
             _LOG.debug("There is a disk cached version")
             obj = self._disk_cached_func(*args, **kwargs)
+            if self._check_only_if_present:
+                raise CachedValueException(func_info)
         else:
             # INV: we didn't hit neither memory nor the disk cache.
             self._last_used_disk_cache = False
@@ -775,10 +790,16 @@ class _Cached:
         Execute the function from memory cache and if not possible try the lower
         cache levels.
         """
+        func_info = "%s(args=%s kwargs=%s)" % (
+            self._func.__name__,
+            str(args),
+            str(kwargs))
         # Get the function signature.
         func_id, args_id = self._get_identifiers("mem", *args, **kwargs)
         if self._has_cached_version("mem", func_id, args_id):
             _LOG.debug("There is a mem cached version")
+            if self._check_only_if_present:
+                raise CachedValueException(func_info)
             # The function execution was cached in the mem cache.
             obj = self._memory_cached_func(*args, **kwargs)
         else:
