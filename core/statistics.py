@@ -2024,6 +2024,7 @@ def compute_regression_coefficients(
     df: pd.DataFrame,
     x_cols: List[Union[int, str]],
     y_col: Union[int, str],
+    sample_weight_col: Optional[Union[int, str]] = None,
 ) -> pd.DataFrame:
     """
     Regresses `y_col` on each `x_col` independently.
@@ -2041,23 +2042,50 @@ def compute_regression_coefficients(
     dbg.dassert_is_subset(x_cols, df.columns)
     dbg.dassert_isinstance(y_col, (int, str))
     dbg.dassert_in(y_col, df.columns)
+    if sample_weight_col is not None:
+        dbg.dassert_in(sample_weight_col, df.columns)
+        weights = df[sample_weight_col].rename("weight")
+    else:
+        weights = pd.Series(index=df.index, data=1, name="weight")
+    # Ensure that no weights are negative.
+    dbg.dassert(not (weights < 0).any())
+    # Ensure that the total weight is positive.
+    dbg.dassert((weights > 0).any())
     # Drop rows with no y value.
     _LOG.debug("y_col=`%s` count=%i", y_col, df[y_col].count())
     df = df.dropna(subset=[y_col])
+    # Reindex weights to reflect any dropped y values.
+    weights = weights.reindex(df.index)
     # Extract x variables.
     x_vars = df[x_cols]
     x_var_counts = x_vars.count().rename("count")
+    weight_df = pd.DataFrame(index=x_vars.index, columns=x_cols)
+    for col in x_cols:
+        weight_df[col] = weights.reindex(x_vars[col].dropna().index)
+    weight_sums = weight_df.sum(axis=0)
+    x_var_eff_counts = weight_df.apply(lambda x: compute_cardinality(x.dropna(), 2)).rename("eff_count")
     # Calculate variance assuming x variables are centered at zero.
-    x_variance = x_vars.pow(2).sum().divide(x_var_counts).rename("var")
+    x_variance = (
+        x_vars.pow(2)
+        .multiply(weight_df, axis=0)
+        .sum(axis=0)
+        .divide(weight_sums)
+        .rename("var")
+    )
     # Calculate covariance assuming x variables and y variable are centered.
     covariance = (
         x_vars.multiply(df[y_col], axis=0)
+        .multiply(weight_df, axis=0)
         .sum(axis=0)
-        .divide(x_var_counts, axis=0)
+        .divide(weight_sums)
         .rename("covar")
     )
     # Calculate y variance assuming variable is centered.
-    y_variance = df[y_col].pow(2).sum() / df[y_col].count()
+    y_variance = (
+        df[y_col].pow(2)
+        .multiply(weights)
+        .sum() / weights.sum()
+    )
     _LOG.debug("y_col=`%s` variance=%f", y_col, y_variance)
     # Calculate correlation from covariances and variances.
     rho = covariance.divide(np.sqrt(x_variance) * np.sqrt(y_variance)).rename(
@@ -2072,8 +2100,9 @@ def compute_regression_coefficients(
     # Calculate autocovariance-related stats of x variables.
     autocovariance = (
         x_vars.multiply(x_vars.shift(1), axis=0)
+        .multiply(weight_df, axis=0)
         .sum(axis=0)
-        .divide(x_var_counts)
+        .divide(weight_sums)
         .rename("autocovar")
     )
     autocorrelation = autocovariance.divide(x_variance).rename("autocorr")
@@ -2081,6 +2110,7 @@ def compute_regression_coefficients(
     # Consolidate stats.
     coefficients = [
         x_var_counts,
+        # x_var_eff_counts,
         x_variance,
         covariance,
         rho,
