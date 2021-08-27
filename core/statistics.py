@@ -2107,10 +2107,9 @@ def compute_regression_coefficients(
     beta = covariance.divide(x_variance).rename("beta")
     # The `x_var_eff_counts` term makes this invariant with respect to
     # rescalings of the weight column.
-    beta_se = np.sqrt(y_variance / (x_variance.multiply(x_var_eff_counts)))\
-        .rename(
-            "SE(beta)"
-        )
+    beta_se = np.sqrt(
+        y_variance / (x_variance.multiply(x_var_eff_counts))
+    ).rename("SE(beta)")
     z_scores = beta.divide(beta_se).rename("beta_z_scored")
     # Calculate autocovariance-related stats of x variables.
     autocovariance = (
