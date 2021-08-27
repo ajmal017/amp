@@ -87,14 +87,13 @@ class LinearRegression(cdnb.FitPredictNode, cdnb.ColModeMixin):
         idx = df_in.index[: -self._steps_ahead] if fit else df_in.index
         self._handle_nans(idx, df.index)
         # Get the name of the forward y column.
-        forward_y_cols = df.drop(x_vars_and_maybe_weight, axis=1).columns.to_list()
+        forward_y_cols = df.drop(
+            x_vars_and_maybe_weight, axis=1
+        ).columns.to_list()
         dbg.dassert_eq(1, len(forward_y_cols))
         forward_y_col = forward_y_cols[0]
         coefficients = cstati.compute_regression_coefficients(
-            df,
-            x_vars,
-            forward_y_col,
-            self._sample_weight_col
+            df, x_vars, forward_y_col, self._sample_weight_col
         )
         if fit:
             self._fit_coefficients = coefficients.copy()
@@ -125,10 +124,7 @@ class LinearRegression(cdnb.FitPredictNode, cdnb.ColModeMixin):
             forward_y_hat, how="outer", left_index=True, right_index=True
         )
         hat_coefficients = cstati.compute_regression_coefficients(
-            df_out,
-            [forward_y_hat_col],
-            forward_y_col,
-            self._sample_weight_col
+            df_out, [forward_y_hat_col], forward_y_col, self._sample_weight_col
         )
         info["hat_coefficients"] = hat_coefficients
         df_out = df_out.reindex(idx)
