@@ -2174,7 +2174,9 @@ def compute_regression_coefficients(
     return pd.concat(coefficients, axis=1)
 
 
-def apply_smoothing_parameters(rho: pd.Series, turn: pd.Series, parameters: List[float]) -> pd.DataFrame:
+def apply_smoothing_parameters(
+    rho: pd.Series, turn: pd.Series, parameters: List[float]
+) -> pd.DataFrame:
     """
     Estimate smoothing effects.
 
