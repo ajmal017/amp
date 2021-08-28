@@ -2174,6 +2174,30 @@ def compute_regression_coefficients(
     return pd.concat(coefficients, axis=1)
 
 
+def apply_smoothing_parameters(rho: pd.Series, turn: pd.Series, parameters: List[float]) -> pd.DataFrame:
+    """
+    Estimate smoothing effects.
+
+    :param parameters: corresponds to (inverse) exponent of `turn`
+    """
+    rhos = []
+    turns = []
+    tsq = turn ** 2
+    for param in parameters:
+        rho_num = np.square(np.linalg.norm(tsq.pow(-1 * param / 4).multiply(rho)))
+        # TODO(Paul): Cross-check.
+        turn_num = np.linalg.norm(tsq.pow(0.5 - 2 * param / 4).multiply(rho))
+        denom = np.linalg.norm(tsq.pow(-2 * param / 4).multiply(rho))
+        rhos.append(rho_num / denom)
+        turns.append(turn_num / denom)
+    rho_srs = pd.Series(index=parameters, data=rhos, name="rho")
+    rho_frac = (rho_srs / rho_srs.max()).rename("rho_frac")
+    turn_srs = pd.Series(index=parameters, data=turns, name="turn")
+    rho_to_turn = (rho_srs / turn_srs).rename("rho_to_turn")
+    df = pd.concat([rho_srs, rho_frac, turn_srs, rho_to_turn], axis=1)
+    return df
+
+
 def compute_local_level_model_stats(
     srs: pd.Series,
     prefix: Optional[str] = None,
