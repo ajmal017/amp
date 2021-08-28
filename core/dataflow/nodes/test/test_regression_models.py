@@ -50,6 +50,9 @@ class TestLinearRegression(hut.TestCase):
         self.check_string(df_str)
 
     def test1(self) -> None:
+        """
+        Test `fit()`.
+        """
         # Load test data.
         data = self._get_frozen_input()
         # Generate node config.
@@ -71,6 +74,9 @@ class TestLinearRegression(hut.TestCase):
         self.check_string(df_str)
 
     def test2(self) -> None:
+        """
+        Test `fit()` with nonzero smoothing.
+        """
         # Load test data.
         data = self._get_frozen_input()
         # Generate node config.
@@ -93,6 +99,9 @@ class TestLinearRegression(hut.TestCase):
         self.check_string(df_str)
 
     def test3(self) -> None:
+        """
+        Test `predict()` after `fit()`.
+        """
         # Load test data.
         data = self._get_frozen_input()
         data_fit = data.loc[:"2000-01-10"]  # type: error[misc]
@@ -104,6 +113,65 @@ class TestLinearRegression(hut.TestCase):
                 "y_vars": ["y"],
                 "steps_ahead": 1,
                 "smoothing": 2,
+                "col_mode": "merge_all",
+            }
+        )
+        node = cdnrm.LinearRegression(
+            "linear_regression",
+            **config.to_dict(),
+        )
+        #
+        node.fit(data_fit)
+        df_out = node.predict(data_predict)["df_out"]
+        df_str = hut.convert_df_to_string(df_out.round(3), index=True, decimals=3)
+        self.check_string(df_str)
+
+    def test4(self) -> None:
+        """
+        Test `fit()` with weights.
+        """
+        # Load test data.
+        data = self._get_frozen_input()
+        data["weight"] = pd.Series(
+            index=data.index, data=range(1, data.shape[0] + 1)
+        )
+        # Generate node config.
+        config = cconfig.get_config_from_nested_dict(
+            {
+                "x_vars": ["x1", "x2", "x3", "x4"],
+                "y_vars": ["y"],
+                "sample_weight_col": "weight",
+                "steps_ahead": 1,
+                "col_mode": "merge_all",
+            }
+        )
+        node = cdnrm.LinearRegression(
+            "linear_regression",
+            **config.to_dict(),
+        )
+        #
+        df_out = node.fit(data)["df_out"]
+        df_str = hut.convert_df_to_string(df_out.round(3), index=True, decimals=3)
+        self.check_string(df_str)
+
+    def test5(self) -> None:
+        """
+        Test `predict()` after `fit()`, both with weights.
+        """
+        # Load test data.
+        data = self._get_frozen_input()
+        data["weight"] = pd.Series(
+            index=data.index, data=range(1, data.shape[0] + 1)
+        )
+        data_fit = data.loc[:"2000-01-10"]  # type: error[misc]
+        data_predict = data.loc["2000-01-10":]  # type: error[misc]
+        # Generate node config.
+        config = cconfig.get_config_from_nested_dict(
+            {
+                "x_vars": ["x1", "x2", "x3", "x4"],
+                "y_vars": ["y"],
+                "sample_weight_col": "weight",
+                "steps_ahead": 1,
                 "col_mode": "merge_all",
             }
         )
