@@ -913,7 +913,7 @@ def compute_centered_gaussian_total_log_likelihood(
 
 
 # #############################################################################
-# Autocorrelation statistics
+# Autocorrelation and cross-correlation statistics
 # #############################################################################
 
 
@@ -972,6 +972,41 @@ def apply_ljung_box_test(
         df_result = pd.DataFrame(result).T
     df_result.columns = columns
     return df_result
+
+
+def compute_cross_correlation(
+    df: pd.DataFrame,
+    x_cols: List[Union[int, str]],
+    y_col: Union[int, str],
+    lags: List[int],
+) -> pd.DataFrame:
+    """
+    Compute cross-correlations between `x_cols` and `y_col` at `lags`.
+
+    :param df: data dataframe
+    :param x_cols: x variable columns
+    :param y_col: y variable column
+    :param lags: list of integer lags to shift `x_cols` by
+    :return: dataframe of cross correlation at lags
+    """
+    dbg.dassert(not df.empty, msg="Dataframe must be nonempty")
+    dbg.dassert_isinstance(x_cols, list)
+    dbg.dassert_is_subset(x_cols, df.columns)
+    dbg.dassert_isinstance(y_col, (int, str))
+    dbg.dassert_in(y_col, df.columns)
+    dbg.dassert_isinstance(lags, list)
+    # Drop rows with no y value.
+    _LOG.debug("y_col=`%s` count=%i", y_col, df[y_col].count())
+    df = df.dropna(subset=[y_col])
+    x_vars = df[x_cols]
+    y_var = df[y_col]
+    correlations = []
+    for lag in lags:
+        corr = x_vars.shift(lag).apply(lambda x: x.corr(y_var))
+        corr.name = lag
+        correlations.append(corr)
+    corr_df = pd.concat(correlations, axis=1)
+    return corr_df.transpose()
 
 
 # #############################################################################
@@ -2137,6 +2172,32 @@ def compute_regression_coefficients(
         turn,
     ]
     return pd.concat(coefficients, axis=1)
+
+
+def apply_smoothing_parameters(
+    rho: pd.Series, turn: pd.Series, parameters: List[float]
+) -> pd.DataFrame:
+    """
+    Estimate smoothing effects.
+
+    :param parameters: corresponds to (inverse) exponent of `turn`
+    """
+    rhos = []
+    turns = []
+    tsq = turn ** 2
+    for param in parameters:
+        rho_num = np.square(np.linalg.norm(tsq.pow(-1 * param / 4).multiply(rho)))
+        # TODO(Paul): Cross-check.
+        turn_num = np.linalg.norm(tsq.pow(0.5 - 2 * param / 4).multiply(rho))
+        denom = np.linalg.norm(tsq.pow(-2 * param / 4).multiply(rho))
+        rhos.append(rho_num / denom)
+        turns.append(turn_num / denom)
+    rho_srs = pd.Series(index=parameters, data=rhos, name="rho")
+    rho_frac = (rho_srs / rho_srs.max()).rename("rho_frac")
+    turn_srs = pd.Series(index=parameters, data=turns, name="turn")
+    rho_to_turn = (rho_srs / turn_srs).rename("rho_to_turn")
+    df = pd.concat([rho_srs, rho_frac, turn_srs, rho_to_turn], axis=1)
+    return df
 
 
 def compute_local_level_model_stats(
