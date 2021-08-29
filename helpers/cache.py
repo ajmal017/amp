@@ -194,6 +194,7 @@ def _create_global_cache_backend(
     return cache_backend
 
 
+# TODO(gp): -> _get_global_cache
 def get_global_cache(cache_type: str, tag: Optional[str] = None) -> joblib.Memory:
     """
     Get global cache by cache type.
@@ -409,13 +410,17 @@ class _Cached:
             # Get memory.
             obj_size = hintro.get_size_in_bytes(obj)
             obj_size_as_str = hintro.format_size(obj_size)
+            last_cache = self.get_last_cache_accessed()
+            cache_dir = self._get_cache_dir(last_cache, self._tag)
             _LOG.info(
-                "  --> Cache data for '%s' was retrieved from '%s' cache "
-                "(size=%s time=%.2f s)",
+                "  --> Cache data for '%s' from '%s' cache "
+                "(size=%s, time=%.2f s, tag=%s, loc=%s)",
                 self._func.__name__,
-                self.get_last_cache_accessed(),
+                last_cache,
                 obj_size_as_str,
                 elapsed_time,
+                self._tag,
+                cache_dir
             )
         return obj
 
@@ -604,8 +609,6 @@ class _Cached:
         )
         return func_path
 
-    # ///////////////////////////////////////////////////////////////////////////
-
     def _create_function_memory_cache(self) -> joblib.Memory:
         """
         Initialize Joblib object storing a memory cache for this function.
@@ -623,7 +626,7 @@ class _Cached:
         """
         Initialize Joblib object storing a disk cache for this function.
         """
-        if self._disk_cache_path:
+        if self.has_function_cache():
             dbg.dassert(
                 not self._use_mem_cache,
                 "When using function cache the memory cache needs to be disabled",
@@ -671,6 +674,21 @@ class _Cached:
         # Get the Joblib object corresponding to the cached function.
         disk_cached_func = disk_cache.cache(self._func)
         return disk_cache, disk_cached_func
+
+    # ///////////////////////////////////////////////////////////////////////////
+
+    def _get_cache_dir(self, cache_type: str, tag: Optional[str]) -> str:
+        """
+        Return the dir of the cache corresponding to `cache_type` and `tag`.
+        """
+        if cache_type == "no_cache":
+            return "no_cache"
+        if self.has_function_cache():
+            dbg.dassert_eq(cache_type, "disk")
+            ret = self._disk_cache_path
+        else:
+            ret = _get_global_cache_path(cache_type, tag=tag)
+        return ret
 
     def _get_memorized_result(self, cache_type: str) -> joblib.MemorizedResult:
         """
