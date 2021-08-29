@@ -144,8 +144,10 @@ def _get_global_cache_path(cache_type: str, tag: Optional[str] = None) -> str:
     cache_name = _get_global_cache_name(cache_type, tag)
     # Get the enclosing directory path.
     if cache_type == "mem":
-        tmpfs_path = "/tmp" if hsyste.get_os_name() == "Darwin" else "/mnt/tmpfs"
-        root_path = tmpfs_path
+        if hsyste.get_os_name() == "Darwin":
+            root_path = "/tmp"
+        else:
+            root_path = "/mnt/tmpfs"
     elif cache_type == "disk":
         root_path = git.get_client_root(super_module=True)
     # Compute path.
