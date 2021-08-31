@@ -782,9 +782,7 @@ def compute_average_holding_period(
 
 
 # TODO(*): Rename `compute_signed_run_starts()`.
-def compute_bet_starts(
-    positions: pd.Series
-) -> pd.Series:
+def compute_bet_starts(positions: pd.Series) -> pd.Series:
     """
     Calculate the start of each new bet.
 
@@ -804,9 +802,7 @@ def compute_bet_starts(
     return bet_starts
 
 
-def compute_bet_ends(
-    positions: pd.Series
-) -> pd.Series:
+def compute_bet_ends(positions: pd.Series) -> pd.Series:
     """
     Calculate the end of each bet.
 
