@@ -1715,9 +1715,7 @@ def compute_bet_stats(
     """
     prefix = prefix or ""
     bet_lengths = cfinan.compute_signed_bet_lengths(positions)
-    log_rets_per_bet = cfinan.compute_returns_per_bet(
-        positions, log_rets
-    )
+    log_rets_per_bet = cfinan.compute_returns_per_bet(positions, log_rets)
     #
     stats = dict()
     stats["num_positions"] = int(bet_lengths.abs().sum())
