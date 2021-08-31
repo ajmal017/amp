@@ -1700,7 +1700,6 @@ def compute_annualized_return_and_volatility(
 def compute_bet_stats(
     positions: pd.Series,
     log_rets: pd.Series,
-    nan_mode: Optional[str] = None,
     prefix: Optional[str] = None,
 ) -> pd.Series:
     """
@@ -1708,7 +1707,6 @@ def compute_bet_stats(
 
     :param positions: series of long/short positions
     :param log_rets: log returns
-    :param nan_mode: argument for hdataf.apply_nan_mode()
     :param prefix: optional prefix for metrics' outcome
     :return: series of average returns for winning/losing and long/short bets,
         number of positions and bets. In `average_num_bets_per_year`, "year" is
@@ -1716,9 +1714,9 @@ def compute_bet_stats(
         year
     """
     prefix = prefix or ""
-    bet_lengths = cfinan.compute_signed_bet_lengths(positions, nan_mode=nan_mode)
+    bet_lengths = cfinan.compute_signed_bet_lengths(positions)
     log_rets_per_bet = cfinan.compute_returns_per_bet(
-        positions, log_rets, nan_mode=nan_mode
+        positions, log_rets
     )
     #
     stats = dict()
