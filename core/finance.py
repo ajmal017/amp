@@ -781,31 +781,8 @@ def compute_average_holding_period(
     return average_holding_period
 
 
-def compute_bet_runs(
-    positions: pd.Series, nan_mode: Optional[str] = None
-) -> pd.Series:
-    """
-    Calculate runs of long/short bets.
-
-    A bet "run" is a (maximal) series of positions on the same "side", e.g.,
-    long or short.
-
-    :param positions: series of long/short positions
-    :return: series of -1/0/1 with 1's indicating long bets and -1 indicating
-        short bets
-    """
-    hpandas.dassert_monotonic_index(positions)
-    # Forward fill NaN positions by default (e.g., do not assume they are
-    # closed out).
-    nan_mode = nan_mode or "ffill"
-    positions = hdataf.apply_nan_mode(positions, mode=nan_mode)
-    bet_runs = csigna.sign_normalize(positions)
-    return bet_runs
-
-
-def compute_bet_starts(
-    positions: pd.Series, nan_mode: Optional[str] = None
-) -> pd.Series:
+# TODO(*): Rename `compute_signed_run_starts()`.
+def compute_bet_starts(positions: pd.Series) -> pd.Series:
     """
     Calculate the start of each new bet.
 
@@ -814,7 +791,7 @@ def compute_bet_starts(
         the start of each new short bet; 0 indicates continuation of bet and
         `NaN` indicates absence of bet.
     """
-    bet_runs = compute_bet_runs(positions, nan_mode)
+    bet_runs = csigna.sign_normalize(positions)
     # Determine start of bets.
     bet_starts = bet_runs.subtract(bet_runs.shift(1, fill_value=0), fill_value=0)
     bet_starts = csigna.sign_normalize(bet_starts)
@@ -825,45 +802,37 @@ def compute_bet_starts(
     return bet_starts
 
 
-def compute_bet_ends(
-    positions: pd.Series, nan_mode: Optional[str] = None
-) -> pd.Series:
+def compute_bet_ends(positions: pd.Series) -> pd.Series:
     """
     Calculate the end of each bet.
 
     NOTE: This function is not casual (because of our choice of indexing).
 
     :param positions: as in `compute_bet_starts()`
-    :param nan_mode: as in `compute_bet_starts()`
     :return: as in `compute_bet_starts()`, but with long/short bet indicator at
         the last time of the bet. Note that this is not casual.
     """
-    # Apply the NaN mode casually (e.g., `ffill` is not time reversible).
-    nan_mode = nan_mode or "ffill"
-    positions = hdataf.apply_nan_mode(positions, mode=nan_mode)
     # Calculate bet ends by calculating the bet starts of the reversed series.
     reversed_positions = positions.iloc[::-1]
-    reversed_bet_starts = compute_bet_starts(reversed_positions, nan_mode=None)
+    reversed_bet_starts = compute_bet_starts(reversed_positions)
     bet_ends = reversed_bet_starts.iloc[::-1]
     return bet_ends
 
 
 def compute_signed_bet_lengths(
     positions: pd.Series,
-    nan_mode: Optional[str] = None,
 ) -> pd.Series:
     """
     Calculate lengths of bets (in sampling freq).
 
     :param positions: series of long/short positions
-    :param nan_mode: argument for hdataf.apply_nan_mode()
     :return: signed lengths of bets, i.e., the sign indicates whether the
         length corresponds to a long bet or a short bet. Index corresponds to
         end of bet (not causal).
     """
-    bet_runs = compute_bet_runs(positions, nan_mode)
-    bet_starts = compute_bet_starts(positions, nan_mode)
-    bet_ends = compute_bet_ends(positions, nan_mode)
+    bet_runs = csigna.sign_normalize(positions)
+    bet_starts = compute_bet_starts(positions)
+    bet_ends = compute_bet_ends(positions)
     # Sanity check indices.
     dbg.dassert(bet_runs.index.equals(bet_starts.index))
     dbg.dassert(bet_starts.index.equals(bet_ends.index))
@@ -891,21 +860,21 @@ def compute_signed_bet_lengths(
     return bet_length_srs
 
 
+# TODO(Paul): Revisit this function and add more test coverage.
 def compute_returns_per_bet(
-    positions: pd.Series, log_rets: pd.Series, nan_mode: Optional[str] = None
+    positions: pd.Series, log_rets: pd.Series
 ) -> pd.Series:
     """
     Calculate returns for each bet.
 
     :param positions: series of long/short positions
     :param log_rets: log returns
-    :param nan_mode: argument for hdataf.apply_nan_mode()
     :return: signed returns for each bet, index corresponds to the last date of
         bet
     """
     dbg.dassert(positions.index.equals(log_rets.index))
     hpandas.dassert_strictly_increasing_index(log_rets)
-    bet_ends = compute_bet_ends(positions, nan_mode)
+    bet_ends = compute_bet_ends(positions)
     # Retrieve locations of bet starts and bet ends.
     bet_ends_idx = bet_ends.loc[bet_ends != 0].dropna().index
     pnl_bets = log_rets * positions

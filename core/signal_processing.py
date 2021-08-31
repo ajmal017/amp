@@ -1617,7 +1617,7 @@ def get_swt(
             _set_warmup_region_to_nan(detail_df[j], width, j)
             _set_warmup_region_to_nan(smooth_df[j], width, j)
     elif timing_mode == "raw":
-        return smooth_df, detail_df
+        pass
     else:
         raise ValueError(f"Unsupported timing_mode `{timing_mode}`")
     # Drop columns that are all-NaNs (e.g., artifacts of padding).

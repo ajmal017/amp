@@ -1113,83 +1113,6 @@ class Test_compute_average_holding_period(hut.TestCase):
         return series
 
 
-class Test_compute_bet_runs(hut.TestCase):
-    def test1(self) -> None:
-        positions = Test_compute_bet_runs._get_series(42)
-        actual = fin.compute_bet_runs(positions)
-        output_str = (
-            f"{prnt.frame('positions')}\n"
-            f"{hut.convert_df_to_string(positions, index=True)}\n"
-            f"{prnt.frame('bet_runs')}\n"
-            f"{hut.convert_df_to_string(actual, index=True)}"
-        )
-        self.check_string(output_str)
-
-    def test2(self) -> None:
-        positions = Test_compute_bet_runs._get_series(42)
-        positions.iloc[:4] = np.nan
-        positions.iloc[10:15] = np.nan
-        positions.iloc[-4:] = np.nan
-        actual = fin.compute_bet_runs(positions)
-        output_str = (
-            f"{prnt.frame('positions')}\n"
-            f"{hut.convert_df_to_string(positions, index=True)}\n"
-            f"{prnt.frame('bet_runs')}\n"
-            f"{hut.convert_df_to_string(actual, index=True)}"
-        )
-        self.check_string(output_str)
-
-    def test3(self) -> None:
-        """
-        Test leading zeros.
-        """
-        idx = pd.date_range(start="2010-01-01", periods=4, freq="D")
-        positions = pd.Series([0, 0, 0, 1], index=idx)
-        expected = pd.Series([0, 0, 0, 1], index=idx, dtype=float)
-        actual = fin.compute_bet_runs(positions)
-        pd.testing.assert_series_equal(actual, expected)
-
-    def test4(self) -> None:
-        """
-        Test all zeros.
-        """
-        idx = pd.date_range(start="2010-01-01", periods=2, freq="D")
-        positions = pd.Series([0, 0], index=idx)
-        expected = pd.Series([0, 0], index=idx, dtype=float)
-        actual = fin.compute_bet_runs(positions)
-        pd.testing.assert_series_equal(actual, expected)
-
-    def test5(self) -> None:
-        """
-        Test leading NaNs.
-        """
-        idx = pd.date_range(start="2010-01-01", periods=4, freq="D")
-        positions = pd.Series([np.nan, np.nan, 0, 1], index=idx)
-        expected = pd.Series([np.nan, np.nan, 0, 1], index=idx, dtype=float)
-        actual = fin.compute_bet_runs(positions)
-        pd.testing.assert_series_equal(actual, expected)
-
-    def test6(self) -> None:
-        """
-        Test series with a single value.
-        """
-        positions = pd.Series([10], index=[pd.Timestamp("2010-01-01")])
-        expected = pd.Series([1], index=[pd.Timestamp("2010-01-01")], dtype=float)
-        actual = fin.compute_bet_runs(positions)
-        pd.testing.assert_series_equal(actual, expected)
-
-    @staticmethod
-    def _get_series(seed: int) -> pd.Series:
-        arparams = np.array([0.75, -0.25])
-        maparams = np.array([0.65, 0.35])
-        arma_process = sig_gen.ArmaProcess(arparams, maparams)
-        date_range = {"start": "1/1/2010", "periods": 40, "freq": "M"}
-        series = arma_process.generate_sample(
-            date_range_kwargs=date_range, seed=seed
-        )
-        return series
-
-
 class Test_compute_bet_starts(hut.TestCase):
     def test1(self) -> None:
         positions = Test_compute_bet_starts._get_series(42)
@@ -1256,7 +1179,7 @@ class Test_compute_bet_starts(hut.TestCase):
             {
                 pd.Timestamp("2010-01-01"): np.nan,
                 pd.Timestamp("2010-01-02"): 1,
-                pd.Timestamp("2010-01-03"): 0,
+                pd.Timestamp("2010-01-03"): np.nan,
                 pd.Timestamp("2010-01-04"): -1,
             },
             dtype=float,
@@ -1347,6 +1270,7 @@ class Test_compute_bet_ends(hut.TestCase):
             },
             dtype=float,
         )
+        # TODO(*): This is testing the wrong function!
         actual = fin.compute_bet_starts(positions)
         pd.testing.assert_series_equal(actual, expected)
 
@@ -1366,11 +1290,12 @@ class Test_compute_bet_ends(hut.TestCase):
             {
                 pd.Timestamp("2010-01-01"): np.nan,
                 pd.Timestamp("2010-01-02"): 1,
-                pd.Timestamp("2010-01-03"): 0,
+                pd.Timestamp("2010-01-03"): np.nan,
                 pd.Timestamp("2010-01-04"): -1,
             },
             dtype=float,
         )
+        # TODO(*): This is testing the wrong function!
         actual = fin.compute_bet_starts(positions)
         pd.testing.assert_series_equal(actual, expected)
 
@@ -1395,6 +1320,7 @@ class Test_compute_bet_ends(hut.TestCase):
             },
             dtype=float,
         )
+        # TODO(*): This is testing the wrong function!
         actual = fin.compute_bet_starts(positions)
         pd.testing.assert_series_equal(actual, expected)
 
@@ -1475,7 +1401,7 @@ class Test_compute_signed_bet_lengths(hut.TestCase):
         idx = pd.to_datetime(["2010-01-01", "2010-01-02", "2010-01-03"])
         positions = pd.Series([1, np.nan, 0], index=idx)
         expected = pd.Series(
-            [2], index=pd.to_datetime(["2010-01-02"]), dtype=float
+            [1], index=pd.to_datetime(["2010-01-01"]), dtype=float
         )
         actual = fin.compute_signed_bet_lengths(positions)
         pd.testing.assert_series_equal(actual, expected)
@@ -1487,7 +1413,7 @@ class Test_compute_signed_bet_lengths(hut.TestCase):
         idx = pd.to_datetime(["2010-01-01", "2010-01-02", "2010-01-03"])
         positions = pd.Series([1, np.nan, np.nan], index=idx)
         expected = pd.Series(
-            [3], index=pd.to_datetime(["2010-01-03"]), dtype=float
+            [1], index=pd.to_datetime(["2010-01-01"]), dtype=float
         )
         actual = fin.compute_signed_bet_lengths(positions)
         pd.testing.assert_series_equal(actual, expected)
