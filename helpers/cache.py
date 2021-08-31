@@ -74,6 +74,8 @@ def enable_clear_cache(val: bool) -> None:
 _GLOBAL_CACHE_NAME = "tmp.cache"
 
 
+# TODO(gp): This approach doesn't work since some caches are generated at import
+#  time, before this has time to be called.
 def set_global_cache_name(val: str) -> None:
     """
     Rename the prefix for the cache name.
@@ -83,6 +85,7 @@ def set_global_cache_name(val: str) -> None:
     global _GLOBAL_CACHE_NAME
     _LOG.warning("Setting global cache name %s -> %s", _GLOBAL_CACHE_NAME, val)
     _GLOBAL_CACHE_NAME = val
+    assert 0
 
 
 def get_global_cache_info(
@@ -99,6 +102,7 @@ def get_global_cache_info(
     cache_types = _get_cache_types()
     txt.append("cache_types=%s" % str(cache_types))
     for cache_type in cache_types:
+        # TODO(gp): Use the created one
         path = _get_global_cache_path(cache_type, tag=tag)
         description = f"global {cache_type}"
         cache_info = _get_cache_size(path, description)
@@ -144,6 +148,9 @@ def _get_global_cache_name(cache_type: str, tag: Optional[str] = None) -> str:
     return cache_name
 
 
+# TODO(gp): We should query the cache location that is inside the joblib.Memory
+#  rather than relying on the paths.
+# TODO(gp): -> _get_global_cache_path_to_create
 def _get_global_cache_path(cache_type: str, tag: Optional[str] = None) -> str:
     """
     Get path to the directory storing the cache.
@@ -205,8 +212,11 @@ def _create_global_cache_backend(
     :return: cache backend object
     """
     _dassert_is_valid_cache_type(cache_type)
-    file_name = _get_global_cache_path(cache_type, tag)
-    cache_backend = joblib.Memory(file_name, verbose=0, compress=True)
+    dir_name = _get_global_cache_path(cache_type, tag)
+    _LOG.debug("Creating cache for cache_type='%s' and tag='%s' at '%s'",
+               cache_type, tag, dir_name)
+    cache_backend = joblib.Memory(dir_name, verbose=0, compress=True)
+    assert 0
     return cache_backend
 
 
@@ -375,22 +385,35 @@ class _Cached:
         self._aws_profile = aws_profile
         #
         self._reset_cache_tracing()
-        # Create the memory and disk cache objects for this function.
-        # TODO(gp): We might simplify the code by using a dict instead of 2 variables.
-        # Store the Joblib memory cache object for this function.
-        self._memory_cached_func = self._create_function_memory_cache()
-        # Store the Joblib memory object and the Joblib memory cache object for
-        # this function.
-        (
-            self._disk_cache,
-            self._disk_cached_func,
-        ) = self._create_function_disk_cache()
         # Enable a mode where an exception `NotCachedValueException` is thrown if
         # the value is not in the cache.
         self._enable_read_only = False
         # Enable a mode where an exception `NotCachedValueException` is thrown if
         # the value is in the cache, instead of accessing the value.
         self._check_only_if_present = False
+        # Store the Joblib memory cache object for this function.
+        self._memory_cached_func
+        # Store the Joblib memory object and the Joblib memory cache object for
+        # this function.
+        self._disk_cache = None
+        self._disk_cached_func = None
+
+    def _get_memory_cached_func(self):
+        if self._memory_cache_func is None:
+            # Create the memory and disk cache objects for this function.
+            # TODO(gp): We might simplify the code by using a dict instead of 2 variables.
+            self._memory_cached_func = self._create_function_memory_cache()
+        return self._memory_cached_func
+
+    def _get_disk_cached_func(self):
+        if self._disk_cache is None:
+            # Store the Joblib memory object and the Joblib memory cache object for
+            # this function.
+            (
+                self._disk_cache,
+                self._disk_cached_func,
+            ) = self._create_function_disk_cache()
+        return self._disk_cache, self._disk_cached_func
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """
@@ -693,6 +716,7 @@ class _Cached:
 
     # ///////////////////////////////////////////////////////////////////////////
 
+    # TODO(gp): We should use the actual stored dir.
     def _get_cache_dir(self, cache_type: str, tag: Optional[str]) -> str:
         """
         Return the dir of the cache corresponding to `cache_type` and `tag`.
@@ -711,7 +735,7 @@ class _Cached:
         Get the instance of a cache by type.
 
         From https://github.com/joblib/joblib/blob/master/joblib/memory.py
-        A MemorizedResult is an object representing a cached value
+        A `MemorizedResult` is an object representing a cached value
 
         :param cache_type: type of a cache
         :return: instance of the Joblib cache
@@ -975,6 +999,11 @@ def cache(
 
 # #############################################################################
 
+
+def _delete_all_mem_caches():
+    cmd = "rm -rf /mnt/tmpfs/tmp.cache.*"
+    hsyste.system(cmd)
+
+
 # Clean up the memory cache on-exit.
-# TODO(gp): Add another function and make it silent.
-atexit.register(clear_global_cache, cache_type="mem", destroy="true")
+atexit.register(_delete_all_mem_caches)
