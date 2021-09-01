@@ -788,18 +788,18 @@ def compute_bet_starts(positions: pd.Series) -> pd.Series:
 
     :param positions: series of long/short positions
     :return: a series with a +1 at the start of each new long bet and a -1 at
-        the start of each new short bet; 0 indicates continuation of bet and
-        `NaN` indicates absence of bet.
+        the start of each new short bet; NaNs are ignored
     """
-    bet_runs = csigna.sign_normalize(positions)
+    # Drop NaNs before determining bet starts.
+    bet_runs = csigna.sign_normalize(positions).dropna()
     # Determine start of bets.
-    bet_starts = bet_runs.subtract(bet_runs.shift(1, fill_value=0), fill_value=0)
-    bet_starts = csigna.sign_normalize(bet_starts)
-    # Set zero bet runs to `NaN`.
-    bet_runs_zero_mask = bet_runs == 0
-    bet_starts.loc[bet_runs_zero_mask] = np.nan
-    bet_starts.loc[bet_runs.isna()] = np.nan
-    return bet_starts
+    # A new bet starts at position j if and only if
+    # - the signed value at `j` is +1 or -1 and
+    # - the value at `j - 1` is different from the value at `j`
+    is_nonzero = bet_runs != 0
+    is_diff = bet_runs.diff() != 0
+    bet_starts = bet_runs[is_nonzero & is_diff]
+    return bet_starts.reindex(positions.index)
 
 
 def compute_bet_ends(positions: pd.Series) -> pd.Series:
