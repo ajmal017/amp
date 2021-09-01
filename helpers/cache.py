@@ -780,6 +780,9 @@ class _Cached:
         :param args_id: digest of arguments obtained from `_get_identifiers()`
         :param obj: return value of the intrinsic function
         """
+        # This corresponds to
+        # /venv/lib/python3.8/site-packages/joblib/memory.py
+        # __call__
         if self._enable_read_only:
             raise NotCachedValueException
         memorized_result = self._get_memorized_result(cache_type)
@@ -788,6 +791,7 @@ class _Cached:
         memorized_result._write_func_code(func_code, first_line)
         # Store the returned value into the cache.
         memorized_result.store_backend.dump_item([func_id, args_id], obj)
+        #
 
     # ///////////////////////////////////////////////////////////////////////////
 
@@ -825,10 +829,11 @@ class _Cached:
             if self._enable_read_only:
                 msg = f"{func_info}: trying to execute"
                 raise NotCachedValueException(msg)
-            obj = self._execute_intrinsic_function(*args, **kwargs)
+            obj = self._disk_cached_func(*args, **kwargs)
+            #obj = self._execute_intrinsic_function(*args, **kwargs)
             # The function was not cached in disk, so now we need to update the
             # memory cache.
-            self._store_cached_version("disk", func_id, args_id, obj)
+            #self._store_cached_version("disk", func_id, args_id, obj)
         return obj
 
     def _execute_func_from_mem_cache(self, *args: Any, **kwargs: Any) -> Any:
