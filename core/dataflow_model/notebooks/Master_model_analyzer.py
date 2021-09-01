@@ -5,9 +5,9 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.11.2
+#       jupytext_version: 1.11.4
 #   kernelspec:
-#     display_name: Python 3
+#     display_name: Python 3 (ipykernel)
 #     language: python
 #     name: python3
 # ---
@@ -35,7 +35,8 @@ import helpers.dbg as dbg
 import helpers.printing as hprint
 
 # %%
-dbg.init_logger(verbosity=logging.INFO)
+#dbg.init_logger(verbosity=logging.INFO)
+dbg.init_logger(verbosity=logging.DEBUG)
 
 _LOG = logging.getLogger(__name__)
 
@@ -47,16 +48,16 @@ hprint.config_notebook()
 # # Notebook config
 
 # %%
-exp_dir = "/app/experiment1"
-# exp_dir = "s3://alphamatic-data/experiments/..."
+#exp_dir = "s3://eglp-spm-sasm/experiments/experiment.RH2Ef.v1_9-all.5T.20210831-004747.run1.tgz"
+exp_dir = "./experiment.RH2Ef.v1_9-all.5T.20210831-004747.run1.tgz"# exp_dir = "s3://alphamatic-data/experiments/..."
 
 eval_config = cconfig.get_config_from_nested_dict(
     {
         "exp_dir": exp_dir,
         "model_evaluator_kwargs": {
-            "returns_col": "ret_0_vol_adj_2",
-            "predictions_col": "ret_0_vol_adj_2_hat",
-            "oos_start": "2017-01-01",
+            "returns_col": "vwap_ret_0_vol_adj_clipped_2",
+            "predictions_col": "vwap_ret_0_vol_adj_clipped_2",
+            #"oos_start": "2017-01-01",
         },
         "bh_adj_threshold": 0.1,
         "resample_rule": "W",
@@ -75,6 +76,7 @@ result_bundles = cdmu.yield_experiment_artifacts(
     "result_bundle.pkl",
 )
 
+# %%
 # Build the ModelEvaluator.
 evaluator = modeval.build_model_evaluator_from_result_bundles(
     result_bundles,
