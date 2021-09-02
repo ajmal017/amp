@@ -491,7 +491,7 @@ def process_bid_ask(
     out_df = pd.concat(results, axis=1)
     if join_output_with_input:
         out_df = out_df.merge(df, left_index=True, right_index=True, how="outer")
-        dbg.dassert(not out_df.has_duplicates)
+        dbg.dassert(not out_df.columns.has_duplicates)
     return out_df
 
 
