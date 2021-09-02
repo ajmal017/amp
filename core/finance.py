@@ -473,16 +473,16 @@ def process_bid_ask(
     midpoint = np.sqrt(df[bid_col] * df[ask_col]).rename("mid")
     results.append(midpoint)
     # Compute the relative spread.
-    spread = np.log(df[ask_col]) - np.log(df[bid_col]).rename("spread")
+    spread = (np.log(df[ask_col]) - np.log(df[bid_col])).rename("spread")
     results.append(spread)
     # Compute the value (e.g., dollars) at the top of the book.
     if bid_volume_col is not None:
         dbg.dassert_in(bid_volume_col, df.columns)
-        bid_value = df[bid_col] * df[bid_volume_col].rename("bid_value")
+        bid_value = (df[bid_col] * df[bid_volume_col]).rename("bid_value")
         results.append(bid_value)
     if ask_volume_col is not None:
         dbg.dassert_in(ask_volume_col, df.columns)
-        ask_value = df[ask_col] * df[ask_volume_col].rename("ask_value")
+        ask_value = (df[ask_col] * df[ask_volume_col]).rename("ask_value")
         results.append(ask_value)
     if bid_volume_col is not None and ask_volume_col is not None:
         mid_value = np.sqrt(bid_value * ask_value).rename("mid_value")
