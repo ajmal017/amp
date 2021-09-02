@@ -450,6 +450,48 @@ def compute_epoch(
 
 
 # #############################################################################
+# Bid-ask processing.
+# #############################################################################
+
+
+def process_bid_ask(
+    df: pd.DataFrame,
+    bid_col: str,
+    ask_col: str,
+    bid_volume_col: Optional[str] = None,
+    ask_volume_col: Optional[str] = None,
+) -> pd.DataFrame:
+    """
+    Process top-of-book bid/ask quotes.
+    """
+    dbg.dassert_isinstance(df, pd.DataFrame)
+    dbg.dassert_in(bid_col, df.columns)
+    dbg.dassert_in(ask_col, df.columns)
+    dbg.dassert(not (df[bid_col] > df[ask_col]).any())
+    results = []
+    # Compute the geometric mean of the bid and ask.
+    midpoint = np.sqrt(df[bid_col] * df[ask_col]).rename("mid")
+    results.append(midpoint)
+    # Compute the relative spread.
+    spread = np.log(df[ask_col]) - np.log(df[bid_col]).rename("spread")
+    results.append(spread)
+    # Compute the value (e.g., dollars) at the top of the book.
+    if bid_volume_col is not None:
+        dbg.dassert_in(bid_volume_col, df.columns)
+        bid_value = df[bid_col] * df[bid_volume_col].rename("bid_value")
+        results.append(bid_value)
+    if ask_volume_col is not None:
+        dbg.dassert_in(ask_volume_col, df.columns)
+        ask_value = df[ask_col] * df[ask_volume_col].rename("ask_value")
+        results.append(ask_value)
+    if bid_volume_col is not None and ask_volume_col is not None:
+        mid_value = np.sqrt(bid_value * ask_value).rename("mid_value")
+        results.append(mid_value)
+    out_df = pd.concat(results, axis=1)
+    return out_df
+
+
+# #############################################################################
 # Returns calculation and helpers.
 # #############################################################################
 
