@@ -460,6 +460,7 @@ def process_bid_ask(
     ask_col: str,
     bid_volume_col: Optional[str] = None,
     ask_volume_col: Optional[str] = None,
+    join_output_with_input: bool = False,
 ) -> pd.DataFrame:
     """
     Process top-of-book bid/ask quotes.
@@ -488,6 +489,9 @@ def process_bid_ask(
         mid_value = np.sqrt(bid_value * ask_value).rename("mid_value")
         results.append(mid_value)
     out_df = pd.concat(results, axis=1)
+    if join_output_with_input:
+        out_df = out_df.merge(df, left_index=True, right_index=True, how="outer")
+        dbg.dassert(not out_df.has_duplicates)
     return out_df
 
 
