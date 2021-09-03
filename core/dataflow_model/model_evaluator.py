@@ -23,6 +23,10 @@ import helpers.dbg as dbg
 
 _LOG = logging.getLogger(__name__)
 
+# #############################################################################
+# ModelEvaluator
+# #############################################################################
+
 
 class ModelEvaluator:
     """
@@ -35,17 +39,40 @@ class ModelEvaluator:
         self,
         data: Dict[str, pd.DataFrame],
         *,
+        # TODO(gp): How can it be None?
         prediction_col: Optional[str] = None,
+        # TODO(gp): How can it be None?
         target_col: Optional[str] = None,
+        # TODO(gp): No default IMO
         oos_start: Optional[Any] = None,
     ) -> None:
+        """
+        Constructor.
+
+        :param data: a dict key (experiment) -> dataframe (containing
+            `ResultBundle.result_df`). E.g.,
+
+            ```
+            {0:                            vwap_ret_0_vol_adj_clipped_2 ...
+             end_time
+             2009-01-02 09:05:00-05:00                              NaN ...
+             2009-01-02 09:10:00-05:00                              NaN ...
+             2009-01-02 09:15:00-05:00                              NaN ...
+             ```
+
+        :param prediction_col: column of `ResultBundle.result_df` to use as
+            predictions
+        :param target_col: column of `ResultBundle.result_df` to use as targets
+            (e.g., returns)
+        :param oos_start: start of the OOS period, or None for nothing
+        """
         self._data = data
         dbg.dassert(data, msg="Data set must be nonempty.")
         # Use plain attributes (see Effective Python item #44).
         self.prediction_col = prediction_col
         self.target_col = target_col
         self.oos_start = oos_start
-        #
+        # The valid keys are the keys in the data dict.
         self.valid_keys = list(self._data.keys())
         self._stats_computer = cstats.StatsComputer()
 
@@ -72,10 +99,10 @@ class ModelEvaluator:
         mode: Optional[str] = None,
     ) -> Tuple[pd.Series, pd.Series, pd.Series]:
         """
-        Combine selected pnls.
+        Combine selected PnLs.
 
-        :param keys: Use all available if `None`
-        :param weights: Average if `None`
+        :param keys: use all available if `None`
+        :param weights: average if `None`
         :param position_method: as in `PositionComputer.compute_positions()`
         :param target_volatility: as in `PositionComputer.compute_positions()`
         :param returns_shift: as in `compute_pnl()`
@@ -165,6 +192,7 @@ class ModelEvaluator:
         )
         stats_dict = {}
         for key in tqdm(pnl_dict.keys(), desc="Calculating stats"):
+            _LOG.debug("key=%s", key)
             if pnl_dict[key].empty:
                 _LOG.warning("PnL series for key=%i is empty.", key)
                 continue
@@ -213,18 +241,18 @@ class ModelEvaluator:
         """
         keys = self.get_keys(keys)
         #
-        returns = {
-            k: self._data[k][self.target_col]
-            .shift(returns_shift)
-            .rename("returns")
-            for k in keys
-        }
-        predictions = {
-            k: self._data[k][self.prediction_col]
-            .shift(predictions_shift)
-            .rename("predictions")
-            for k in keys
-        }
+        returns = {}
+        predictions = {}
+        for key in keys:
+            dbg.dassert_in(self.target_col, self._data[key].columns)
+            returns[k] = (self._data[key][self.target_col]
+                .shift(returns_shift)
+                .rename("returns"))
+            #
+            dbg.dassert_in(self.prediction_col, self._data[key].columns)
+            predictions[k] = (self._data[key][self.prediction_col]
+                .shift(predictions_shift)
+                .rename("predictions"))
         positions = {}
         for k in tqdm(returns.keys(), "Calculating positions"):
             position_computer = PositionComputer(
@@ -272,6 +300,8 @@ class ModelEvaluator:
 
 
 # #############################################################################
+# PnlComputer
+# #############################################################################
 
 
 class PnlComputer:
@@ -312,6 +342,8 @@ class PnlComputer:
         dbg.dassert(srs.index.freq)
 
 
+# #############################################################################
+# PositionComputer
 # #############################################################################
 
 
@@ -533,10 +565,14 @@ class TransactionCostModeler:
         dbg.dassert(srs.index.freq)
 
 
+# #############################################################################
+
+
 # TODO(gp): Maybe make it a classmethod builder for ModelEvaluator called
-#  `build_from_result_bundle_dicts`.
+#  `build_from_result_bundles`.
 def build_model_evaluator_from_result_bundles(
     result_bundle_pairs: Iterable[Tuple[int, cdataf.ResultBundle]],
+    # TODO(gp): -> target_col, also keep the same order as in the ctor
     returns_col: str,
     predictions_col: str,
     oos_start: Optional[Any] = None,
@@ -545,11 +581,8 @@ def build_model_evaluator_from_result_bundles(
     """
     Initialize a `ModelEvaluator` from `ResultBundle`s.
 
-    :param result_bundle_pairs:
-    :param returns_col: column of `ResultBundle.result_df` to use as the column
-        representing returns
-    :param predictions_col: like `returns_col`, but for predictions
-    :param oos_start: as in `ModelEvaluator`
+    :param result_bundle_pairs: list of pairs (int,
+    :param *: as in `ModelEvaluator`
     :return: `ModelEvaluator` initialized with returns and predictions from
        result bundles
     """
@@ -561,6 +594,7 @@ def build_model_evaluator_from_result_bundles(
             df = result_bundle.result_df
             dbg.dassert_in(returns_col, df.columns)
             dbg.dassert_in(predictions_col, df.columns)
+            dbg.dassert_not_in(key, data_dict.keys())
             data_dict[key] = df[[returns_col, predictions_col]]
         except Exception as e:
             _LOG.error(

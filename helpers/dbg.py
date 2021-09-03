@@ -884,6 +884,8 @@ def init_logger(
     force_white: bool = True,
     force_no_warning: bool = False,
     in_pytest: bool = False,
+    report_resource_usage: bool = False,
+    report_cpu_usage: bool = False
 ) -> None:
     """
     Send stderr and stdout to logging (optionally teeing the logs to file).
@@ -901,6 +903,8 @@ def init_logger(
         output of a script when redirected to file with echo characters
     :param in_pytest: True when we are running through pytest, so that we
         can overwrite the default logger from pytest
+    :param report_resource_usage: turn on reporting memory usage
+    :param report_cpu_usage: turn on reporting CPU usage
     """
     # TODO(gp): Print the stacktrace every time is called.
     if force_white:
@@ -928,9 +932,6 @@ def init_logger(
         return
     #
     print(INFO + ": > cmd='%s'" % get_command_line())
-    # Turn on reporting memory and CPU usage.
-    report_resource_usage = report_cpu_usage = False
-    #
     ch = logging.StreamHandler(sys.stdout)
     ch.setLevel(verbosity)
     # Decide whether to use verbose or print format.

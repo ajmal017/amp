@@ -35,8 +35,8 @@ import helpers.dbg as dbg
 import helpers.printing as hprint
 
 # %%
-#dbg.init_logger(verbosity=logging.INFO)
-dbg.init_logger(verbosity=logging.DEBUG)
+dbg.init_logger(verbosity=logging.INFO)
+#dbg.init_logger(verbosity=logging.DEBUG)
 
 _LOG = logging.getLogger(__name__)
 
@@ -71,9 +71,11 @@ eval_config = cconfig.get_config_from_nested_dict(
 
 # %%
 # Load the data.
+selected_idxs = list(range(2))
 result_bundles = cdmu.yield_experiment_artifacts(
     eval_config["exp_dir"],
     "result_bundle.pkl",
+    selected_idxs=selected_idxs,
 )
 
 # %%
@@ -83,9 +85,11 @@ evaluator = modeval.build_model_evaluator_from_result_bundles(
     abort_on_error=False,
     **eval_config["model_evaluator_kwargs"].to_dict(),
 )
-
 # Build the ModelPlotter.
 plotter = modplot.ModelPlotter(evaluator)
+
+# %%
+evaluator._data
 
 # %% [markdown]
 # # Analysis

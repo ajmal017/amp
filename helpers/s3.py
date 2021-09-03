@@ -531,6 +531,7 @@ def expand_archived_data(src_tgz_file: str, dst_dir: str) -> str:
     _ = rc
     _LOG.debug(hprint.to_str("enclosing_tgz_dir_name"))
     tgz_dst_dir = os.path.join(dst_dir, enclosing_tgz_dir_name)
+
     if os.path.exists(tgz_dst_dir):
         dbg.dassert_dir_exists(dst_dir)
         _LOG.info("While expanding '%s' dst dir '%s' already exists: skipping",
