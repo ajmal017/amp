@@ -207,7 +207,7 @@ def resample_bars(
     vwap_groups: List[Tuple[str, str, str]],
 ) -> pd.DataFrame:
     """
-    Resampling with optional VWAP
+    Resampling with optional VWAP.
 
     Output column names must not collide.
 
