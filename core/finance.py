@@ -153,6 +153,20 @@ def _merge(df1: pd.DataFrame, df2: pd.DataFrame) -> pd.DataFrame:
     return result_df
 
 
+def resample_bars(
+    df: pd.DataFrame,
+    rule: str,
+    # TODO(*): Use List of tuples maybe
+        col_groups: List[List[str]],
+        out_col_names: List[List[str]],
+        aggregation_funcs: List[List[str]],
+        aggregation_kwargs: List[...]
+    # Tuple for VWAP
+        price_col, volume
+) -> pd.DataFrame:
+
+
+# TODO(Paul): Consider deprecating.
 def resample_time_bars(
     df: pd.DataFrame,
     rule: str,
@@ -305,6 +319,42 @@ def resample_ohlcv_bars(
         )
         result_df = _merge(result_df, twap_vwap_df)
     return result_df
+
+
+def compute_vwap(
+    df: pd.DataFrame,
+    rule: str,
+    *,
+    price_col: str,
+    volume_col: str,
+) -> pd.Series:
+    dbg.dassert_isinstance(df, pd.DataFrame)
+    dbg.dassert_in(price_col, df.columns)
+    dbg.dassert_in(volume_col, df.columns)
+    # Only use rows where both price and volume are non-NaN.
+    non_nan_idx = df[[price_col, volume_col]].dropna().index
+    nan_idx = df.index.difference(non_nan_idx)
+    price = df[price_col]
+    #
+    price.loc[nan_idx] = np.nan
+    volume = df[volume_col]
+    volume.loc[nan_idx] = np.nan
+    # Weight price according to volume.
+    volume_weighted_price = price.multiply(volume)
+    resampled_volume_weighted_price = csigna.resample(
+        volume_weighted_price,
+        rule=rule,
+        offset=offset,
+    ).sum(min_count=1)
+    resampled_volume = csigna.resample(volume, rule=rule, offset=offset).sum(
+        min_count=1
+    )
+    # Complete the VWAP calculation.
+    vwap = resampled_volume_weighted_price.divide(resampled_volume)
+    # Replace infs with NaNs.
+    vwap = vwap.replace([-np.inf, np.inf], np.nan)
+    vwap.name = "vwap"
+    return vwap
 
 
 def compute_twap_vwap(
