@@ -386,7 +386,9 @@ def compute_twap_vwap(
     #  accommodate data that is not perfectly aligned with a pandas freq
     #  (e.g., Kibot).
     # dbg.dassert(df.index.freq)
-    vwap = compute_vwap(df, rule=rule, price_col=price_col, volume_col=volume_col, offset=offset)
+    vwap = compute_vwap(
+        df, rule=rule, price_col=price_col, volume_col=volume_col, offset=offset
+    )
     price = df[price_col]
     if add_last_price:
         # Calculate last price (regardless of whether we have volume data).
