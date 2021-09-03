@@ -153,17 +153,17 @@ def _merge(df1: pd.DataFrame, df2: pd.DataFrame) -> pd.DataFrame:
     return result_df
 
 
-def resample_bars(
-    df: pd.DataFrame,
-    rule: str,
-    # TODO(*): Use List of tuples maybe
-        col_groups: List[List[str]],
-        out_col_names: List[List[str]],
-        aggregation_funcs: List[List[str]],
-        aggregation_kwargs: List[...]
-    # Tuple for VWAP
-        price_col, volume
-) -> pd.DataFrame:
+# def resample_bars(
+#     df: pd.DataFrame,
+#     rule: str,
+#     # TODO(*): Use List of tuples maybe
+#         col_groups: List[List[str]],
+#         out_col_names: List[List[str]],
+#         aggregation_funcs: List[List[str]],
+#         aggregation_kwargs: List[...]
+#     # Tuple for VWAP
+#         price_col, volume
+# ) -> pd.DataFrame:
 
 
 # TODO(Paul): Consider deprecating.
@@ -327,6 +327,7 @@ def compute_vwap(
     *,
     price_col: str,
     volume_col: str,
+    offset: Optional[str] = None,
 ) -> pd.Series:
     dbg.dassert_isinstance(df, pd.DataFrame)
     dbg.dassert_in(price_col, df.columns)
@@ -385,11 +386,7 @@ def compute_twap_vwap(
     #  accommodate data that is not perfectly aligned with a pandas freq
     #  (e.g., Kibot).
     # dbg.dassert(df.index.freq)
-    dbg.dassert_in(price_col, df.columns)
-    dbg.dassert_in(volume_col, df.columns)
-    # Only use rows where both price and volume are non-NaN.
-    non_nan_idx = df[[price_col, volume_col]].dropna().index
-    nan_idx = df.index.difference(non_nan_idx)
+    vwap = compute_vwap(df, rule=rule, price_col=price_col, volume_col=volume_col, offset=offset)
     price = df[price_col]
     if add_last_price:
         # Calculate last price (regardless of whether we have volume data).
@@ -397,7 +394,6 @@ def compute_twap_vwap(
             min_count=1
         )
         last_price.name = "last"
-    price.loc[nan_idx] = np.nan
     volume = df[volume_col]
     if add_bar_volume:
         # Calculate bar volume (regardless of whether we have price data).
@@ -405,26 +401,8 @@ def compute_twap_vwap(
             min_count=1
         )
         bar_volume.name = "volume"
-    volume.loc[nan_idx] = np.nan
-    # Weight price according to volume.
-    volume_weighted_price = price.multiply(volume)
-    # Resample using `rule`.
-    resampled_volume_weighted_price = csigna.resample(
-        volume_weighted_price,
-        rule=rule,
-        offset=offset,
-    ).sum(min_count=1)
-    resampled_volume = csigna.resample(volume, rule=rule, offset=offset).sum(
-        min_count=1
-    )
-    # Complete the VWAP calculation.
-    vwap = resampled_volume_weighted_price.divide(resampled_volume)
-    # Replace infs with NaNs.
-    vwap = vwap.replace([-np.inf, np.inf], np.nan)
-    vwap.name = "vwap"
     # Calculate TWAP, but preserve NaNs for all-NaN bars.
     twap = csigna.resample(price, rule=rule, offset=offset).mean()
-    twap.loc[resampled_volume_weighted_price.isna()] = np.nan
     twap.name = "twap"
     # Make sure columns are not overwritten by the new ones.
     dbg.dassert_not_in(vwap.name, df.columns)
