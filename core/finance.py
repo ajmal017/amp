@@ -8,7 +8,7 @@ import core.finance as fin
 
 import datetime
 import logging
-from typing import Dict, List, Optional, Union, cast
+from typing import Dict, List, Optional, Tuple, Union, cast
 
 import numpy as np
 import pandas as pd
@@ -153,17 +153,42 @@ def _merge(df1: pd.DataFrame, df2: pd.DataFrame) -> pd.DataFrame:
     return result_df
 
 
-# def resample_bars(
-#     df: pd.DataFrame,
-#     rule: str,
-#     # TODO(*): Use List of tuples maybe
-#         col_groups: List[List[str]],
-#         out_col_names: List[List[str]],
-#         aggregation_funcs: List[List[str]],
-#         aggregation_kwargs: List[...]
-#     # Tuple for VWAP
-#         price_col, volume
-# ) -> pd.DataFrame:
+def resample_bars(
+    df: pd.DataFrame,
+    rule: str,
+    resampling_groups: List[Tuple[Dict[str, str], str, htypes.Kwargs]],
+    vwap_groups: List[Tuple[str, str, str]],
+) -> pd.DataFrame:
+    """
+    Resampling with optional VWAP
+
+    Output column names must not collide.
+
+    :param resampling_groups: list of tuples of the following form:
+        (col_dict, aggregation function, aggregation kwargs)
+    :param vwap_groups: list of tuples of the following form:
+        (in_price_col_name, in_vol_col_name, vwap_col_name)
+    """
+    results = []
+    for col_dict, agg_func, agg_func_kwargs in resampling_groups:
+        resampled = _resample_with_aggregate_function(
+            df,
+            rule=rule,
+            cols=list(col_dict.keys()),
+            agg_func=agg_func,
+            agg_func_kwargs=agg_func_kwargs,
+        )
+        resampled = resampled.rename(columns=col_dict)
+        dbg.dassert(not resampled.columns.has_duplicates)
+        results.append(resampled)
+    for price_col, vol_col, vwap_col in vwap_groups:
+        vwap = compute_vwap(df, rule=rule, price_col=price_col, volume_col=volume_col)
+        vwap.name = vwap_col
+        results.append(vwap)
+    out_df = pd.concat(results, axis=1)
+    dbg.dassert(not out_df.columns.has_duplicates)
+    dbg.dassert(out_df.index.freq)
+    return out_df
 
 
 # TODO(Paul): Consider deprecating.
