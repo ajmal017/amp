@@ -70,6 +70,21 @@ eval_config = cconfig.get_config_from_nested_dict(
 # # Initialize ModelEvaluator and ModelPlotter
 
 # %%
+import pandas as pd
+import core.signal_processing as csigna
+
+xs = [x / 10 for x in range(-10, 10)]
+#y = [csigna.c_infinity(x) for x in xs]
+y = [csigna.c_infinity_step_function(x) for x in xs]
+#y = [csigna.c_infinity_bump_function(x, 2, 10) for x in xs]
+
+df = pd.DataFrame()
+df["x"] = pd.Series(xs)
+df["y"] = pd.Series(y)
+
+df.plot("x")
+
+# %%
 # Load the data.
 selected_idxs = list(range(2))
 result_bundles = cdmu.yield_experiment_artifacts(

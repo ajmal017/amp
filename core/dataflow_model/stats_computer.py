@@ -6,7 +6,7 @@ import core.stats_computer as cstats
 
 import functools
 import logging
-from typing import Callable, Optional
+from typing import Callable, List, Optional
 
 import pandas as pd
 
@@ -23,8 +23,10 @@ class StatsComputer:
     Compute a particular piece of stats instead of the whole stats table.
     """
 
-    # TODO(gp): -> compute_all_stats.
     def compute_time_series_stats(self, srs: pd.Series) -> pd.Series:
+        """
+        Compute statistics for a non-necessarily financial time series.
+        """
         # List of pd.Series each with various metrics.
         stats = []
         with htimer.TimedScope(logging.DEBUG, "Computing samplings stats"):
@@ -43,7 +45,7 @@ class StatsComputer:
             logging.DEBUG, "Computing signal quality stats"
         ):
             stats.append(self.compute_signal_quality_stats(srs))
-        # Concatenate the resulting series.
+        # Concatenate the resulting series into a single multi-index series.
         names = [stat.name for stat in stats]
         result = pd.concat(stats, axis=0, keys=names)
         result.name = srs.name
@@ -133,6 +135,9 @@ class StatsComputer:
         positions_col: Optional[str] = None,
         pnl_col: Optional[str] = None,
     ) -> pd.DataFrame:
+        """
+        Compute financially meaningful statistics.
+        """
         results = []
         # Compute stats related to positions.
         if positions_col is not None:
