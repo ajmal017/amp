@@ -323,12 +323,23 @@ def resample_ohlcv_bars(
 
 def compute_vwap(
     df: pd.DataFrame,
-    rule: str,
     *,
+    rule: str,
     price_col: str,
     volume_col: str,
     offset: Optional[str] = None,
 ) -> pd.Series:
+    """
+    Compute VWAP from price and volume columns.
+
+    :param df: input dataframe with datetime index
+    :param rule: resampling frequency and VWAP aggregation window
+    :param price_col: price for bar
+    :param volume_col: volume for bar
+    :param offset: offset in the Pandas format (e.g., `1T`) used to shift the
+        sampling
+    :return: vwap price series
+    """
     dbg.dassert_isinstance(df, pd.DataFrame)
     dbg.dassert_in(price_col, df.columns)
     dbg.dassert_in(volume_col, df.columns)
@@ -336,7 +347,6 @@ def compute_vwap(
     non_nan_idx = df[[price_col, volume_col]].dropna().index
     nan_idx = df.index.difference(non_nan_idx)
     price = df[price_col]
-    #
     price.loc[nan_idx] = np.nan
     volume = df[volume_col]
     volume.loc[nan_idx] = np.nan
@@ -390,29 +400,24 @@ def compute_twap_vwap(
         df, rule=rule, price_col=price_col, volume_col=volume_col, offset=offset
     )
     price = df[price_col]
+    # Calculate TWAP, but preserve NaNs for all-NaN bars.
+    twap = csigna.resample(price, rule=rule, offset=offset).mean()
+    twap.name = "twap"
+    dfs = [vwap, twap]
     if add_last_price:
         # Calculate last price (regardless of whether we have volume data).
         last_price = csigna.resample(price, rule=rule, offset=offset).last(
             min_count=1
         )
         last_price.name = "last"
-    volume = df[volume_col]
+        dfs.append(last_price)
     if add_bar_volume:
+        volume = df[volume_col]
         # Calculate bar volume (regardless of whether we have price data).
         bar_volume = csigna.resample(volume, rule=rule, offset=offset).sum(
             min_count=1
         )
         bar_volume.name = "volume"
-    # Calculate TWAP, but preserve NaNs for all-NaN bars.
-    twap = csigna.resample(price, rule=rule, offset=offset).mean()
-    twap.name = "twap"
-    # Make sure columns are not overwritten by the new ones.
-    dbg.dassert_not_in(vwap.name, df.columns)
-    dbg.dassert_not_in(twap.name, df.columns)
-    dfs = [vwap, twap]
-    if add_last_price:
-        dfs.append(last_price)
-    if add_bar_volume:
         dfs.append(bar_volume)
     if add_bar_start_timestamps:
         bar_start_timestamps = compute_bar_start_timestamps(vwap)
