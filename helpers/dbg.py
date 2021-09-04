@@ -736,6 +736,26 @@ class _ColoredFormatter(  # type: ignore[misc]
         return logging.Formatter.format(self, colored_record)
 
 
+def get_memory_usage(process: Optional[Any]=None) -> str:
+    if process is None:
+        import psutil
+        process = psutil.Process()
+    rss_in_GB = process.memory_info().rss / (1024 ** 3)
+    vms_in_GB = process.memory_info().vms / (1024 ** 3)
+    mem_pct = process.memory_percent()
+    return (rss_in_GB, vms_in_GB, mem_pct)
+
+
+def get_memory_usage_as_str(process: Optional[Any]=None) -> str:
+    (rss_in_GB, vms_in_GB, mem_pct) = get_memory_usage(process)
+    resource_use = "rss=%.3fGB vms=%.3fGB mem_pct=%.0f%%" % (
+        rss_in_GB,
+        vms_in_GB,
+        mem_pct,
+    )
+    return resource_use
+
+
 # From https://stackoverflow.com/questions/10848342
 # and https://docs.python.org/3/howto/logging-cookbook.html#filters-contextual
 class ResourceUsageFilter(logging.Filter):
@@ -759,14 +779,7 @@ class ResourceUsageFilter(logging.Filter):
         """
         p = self._process
         # Report memory usage.
-        rss_in_GB = p.memory_info().rss / (1024 ** 3)
-        vms_in_GB = p.memory_info().vms / (1024 ** 3)
-        mem_pct = p.memory_percent()
-        resource_use = "rss=%.1fGB vms=%.1fGB mem_pct=%.0f%%" % (
-            rss_in_GB,
-            vms_in_GB,
-            mem_pct,
-        )
+        resource_use = get_memory_usage(p)
         # Report CPU usage.
         if self._report_cpu_usage:
             # CPU usage since the previous call.

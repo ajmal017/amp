@@ -56,7 +56,7 @@ eval_config = cconfig.get_config_from_nested_dict(
         "exp_dir": exp_dir,
         "model_evaluator_kwargs": {
             "returns_col": "vwap_ret_0_vol_adj_clipped_2",
-            "predictions_col": "vwap_ret_0_vol_adj_clipped_2",
+            "predictions_col": "vwap_ret_0_vol_adj_clipped_2_hat",
             #"oos_start": "2017-01-01",
         },
         "bh_adj_threshold": 0.1,
@@ -70,28 +70,56 @@ eval_config = cconfig.get_config_from_nested_dict(
 # # Initialize ModelEvaluator and ModelPlotter
 
 # %%
-import pandas as pd
-import core.signal_processing as csigna
-
-xs = [x / 10 for x in range(-10, 10)]
-#y = [csigna.c_infinity(x) for x in xs]
-y = [csigna.c_infinity_step_function(x) for x in xs]
-#y = [csigna.c_infinity_bump_function(x, 2, 10) for x in xs]
-
-df = pd.DataFrame()
-df["x"] = pd.Series(xs)
-df["y"] = pd.Series(y)
-
-df.plot("x")
-
-# %%
 # Load the data.
-selected_idxs = list(range(2))
+selected_idxs = list(range(4))
 result_bundles = cdmu.yield_experiment_artifacts(
     eval_config["exp_dir"],
     "result_bundle.pkl",
     selected_idxs=selected_idxs,
 )
+
+# %%
+print("before:", dbg.get_memory_usage(None))
+df = next(result_bundles)
+print("after:", dbg.get_memory_usage(None))
+
+# %%
+i = 0
+dfs = []
+
+# %%
+rss_before = dbg.get_memory_usage()[0]
+print("before", dbg.get_memory_usage_as_str(None))
+
+df_copy = result_df.copy(deep=True)
+print(df_copy.memory_usage().sum() / 1024 ** 3)
+dfs.append(df_copy)
+
+rss_after = dbg.get_memory_usage()[0]
+print("after", dbg.get_memory_usage_as_str(None))
+
+print("mem_increase=", rss_after - rss_before)
+
+# %%
+result_df = df[1]["result_df"]
+
+# %%
+result_df.memory_usage().sum()
+
+# %%
+hintro.format_size(result_df[["vwap_ret_0_vol_adj_clipped_2", "vwap_ret_0_vol_adj_clipped_2_hat"]].memory_usage().sum())
+
+# %%
+import helpers.introspection as hintro
+
+# %%
+print(df[1].keys())
+
+#hintro.get_size_in_bytes(df[1]["result_df"])
+df[1]["result_df"].memory_usage(index=True, deep=True).sum()
+#df[1]["result_df"].info()
+
+# %%
 
 # %%
 # Build the ModelEvaluator.
@@ -102,9 +130,6 @@ evaluator = modeval.build_model_evaluator_from_result_bundles(
 )
 # Build the ModelPlotter.
 plotter = modplot.ModelPlotter(evaluator)
-
-# %%
-evaluator._data
 
 # %% [markdown]
 # # Analysis
