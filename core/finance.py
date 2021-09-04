@@ -128,31 +128,6 @@ def set_weekends_to_nan(df: pd.DataFrame) -> pd.DataFrame:
 # TODO(Paul): Consider moving resampling code to a new `resampling.py`
 
 
-def _resample_with_aggregate_function(
-    df: pd.DataFrame,
-    rule: str,
-    cols: List[str],
-    agg_func: str,
-    agg_func_kwargs: htypes.Kwargs,
-) -> pd.DataFrame:
-    """
-    Resample columns `cols` of `df` using the passed parameters.
-    """
-    dbg.dassert(not df.empty)
-    dbg.dassert_isinstance(cols, list)
-    dbg.dassert(cols, msg="`cols` must be nonempty.")
-    dbg.dassert_is_subset(cols, df.columns)
-    resampler = csigna.resample(df[cols], rule=rule)
-    resampled = resampler.agg(agg_func, **agg_func_kwargs)
-    return resampled
-
-
-def _merge(df1: pd.DataFrame, df2: pd.DataFrame) -> pd.DataFrame:
-    result_df = df1.merge(df2, how="outer", left_index=True, right_index=True)
-    dbg.dassert(result_df.index.freq)
-    return result_df
-
-
 def compute_vwap(
     df: pd.DataFrame,
     *,
@@ -200,6 +175,25 @@ def compute_vwap(
     return vwap
 
 
+def _resample_with_aggregate_function(
+        df: pd.DataFrame,
+        rule: str,
+        cols: List[str],
+        agg_func: str,
+        agg_func_kwargs: htypes.Kwargs,
+) -> pd.DataFrame:
+    """
+    Resample columns `cols` of `df` using the passed parameters.
+    """
+    dbg.dassert(not df.empty)
+    dbg.dassert_isinstance(cols, list)
+    dbg.dassert(cols, msg="`cols` must be nonempty.")
+    dbg.dassert_is_subset(cols, df.columns)
+    resampler = csigna.resample(df[cols], rule=rule)
+    resampled = resampler.agg(agg_func, **agg_func_kwargs)
+    return resampled
+
+
 def resample_bars(
     df: pd.DataFrame,
     rule: str,
@@ -241,6 +235,8 @@ def resample_bars(
 
 
 # TODO(Paul): Consider deprecating.
+# This provides some sensible defaults for `resample_bars()`, but may not be
+# worth the additional complexity.
 def resample_time_bars(
     df: pd.DataFrame,
     rule: str,
@@ -374,10 +370,13 @@ def resample_ohlcv_bars(
         twap_vwap_df = compute_twap_vwap(
             df, rule=rule, price_col=close_col, volume_col=volume_col
         )
-        result_df = _merge(result_df, twap_vwap_df)
+        result_df = result_df.merge(twap_vwap_df, how="outer", left_index=True, right_index=True)
+        dbg.dassert(result_df.index.freq)
     return result_df
 
 
+# TODO(Paul): Deprecate this function. The bells and whistles do not really
+# fit, and the core functionality can be accessed through the above functions.
 def compute_twap_vwap(
     df: pd.DataFrame,
     rule: str,
