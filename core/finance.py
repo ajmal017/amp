@@ -176,11 +176,11 @@ def compute_vwap(
 
 
 def _resample_with_aggregate_function(
-        df: pd.DataFrame,
-        rule: str,
-        cols: List[str],
-        agg_func: str,
-        agg_func_kwargs: htypes.Kwargs,
+    df: pd.DataFrame,
+    rule: str,
+    cols: List[str],
+    agg_func: str,
+    agg_func_kwargs: htypes.Kwargs,
 ) -> pd.DataFrame:
     """
     Resample columns `cols` of `df` using the passed parameters.
@@ -370,7 +370,9 @@ def resample_ohlcv_bars(
         twap_vwap_df = compute_twap_vwap(
             df, rule=rule, price_col=close_col, volume_col=volume_col
         )
-        result_df = result_df.merge(twap_vwap_df, how="outer", left_index=True, right_index=True)
+        result_df = result_df.merge(
+            twap_vwap_df, how="outer", left_index=True, right_index=True
+        )
         dbg.dassert(result_df.index.freq)
     return result_df
 
