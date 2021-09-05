@@ -20,8 +20,16 @@ import core.finance as fin
 import core.signal_processing as sigp
 import core.statistics as stats
 import helpers.dbg as dbg
+import helpers.introspection as hintro
 
 _LOG = logging.getLogger(__name__)
+
+# #############################################################################
+# ModelEvaluator
+# #############################################################################
+
+# A model / experiment is represented by a key, encoded as a string.
+Key = str
 
 
 class ModelEvaluator:
@@ -29,33 +37,59 @@ class ModelEvaluator:
     Evaluate performance of financial models for returns.
     """
 
-    # TODO(Paul): Add setters for `prediction_col` and `target_col`.
-
     def __init__(
         self,
-        data: Dict[str, pd.DataFrame],
+        data: Dict[Key, pd.DataFrame],
         *,
         prediction_col: Optional[str] = None,
         target_col: Optional[str] = None,
         oos_start: Optional[Any] = None,
     ) -> None:
+        """
+        Constructor.
+
+        :param data: a dict key (tag of model / experiment) -> dataframe (containing
+            `ResultBundle.result_df`). Each model / experiment is represented by
+            a key.
+
+            E.g.,
+
+            ```
+            {0:                            vwap_ret_0_vol_adj_clipped_2 ...
+             end_time
+             2009-01-02 09:05:00-05:00                              NaN ...
+             2009-01-02 09:10:00-05:00                              NaN ...
+             2009-01-02 09:15:00-05:00                              NaN ...
+            ```
+
+        :param prediction_col: column of `ResultBundle.result_df` to use as
+            predictions
+        :param target_col: column of `ResultBundle.result_df` to use as targets
+            (e.g., returns)
+        :param oos_start: start of the OOS period, or None for nothing
+        """
         self._data = data
         dbg.dassert(data, msg="Data set must be nonempty.")
-        # Use plain attributes (see Effective Python item #44).
+        # This is required by the current implementation otherwise when we extract
+        # columns from dataframes we get dataframes and not series.
+        dbg.dassert_ne(
+            prediction_col,
+            target_col,
+            "Prediction and target columns need to be different",
+        )
+        # TODO(Paul): Add setters for `prediction_col` and `target_col`.
         self.prediction_col = prediction_col
         self.target_col = target_col
         self.oos_start = oos_start
-        #
+        # The valid keys are the keys in the data dict.
         self.valid_keys = list(self._data.keys())
         self._stats_computer = cstats.StatsComputer()
 
-    # TODO(gp): Maybe we can use a stricter type for the keys instead of `Any`.
-    #  It might be better to always use `str` instead of using string-ified ints,
-    #  like `str(0)`.
     # TODO(gp): Maybe `resolve_keys()` is a better name.
-    def get_keys(self, keys: Optional[List[Any]]) -> List[Any]:
+    def get_keys(self, keys: Optional[List[Key]]) -> List[Any]:
         """
-        Return the keys to select models, or all available keys for `keys=None`.
+        Return the keys to select models, or all available keys for
+        `keys=None`.
         """
         keys = keys or self.valid_keys
         dbg.dassert_is_subset(keys, self.valid_keys)
@@ -72,15 +106,15 @@ class ModelEvaluator:
         mode: Optional[str] = None,
     ) -> Tuple[pd.Series, pd.Series, pd.Series]:
         """
-        Combine selected pnls.
+        Combine PnLs selected through `keys`.
 
-        :param keys: Use all available if `None`
-        :param weights: Average if `None`
+        :param keys: use all available keys if `None`
+        :param weights: average if `None`
         :param position_method: as in `PositionComputer.compute_positions()`
         :param target_volatility: as in `PositionComputer.compute_positions()`
         :param returns_shift: as in `compute_pnl()`
         :param predictions_shift: as in `compute_pnl()`
-        :param mode: "all_available", "ins", or "oos"
+        :param mode: "all_available", "ins" (default), or "oos"
         :return: aggregate pnl stream, position stream, statistics
         """
         keys = self.get_keys(keys)
@@ -93,10 +127,11 @@ class ModelEvaluator:
             predictions_shift=predictions_shift,
         )
         pnl_df = pd.concat({k: v["pnl"] for k, v in pnl_dict.items()}, axis=1)
+        # Get the weights.
         weights = weights or [1 / len(keys)] * len(keys)
         dbg.dassert_eq(len(keys), len(weights))
         col_map = {keys[idx]: weights[idx] for idx in range(len(keys))}
-        # Calculate pnl srs.
+        # Calculate PnL series.
         pnl_df = pnl_df.apply(lambda x: x * col_map[x.name]).sum(
             axis=1, min_count=1
         )
@@ -165,6 +200,7 @@ class ModelEvaluator:
         )
         stats_dict = {}
         for key in tqdm(pnl_dict.keys(), desc="Calculating stats"):
+            _LOG.debug("key=%s", key)
             if pnl_dict[key].empty:
                 _LOG.warning("PnL series for key=%i is empty.", key)
                 continue
@@ -191,7 +227,7 @@ class ModelEvaluator:
 
     def compute_pnl(
         self,
-        keys: Optional[List[Any]] = None,
+        keys: Optional[List[Key]] = None,
         position_method: Optional[str] = None,
         target_volatility: Optional[float] = None,
         returns_shift: Optional[int] = 0,
@@ -201,7 +237,7 @@ class ModelEvaluator:
         """
         Helper for calculating positions and PnL from returns and predictions.
 
-        :param keys: Use all available if `None`
+        :param keys: use all available models if `None`
         :param position_method: as in `PositionComputer.compute_positions()`
         :param target_volatility: as in `PositionComputer.compute_positions()`
         :param returns_shift: number of shifts to pre-apply to returns col
@@ -212,51 +248,72 @@ class ModelEvaluator:
             "positions", "pnl"]
         """
         keys = self.get_keys(keys)
-        #
-        returns = {
-            k: self._data[k][self.target_col]
-            .shift(returns_shift)
-            .rename("returns")
-            for k in keys
-        }
-        predictions = {
-            k: self._data[k][self.prediction_col]
-            .shift(predictions_shift)
-            .rename("predictions")
-            for k in keys
-        }
+        # Extract and align the returns.
+        _LOG.debug("Process returns")
+        returns = {}
+        for key in keys:
+            dbg.dassert_in(self.target_col, self._data[key].columns)
+            srs = self._data[key][self.target_col]
+            _validate_series(srs)
+            dbg.dassert_lte(0, returns_shift)
+            srs = srs.shift(returns_shift)
+            srs.name = "returns"
+            _validate_series(srs)
+            returns[key] = srs
+        # Extract and align the predictions.
+        _LOG.debug("Process predictions")
+        predictions = {}
+        for key in keys:
+            dbg.dassert_in(self.prediction_col, self._data[key].columns)
+            srs = self._data[key][self.prediction_col]
+            _validate_series(srs)
+            dbg.dassert_lte(0, predictions_shift)
+            srs = srs.shift(predictions_shift)
+            srs.name = "predictions"
+            _validate_series(srs)
+            predictions[key] = srs
+        # Compute the positions.
+        _LOG.debug("Process positions")
         positions = {}
-        for k in tqdm(returns.keys(), "Calculating positions"):
+        for key in tqdm(returns.keys(), "Calculating positions"):
+            _LOG.debug("Process key=%s", key)
             position_computer = PositionComputer(
-                returns=returns[k],
-                predictions=predictions[k],
+                returns=returns[key],
+                predictions=predictions[key],
             )
-            positions[k] = position_computer.compute_positions(
+            positions[key] = position_computer.compute_positions(
                 prediction_strategy=position_method,
                 target_volatility=target_volatility,
             ).rename("positions")
+        # Compute PnLs.
+        _LOG.debug("Process PnLs")
         pnls = {}
-        for k in tqdm(positions.keys(), "Calculating PnL"):
+        for key in tqdm(positions.keys(), "Calculating PnL"):
+            _LOG.debug("Process key=%s", key)
             pnl_computer = PnlComputer(
-                returns=returns[k],
-                positions=positions[k],
+                returns=returns[key],
+                positions=positions[key],
             )
-            pnls[k] = pnl_computer.compute_pnl().rename("pnl")
+            pnls[key] = pnl_computer.compute_pnl().rename("pnl")
+        # Assemble the results into a dictionary of dataframes.
+        _LOG.debug("Assemble results into pnl_dict")
         pnl_dict = {}
-        for k in keys:
-            pnl_dict[k] = pd.concat(
-                [returns[k], predictions[k], positions[k], pnls[k]], axis=1
+        for key in keys:
+            pnl_dict[key] = pd.concat(
+                [returns[key], predictions[key], positions[key], pnls[key]],
+                axis=1,
             )
+        _LOG.debug("Trim pnl_dict")
         pnl_dict = self._trim_time_range(pnl_dict, mode=mode)
         return pnl_dict
 
     def _trim_time_range(
         self,
-        data_dict: Dict[Any, Union[pd.Series, pd.DataFrame]],
+        data_dict: Dict[Key, Union[pd.Series, pd.DataFrame]],
         mode: Optional[str] = None,
     ) -> Dict[Any, Union[pd.Series, pd.DataFrame]]:
         """
-        Helper to trim to in-sample/out-of-sample region.
+        Trim the dataframes in the data in-sample/out-of-sample region.
         """
         mode = mode or "ins"
         if mode == "all_available":
@@ -272,11 +329,29 @@ class ModelEvaluator:
 
 
 # #############################################################################
+# PnlComputer
+# #############################################################################
+
+
+def _validate_series(srs: pd.Series, oos_start: Optional[float] = None) -> None:
+    dbg.dassert_isinstance(srs, pd.Series)
+    dbg.dassert(not srs.empty, "Empty series")
+    dbg.dassert(not srs.dropna().empty, "Series with only nans")
+    if oos_start is not None:
+        dbg.dassert(
+            not srs[:oos_start].dropna().empty,  # type: ignore[misc]
+            "Empty in-sample series",
+        )
+        dbg.dassert(
+            not srs[oos_start:].dropna().empty,  # type: ignore[misc]
+            "Empty OOS series",
+        )
+    dbg.dassert(srs.index.freq)
 
 
 class PnlComputer:
     """
-    Computes PnL from returns and holdings.
+    Compute PnL from returns and positions (i.e., holdings).
     """
 
     def __init__(
@@ -290,34 +365,30 @@ class PnlComputer:
         :param returns: financial returns
         :param predictions: returns predictions (aligned with returns)
         """
-        self._validate_series(returns)
-        self._validate_series(positions)
+        _validate_series(returns)
         self.returns = returns
+        _validate_series(positions)
         self.positions = positions
-        # TODO(*): validate indices
+        # TODO(Paul): validate indices by making sure they are the same.
 
     def compute_pnl(self) -> pd.Series:
         """
         Compute PnL from returns and positions.
         """
         pnl = self.returns.multiply(self.positions)
-        dbg.dassert(pnl.index.freq)
+        _validate_series(pnl)
         pnl.name = "pnl"
         return pnl
 
-    @staticmethod
-    def _validate_series(srs: pd.Series) -> None:
-        dbg.dassert_isinstance(srs, pd.Series)
-        dbg.dassert(not srs.dropna().empty)
-        dbg.dassert(srs.index.freq)
 
-
+# #############################################################################
+# PositionComputer
 # #############################################################################
 
 
 class PositionComputer:
     """
-    Computes target positions from returns, predictions, and constraints.
+    Compute target positions from returns, predictions, and constraints.
     """
 
     def __init__(
@@ -335,9 +406,9 @@ class PositionComputer:
         :param oos_start: optional end of in-sample/start of out-of-sample.
         """
         self.oos_start = oos_start
-        self._validate_series(returns, self.oos_start)
-        self._validate_series(predictions, self.oos_start)
+        _validate_series(returns, self.oos_start)
         self.returns = returns
+        _validate_series(predictions, self.oos_start)
         self.predictions = predictions
 
     def compute_positions(
@@ -351,9 +422,9 @@ class PositionComputer:
         """
         Compute positions from returns and predictions.
 
-        :param target_volatility: generate positions to achieve target
-            volatility on in-sample region.
-        :param prediction_strategy: "raw", "kernel", "squash", "binarize"
+        :param target_volatility: generate positions to achieve target volatility
+            on in-sample region
+        :param prediction_strategy: "raw" (default), "kernel", "squash", "binarize"
         :param volatility_strategy: "rescale", "rolling" (not yet implemented)
         :param mode: "all_available", "ins", or "oos"
         :return: series of positions
@@ -362,6 +433,7 @@ class PositionComputer:
         # Process/adjust predictions.
         prediction_strategy = prediction_strategy or "raw"
         if prediction_strategy == "raw":
+            # TODO(gp): Why this copy?
             predictions = self.predictions.copy()
         elif prediction_strategy == "kernel":
             predictions = self._multiply_kernel(self.predictions, **kwargs)
@@ -376,15 +448,18 @@ class PositionComputer:
         # Specify strategy for volatility targeting.
         volatility_strategy = volatility_strategy or "rescale"
         if target_volatility is None:
+            # TODO(gp): Why this copy?
             positions = predictions.copy()
             positions.name = "positions"
-            return self._return_srs(positions, mode=mode)
-        return self._adjust_for_volatility(
-            predictions,
-            target_volatility=target_volatility,
-            mode=mode,
-            volatility_strategy=volatility_strategy,
-        )
+            ret = self._return_srs(positions, mode=mode)
+        else:
+            ret = self._adjust_for_volatility(
+                predictions,
+                target_volatility,
+                mode,
+                volatility_strategy,
+            )
+        return ret
 
     @staticmethod
     def _multiply_kernel(
@@ -394,9 +469,11 @@ class PositionComputer:
         z_mute_point: float,
         z_saturation_point: float,
     ) -> pd.Series:
+        # z-score.
         zscored_preds = sigp.compute_rolling_zscore(
             predictions, tau=tau, delay=delay
         )
+        # Multiple by a kernel.
         bump_function = functools.partial(
             sigp.c_infinity_bump_function, a=z_mute_point, b=z_saturation_point
         )
@@ -424,57 +501,56 @@ class PositionComputer:
         volatility_strategy: str,
     ) -> pd.Series:
         """
-
-        :param predictions:
-        :param target_volatility:
-        :param mode:
-        :param volatility_strategy:
-        :return:
+        Adjust predictions to achieve a given target volatility.
         """
         # Compute PnL by interpreting predictions as positions.
         pnl_computer = PnlComputer(self.returns, predictions)
         pnl = pnl_computer.compute_pnl()
         pnl.name = "pnl"
-        #
-        ins_pnl = pnl[: self.oos_start]
+        # Rescale in-sample.
+        ins_pnl = pnl[: self.oos_start]  # type: ignore[misc]
         if volatility_strategy == "rescale":
             scale_factor = fin.compute_volatility_normalization_factor(
                 srs=ins_pnl, target_volatility=target_volatility
             )
             positions = scale_factor * predictions
             positions.name = "positions"
-            return self._return_srs(positions, mode=mode)
-        raise ValueError(f"Unrecognized strategy `{volatility_strategy}`!")
+            ret = self._return_srs(positions, mode=mode)
+        elif volatility_strategy == "rolling":
+            raise NotImplementedError
+        else:
+            raise ValueError(f"Invalid strategy `{volatility_strategy}`")
+        return ret
 
     def _return_srs(self, srs: pd.Series, mode: str) -> pd.Series:
+        """
+        Extract part of the time series depending on which period is selected.
+
+        :param mode: "ins", "oos", "all"
+        """
         if mode == "ins":
-            return srs[: self.oos_start]
-        elif mode == "all_available":
-            return srs
+            ret = srs[: self.oos_start]  # type: ignore[misc]
         elif mode == "oos":
             dbg.dassert(
                 self.oos_start,
                 msg="Must set `oos_start` to run `oos`",
             )
-            return srs[self.oos_start :]
-        raise ValueError(f"Invalid mode `{mode}`!")
-
-    @staticmethod
-    def _validate_series(srs: pd.Series, oos_start: Optional[float]) -> None:
-        dbg.dassert_isinstance(srs, pd.Series)
-        dbg.dassert(not srs.dropna().empty)
-        if oos_start is not None:
-            dbg.dassert(not srs[:oos_start].dropna().empty)
-            dbg.dassert(not srs[oos_start:].dropna().empty)
-        dbg.dassert(srs.index.freq)
+            ret = srs[self.oos_start :]  # type: ignore[misc]
+        elif mode == "all_available":
+            ret = srs
+        else:
+            raise ValueError(f"Invalid mode `{mode}`")
+        return ret
 
 
+# #############################################################################
+# TransactionCostModeler
 # #############################################################################
 
 
 class TransactionCostModeler:
     """
-    Estimates transaction costs.
+    Estimate transaction costs.
     """
 
     def __init__(
@@ -485,9 +561,9 @@ class TransactionCostModeler:
         oos_start: Optional[float] = None,
     ) -> None:
         self.oos_start = oos_start
-        self._validate_series(price, self.oos_start)
-        self._validate_series(positions, self.oos_start)
+        _validate_series(price, self.oos_start)
         self.price = price
+        _validate_series(positions, self.oos_start)
         self.positions = positions
 
     def compute_transaction_costs(
@@ -510,7 +586,7 @@ class TransactionCostModeler:
 
     def _return_srs(self, srs: pd.Series, mode: str) -> pd.Series:
         if mode == "ins":
-            ret = srs[: self.oos_start]
+            ret = srs[: self.oos_start]  # type: ignore[misc]
         elif mode == "all_available":
             ret = srs
         elif mode == "oos":
@@ -518,25 +594,20 @@ class TransactionCostModeler:
                 self.oos_start,
                 msg="Must set `oos_start` to run `oos`",
             )
-            ret = srs[self.oos_start :]
+            ret = srs[self.oos_start :]  # type: ignore[misc]
         else:
             raise ValueError(f"Invalid mode `{mode}`!")
         return ret
 
-    @staticmethod
-    def _validate_series(srs: pd.Series, oos_start: Optional[float]) -> None:
-        dbg.dassert_isinstance(srs, pd.Series)
-        dbg.dassert(not srs.dropna().empty)
-        if oos_start is not None:
-            dbg.dassert(not srs[:oos_start].dropna().empty)
-            dbg.dassert(not srs[oos_start:].dropna().empty)
-        dbg.dassert(srs.index.freq)
+
+# #############################################################################
 
 
 # TODO(gp): Maybe make it a classmethod builder for ModelEvaluator called
-#  `build_from_result_bundle_dicts`.
+#  `build_from_result_bundles`.
 def build_model_evaluator_from_result_bundles(
     result_bundle_pairs: Iterable[Tuple[int, cdataf.ResultBundle]],
+    # TODO(gp): -> target_col, also keep the same order as in the ctor
     returns_col: str,
     predictions_col: str,
     oos_start: Optional[Any] = None,
@@ -545,28 +616,32 @@ def build_model_evaluator_from_result_bundles(
     """
     Initialize a `ModelEvaluator` from `ResultBundle`s.
 
-    :param result_bundle_pairs:
-    :param returns_col: column of `ResultBundle.result_df` to use as the column
-        representing returns
-    :param predictions_col: like `returns_col`, but for predictions
-    :param oos_start: as in `ModelEvaluator`
+    :param result_bundle_pairs: iterators with key and `ResultBundle`
+    :param *: as in `ModelEvaluator`
     :return: `ModelEvaluator` initialized with returns and predictions from
        result bundles
     """
-    data_dict = {}
+    data_dict: Dict[Key, pd.DataFrame] = {}
     # Convert each `ResultBundle` dict into a `ResultBundle` class object.
     for key, value in result_bundle_pairs:
+        _LOG.debug("Loading key=%s", key)
         try:
+            _LOG.debug("memory_usage=%s", dbg.get_memory_usage(None))
             result_bundle = cdataf.ResultBundle.from_dict(value)
             df = result_bundle.result_df
+            _LOG.debug(
+                "result_df.memory_usage=%s",
+                hintro.format_size(df.memory_usage(index=True, deep=True).sum()),
+            )
+            # Extract the needed columns.
             dbg.dassert_in(returns_col, df.columns)
             dbg.dassert_in(predictions_col, df.columns)
+            dbg.dassert_not_in(key, data_dict.keys())
             data_dict[key] = df[[returns_col, predictions_col]]
         except Exception as e:
             _LOG.error(
-                "Error while loading ResultBundle for config %d with exception:\n%s" % (
-                key,
-                str(e))
+                "Error while loading ResultBundle for config %d with exception:\n%s"
+                % (key, str(e))
             )
             if abort_on_error:
                 raise e
