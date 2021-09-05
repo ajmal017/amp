@@ -144,8 +144,10 @@ def _get_global_cache_path(cache_type: str, tag: Optional[str] = None) -> str:
     cache_name = _get_global_cache_name(cache_type, tag)
     # Get the enclosing directory path.
     if cache_type == "mem":
-        tmpfs_path = "/tmp" if hsyste.get_os_name() == "Darwin" else "/mnt/tmpfs"
-        root_path = tmpfs_path
+        if hsyste.get_os_name() == "Darwin":
+            root_path = "/tmp"
+        else:
+            root_path = "/mnt/tmpfs"
     elif cache_type == "disk":
         root_path = git.get_client_root(super_module=True)
     # Compute path.
@@ -189,11 +191,14 @@ def _create_global_cache_backend(
     :return: cache backend object
     """
     _dassert_is_valid_cache_type(cache_type)
-    file_name = _get_global_cache_path(cache_type, tag)
-    cache_backend = joblib.Memory(file_name, verbose=0, compress=True)
+    dir_name = _get_global_cache_path(cache_type, tag)
+    _LOG.debug("Creating cache for cache_type='%s' and tag='%s' at '%s'",
+               cache_type, tag, dir_name)
+    cache_backend = joblib.Memory(dir_name, verbose=0, compress=True)
     return cache_backend
 
 
+# TODO(gp): -> _get_global_cache
 def get_global_cache(cache_type: str, tag: Optional[str] = None) -> joblib.Memory:
     """
     Get global cache by cache type.
@@ -409,13 +414,17 @@ class _Cached:
             # Get memory.
             obj_size = hintro.get_size_in_bytes(obj)
             obj_size_as_str = hintro.format_size(obj_size)
+            last_cache = self.get_last_cache_accessed()
+            cache_dir = self._get_cache_dir(last_cache, self._tag)
             _LOG.info(
-                "  --> Cache data for '%s' was retrieved from '%s' cache "
-                "(size=%s time=%.2f s)",
+                "  --> Cache data for '%s' from '%s' cache "
+                "(size=%s, time=%.2f s, tag=%s, loc=%s)",
                 self._func.__name__,
-                self.get_last_cache_accessed(),
+                last_cache,
                 obj_size_as_str,
                 elapsed_time,
+                self._tag,
+                cache_dir
             )
         return obj
 
@@ -604,8 +613,6 @@ class _Cached:
         )
         return func_path
 
-    # ///////////////////////////////////////////////////////////////////////////
-
     def _create_function_memory_cache(self) -> joblib.Memory:
         """
         Initialize Joblib object storing a memory cache for this function.
@@ -623,7 +630,7 @@ class _Cached:
         """
         Initialize Joblib object storing a disk cache for this function.
         """
-        if self._disk_cache_path:
+        if self.has_function_cache():
             dbg.dassert(
                 not self._use_mem_cache,
                 "When using function cache the memory cache needs to be disabled",
@@ -672,12 +679,28 @@ class _Cached:
         disk_cached_func = disk_cache.cache(self._func)
         return disk_cache, disk_cached_func
 
+    # ///////////////////////////////////////////////////////////////////////////
+
+    # TODO(gp): We should use the actual stored dir.
+    def _get_cache_dir(self, cache_type: str, tag: Optional[str]) -> str:
+        """
+        Return the dir of the cache corresponding to `cache_type` and `tag`.
+        """
+        if cache_type == "no_cache":
+            return "no_cache"
+        if self.has_function_cache():
+            dbg.dassert_eq(cache_type, "disk")
+            ret = self._disk_cache_path
+        else:
+            ret = _get_global_cache_path(cache_type, tag=tag)
+        return ret
+
     def _get_memorized_result(self, cache_type: str) -> joblib.MemorizedResult:
         """
         Get the instance of a cache by type.
 
         From https://github.com/joblib/joblib/blob/master/joblib/memory.py
-        A MemorizedResult is an object representing a cached value
+        A `MemorizedResult` is an object representing a cached value
 
         :param cache_type: type of a cache
         :return: instance of the Joblib cache
@@ -757,6 +780,9 @@ class _Cached:
         :param args_id: digest of arguments obtained from `_get_identifiers()`
         :param obj: return value of the intrinsic function
         """
+        # This corresponds to
+        # /venv/lib/python3.8/site-packages/joblib/memory.py
+        # __call__
         if self._enable_read_only:
             raise NotCachedValueException
         memorized_result = self._get_memorized_result(cache_type)
@@ -765,6 +791,7 @@ class _Cached:
         memorized_result._write_func_code(func_code, first_line)
         # Store the returned value into the cache.
         memorized_result.store_backend.dump_item([func_id, args_id], obj)
+        #
 
     # ///////////////////////////////////////////////////////////////////////////
 
@@ -802,10 +829,11 @@ class _Cached:
             if self._enable_read_only:
                 msg = f"{func_info}: trying to execute"
                 raise NotCachedValueException(msg)
-            obj = self._execute_intrinsic_function(*args, **kwargs)
+            obj = self._disk_cached_func(*args, **kwargs)
+            #obj = self._execute_intrinsic_function(*args, **kwargs)
             # The function was not cached in disk, so now we need to update the
             # memory cache.
-            self._store_cached_version("disk", func_id, args_id, obj)
+            #self._store_cached_version("disk", func_id, args_id, obj)
         return obj
 
     def _execute_func_from_mem_cache(self, *args: Any, **kwargs: Any) -> Any:

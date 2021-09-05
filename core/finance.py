@@ -8,7 +8,7 @@ import core.finance as fin
 
 import datetime
 import logging
-from typing import Dict, List, Optional, Union, cast
+from typing import Dict, List, Optional, Tuple, Union, cast
 
 import numpy as np
 import pandas as pd
@@ -128,6 +128,53 @@ def set_weekends_to_nan(df: pd.DataFrame) -> pd.DataFrame:
 # TODO(Paul): Consider moving resampling code to a new `resampling.py`
 
 
+def compute_vwap(
+    df: pd.DataFrame,
+    *,
+    rule: str,
+    price_col: str,
+    volume_col: str,
+    offset: Optional[str] = None,
+) -> pd.Series:
+    """
+    Compute VWAP from price and volume columns.
+
+    :param df: input dataframe with datetime index
+    :param rule: resampling frequency and VWAP aggregation window
+    :param price_col: price for bar
+    :param volume_col: volume for bar
+    :param offset: offset in the Pandas format (e.g., `1T`) used to shift the
+        sampling
+    :return: vwap price series
+    """
+    dbg.dassert_isinstance(df, pd.DataFrame)
+    dbg.dassert_in(price_col, df.columns)
+    dbg.dassert_in(volume_col, df.columns)
+    # Only use rows where both price and volume are non-NaN.
+    non_nan_idx = df[[price_col, volume_col]].dropna().index
+    nan_idx = df.index.difference(non_nan_idx)
+    price = df[price_col]
+    price.loc[nan_idx] = np.nan
+    volume = df[volume_col]
+    volume.loc[nan_idx] = np.nan
+    # Weight price according to volume.
+    volume_weighted_price = price.multiply(volume)
+    resampled_volume_weighted_price = csigna.resample(
+        volume_weighted_price,
+        rule=rule,
+        offset=offset,
+    ).sum(min_count=1)
+    resampled_volume = csigna.resample(volume, rule=rule, offset=offset).sum(
+        min_count=1
+    )
+    # Complete the VWAP calculation.
+    vwap = resampled_volume_weighted_price.divide(resampled_volume)
+    # Replace infs with NaNs.
+    vwap = vwap.replace([-np.inf, np.inf], np.nan)
+    vwap.name = "vwap"
+    return vwap
+
+
 def _resample_with_aggregate_function(
     df: pd.DataFrame,
     rule: str,
@@ -147,12 +194,49 @@ def _resample_with_aggregate_function(
     return resampled
 
 
-def _merge(df1: pd.DataFrame, df2: pd.DataFrame) -> pd.DataFrame:
-    result_df = df1.merge(df2, how="outer", left_index=True, right_index=True)
-    dbg.dassert(result_df.index.freq)
-    return result_df
+def resample_bars(
+    df: pd.DataFrame,
+    rule: str,
+    resampling_groups: List[Tuple[Dict[str, str], str, htypes.Kwargs]],
+    vwap_groups: List[Tuple[str, str, str]],
+) -> pd.DataFrame:
+    """
+    Resampling with optional VWAP.
+
+    Output column names must not collide.
+
+    :param resampling_groups: list of tuples of the following form:
+        (col_dict, aggregation function, aggregation kwargs)
+    :param vwap_groups: list of tuples of the following form:
+        (in_price_col_name, in_vol_col_name, vwap_col_name)
+    """
+    results = []
+    for col_dict, agg_func, agg_func_kwargs in resampling_groups:
+        resampled = _resample_with_aggregate_function(
+            df,
+            rule=rule,
+            cols=list(col_dict.keys()),
+            agg_func=agg_func,
+            agg_func_kwargs=agg_func_kwargs,
+        )
+        resampled = resampled.rename(columns=col_dict)
+        dbg.dassert(not resampled.columns.has_duplicates)
+        results.append(resampled)
+    for price_col, vol_col, vwap_col in vwap_groups:
+        vwap = compute_vwap(
+            df, rule=rule, price_col=price_col, volume_col=volume_col
+        )
+        vwap.name = vwap_col
+        results.append(vwap)
+    out_df = pd.concat(results, axis=1)
+    dbg.dassert(not out_df.columns.has_duplicates)
+    dbg.dassert(out_df.index.freq)
+    return out_df
 
 
+# TODO(Paul): Consider deprecating.
+# This provides some sensible defaults for `resample_bars()`, but may not be
+# worth the additional complexity.
 def resample_time_bars(
     df: pd.DataFrame,
     rule: str,
@@ -195,36 +279,31 @@ def resample_time_bars(
         although not in the same order as passed
     """
     dbg.dassert_isinstance(df, pd.DataFrame)
-    result_df = pd.DataFrame()
-    # Maybe resample returns.
-    # TODO(gp): Consider refactoring this chunk of code in a separate helper
-    #  or merge the common code in _resample_with_aggregate_function().
-    #  The only differences between the 3 resampling of returns, prices, and volume
-    #  is the default value and _kwargs.
+    resampling_groups = []
     if return_cols:
-        return_agg_func = return_agg_func or "sum"
-        return_agg_func_kwargs = return_agg_func_kwargs or {"min_count": 1}
-        return_df = _resample_with_aggregate_function(
-            df, rule, return_cols, return_agg_func, return_agg_func_kwargs
-        )
-        result_df = _merge(result_df, return_df)
-    # Maybe resample prices.
+        col_mapping = {col: col for col in return_cols}
+        agg_func = return_agg_func or "sum"
+        agg_func_kwargs = return_agg_func_kwargs or {"min_count": 1}
+        group = (col_mapping, agg_func, agg_func_kwargs)
+        resampling_groups.append(group)
     if price_cols:
-        price_agg_func = price_agg_func or "mean"
-        # TODO(*): Explain the rationale of not using `min_count` for `mean`.
-        price_agg_func_kwargs = price_agg_func_kwargs or {}
-        price_df = _resample_with_aggregate_function(
-            df, rule, price_cols, price_agg_func, price_agg_func_kwargs
-        )
-        result_df = _merge(result_df, price_df)
-    # Maybe resample volume.
+        col_mapping = {col: col for col in price_cols}
+        agg_func = price_agg_func or "mean"
+        agg_func_kwargs = price_agg_func_kwargs or {}
+        group = (col_mapping, agg_func, agg_func_kwargs)
+        resampling_groups.append(group)
     if volume_cols:
-        volume_agg_func = volume_agg_func or "sum"
-        volume_agg_func_kwargs = volume_agg_func_kwargs or {"min_count": 1}
-        volume_df = _resample_with_aggregate_function(
-            df, rule, volume_cols, volume_agg_func, volume_agg_func_kwargs
-        )
-        result_df = _merge(result_df, volume_df)
+        col_mapping = {col: col for col in volume_cols}
+        agg_func = volume_agg_func or "sum"
+        agg_func_kwargs = volume_agg_func_kwargs or {"min_count": 1}
+        group = (col_mapping, agg_func, agg_func_kwargs)
+        resampling_groups.append(group)
+    result_df = resample_bars(
+        df,
+        rule=rule,
+        resampling_groups=resampling_groups,
+        vwap_groups=[],
+    )
     return result_df
 
 
@@ -260,42 +339,30 @@ def resample_ohlcv_bars(
     for col in [open_col, high_col, low_col, close_col, volume_col]:
         if col is not None:
             dbg.dassert_in(col, df.columns)
-    # Process each requested OHLCV column.
-    result_df = pd.DataFrame()
+    resampling_groups = []
     if open_col:
-        open_df = resample_time_bars(
-            df[[open_col]],
-            rule=rule,
-            price_cols=[open_col],
-            price_agg_func="first",
-        )
-        result_df = _merge(result_df, open_df)
+        group = ({open_col: open_col}, "first", {})
+        resampling_groups.append(group)
     if high_col:
-        high_df = resample_time_bars(
-            df[[high_col]], rule=rule, price_cols=[high_col], price_agg_func="max"
-        )
-        result_df = _merge(result_df, high_df)
+        group = ({high_col: high_col}, "max", {})
+        resampling_groups.append(group)
     if low_col:
-        low_df = resample_time_bars(
-            df[[low_col]], rule=rule, price_cols=[low_col], price_agg_func="min"
-        )
-        result_df = _merge(result_df, low_df)
+        group = ({low_col: low_col}, "min", {})
+        resampling_groups.append(group)
     if close_col:
-        close_df = resample_time_bars(
-            df[[close_col]],
-            rule=rule,
-            price_cols=[close_col],
-            price_agg_func="last",
-        )
-        result_df = _merge(result_df, close_df)
+        group = ({close_col: close_col}, "last", {})
+        resampling_groups.append(group)
     if volume_col:
-        # We rely on the default behavior of accumulating the volume.
-        volume_df = resample_time_bars(
-            df[[volume_col]],
-            rule=rule,
-            volume_cols=[volume_col],
-        )
-        result_df = _merge(result_df, volume_df)
+        group = ({volume_col: volume_col}, "sum", {"min_count": 1})
+        resampling_groups.append(group)
+    result_df = resample_bars(
+        df,
+        rule=rule,
+        resampling_groups=resampling_groups,
+        vwap_groups=[],
+    )
+    # TODO(Paul): Refactor this so that we do not call `compute_twap_vwap()`
+    #  directly.
     # Add TWAP / VWAP prices, if needed.
     if add_twap_vwap:
         close_col = cast(str, close_col)
@@ -303,10 +370,15 @@ def resample_ohlcv_bars(
         twap_vwap_df = compute_twap_vwap(
             df, rule=rule, price_col=close_col, volume_col=volume_col
         )
-        result_df = _merge(result_df, twap_vwap_df)
+        result_df = result_df.merge(
+            twap_vwap_df, how="outer", left_index=True, right_index=True
+        )
+        dbg.dassert(result_df.index.freq)
     return result_df
 
 
+# TODO(Paul): Deprecate this function. The bells and whistles do not really
+# fit, and the core functionality can be accessed through the above functions.
 def compute_twap_vwap(
     df: pd.DataFrame,
     rule: str,
@@ -335,54 +407,28 @@ def compute_twap_vwap(
     #  accommodate data that is not perfectly aligned with a pandas freq
     #  (e.g., Kibot).
     # dbg.dassert(df.index.freq)
-    dbg.dassert_in(price_col, df.columns)
-    dbg.dassert_in(volume_col, df.columns)
-    # Only use rows where both price and volume are non-NaN.
-    non_nan_idx = df[[price_col, volume_col]].dropna().index
-    nan_idx = df.index.difference(non_nan_idx)
+    vwap = compute_vwap(
+        df, rule=rule, price_col=price_col, volume_col=volume_col, offset=offset
+    )
     price = df[price_col]
+    # Calculate TWAP, but preserve NaNs for all-NaN bars.
+    twap = csigna.resample(price, rule=rule, offset=offset).mean()
+    twap.name = "twap"
+    dfs = [vwap, twap]
     if add_last_price:
         # Calculate last price (regardless of whether we have volume data).
         last_price = csigna.resample(price, rule=rule, offset=offset).last(
             min_count=1
         )
         last_price.name = "last"
-    price.loc[nan_idx] = np.nan
-    volume = df[volume_col]
+        dfs.append(last_price)
     if add_bar_volume:
+        volume = df[volume_col]
         # Calculate bar volume (regardless of whether we have price data).
         bar_volume = csigna.resample(volume, rule=rule, offset=offset).sum(
             min_count=1
         )
         bar_volume.name = "volume"
-    volume.loc[nan_idx] = np.nan
-    # Weight price according to volume.
-    volume_weighted_price = price.multiply(volume)
-    # Resample using `rule`.
-    resampled_volume_weighted_price = csigna.resample(
-        volume_weighted_price,
-        rule=rule,
-        offset=offset,
-    ).sum(min_count=1)
-    resampled_volume = csigna.resample(volume, rule=rule, offset=offset).sum(
-        min_count=1
-    )
-    # Complete the VWAP calculation.
-    vwap = resampled_volume_weighted_price.divide(resampled_volume)
-    # Replace infs with NaNs.
-    vwap = vwap.replace([-np.inf, np.inf], np.nan)
-    vwap.name = "vwap"
-    # Calculate TWAP, but preserve NaNs for all-NaN bars.
-    twap = csigna.resample(price, rule=rule, offset=offset).mean()
-    twap.loc[resampled_volume_weighted_price.isna()] = np.nan
-    twap.name = "twap"
-    # Make sure columns are not overwritten by the new ones.
-    dbg.dassert_not_in(vwap.name, df.columns)
-    dbg.dassert_not_in(twap.name, df.columns)
-    dfs = [vwap, twap]
-    if add_last_price:
-        dfs.append(last_price)
-    if add_bar_volume:
         dfs.append(bar_volume)
     if add_bar_start_timestamps:
         bar_start_timestamps = compute_bar_start_timestamps(vwap)
@@ -447,6 +493,52 @@ def compute_epoch(
     if isinstance(data, pd.DataFrame):
         return srs.to_frame()
     return srs
+
+
+# #############################################################################
+# Bid-ask processing.
+# #############################################################################
+
+
+def process_bid_ask(
+    df: pd.DataFrame,
+    bid_col: str,
+    ask_col: str,
+    bid_volume_col: Optional[str] = None,
+    ask_volume_col: Optional[str] = None,
+    join_output_with_input: bool = False,
+) -> pd.DataFrame:
+    """
+    Process top-of-book bid/ask quotes.
+    """
+    dbg.dassert_isinstance(df, pd.DataFrame)
+    dbg.dassert_in(bid_col, df.columns)
+    dbg.dassert_in(ask_col, df.columns)
+    dbg.dassert(not (df[bid_col] > df[ask_col]).any())
+    results = []
+    # Compute the geometric mean of the bid and ask.
+    midpoint = np.sqrt(df[bid_col] * df[ask_col]).rename("mid")
+    results.append(midpoint)
+    # Compute the relative spread.
+    spread = (np.log(df[ask_col]) - np.log(df[bid_col])).rename("spread")
+    results.append(spread)
+    # Compute the value (e.g., dollars) at the top of the book.
+    if bid_volume_col is not None:
+        dbg.dassert_in(bid_volume_col, df.columns)
+        bid_value = (df[bid_col] * df[bid_volume_col]).rename("bid_value")
+        results.append(bid_value)
+    if ask_volume_col is not None:
+        dbg.dassert_in(ask_volume_col, df.columns)
+        ask_value = (df[ask_col] * df[ask_volume_col]).rename("ask_value")
+        results.append(ask_value)
+    if bid_volume_col is not None and ask_volume_col is not None:
+        mid_value = np.sqrt(bid_value * ask_value).rename("mid_value")
+        results.append(mid_value)
+    out_df = pd.concat(results, axis=1)
+    if join_output_with_input:
+        out_df = out_df.merge(df, left_index=True, right_index=True, how="outer")
+        dbg.dassert(not out_df.columns.has_duplicates)
+    return out_df
 
 
 # #############################################################################
