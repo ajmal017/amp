@@ -270,7 +270,8 @@ def yield_experiment_artifacts(
     aws_profile: Optional[str] = None,
 ) -> Iterable[Tuple[int, Any]]:
     """
-    Create an iterator returning the key of the experiment and an experiment artifact.
+    Create an iterator returning the key of the experiment and an experiment
+    artifact.
     """
     _LOG.info("# Load artifacts '%s' from '%s'", file_name, src_dir)
     # Get the experiment subdirs.
@@ -355,14 +356,18 @@ def yield_rolling_experiment_out_of_sample_df(
 # #############################################################################
 
 
-def _retrieve_archived_experiment_artifacts(
-    s3_file_name: str, aws_profile: str
+def _retrieve_archived_experiment_artifacts_from_S3(
+    s3_file_name: str,
+    dst_dir: str,
+    aws_profile: str,
 ) -> str:
     """
     Retrieve a package containing experiment artifacts from S3.
 
-    E.g., s3://alphamatic-data/experiments/experiment.RH1E.v1.20210726-20_09_53.5T.tgz
-
+    :param s3_file_name: S3 file name containing the archive.
+        E.g., s3://alphamatic-data/experiments/experiment.RH1E.v1.20210726-20_09_53.5T.tgz
+    :param dst_dir: where to save the data
+    :param aws_profile: the AWS profile to use it to access the archive
     :return: path to local dir with the content of the decompressed archive
     """
     hs3.dassert_is_s3_path(s3_file_name)
@@ -374,7 +379,7 @@ def _retrieve_archived_experiment_artifacts(
         )
     dbg.dassert_file_extension(s3_file_name, "tgz")
     tgz_dst_dir = hs3.retrieve_archived_data_from_s3(
-        s3_file_name, scratch_dir, aws_profile
+        s3_file_name, dst_dir, aws_profile
     )
     _LOG.info("Retrieved artifacts to '%s'", tgz_dst_dir)
     return tgz_dst_dir  # type: ignore[no-any-return]
@@ -398,12 +403,16 @@ def _get_experiment_subdirs(
     """
     # Handle the situation where the file is an archived file.
     if src_dir.endswith(".tgz"):
+        scratch_dir = "."
         if hs3.is_s3_path(src_dir):
-            tgz_file = _retrieve_archived_experiment_artifacts(src_dir, aws_profile)
+            dbg.dassert_is_not(aws_profile, None)
+            aws_profile = cast(str, aws_profile)
+            tgz_file = _retrieve_archived_experiment_artifacts_from_S3(
+                src_dir, scratch_dir, aws_profile
+            )
         else:
             tgz_file = src_dir
         # Expand.
-        scratch_dir = "."
         src_dir = hs3.expand_archived_data(tgz_file, scratch_dir)
         _LOG.debug("src_dir=%s", src_dir)
     # Retrieve all the subdirectories in `src_dir` that store results.

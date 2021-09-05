@@ -10,7 +10,7 @@ import functools
 import logging
 import os
 import pprint
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 _WARNING = "\033[33mWARNING\033[0m"
 
@@ -81,7 +81,7 @@ def dassert_s3_not_exists(s3_path: str, s3fs_: s3fs.core.S3FileSystem) -> None:
     dbg.dassert(not s3fs_.exists(s3_path), "S3 file '%s' already exist", s3_path)
 
 
-def split_path(s3_path: str) -> str:
+def split_path(s3_path: str) -> Tuple[str, str]:
     """
     Separate an S3 path in the bucket and the rest of the path as absolute from
     the root.
@@ -473,19 +473,18 @@ def archive_data_on_s3(
 
 def retrieve_archived_data_from_s3(
     s3_file_path: str,
+    dst_dir: str,
     aws_profile: Optional[str] = None,
     incremental: bool = True,
 ) -> str:
     """
-    Retrieve archived tgz file from S3.
-
-    E.g.,
-    - given a tgz file like `s3://.../experiment.20210802-121908.tgz` (which is the
-      result of compressing a dir like `/app/.../experiment.RH1E`)
-    - expand it into a dir `{dst_dir}/experiment.RH1E`
+    Retrieve tgz file from S3, unless it's already present (incremental mode).
 
     :param s3_file_path: path to the S3 file with the archived data. E.g.,
        `s3://.../experiment.20210802-121908.tgz`
+    :param dst_dir: destination directory where to save the data
+    :param aws_profile: AWS profile to use to access the data
+    :param incremental: skip if the tgz file is already present locally
     :return: path with the local tgz file
     """
     aws_profile = get_aws_profile(aws_profile)
@@ -501,8 +500,9 @@ def retrieve_archived_data_from_s3(
     dst_file = os.path.join(dst_dir, os.path.basename(s3_file_path))
     _LOG.debug(hprint.to_str("s3_file_path dst_dir dst_file"))
     if incremental and os.path.exists(dst_file):
-        _LOG.info("Found '%s': skipping downloading", dst_file)
+        _LOG.warning("Found '%s': skipping downloading", dst_file)
     else:
+        # Download.
         s3fs_ = get_s3fs(aws_profile)
         dassert_s3_exists(s3_file_path, s3fs_)
         _LOG.debug("Getting from s3: '%s' -> '%s", s3_file_path, dst_file)
@@ -513,16 +513,17 @@ def retrieve_archived_data_from_s3(
 
 def expand_archived_data(src_tgz_file: str, dst_dir: str) -> str:
     """
+    Expand an S3 tarball storing results of an experiment.
+
     E.g.,
     - given a tgz file like `s3://.../experiment.20210802-121908.tgz` (which is the
       result of compressing a dir like `/app/.../experiment.RH1E`)
     - expand it into a dir `{dst_dir}/experiment.RH1E`
 
-    :param s3_file_path: path to the S3 file with the archived data. E.g.,
-       `s3://.../experiment.20210802-121908.tgz`
+    :param src_tgz_file: path to the local file with the archived data. E.g.,
+       `/.../experiment.20210802-121908.tgz`
     :param dst_dir: directory where expand the archive tarball
     :return: dir with the expanded data (e.g., `{dst_dir/experiment.RH1E`)
-
     """
     _LOG.debug("Expanding '%s'", src_tgz_file)
     # Get the name of the including dir, e.g., `experiment.RH1E`.
@@ -534,8 +535,11 @@ def expand_archived_data(src_tgz_file: str, dst_dir: str) -> str:
 
     if os.path.exists(tgz_dst_dir):
         dbg.dassert_dir_exists(dst_dir)
-        _LOG.info("While expanding '%s' dst dir '%s' already exists: skipping",
-                  src_tgz_file, tgz_dst_dir)
+        _LOG.info(
+            "While expanding '%s' dst dir '%s' already exists: skipping",
+            src_tgz_file,
+            tgz_dst_dir,
+        )
     else:
         # Expand the tgz file.
         # The output should be the original compressed dir under `{dst_dir}`.

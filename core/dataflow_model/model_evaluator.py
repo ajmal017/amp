@@ -20,6 +20,7 @@ import core.finance as fin
 import core.signal_processing as sigp
 import core.statistics as stats
 import helpers.dbg as dbg
+import helpers.introspection as hintro
 
 _LOG = logging.getLogger(__name__)
 
@@ -27,13 +28,14 @@ _LOG = logging.getLogger(__name__)
 # ModelEvaluator
 # #############################################################################
 
+# A model / experiment is represented by a key, encoded as a string.
+Key = str
+
 
 class ModelEvaluator:
     """
     Evaluate performance of financial models for returns.
     """
-
-    Key = str
 
     def __init__(
         self,
@@ -70,8 +72,11 @@ class ModelEvaluator:
         dbg.dassert(data, msg="Data set must be nonempty.")
         # This is required by the current implementation otherwise when we extract
         # columns from dataframes we get dataframes and not series.
-        dbg.dassert_ne(prediction_col, target_col,
-                       "Prediction and target columns need to be different")
+        dbg.dassert_ne(
+            prediction_col,
+            target_col,
+            "Prediction and target columns need to be different",
+        )
         # TODO(Paul): Add setters for `prediction_col` and `target_col`.
         self.prediction_col = prediction_col
         self.target_col = target_col
@@ -83,7 +88,8 @@ class ModelEvaluator:
     # TODO(gp): Maybe `resolve_keys()` is a better name.
     def get_keys(self, keys: Optional[List[Key]]) -> List[Any]:
         """
-        Return the keys to select models, or all available keys for `keys=None`.
+        Return the keys to select models, or all available keys for
+        `keys=None`.
         """
         keys = keys or self.valid_keys
         dbg.dassert_is_subset(keys, self.valid_keys)
@@ -220,13 +226,13 @@ class ModelEvaluator:
         return stats_df
 
     def compute_pnl(
-            self,
-            keys: Optional[List[Key]] = None,
-            position_method: Optional[str] = None,
-            target_volatility: Optional[float] = None,
-            returns_shift: Optional[int] = 0,
-            predictions_shift: Optional[int] = 0,
-            mode: Optional[str] = None,
+        self,
+        keys: Optional[List[Key]] = None,
+        position_method: Optional[str] = None,
+        target_volatility: Optional[float] = None,
+        returns_shift: Optional[int] = 0,
+        predictions_shift: Optional[int] = 0,
+        mode: Optional[str] = None,
     ) -> Dict[Any, pd.DataFrame]:
         """
         Helper for calculating positions and PnL from returns and predictions.
@@ -294,7 +300,8 @@ class ModelEvaluator:
         pnl_dict = {}
         for key in keys:
             pnl_dict[key] = pd.concat(
-                [returns[key], predictions[key], positions[key], pnls[key]], axis=1
+                [returns[key], predictions[key], positions[key], pnls[key]],
+                axis=1,
             )
         _LOG.debug("Trim pnl_dict")
         pnl_dict = self._trim_time_range(pnl_dict, mode=mode)
@@ -331,8 +338,14 @@ def _validate_series(srs: pd.Series, oos_start: Optional[float] = None) -> None:
     dbg.dassert(not srs.empty, "Empty series")
     dbg.dassert(not srs.dropna().empty, "Series with only nans")
     if oos_start is not None:
-        dbg.dassert(not srs[:oos_start].dropna().empty, "Empty in-sample series")
-        dbg.dassert(not srs[oos_start:].dropna().empty, "Empty OOS series")
+        dbg.dassert(
+            not srs[:oos_start].dropna().empty,  # type: ignore[misc]
+            "Empty in-sample series",
+        )
+        dbg.dassert(
+            not srs[oos_start:].dropna().empty,  # type: ignore[misc]
+            "Empty OOS series",
+        )
     dbg.dassert(srs.index.freq)
 
 
@@ -495,7 +508,7 @@ class PositionComputer:
         pnl = pnl_computer.compute_pnl()
         pnl.name = "pnl"
         # Rescale in-sample.
-        ins_pnl = pnl[: self.oos_start]
+        ins_pnl = pnl[: self.oos_start]  # type: ignore[misc]
         if volatility_strategy == "rescale":
             scale_factor = fin.compute_volatility_normalization_factor(
                 srs=ins_pnl, target_volatility=target_volatility
@@ -516,13 +529,13 @@ class PositionComputer:
         :param mode: "ins", "oos", "all"
         """
         if mode == "ins":
-            ret = srs[: self.oos_start]
+            ret = srs[: self.oos_start]  # type: ignore[misc]
         elif mode == "oos":
             dbg.dassert(
                 self.oos_start,
                 msg="Must set `oos_start` to run `oos`",
             )
-            ret = srs[self.oos_start:]
+            ret = srs[self.oos_start :]  # type: ignore[misc]
         elif mode == "all_available":
             ret = srs
         else:
@@ -573,7 +586,7 @@ class TransactionCostModeler:
 
     def _return_srs(self, srs: pd.Series, mode: str) -> pd.Series:
         if mode == "ins":
-            ret = srs[: self.oos_start]
+            ret = srs[: self.oos_start]  # type: ignore[misc]
         elif mode == "all_available":
             ret = srs
         elif mode == "oos":
@@ -581,15 +594,13 @@ class TransactionCostModeler:
                 self.oos_start,
                 msg="Must set `oos_start` to run `oos`",
             )
-            ret = srs[self.oos_start :]
+            ret = srs[self.oos_start :]  # type: ignore[misc]
         else:
             raise ValueError(f"Invalid mode `{mode}`!")
         return ret
 
 
 # #############################################################################
-
-import helpers.introspection as hintro
 
 
 # TODO(gp): Maybe make it a classmethod builder for ModelEvaluator called
@@ -610,7 +621,7 @@ def build_model_evaluator_from_result_bundles(
     :return: `ModelEvaluator` initialized with returns and predictions from
        result bundles
     """
-    data_dict = {}
+    data_dict: Dict[Key, pd.DataFrame] = {}
     # Convert each `ResultBundle` dict into a `ResultBundle` class object.
     for key, value in result_bundle_pairs:
         _LOG.debug("Loading key=%s", key)
@@ -618,8 +629,10 @@ def build_model_evaluator_from_result_bundles(
             _LOG.debug("memory_usage=%s", dbg.get_memory_usage(None))
             result_bundle = cdataf.ResultBundle.from_dict(value)
             df = result_bundle.result_df
-            _LOG.debug("result_df.memory_usage=%s",
-                       hintro.format_size(df.memory_usage(index=True, deep=True).sum()))
+            _LOG.debug(
+                "result_df.memory_usage=%s",
+                hintro.format_size(df.memory_usage(index=True, deep=True).sum()),
+            )
             # Extract the needed columns.
             dbg.dassert_in(returns_col, df.columns)
             dbg.dassert_in(predictions_col, df.columns)
@@ -627,9 +640,8 @@ def build_model_evaluator_from_result_bundles(
             data_dict[key] = df[[returns_col, predictions_col]]
         except Exception as e:
             _LOG.error(
-                "Error while loading ResultBundle for config %d with exception:\n%s" % (
-                key,
-                str(e))
+                "Error while loading ResultBundle for config %d with exception:\n%s"
+                % (key, str(e))
             )
             if abort_on_error:
                 raise e

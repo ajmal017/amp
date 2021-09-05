@@ -45,6 +45,7 @@ def get_function_name(count: int = 0) -> str:
 # https://code.activestate.com/recipes/577504/
 # https://stackoverflow.com/questions/449560/how-do-i-determine-the-size-of-an-object-in-python
 
+
 def get_size_in_bytes(obj: object, seen: Optional[set] = None) -> int:
     """
     Recursively find size of an object `obj` in bytes.
