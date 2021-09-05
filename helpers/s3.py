@@ -473,12 +473,11 @@ def archive_data_on_s3(
 
 def retrieve_archived_data_from_s3(
     s3_file_path: str,
-    dst_dir: str,
     aws_profile: Optional[str] = None,
     incremental: bool = True,
 ) -> str:
     """
-    Retrieve archived tgz data from S3.
+    Retrieve archived tgz file from S3.
 
     E.g.,
     - given a tgz file like `s3://.../experiment.20210802-121908.tgz` (which is the
@@ -487,8 +486,7 @@ def retrieve_archived_data_from_s3(
 
     :param s3_file_path: path to the S3 file with the archived data. E.g.,
        `s3://.../experiment.20210802-121908.tgz`
-    :param dst_dir: directory where expand the archive tarball
-    :return: dir with the expanded data (e.g., `{dst_dir/experiment.RH1E`)
+    :return: path with the local tgz file
     """
     aws_profile = get_aws_profile(aws_profile)
     _LOG.info(
@@ -510,23 +508,46 @@ def retrieve_archived_data_from_s3(
         _LOG.debug("Getting from s3: '%s' -> '%s", s3_file_path, dst_file)
         s3fs_.get(s3_file_path, dst_file)
         _LOG.info("Saved to '%s'", dst_file)
-    # Expand the tgz file.
-    # The output should be the original compressed dir under `{dst_dir}`.
-    # E.g.,
-    # > tar tzf /app/.../TestRunExperimentArchiveOnS3.test_serial1/experiment.20210802-133901.tgz
-    # experiment.RH1E/
-    # experiment.RH1E/log.20210802-133859.txt
-    # experiment.RH1E/result_0/
-    with htimer.TimedScope(logging.INFO, "Decompressing"):
-        dbg.dassert_file_exists(dst_file)
-        cmd = f"cd {dst_dir} && tar xzf {dst_file}"
-        hsyste.system(cmd)
+    return dst_file
+
+
+def expand_archived_data(src_tgz_file: str, dst_dir: str) -> str:
+    """
+    E.g.,
+    - given a tgz file like `s3://.../experiment.20210802-121908.tgz` (which is the
+      result of compressing a dir like `/app/.../experiment.RH1E`)
+    - expand it into a dir `{dst_dir}/experiment.RH1E`
+
+    :param s3_file_path: path to the S3 file with the archived data. E.g.,
+       `s3://.../experiment.20210802-121908.tgz`
+    :param dst_dir: directory where expand the archive tarball
+    :return: dir with the expanded data (e.g., `{dst_dir/experiment.RH1E`)
+
+    """
+    _LOG.debug("Expanding '%s'", src_tgz_file)
     # Get the name of the including dir, e.g., `experiment.RH1E`.
-    cmd = f"cd {dst_dir} && tar tzf {dst_file} | head -1"
+    cmd = f"cd {dst_dir} && tar tzf {src_tgz_file} | head -1"
     rc, enclosing_tgz_dir_name = hsyste.system_to_one_line(cmd)
     _ = rc
     _LOG.debug(hprint.to_str("enclosing_tgz_dir_name"))
     tgz_dst_dir = os.path.join(dst_dir, enclosing_tgz_dir_name)
+
+    if os.path.exists(tgz_dst_dir):
+        dbg.dassert_dir_exists(dst_dir)
+        _LOG.info("While expanding '%s' dst dir '%s' already exists: skipping",
+                  src_tgz_file, tgz_dst_dir)
+    else:
+        # Expand the tgz file.
+        # The output should be the original compressed dir under `{dst_dir}`.
+        # E.g.,
+        # > tar tzf /app/.../TestRunExperimentArchiveOnS3.test_serial1/experiment.20210802-133901.tgz
+        # experiment.RH1E/
+        # experiment.RH1E/log.20210802-133859.txt
+        # experiment.RH1E/result_0/
+        with htimer.TimedScope(logging.INFO, "Decompressing"):
+            dbg.dassert_file_exists(src_tgz_file)
+            cmd = f"cd {dst_dir} && tar xzf {src_tgz_file}"
+            hsyste.system(cmd)
     dbg.dassert_dir_exists(tgz_dst_dir)
     # Return `{dst_dir}/experiment.RH1E`.
     return tgz_dst_dir

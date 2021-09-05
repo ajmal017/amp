@@ -269,6 +269,9 @@ def yield_experiment_artifacts(
     selected_idxs: Optional[Iterable[int]] = None,
     aws_profile: Optional[str] = None,
 ) -> Iterable[Tuple[int, Any]]:
+    """
+    Create an iterator returning the key of the experiment and an experiment artifact.
+    """
     _LOG.info("# Load artifacts '%s' from '%s'", file_name, src_dir)
     # Get the experiment subdirs.
     src_dir, experiment_subdirs = _get_experiment_subdirs(
@@ -276,12 +279,14 @@ def yield_experiment_artifacts(
     )
     # Iterate over experiment directories.
     for key, subdir in tqdm(experiment_subdirs.items(), desc="Loading artifacts"):
+        # Build the name of the file.
         dbg.dassert_dir_exists(subdir)
         file_name_tmp = os.path.join(subdir, file_name)
         _LOG.debug("Loading '%s'", file_name_tmp)
         if not os.path.exists(file_name_tmp):
             _LOG.warning("Can't find '%s': skipping", file_name_tmp)
             continue
+        # Load the file, depending on the extension.
         if file_name_tmp.endswith(".pkl"):
             # Load pickle files.
             res = hpickle.from_pickle(
@@ -351,7 +356,7 @@ def yield_rolling_experiment_out_of_sample_df(
 
 
 def _retrieve_archived_experiment_artifacts(
-    s3_file_name: str, aws_profile: str, scratch_dir: str = "."
+    s3_file_name: str, aws_profile: str
 ) -> str:
     """
     Retrieve a package containing experiment artifacts from S3.
@@ -360,6 +365,7 @@ def _retrieve_archived_experiment_artifacts(
 
     :return: path to local dir with the content of the decompressed archive
     """
+    hs3.dassert_is_s3_path(s3_file_name)
     # Get the file name and the enclosing dir name.
     dir_name = os.path.basename(os.path.dirname(s3_file_name))
     if dir_name != "experiments":
@@ -382,7 +388,7 @@ def _get_experiment_subdirs(
     """
     Get the subdirectories under `src_dir` with a format like `result_*`.
 
-    This function works also for archived S3 tarballs of experiment results.
+    This function works also for archived (S3 or local) tarballs of experiment results.
 
     :param src_dir: directory with results or S3 path to archive
     :param selected_idxs: config indices to consider. `None` means all available
@@ -390,9 +396,16 @@ def _get_experiment_subdirs(
     :return: the dir used to retrieve the experiment subdirectory,
         dict `config idx` to `experiment subdirectory`
     """
-    # Handle the situation where the file is an archived S3 file.
-    if hs3.is_s3_path(src_dir):
-        src_dir = _retrieve_archived_experiment_artifacts(src_dir, aws_profile)
+    # Handle the situation where the file is an archived file.
+    if src_dir.endswith(".tgz"):
+        if hs3.is_s3_path(src_dir):
+            tgz_file = _retrieve_archived_experiment_artifacts(src_dir, aws_profile)
+        else:
+            tgz_file = src_dir
+        # Expand.
+        scratch_dir = "."
+        src_dir = hs3.expand_archived_data(tgz_file, scratch_dir)
+        _LOG.debug("src_dir=%s", src_dir)
     # Retrieve all the subdirectories in `src_dir` that store results.
     dbg.dassert_dir_exists(src_dir)
     subdirs = [d for d in glob.glob(f"{src_dir}/result_*") if os.path.isdir(d)]

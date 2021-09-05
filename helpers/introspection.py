@@ -57,7 +57,7 @@ def get_size_in_bytes(obj: object, seen: Optional[set] = None) -> int:
     obj_id = id(obj)
     if obj_id in seen:
         return 0
-    # Important mark as seen *before* entering recursion to gracefully handle
+    # Mark as seen *before* entering recursion to gracefully handle
     # self-referential objects.
     seen.add(obj_id)
     if hasattr(obj, "__dict__"):
