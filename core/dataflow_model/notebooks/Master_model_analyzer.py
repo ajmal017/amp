@@ -92,7 +92,7 @@ rss_before = dbg.get_memory_usage()[0]
 print("before", dbg.get_memory_usage_as_str(None))
 
 df_copy = result_df.copy(deep=True)
-print(df_copy.memory_usage().sum() / 1024 ** 3)
+print("mem usage=", df_copy.memory_usage().sum() / 1024 ** 3)
 dfs.append(df_copy)
 
 rss_after = dbg.get_memory_usage()[0]

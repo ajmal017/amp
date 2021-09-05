@@ -779,7 +779,7 @@ class ResourceUsageFilter(logging.Filter):
         """
         p = self._process
         # Report memory usage.
-        resource_use = get_memory_usage(p)
+        resource_use = get_memory_usage_as_str(p)
         # Report CPU usage.
         if self._report_cpu_usage:
             # CPU usage since the previous call.
