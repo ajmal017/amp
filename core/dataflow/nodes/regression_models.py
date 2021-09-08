@@ -73,7 +73,7 @@ class LinearRegression(cdnb.FitPredictNode, cdnb.ColModeMixin):
             x_vars_and_maybe_weight = x_vars + [self._sample_weight_col]
         else:
             x_vars_and_maybe_weight = x_vars
-            sample_weight_col
+            sample_weight_col = None
         # Get x and forward y df.
         if fit:
             # This df has no NaNs.
