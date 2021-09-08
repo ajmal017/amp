@@ -20,9 +20,9 @@ import helpers.pickle_ as hpickle
 _LOG = logging.getLogger(__name__)
 
 
-# ############################################################################
+# #############################################################################
 # ResultBundle
-# ############################################################################
+# #############################################################################
 
 
 class ResultBundle(abc.ABC):
@@ -132,25 +132,6 @@ class ResultBundle(abc.ABC):
     def get_columns_for_tag(self, tag: Any) -> Optional[List[Any]]:
         return ResultBundle._search_mapping(tag, self.tag_to_columns)
 
-    # TODO(gp): value -> key?
-    @staticmethod
-    def _search_mapping(
-            value: Any, mapping: Optional[Dict[Any, List[Any]]]
-    ) -> Optional[List[Any]]:
-        """
-        Look for a key `value` in the dictionary `mapping`.
-
-        Return the corresponding value or `None` if the key does not
-        exist.
-        """
-        if mapping is None:
-            _LOG.warning("No mapping provided.")
-            return None
-        if value not in mapping:
-            _LOG.warning("'%s' not in `mapping`='%s'.", value, mapping)
-            return None
-        return mapping[value]
-
     # Methods to serialize to / from strings.
 
     def to_config(self, commit_hash: bool = False) -> cconfig.Config:
@@ -232,23 +213,47 @@ class ResultBundle(abc.ABC):
         obj = result_bundle.to_config().to_dict()
         if use_pq:
             # Split the object in two pieces.
-            result_df = obj["result_df"]
+            obj["result_df"]
             del obj["result_df"]
-            hpickle.to_pickle(obj, file_name, log_level=logging.INFO, verbose=True)
+            hpickle.to_pickle(
+                obj, file_name, log_level=logging.INFO, verbose=True
+            )
 
         else:
-            hpickle.to_pickle(obj, file_name, log_level=logging.INFO, verbose=True)
+            hpickle.to_pickle(
+                obj, file_name, log_level=logging.INFO, verbose=True
+            )
 
     @classmethod
-    def from_pickle(cls, file_name: str, use_pq: bool = True,
-                    pq_columns: Optional[List[str]] = None) -> "ResultBundle":
-        obj = hpickle.from_pickle(
-            file_name, log_level=logging.INFO, verbose=True
-        )
+    def from_pickle(
+        cls,
+        file_name: str,
+        use_pq: bool = True,
+        pq_columns: Optional[List[str]] = None,
+    ) -> "ResultBundle":
+        obj = hpickle.from_pickle(file_name, log_level=logging.INFO, verbose=True)
 
-# ############################################################################
+    @staticmethod
+    def _search_mapping(
+        key: Any, mapping: Optional[Dict[Any, List[Any]]]
+    ) -> Optional[List[Any]]:
+        """
+        Look for a key `key` in the dictionary `mapping`.
+
+        Return the corresponding value or `None` if the key does not exist.
+        """
+        if mapping is None:
+            _LOG.warning("No mapping provided.")
+            return None
+        if key not in mapping:
+            _LOG.warning("'%s' not in `mapping`='%s'.", key, mapping)
+            return None
+        return mapping[key]
+
+
+# #############################################################################
 # PredictionResultBundle
-# ############################################################################
+# #############################################################################
 
 
 # TODO(gp): Add a docstring explaining the difference with `ResultBundle`.

@@ -13,16 +13,19 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 import helpers.dbg as dbg
-import helpers.io_ as hio
 import helpers.introspection as hintro
+import helpers.io_ as hio
 import helpers.timer as htimer
 
 _LOG = logging.getLogger(__name__)
 
-def to_parquet(df: pd.DataFrame, file_name: str,
-               *,
+
+def to_parquet(
+    df: pd.DataFrame,
+    file_name: str,
+    *,
     log_level: int = logging.DEBUG,
-               ) -> None:
+) -> None:
     """
     Save a dataframe as Parquet.
     """
@@ -41,7 +44,8 @@ def to_parquet(df: pd.DataFrame, file_name: str,
     # Report stats.
     _, elapsed_time = htimer.dtimer_stop(dtmr)
     file_size = hintro.format_size(os.path.getsize(file_name))
-    _LOG.log(log_level,
+    _LOG.log(
+        log_level,
         "Saved '%s' (size=%s, time=%.1fs)",
         file_name,
         file_size,
@@ -49,12 +53,13 @@ def to_parquet(df: pd.DataFrame, file_name: str,
     )
 
 
-def from_parquet(file_name: str,
-                 columns: Optional[List[str]] = None,
-                 filters: Optional[List[Any]] = None,
-                 *,
-                 log_level: int = logging.DEBUG,
-                 ) -> pd.DataFrame:
+def from_parquet(
+    file_name: str,
+    columns: Optional[List[str]] = None,
+    filters: Optional[List[Any]] = None,
+    *,
+    log_level: int = logging.DEBUG,
+) -> pd.DataFrame:
     """
     Load a dataframe from a Parquet file.
     """
@@ -76,7 +81,8 @@ def from_parquet(file_name: str,
     # Report stats.
     _, elapsed_time = htimer.dtimer_stop(dtmr)
     file_size = hintro.format_size(os.path.getsize(file_name))
-    _LOG.log(log_level,
+    _LOG.log(
+        log_level,
         "Loaded '%s' (size=%s, time=%.1fs)",
         file_name,
         file_size,

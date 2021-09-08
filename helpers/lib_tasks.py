@@ -2769,9 +2769,7 @@ def _get_gh_issue_title(issue_id: int, repo_short_name: str) -> str:
     # > (export NO_COLOR=1; gh issue view 1251 --json title)
     # {"title":"Update GH actions for amp"}
     dbg.dassert_lte(1, issue_id)
-    cmd = (
-        f"gh issue view {issue_id} --repo {repo_full_name_with_host} --json title,url"
-    )
+    cmd = f"gh issue view {issue_id} --repo {repo_full_name_with_host} --json title,url"
     _, txt = hsinte.system_to_string(cmd)
     _LOG.debug("txt=\n%s", txt)
     # Parse json.
@@ -2810,7 +2808,7 @@ def gh_issue_title(ctx, issue_id, repo_short_name="current", pbcopy=True):  # ty
     dbg.dassert_lte(1, issue_id)
     title, url = _get_gh_issue_title(issue_id, repo_short_name)
     # Print or copy to clipboard.
-    msg = f'{title}: {url}'
+    msg = f"{title}: {url}"
     _to_pbcopy(msg, pbcopy)
 
 

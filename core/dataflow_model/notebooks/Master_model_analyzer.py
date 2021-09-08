@@ -36,7 +36,7 @@ import helpers.printing as hprint
 
 # %%
 dbg.init_logger(verbosity=logging.INFO)
-#dbg.init_logger(verbosity=logging.DEBUG)
+# dbg.init_logger(verbosity=logging.DEBUG)
 
 _LOG = logging.getLogger(__name__)
 
@@ -48,8 +48,8 @@ hprint.config_notebook()
 # # Notebook config
 
 # %%
-#exp_dir = "s3://eglp-spm-sasm/experiments/experiment.RH2Ef.v1_9-all.5T.20210831-004747.run1.tgz"
-exp_dir = "./experiment.RH2Ef.v1_9-all.5T.20210831-004747.run1.tgz"# exp_dir = "s3://alphamatic-data/experiments/..."
+# exp_dir = "s3://eglp-spm-sasm/experiments/experiment.RH2Ef.v1_9-all.5T.20210831-004747.run1.tgz"
+exp_dir = "./experiment.RH2Ef.v1_9-all.5T.20210831-004747.run1.tgz"  # exp_dir = "s3://alphamatic-data/experiments/..."
 
 eval_config = cconfig.get_config_from_nested_dict(
     {
@@ -57,7 +57,7 @@ eval_config = cconfig.get_config_from_nested_dict(
         "model_evaluator_kwargs": {
             "returns_col": "vwap_ret_0_vol_adj_clipped_2",
             "predictions_col": "vwap_ret_0_vol_adj_clipped_2_hat",
-            #"oos_start": "2017-01-01",
+            # "oos_start": "2017-01-01",
         },
         "bh_adj_threshold": 0.1,
         "resample_rule": "W",
@@ -107,17 +107,22 @@ result_df = df[1]["result_df"]
 result_df.memory_usage().sum()
 
 # %%
-hintro.format_size(result_df[["vwap_ret_0_vol_adj_clipped_2", "vwap_ret_0_vol_adj_clipped_2_hat"]].memory_usage().sum())
+hintro.format_size(
+    result_df[
+        ["vwap_ret_0_vol_adj_clipped_2", "vwap_ret_0_vol_adj_clipped_2_hat"]
+    ]
+    .memory_usage()
+    .sum()
+)
 
 # %%
-import helpers.introspection as hintro
 
 # %%
 print(df[1].keys())
 
-#hintro.get_size_in_bytes(df[1]["result_df"])
+# hintro.get_size_in_bytes(df[1]["result_df"])
 df[1]["result_df"].memory_usage(index=True, deep=True).sum()
-#df[1]["result_df"].info()
+# df[1]["result_df"].info()
 
 # %%
 

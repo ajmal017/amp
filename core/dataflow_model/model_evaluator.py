@@ -33,6 +33,7 @@ _LOG.debug = _LOG.info
 # A model / experiment is represented by a key, encoded as a string.
 Key = str
 
+
 class ModelEvaluator:
     """
     Evaluate performance of financial models for returns.
@@ -234,13 +235,13 @@ class ModelEvaluator:
 
     # TODO(gp): This is first.
     def compute_pnl(
-            self,
-            keys: Optional[List[Key]] = None,
-            position_method: Optional[str] = None,
-            target_volatility: Optional[float] = None,
-            returns_shift: Optional[int] = 0,
-            predictions_shift: Optional[int] = 0,
-            mode: Optional[str] = None,
+        self,
+        keys: Optional[List[Key]] = None,
+        position_method: Optional[str] = None,
+        target_volatility: Optional[float] = None,
+        returns_shift: Optional[int] = 0,
+        predictions_shift: Optional[int] = 0,
+        mode: Optional[str] = None,
     ) -> Dict[Any, pd.DataFrame]:
         """
         Helper for calculating positions and PnL from returns and predictions.
@@ -356,6 +357,7 @@ def _validate_series(srs: pd.Series, oos_start: Optional[float] = None) -> None:
             "Empty OOS series",
         )
     dbg.dassert(srs.index.freq)
+
 
 def _validate_series(srs: pd.Series, oos_start: Optional[float] = None) -> None:
     dbg.dassert_isinstance(srs, pd.Series)
