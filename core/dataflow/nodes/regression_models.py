@@ -68,10 +68,12 @@ class LinearRegression(cdnb.FitPredictNode, cdnb.ColModeMixin):
         # Materialize names of x and y vars.
         x_vars = cdtfu.convert_to_list(self._x_vars)
         y_vars = cdtfu.convert_to_list(self._y_vars)
-        if self._sample_weight_col is not None:
+        sample_weight_col = self._sample_weight_col
+        if fit and self._sample_weight_col is not None:
             x_vars_and_maybe_weight = x_vars + [self._sample_weight_col]
         else:
             x_vars_and_maybe_weight = x_vars
+            sample_weight_col = None
         # Get x and forward y df.
         if fit:
             # This df has no NaNs.
@@ -93,29 +95,30 @@ class LinearRegression(cdnb.FitPredictNode, cdnb.ColModeMixin):
         dbg.dassert_eq(1, len(forward_y_cols))
         forward_y_col = forward_y_cols[0]
         coefficients = cstati.compute_regression_coefficients(
-            df, x_vars, forward_y_col, self._sample_weight_col
+            df, x_vars, forward_y_col, sample_weight_col
         )
         if fit:
             self._fit_coefficients = coefficients.copy()
-        dbg.dassert(
-            self._fit_coefficients is not None,
-            "Model not found! Check if `fit()` has been run.",
-        )
-        # Generate x_var weights.
-        smoothing = 1 / self._fit_coefficients["turn"] ** self._smoothing
-        beta_norm = np.linalg.norm(self._fit_coefficients["beta"])
-        self._fit_coefficients["weight"] = beta_norm * csigna.normalize(
-            self._fit_coefficients["beta"] * smoothing
-        )
-        self._fit_coefficients["norm_weight"] = csigna.normalize(
-            self._fit_coefficients["weight"]
-        )
+            # Generate x_var weights.
+            smoothing = 1 / self._fit_coefficients["turn"] ** self._smoothing
+            beta_norm = np.linalg.norm(self._fit_coefficients["beta"])
+            self._fit_coefficients["weight"] = beta_norm * csigna.normalize(
+                self._fit_coefficients["beta"] * smoothing
+            )
+            self._fit_coefficients["norm_weight"] = csigna.normalize(
+                self._fit_coefficients["weight"]
+            )
+            dbg.dassert(
+                self._fit_coefficients is not None,
+                "Model not found! Check if `fit()` has been run.",
+            )
         # Generate predictions.
         forward_y_hat = (
             df[x_vars].multiply(self._fit_coefficients["weight"]).sum(axis=1)
         )
         forward_y_hat_col = f"{forward_y_col}_hat"
         forward_y_hat = forward_y_hat.rename(forward_y_hat_col)
+        # Populate `info`.
         info = collections.OrderedDict()
         info["fit_coefficients"] = self._fit_coefficients
         if not fit:
