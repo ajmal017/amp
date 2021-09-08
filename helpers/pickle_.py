@@ -33,6 +33,7 @@ def _replace_extension(file_name: str, ext: str) -> str:
 # #############################################################################
 
 
+# TODO(gp): No need for verbose. Just use log_level.
 def to_pickle(
     obj: Any,
     file_name: str,
@@ -174,6 +175,8 @@ def unpickle_function(code_as_str: str, func_name: str) -> Callable:
 # #############################################################################
 # JSON
 # #############################################################################
+
+# TODO(gp): Maybe move helpers/hjson.py?
 
 
 # TODO(gp): Switch file_name and obj to be consistent with the pickle functions.

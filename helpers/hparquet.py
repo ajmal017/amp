@@ -1,0 +1,76 @@
+"""
+Import as:
+
+import helpers.hpandas as hpandas
+"""
+
+from typing import Any, List, Optional
+
+import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
+
+import helpers.dbg as dbg
+import helpers.introspection as hintro
+
+
+def to_parquet(df: pd.DataFrame, file_name: str,
+    log_level: int = logging.DEBUG,
+                     verbose: bool = True
+               ) -> None:
+    """
+    Save a dataframe as Parquet.
+    """
+    dbg.dassert_is_instance(df, pd.DataFrame)
+    dbg.dassert_type_is(file_name, str)
+    dbg.dassert(file_name.endswith(".pq"), "Invalid file_name='%s'", file_name)
+    #
+    hio.create_enclosing_dir(file_name, incremental=True)
+    _LOG.log(log_level, "df.shape=%s", str(df.shape))
+    mem = df.memory_usage().sum()
+    _LOG.log(log_level, "df.memory_usage=%s", hintro.format_size(mem))
+    # Save data.
+    dtmr = htimer.dtimer_start(log_level, "To parquet '%s'" % file_name)
+    table = pa.Table.from_pandas(df)
+    pq.write_table(table, file_name)
+    # Report stats.
+    _, elapsed_time = htimer.dtimer_stop(dtmr)
+    size_mb = hintro.format_size(os.path.getsize(file_name))
+    if verbose:
+        _LOG.info(
+            "Saved '%s' (size=%.2f Mb, time=%.1fs)",
+            file_name,
+            size_mb,
+            elapsed_time,
+        )
+
+
+def from_parquet(file_name: str,
+                 columns: Optional[List[str]] = None,
+                 log_level: int = logging.DEBUG,
+                 verbose: bool = True,
+                 ) -> pd.DataFrame:
+    """
+    Load a dataframe from a Parquet file.
+    """
+    dbg.dassert_type_is(file_name, str)
+    dbg.dassert(file_name.endswith(".pq"), "Invalid file_name='%s'", file_name)
+    # Load data.
+    dtmr = htimer.dtimer_start(log_level, "From parquet '%s'" % file_name)
+    table = pq.read_table(file_name, columns=columns)
+    df = table.to_pandas()
+    # Report stats.
+    _, elapsed_time = htimer.dtimer_stop(dtmr)
+    size_mb = hintro.format_size(os.path.getsize(file_name))
+    if verbose:
+        _LOG.info(
+            "Saved '%s' (size=%.2f Mb, time=%.1fs)",
+            file_name,
+            size_mb,
+            elapsed_time,
+        )
+    # Report stats about the df.
+    _LOG.log(log_level, "df.shape=%s", str(df.shape))
+    mem = df.memory_usage().sum()
+    _LOG.log(log_level, "df.memory_usage=%s", hintro.format_size(mem))
+    return df
