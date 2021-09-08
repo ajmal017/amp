@@ -23,12 +23,6 @@ import helpers.timer as htimer
 _LOG = logging.getLogger(__name__)
 
 
-# TODO(gp): Move to hio, maybe there is already an implementation.
-def _replace_extension(file_name: str, ext: str) -> str:
-    dbg.dassert(not ext.startswith("."), msg="ext='%s'" % ext)
-    return "%s.%s" % (os.path.splitext(file_name)[0], ext)
-
-
 # #############################################################################
 # pickle
 # #############################################################################
@@ -56,9 +50,7 @@ def to_pickle(
     # We assume that the user always specifies a .pkl extension and then we
     # change the extension based on the backend.
     if backend in ("pickle", "dill"):
-        dbg.dassert(
-            file_name.endswith(".pkl"), msg="Invalid file_name=%s" % file_name
-        )
+        dbg.dassert_file_extension(file_name, "pkl")
         if backend == "pickle":
             with open(file_name, "wb") as fd:
                 pickler = pickle.Pickler(fd, pickle.HIGHEST_PROTOCOL)
@@ -72,6 +64,7 @@ def to_pickle(
         else:
             raise ValueError("Invalid backend='%s'" % backend)
     elif backend == "pickle_gzip":
+        # TODO(gp): Use `dassert_file_extension` if possible.
         dbg.dassert(
             file_name.endswith(".pkl.gz"), msg="Invalid file_name=%s" % file_name
         )
@@ -107,9 +100,7 @@ def from_pickle(
     # We assume that the user always specifies a .pkl extension and then we
     # change the extension based on the backend.
     if backend in ("pickle", "dill"):
-        dbg.dassert(
-            file_name.endswith(".pkl"), msg="Invalid file_name=%s" % file_name
-        )
+        dbg.dassert_file_extension(file_name, "pkl")
         if backend == "pickle":
             with open(file_name, "rb") as fd:
                 unpickler = pickle.Unpickler(fd)
@@ -122,6 +113,7 @@ def from_pickle(
         else:
             raise ValueError("Invalid backend='%s'" % backend)
     elif backend == "pickle_gzip":
+        # TODO(gp): Use `dassert_file_extension` if possible.
         dbg.dassert(
             file_name.endswith(".pkl.gz"), msg="Invalid file_name=%s" % file_name
         )
@@ -181,11 +173,13 @@ def unpickle_function(code_as_str: str, func_name: str) -> Callable:
 
 # TODO(gp): Switch file_name and obj to be consistent with the pickle functions.
 def to_json(file_name: str, obj: object) -> None:
+    dbg.dassert_file_extension(file_name, "json")
     with open(file_name, "w") as outfile:
         json.dump(obj, outfile)
 
 
 def from_json(file_name: str) -> object:
     dbg.dassert_exists(file_name)
+    dbg.dassert_file_extension(file_name, "json")
     obj = json.loads(hio.from_file(file_name))
     return obj

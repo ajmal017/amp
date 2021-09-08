@@ -15,6 +15,8 @@ import core.config as cconfig
 import core.dataflow.core as cdtfc
 import helpers.dbg as dbg
 import helpers.git as git
+import helpers.hparquet as hparquet
+import helpers.io_ as io_
 import helpers.pickle_ as hpickle
 
 _LOG = logging.getLogger(__name__)
@@ -134,6 +136,9 @@ class ResultBundle(abc.ABC):
 
     # Methods to serialize to / from strings.
 
+    # TODO(gp): Not sure if all the serialization would work also for derived classes,
+    #  e.g., `PredictionResultBundle`.
+
     def to_config(self, commit_hash: bool = False) -> cconfig.Config:
         """
         Represent class state as config.
@@ -213,25 +218,41 @@ class ResultBundle(abc.ABC):
         obj = result_bundle.to_config().to_dict()
         if use_pq:
             # Split the object in two pieces.
-            obj["result_df"]
+            result_df = obj["result_df"]
             del obj["result_df"]
+            # Save the config as pickle.
             hpickle.to_pickle(
                 obj, file_name, log_level=logging.INFO, verbose=True
             )
-
+            # Save the dataframe as parquet.
+            file_name_pq = io_.change_filename_extension(file_name, "pkl", "pq")
+            hparquet.to_parquet(result_df, file_name_pq, log_level=logging.INFO)
         else:
+            # Save the entire object as pickle.
             hpickle.to_pickle(
                 obj, file_name, log_level=logging.INFO, verbose=True
             )
 
-    @classmethod
+    # TODO(gp): Use classmethod.
+    @staticmethod
     def from_pickle(
-        cls,
         file_name: str,
         use_pq: bool = True,
-        pq_columns: Optional[List[str]] = None,
+        columns: Optional[List[str]] = None,
     ) -> "ResultBundle":
-        obj = hpickle.from_pickle(file_name, log_level=logging.INFO, verbose=True)
+        if use_pq:
+            # Load the config as pickle.
+            obj = hpickle.from_pickle(
+                file_name, log_level=logging.INFO, verbose=True
+            )
+            dbg.dassert_isinstance(obj, ResultBundle)
+            # Load the dataframe as parquet.
+            file_name_pq = io_.change_filename_extension(file_name, "pkl", "pq")
+            obj.result_df = hparquet.from_parquet(file_name_pq, columns=columns,
+                                                  log_level=logging.INFO)
+        else:
+            obj = hpickle.from_pickle(file_name, log_level=logging.INFO, verbose=True)
+        return obj
 
     @staticmethod
     def _search_mapping(
@@ -243,10 +264,10 @@ class ResultBundle(abc.ABC):
         Return the corresponding value or `None` if the key does not exist.
         """
         if mapping is None:
-            _LOG.warning("No mapping provided.")
+            _LOG.warning("No mapping provided to search for '%s'", key)
             return None
         if key not in mapping:
-            _LOG.warning("'%s' not in `mapping`='%s'.", key, mapping)
+            _LOG.warning("'%s' not in `mapping`='%s'", key, mapping)
             return None
         return mapping[key]
 
@@ -256,8 +277,11 @@ class ResultBundle(abc.ABC):
 # #############################################################################
 
 
-# TODO(gp): Add a docstring explaining the difference with `ResultBundle`.
 class PredictionResultBundle(ResultBundle):
+    """
+    Class adding some semantic meaning to a `ResultBundle`.
+    """
+
     @property
     def feature_col_names(self) -> List[Any]:
         cols = self.get_columns_for_tag("feature_col") or []
@@ -286,6 +310,7 @@ class PredictionResultBundle(ResultBundle):
         dbg.dassert_isinstance(tags, list)
         target_cols = set(self.target_col_names)
         prediction_cols = set(self.prediction_col_names)
+        # TODO(gp): Move this out.
         TargetPredictionColPair = collections.namedtuple(
             "TargetPredictionColPair", ["target", "prediction"]
         )

@@ -367,7 +367,7 @@ def create_test_dir(
 
 
 def get_dir_signature(
-    dir_name: str, include_file_content: bool, num_lines: Optional[int]
+    dir_name: str, include_file_content: bool, num_lines: Optional[int] = None
 ) -> str:
     """
     Compute a string with the content of the files in `dir_name`.

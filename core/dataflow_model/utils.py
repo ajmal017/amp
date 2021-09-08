@@ -257,10 +257,8 @@ def save_experiment_result_bundle(
     Save the `ResultBundle` from running `Config`.
     """
     # TODO(Paul): Consider having the caller provide the dir instead.
-    path = os.path.join(config["meta", "experiment_result_dir"], file_name)
-    # TODO(gp): Use result_bundle.to_pickle()
-    obj = result_bundle.to_config().to_dict()
-    hpickle.to_pickle(obj, path)
+    file_name = os.path.join(config["meta", "experiment_result_dir"], file_name)
+    result_bundle.to_pickle(file_name, use_pq=True)
 
 
 def yield_experiment_artifacts(
