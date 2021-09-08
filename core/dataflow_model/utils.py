@@ -258,7 +258,7 @@ def save_experiment_result_bundle(
     """
     # TODO(Paul): Consider having the caller provide the dir instead.
     path = os.path.join(config["meta", "experiment_result_dir"], file_name)
-    # TODO(gp): This should be a method of `ResultBundle`.
+    # TODO(gp): Use result_bundle.to_pickle()
     obj = result_bundle.to_config().to_dict()
     hpickle.to_pickle(obj, path)
 
@@ -295,6 +295,7 @@ def yield_experiment_artifacts(
             )
         elif file_name_tmp.endswith(".json"):
             # Load JSON files.
+            # TODO(gp): Use hpickle.to_json
             with open(file_name_tmp, "r") as file:
                 res = json.load(file)
         elif file_name_tmp.endswith(".txt"):

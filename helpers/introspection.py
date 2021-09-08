@@ -84,6 +84,7 @@ def get_size_in_bytes(obj: object, seen: Optional[set] = None) -> int:
     return size
 
 
+# TODO(gp): -> move to helpers/hprint.py
 def format_size(num: float) -> str:
     """
     Return a human-readable string for a filesize (e.g., "3.5 MB").

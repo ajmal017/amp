@@ -15,8 +15,14 @@ import core.config as cconfig
 import core.dataflow.core as cdtfc
 import helpers.dbg as dbg
 import helpers.git as git
+import helpers.pickle_ as hpickle
 
 _LOG = logging.getLogger(__name__)
+
+
+# ############################################################################
+# ResultBundle
+# ############################################################################
 
 
 class ResultBundle(abc.ABC):
@@ -30,11 +36,14 @@ class ResultBundle(abc.ABC):
         result_nid: cdtfc.NodeId,
         method: cdtfc.Method,
         result_df: pd.DataFrame,
+        # TODO(gp): -> str
         column_to_tags: Optional[Dict[Any, List[Any]]] = None,
         info: Optional[collections.OrderedDict] = None,
         payload: Optional[cconfig.Config] = None,
     ) -> None:
         """
+        Constructor.
+
         :param config: DAG config
         :param result_nid: identifier of terminal node for which DAG was executed
         :param method: method which was executed
@@ -46,7 +55,9 @@ class ResultBundle(abc.ABC):
         """
         self._config = config
         self._result_nid = result_nid
+        dbg.dassert_isinstance(method, cdtfc.Method)
         self._method = method
+        dbg.dassert_isinstance(result_df, pd.DataFrame)
         self._result_df = result_df
         self._column_to_tags = column_to_tags
         self._info = info
@@ -54,17 +65,19 @@ class ResultBundle(abc.ABC):
 
     def __str__(self) -> str:
         """
-        Return the string representation.
+        Return a string representation.
         """
         return str(self.to_config())
 
     def __repr__(self) -> str:
         """
-        Return an unambiguous representation the same as str().
+        Return an unambiguous string representation.
 
         This is used by Jupyter notebook when printing.
         """
         return str(self)
+
+    # Accessors.
 
     @property
     def config(self) -> cconfig.Config:
@@ -113,6 +126,33 @@ class ResultBundle(abc.ABC):
     def payload(self, value: Optional[cconfig.Config]) -> None:
         self._payload = value
 
+    def get_tags_for_column(self, column: Any) -> Optional[List[Any]]:
+        return ResultBundle._search_mapping(column, self._column_to_tags)
+
+    def get_columns_for_tag(self, tag: Any) -> Optional[List[Any]]:
+        return ResultBundle._search_mapping(tag, self.tag_to_columns)
+
+    # TODO(gp): value -> key?
+    @staticmethod
+    def _search_mapping(
+            value: Any, mapping: Optional[Dict[Any, List[Any]]]
+    ) -> Optional[List[Any]]:
+        """
+        Look for a key `value` in the dictionary `mapping`.
+
+        Return the corresponding value or `None` if the key does not
+        exist.
+        """
+        if mapping is None:
+            _LOG.warning("No mapping provided.")
+            return None
+        if value not in mapping:
+            _LOG.warning("'%s' not in `mapping`='%s'.", value, mapping)
+            return None
+        return mapping[value]
+
+    # Methods to serialize to / from strings.
+
     def to_config(self, commit_hash: bool = False) -> cconfig.Config:
         """
         Represent class state as config.
@@ -134,29 +174,6 @@ class ResultBundle(abc.ABC):
         if commit_hash:
             serialized_bundle["commit_hash"] = git.get_current_commit_hash()
         return serialized_bundle
-
-    def to_dict(self, commit_hash: bool = False) -> collections.OrderedDict:
-        """
-        Represent class state as an ordered dict.
-        """
-        config = self.to_config(commit_hash=commit_hash)
-        dict_ = config.to_dict()
-        dict_ = cast(collections.OrderedDict, dict_)
-        return dict_
-
-    @staticmethod
-    def from_dict(result_bundle_dict: collections.OrderedDict) -> "ResultBundle":
-        """
-        Initialize `ResultBundle` from a nested dict.
-        """
-        result_bundle_config = cconfig.get_config_from_nested_dict(
-            result_bundle_dict
-        )
-        result_bundle_class = eval(result_bundle_config["class"])
-        result_bundle: ResultBundle = result_bundle_class.from_config(
-            result_bundle_config
-        )
-        return result_bundle
 
     @classmethod
     def from_config(cls, serialized_bundle: cconfig.Config) -> "ResultBundle":
@@ -180,30 +197,58 @@ class ResultBundle(abc.ABC):
         )
         return rb
 
-    def get_tags_for_column(self, column: Any) -> Optional[List[Any]]:
-        return ResultBundle._search_mapping(column, self._column_to_tags)
+    def to_dict(self, commit_hash: bool = False) -> collections.OrderedDict:
+        """
+        Represent class state as an ordered dict.
+        """
+        config = self.to_config(commit_hash=commit_hash)
+        dict_ = config.to_dict()
+        dict_ = cast(collections.OrderedDict, dict_)
+        return dict_
 
-    def get_columns_for_tag(self, tag: Any) -> Optional[List[Any]]:
-        return ResultBundle._search_mapping(tag, self.tag_to_columns)
-
-    # TODO(gp): value -> key?
+    # TODO(gp): Use classmethod.
     @staticmethod
-    def _search_mapping(
-        value: Any, mapping: Optional[Dict[Any, List[Any]]]
-    ) -> Optional[List[Any]]:
+    def from_dict(result_bundle_dict: collections.OrderedDict) -> "ResultBundle":
         """
-        Look for a key `value` in the dictionary `mapping`.
+        Initialize `ResultBundle` from a nested dict.
+        """
+        result_bundle_config = cconfig.get_config_from_nested_dict(
+            result_bundle_dict
+        )
+        result_bundle_class = eval(result_bundle_config["class"])
+        result_bundle: ResultBundle = result_bundle_class.from_config(
+            result_bundle_config
+        )
+        return result_bundle
 
-        Return the corresponding value or `None` if the key does not
-        exist.
+    # Methods to serialize to / from disk.
+
+    def to_pickle(self, file_name: str, use_pq: bool = True) -> None:
         """
-        if mapping is None:
-            _LOG.warning("No mapping provided.")
-            return None
-        if value not in mapping:
-            _LOG.warning("'%s' not in `mapping`='%s'.", value, mapping)
-            return None
-        return mapping[value]
+        :param use_pq: save the `result_df` dataframe using Parquet.
+            If False, everything is saved as a single pickle object.
+        """
+        io_.create_enclosing_dir(file_name, incremental=True)
+        obj = result_bundle.to_config().to_dict()
+        if use_pq:
+            # Split the object in two pieces.
+            result_df = obj["result_df"]
+            del obj["result_df"]
+            hpickle.to_pickle(obj, file_name, log_level=logging.INFO, verbose=True)
+
+        else:
+            hpickle.to_pickle(obj, file_name, log_level=logging.INFO, verbose=True)
+
+    @classmethod
+    def from_pickle(cls, file_name: str, use_pq: bool = True,
+                    pq_columns: Optional[List[str]] = None) -> "ResultBundle":
+        obj = hpickle.from_pickle(
+            file_name, log_level=logging.INFO, verbose=True
+        )
+
+# ############################################################################
+# PredictionResultBundle
+# ############################################################################
 
 
 # TODO(gp): Add a docstring explaining the difference with `ResultBundle`.

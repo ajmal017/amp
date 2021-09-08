@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+# TODO(gp): Remove this since it is obsolete.
+
 """
 Add a description of what the script does and examples of command lines.
 
