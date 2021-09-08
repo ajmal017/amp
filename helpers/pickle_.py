@@ -17,6 +17,7 @@ from typing import Any, Callable
 
 import helpers.dbg as dbg
 import helpers.io_ as hio
+import helpers.introspection as hintro
 import helpers.timer as htimer
 
 _LOG = logging.getLogger(__name__)
@@ -82,13 +83,12 @@ def to_pickle(
         raise ValueError("Invalid backend='%s'" % backend)
     # Report time and size.
     _, elapsed_time = htimer.dtimer_stop(dtmr)
-    # TODO(gp): Use hintro.format_size().
-    size_mb = os.path.getsize(file_name) / (1024.0 ** 2)
+    file_size = hintro.format_size(os.path.getsize(file_name))
     if verbose:
         _LOG.info(
-            "Saved '%s' (size=%.2f Mb, time=%.1fs)",
+            "Saved '%s' (size=%s, time=%.1fs)",
             file_name,
-            size_mb,
+            file_size,
             elapsed_time,
         )
 
@@ -102,7 +102,7 @@ def from_pickle(
     """
     Unpickle and return object stored in `file_name`.
     """
-    dbg.dassert_type_is(file_name, str)
+    dbg.dassert_isinstance(file_name, str)
     dtmr = htimer.dtimer_start(log_level, "Unpickling from '%s'" % file_name)
     # We assume that the user always specifies a .pkl extension and then we
     # change the extension based on the backend.
@@ -132,12 +132,12 @@ def from_pickle(
         raise ValueError("Invalid backend='%s'" % backend)
     # Report time and size.
     _, elapsed_time = htimer.dtimer_stop(dtmr)
-    size_mb = os.path.getsize(file_name) / (1024.0 ** 2)
+    file_size = hintro.format_size(os.path.getsize(file_name))
     if verbose:
         _LOG.info(
-            "Read '%s' (size=%.2f Mb, time=%.1fs)",
+            "Read '%s' (size=%s, time=%.1fs)",
             file_name,
-            size_mb,
+            file_size,
             elapsed_time,
         )
     return obj
@@ -166,7 +166,7 @@ def unpickle_function(code_as_str: str, func_name: str) -> Callable:
 
     - return: function
     """
-    dbg.dassert_type_is(code_as_str, str)
+    dbg.dassert_isinstance(code_as_str, str)
     code = marshal.loads(code_as_str.encode())
     func = types.FunctionType(code, globals(), name=func_name)
     return func
