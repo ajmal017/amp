@@ -222,7 +222,7 @@ def resample_bars(
         resampled = resampled.rename(columns=col_dict)
         dbg.dassert(not resampled.columns.has_duplicates)
         results.append(resampled)
-    for price_col, vol_col, vwap_col in vwap_groups:
+    for price_col, volume_col, vwap_col in vwap_groups:
         vwap = compute_vwap(
             df, rule=rule, price_col=price_col, volume_col=volume_col
         )
