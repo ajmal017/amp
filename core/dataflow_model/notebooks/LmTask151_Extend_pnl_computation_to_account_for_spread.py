@@ -59,17 +59,11 @@ display(df.head(5))
 # %%
 # Sample on 5 minute bars labeling and close on the right
 
-#df_5mins = df.resample("5T", closed="right", label="right").mean()
 df_5mins = df.resample("5T", closed="right", label="right").last()
-
-if False:
-    a = df.iloc[1:6]["price"].mean()
-    b = df_5mins.iloc[1]["price"]
-    #print(a, b)
-    assert a == b
     
 df_5mins["ret_0"] = df_5mins["price"].pct_change()
 
+np.random.seed(42)
 df_5mins["preds"] = (np.random.random(df_5mins.shape[0]) >= 0.5) * 2.0 - 1.0
 display(df_5mins)
 
@@ -117,5 +111,78 @@ print((1 + pnls).prod() - 1)
 display(df_5mins[:-1])
 
 # %%
+# Show that the previous approach (which trades two times per interval) is equivalent to trading once with the
+# sum of the position.
+
+orders = []
+
+for ts, row in df_5mins[:-2].iterrows():
+    _LOG.debug("ts=%s", ts)
+    pred = row["preds"]
+    if pred == 1:
+        # Go long.
+        action_5 = "buy"
+        action_10 = "sell"
+    elif pred == -1:
+        # Short sell.
+        action_5 = "sell"
+        action_10 = "buy"
+    else:
+        raise ValueError
+    order = (ts + pd.DateOffset(minutes=5), action_5)
+    print(order)
+    orders.append(order)
+    order = (ts + pd.DateOffset(minutes=10), action_10)
+    print(order)
+    orders.append(order)
+    
+w0 = 100.0
+
+def compute_pnl_from_orders(orders):
+    # Assume the orders are in chronological order.
+    holdings = 0.0
+    cash = w0
+    for order in orders:
+        ts, action = order
+        _LOG.debug("# ts=%s action=%s", ts, action)
+        price = df.loc[ts]["price"]
+        _LOG.debug("  price=%s", price)
+        # 
+        wealth = holdings * price + cash
+        _LOG.debug("  before: cash=%s holdings=%s wealth=%s", cash, holdings, wealth)
+        # Assume that we invest always all the wealth.
+        num_shares = wealth / price
+        if action == "buy":
+            cash -= num_shares * price
+            holdings += num_shares
+        elif action == "sell":
+            cash += num_shares * price
+            holdings -= num_shares
+        else:
+            raise ValueError
+        _LOG.debug("  after: cash=%s holdings=%s wealth=%s", cash, holdings, wealth)
+    # We don't necessary liquidate the portfolio.
+    return holdings * price + cash
+
+
+w = compute_pnl_from_orders(orders)
+print((w - w0) / w0)
+
 
 # %%
+## Case 2: interval trading, no costs
+
+# %%
+df_5mins = df.resample("5T", closed="right", label="right").mean()
+
+if True:
+    a = df.iloc[1:6]["price"].mean()
+    b = df_5mins.iloc[1]["price"]
+    #print(a, b)
+    assert a == b
+    
+df_5mins["ret_0"] = df_5mins["price"].pct_change()
+
+np.random.seed(42)
+df_5mins["preds"] = (np.random.random(df_5mins.shape[0]) >= 0.5) * 2.0 - 1.0
+display(df_5mins)
