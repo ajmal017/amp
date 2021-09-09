@@ -34,11 +34,11 @@ def to_parquet(
     dbg.dassert_file_extension(file_name, "pq")
     #
     hio.create_enclosing_dir(file_name, incremental=True)
-    _LOG.log(log_level, "df.shape=%s", str(df.shape))
+    _LOG.debug("df.shape=%s", str(df.shape))
     mem = df.memory_usage().sum()
-    _LOG.log(log_level, "df.memory_usage=%s", hintro.format_size(mem))
+    _LOG.debug("df.memory_usage=%s", hintro.format_size(mem))
     # Save data.
-    dtmr = htimer.dtimer_start(log_level, "To parquet '%s'" % file_name)
+    dtmr = htimer.dtimer_start(logging.DEBUG, "To parquet '%s'" % file_name)
     table = pa.Table.from_pandas(df)
     pq.write_table(table, file_name)
     # Report stats.
@@ -66,7 +66,7 @@ def from_parquet(
     dbg.dassert_isinstance(file_name, str)
     dbg.dassert_file_extension(file_name, "pq")
     # Load data.
-    dtmr = htimer.dtimer_start(log_level, "From parquet '%s'" % file_name)
+    dtmr = htimer.dtimer_start(logging.DEBUG, "From parquet '%s'" % file_name)
     filesystem = None
     dataset = pq.ParquetDataset(
         file_name,
@@ -89,7 +89,7 @@ def from_parquet(
         elapsed_time,
     )
     # Report stats about the df.
-    _LOG.log(log_level, "df.shape=%s", str(df.shape))
+    _LOG.debug("df.shape=%s", str(df.shape))
     mem = df.memory_usage().sum()
-    _LOG.log(log_level, "df.memory_usage=%s", hintro.format_size(mem))
+    _LOG.debug("df.memory_usage=%s", hintro.format_size(mem))
     return df

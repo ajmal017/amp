@@ -28,13 +28,11 @@ _LOG = logging.getLogger(__name__)
 # #############################################################################
 
 
-# TODO(gp): No need for verbose. Just use log_level.
 def to_pickle(
     obj: Any,
     file_name: str,
     backend: str = "pickle",
     log_level: int = logging.DEBUG,
-    verbose: bool = True,
 ) -> None:
     """
     Pickle object `obj` into file `file_name`.
@@ -46,7 +44,7 @@ def to_pickle(
     """
     dbg.dassert_type_is(file_name, str)
     hio.create_enclosing_dir(file_name, incremental=True)
-    dtmr = htimer.dtimer_start(log_level, "Pickling to '%s'" % file_name)
+    dtmr = htimer.dtimer_start(logging.DEBUG, "Pickling to '%s'" % file_name)
     # We assume that the user always specifies a .pkl extension and then we
     # change the extension based on the backend.
     if backend in ("pickle", "dill"):
@@ -77,26 +75,24 @@ def to_pickle(
     # Report time and size.
     _, elapsed_time = htimer.dtimer_stop(dtmr)
     file_size = hintro.format_size(os.path.getsize(file_name))
-    if verbose:
-        _LOG.info(
-            "Saved '%s' (size=%s, time=%.1fs)",
-            file_name,
-            file_size,
-            elapsed_time,
-        )
+    _LOG.log(log_level,
+        "Saved '%s' (size=%s, time=%.1fs)",
+        file_name,
+        file_size,
+        elapsed_time,
+    )
 
 
 def from_pickle(
     file_name: str,
     backend: str = "pickle",
     log_level: int = logging.DEBUG,
-    verbose: bool = True,
 ) -> Any:
     """
     Unpickle and return object stored in `file_name`.
     """
     dbg.dassert_isinstance(file_name, str)
-    dtmr = htimer.dtimer_start(log_level, "Unpickling from '%s'" % file_name)
+    dtmr = htimer.dtimer_start(logging.DEBUG, "Unpickling from '%s'" % file_name)
     # We assume that the user always specifies a .pkl extension and then we
     # change the extension based on the backend.
     if backend in ("pickle", "dill"):
@@ -125,13 +121,12 @@ def from_pickle(
     # Report time and size.
     _, elapsed_time = htimer.dtimer_stop(dtmr)
     file_size = hintro.format_size(os.path.getsize(file_name))
-    if verbose:
-        _LOG.info(
-            "Read '%s' (size=%s, time=%.1fs)",
-            file_name,
-            file_size,
-            elapsed_time,
-        )
+    _LOG.log(log_level,
+        "Read '%s' (size=%s, time=%.1fs)",
+        file_name,
+        file_size,
+        elapsed_time,
+    )
     return obj
 
 

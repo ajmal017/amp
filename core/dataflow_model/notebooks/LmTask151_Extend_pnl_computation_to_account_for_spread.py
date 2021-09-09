@@ -41,20 +41,6 @@ import core.dataflow_model.pnl as pnl
 
 df = pnl.compute_data(21)
 
-# np.random.seed(42)
-
-# #date_range = pd.date_range("09:30", "15:00", freq="1T")
-# date_range = pd.date_range("09:30", "10:00", freq="1T")
-
-# diff = np.random.normal(0, 1, size=len(date_range))
-# diff = diff.cumsum()
-# price = 100.0 + diff
-# df = pd.DataFrame(price, index=date_range, columns=["price"])
-
-# # ask, bid
-# df["ask"] = price + np.abs(np.random.normal(0, 1, size=len(date_range)))
-# df["bid"] = price - np.abs(np.random.normal(0, 1, size=len(date_range)))
-#display(df)
 display(df.head(3))
 display(df.tail(3))
 
@@ -62,15 +48,6 @@ display(df.tail(3))
 # ## Case 1: instantaneous, no costs
 
 # %%
-# Sample on 5 minute bars labeling and close on the right
-
-# df_5mins = df.resample("5T", closed="right", label="right").last()
-    
-# df_5mins["ret_0"] = df_5mins["price"].pct_change()
-
-# np.random.seed(42)
-# df_5mins["preds"] = (np.random.random(df_5mins.shape[0]) >= 0.5) * 2.0 - 1.0
-
 mode = "instantaneous"
 df_5mins = pnl.resample_data(df, mode)
 display(df_5mins)
@@ -156,8 +133,8 @@ w = compute_pnl_from_orders(orders)
 print((w - w0) / w0)
 
 
-# %%
-## Case 2: interval trading, no costs
+# %% [markdown]
+# ## Case 2: interval trading, no costs
 
 # %%
 df_5mins = df.resample("5T", closed="right", label="right").mean()

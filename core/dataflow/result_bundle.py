@@ -59,7 +59,8 @@ class ResultBundle(abc.ABC):
         self._result_nid = result_nid
         dbg.dassert_isinstance(method, cdtfc.Method)
         self._method = method
-        dbg.dassert_isinstance(result_df, pd.DataFrame)
+        if result_df is not None:
+            dbg.dassert_isinstance(result_df, pd.DataFrame)
         self._result_df = result_df
         self._column_to_tags = column_to_tags
         self._info = info
@@ -83,7 +84,7 @@ class ResultBundle(abc.ABC):
 
     @property
     def config(self) -> cconfig.Config:
-        return self._config.copy()
+        return self._config
 
     @property
     def result_nid(self) -> cdtfc.NodeId:
@@ -95,9 +96,7 @@ class ResultBundle(abc.ABC):
 
     @property
     def result_df(self) -> pd.DataFrame:
-        # TODO(gp): Ok to copy but we will make a copy at every access. Maybe we
-        #  can make a single copy and use only that.
-        return self._result_df.copy()
+        return self._result_df
 
     @property
     def column_to_tags(self) -> Optional[Dict[Any, List[Any]]]:
@@ -124,15 +123,21 @@ class ResultBundle(abc.ABC):
     def payload(self) -> Optional[cconfig.Config]:
         return self._payload
 
-    @payload.setter
-    def payload(self, value: Optional[cconfig.Config]) -> None:
-        self._payload = value
-
     def get_tags_for_column(self, column: Any) -> Optional[List[Any]]:
         return ResultBundle._search_mapping(column, self._column_to_tags)
 
     def get_columns_for_tag(self, tag: Any) -> Optional[List[Any]]:
         return ResultBundle._search_mapping(tag, self.tag_to_columns)
+
+    # Setters.
+
+    @result_df.setter
+    def result_df(self, value: pd.DataFrame) -> None:
+        self._result_df = value
+
+    @payload.setter
+    def payload(self, value: Optional[cconfig.Config]) -> None:
+        self._payload = value
 
     # Methods to serialize to / from strings.
 
@@ -209,29 +214,41 @@ class ResultBundle(abc.ABC):
 
     # Methods to serialize to / from disk.
 
-    def to_pickle(self, file_name: str, use_pq: bool = True) -> None:
+    def to_pickle(self, file_name: str, use_pq: bool = True) -> List[str]:
         """
+        Serialize the current `ResultBundle`.
+
         :param use_pq: save the `result_df` dataframe using Parquet.
             If False, everything is saved as a single pickle object.
+        :return: list with names of the files saved
         """
+        # TODO(gp): We should pass file_name without an extension, since the
+        #  extension(s) depend on the format used.
         io_.create_enclosing_dir(file_name, incremental=True)
-        obj = result_bundle.to_config().to_dict()
+        # Convert to a dict.
+        #obj = self.to_config().to_dict()
+        obj = copy.copy(self)
         if use_pq:
             # Split the object in two pieces.
-            result_df = obj["result_df"]
-            del obj["result_df"]
+            result_df = obj.result_df
+            obj.result_df = None
             # Save the config as pickle.
+            file_name_rb = io_.change_filename_extension(file_name, "pkl", "v2_0.pkl")
             hpickle.to_pickle(
-                obj, file_name, log_level=logging.INFO, verbose=True
+                obj, file_name_rb, log_level=logging.DEBUG
             )
-            # Save the dataframe as parquet.
-            file_name_pq = io_.change_filename_extension(file_name, "pkl", "pq")
-            hparquet.to_parquet(result_df, file_name_pq, log_level=logging.INFO)
+            # Save the `result_df` as parquet.
+            file_name_pq = io_.change_filename_extension(file_name, "pkl", "v2_0.pq")
+            hparquet.to_parquet(result_df, file_name_pq, log_level=logging.DEBUG)
+            res = [file_name_rb, file_name_pq]
         else:
             # Save the entire object as pickle.
+            file_name = io_.change_filename_extension(file_name, "pkl", "v1_0.pkl")
             hpickle.to_pickle(
-                obj, file_name, log_level=logging.INFO, verbose=True
+                obj, file_name, log_level=logging.DEBUG
             )
+            res = [file_name]
+        return res
 
     # TODO(gp): Use classmethod.
     @staticmethod
@@ -240,18 +257,33 @@ class ResultBundle(abc.ABC):
         use_pq: bool = True,
         columns: Optional[List[str]] = None,
     ) -> "ResultBundle":
+        """
+        Deserialize the current `ResultBundle`.
+
+        :param use_pq: load multiple files storing the data
+        :param columns: columns of `result_df` to load
+        """
+        # TODO(gp): We should pass file_name without an extension, since the
+        #  extension(s) depend on the format used.
         if use_pq:
-            # Load the config as pickle.
+            # Load the part of the `ResultBundle` stored as pickle.
+            dbg.dassert(file_name.endswith("v2_0.pkl"), "Invalid file_name='%s'", file_name)
             obj = hpickle.from_pickle(
-                file_name, log_level=logging.INFO, verbose=True
+                file_name, log_level=logging.INFO
             )
             dbg.dassert_isinstance(obj, ResultBundle)
-            # Load the dataframe as parquet.
+            # Load the `result_df` as parquet.
             file_name_pq = io_.change_filename_extension(file_name, "pkl", "pq")
+            if columns is None:
+                _LOG.warning("Loading the entire `result_df` without filtering by columns: this is slow and requires a lot of memory")
             obj.result_df = hparquet.from_parquet(file_name_pq, columns=columns,
                                                   log_level=logging.INFO)
         else:
-            obj = hpickle.from_pickle(file_name, log_level=logging.INFO, verbose=True)
+            # Load the `ResultBundle` as a single pickle.
+            dbg.dassert(file_name.endswith("v1_0.pkl"), "Invalid file_name='%s'", file_name)
+            dbg.dassert_is(columns, None, "`columns` can be specified only with `use_pq=True`")
+            file_name = io_.change_filename_extension(file_name, "pkl", "v1_0.pkl")
+            obj = hpickle.from_pickle(file_name, log_level=logging.INFO)
         return obj
 
     @staticmethod

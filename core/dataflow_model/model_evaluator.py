@@ -24,7 +24,7 @@ import helpers.introspection as hintro
 
 _LOG = logging.getLogger(__name__)
 
-_LOG.debug = _LOG.info
+#_LOG.debug = _LOG.info
 
 # #############################################################################
 # ModelEvaluator
@@ -90,6 +90,58 @@ class ModelEvaluator:
         # The valid keys are the keys in the data dict.
         self.valid_keys = list(self._data.keys())
         self._stats_computer = cstats.StatsComputer()
+
+    @classmethod
+    def from_result_bundle_dict(
+        cls,
+        result_bundle_dict: Dict[Key, cdataf.ResultBundle],
+        predictions_col: str,
+        target_col: str,
+        oos_start: Optional[Any] = None,
+        abort_on_error: bool = True,
+    ) -> ModelEvaluator:
+        """
+        Initialize a `ModelEvaluator` from a dictionary `key` -> `ResultBundle`.
+
+        :param result_bundle_dict: mapping from key to `ResultBundle`
+        :param *: as in `ModelEvaluator` constructor
+        :return: `ModelEvaluator` initialized with returns and predictions from
+           result bundles
+        """
+        data_dict: Dict[Key, pd.DataFrame] = {}
+        # Convert each `ResultBundle` dict into a `ResultBundle` class object.
+        for key, result_bundle in result_bundle_dict.items():
+            _LOG.debug("Loading key=%s", key)
+            try:
+                _LOG.debug("memory_usage=%s", dbg.get_memory_usage_as_str(None))
+                df = result_bundle.result_df
+                dbg.dassert_is_not(df, None)
+                _LOG.debug(
+                    "result_df.memory_usage=%s",
+                    hintro.format_size(df.memory_usage(index=True, deep=True).sum()),
+                )
+                # Extract the needed columns.
+                dbg.dassert_in(target_col, df.columns)
+                dbg.dassert_in(predictions_col, df.columns)
+                dbg.dassert_not_in(key, data_dict.keys())
+                data_dict[key] = df[[target_col, predictions_col]]
+            except Exception as e:
+                _LOG.error(
+                    "Error while loading ResultBundle for config %s with exception:\n%s"
+                    % (key, str(e))
+                )
+                if abort_on_error:
+                    raise e
+                else:
+                    _LOG.warning("Continuing as per user request")
+        # Initialize `ModelEvaluator`.
+        evaluator = cls(
+            data=data_dict,
+            prediction_col=predictions_col,
+            target_col=target_col,
+            oos_start=oos_start,
+        )
+        return evaluator
 
     # TODO(gp): Maybe `resolve_keys()` is a better name.
     def get_keys(self, keys: Optional[List[Key]]) -> List[Any]:
@@ -629,58 +681,3 @@ class TransactionCostModeler:
         return ret
 
 
-# #############################################################################
-
-
-# TODO(gp): Maybe make it a classmethod builder for ModelEvaluator called
-#  `build_from_result_bundles`.
-def build_model_evaluator_from_result_bundles(
-    result_bundle_pairs: Iterable[Tuple[int, cdataf.ResultBundle]],
-    # TODO(gp): -> target_col, also keep the same order as in the ctor
-    returns_col: str,
-    predictions_col: str,
-    oos_start: Optional[Any] = None,
-    abort_on_error: bool = True,
-) -> ModelEvaluator:
-    """
-    Initialize a `ModelEvaluator` from `ResultBundle`s.
-
-    :param result_bundle_pairs: iterators with key and `ResultBundle`
-    :param *: as in `ModelEvaluator`
-    :return: `ModelEvaluator` initialized with returns and predictions from
-       result bundles
-    """
-    data_dict: Dict[Key, pd.DataFrame] = {}
-    # Convert each `ResultBundle` dict into a `ResultBundle` class object.
-    for key, value in result_bundle_pairs:
-        _LOG.debug("Loading key=%s", key)
-        try:
-            _LOG.debug("memory_usage=%s", dbg.get_memory_usage(None))
-            result_bundle = cdataf.ResultBundle.from_dict(value)
-            df = result_bundle.result_df
-            _LOG.debug(
-                "result_df.memory_usage=%s",
-                hintro.format_size(df.memory_usage(index=True, deep=True).sum()),
-            )
-            # Extract the needed columns.
-            dbg.dassert_in(returns_col, df.columns)
-            dbg.dassert_in(predictions_col, df.columns)
-            dbg.dassert_not_in(key, data_dict.keys())
-            data_dict[key] = df[[returns_col, predictions_col]]
-        except Exception as e:
-            _LOG.error(
-                "Error while loading ResultBundle for config %d with exception:\n%s"
-                % (key, str(e))
-            )
-            if abort_on_error:
-                raise e
-            else:
-                _LOG.warning("Continuing as per user request")
-    # Initialize `ModelEvaluator`.
-    evaluator = ModelEvaluator(
-        data=data_dict,
-        prediction_col=predictions_col,
-        target_col=returns_col,
-        oos_start=oos_start,
-    )
-    return evaluator
