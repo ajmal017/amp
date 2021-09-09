@@ -44,12 +44,9 @@ class ModelEvaluator:
         # TODO(gp): data -> df_dict or data_dict? Make it uniform across the code.
         data: Dict[Key, pd.DataFrame],
         *,
-        # TODO(gp): How can it be None?
-        prediction_col: Optional[str] = None,
-        # TODO(gp): How can it be None?
-        target_col: Optional[str] = None,
-        # TODO(gp): No default IMO
-        oos_start: Optional[Any] = None,
+        prediction_col: str,
+        target_col: str,
+        oos_start: Optional[pd.Timestamp]
     ) -> None:
         """
         Constructor.
@@ -83,7 +80,6 @@ class ModelEvaluator:
             target_col,
             "Prediction and target columns need to be different",
         )
-        # TODO(Paul): Add setters for `prediction_col` and `target_col`.
         self.prediction_col = prediction_col
         self.target_col = target_col
         self.oos_start = oos_start
@@ -97,7 +93,7 @@ class ModelEvaluator:
         result_bundle_dict: Dict[Key, cdataf.ResultBundle],
         predictions_col: str,
         target_col: str,
-        oos_start: Optional[Any] = None,
+        oos_start: Optional[pd.Timestamp],
         abort_on_error: bool = True,
     ) -> ModelEvaluator:
         """
