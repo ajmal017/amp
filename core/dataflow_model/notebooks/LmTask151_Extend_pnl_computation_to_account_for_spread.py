@@ -37,21 +37,26 @@ _LOG.debug = _LOG.info
 # %%
 import numpy as np
 import pandas as pd
+import core.dataflow_model.pnl as pnl
 
-np.random.seed(42)
+df = pnl.compute_data(21)
 
-#date_range = pd.date_range("09:30", "15:00", freq="1T")
-date_range = pd.date_range("09:30", "10:00", freq="1T")
+# np.random.seed(42)
 
-diff = np.random.normal(0, 1, size=len(date_range))
-diff = diff.cumsum()
-price = 100.0 + diff
-df = pd.DataFrame(price, index=date_range, columns=["price"])
+# #date_range = pd.date_range("09:30", "15:00", freq="1T")
+# date_range = pd.date_range("09:30", "10:00", freq="1T")
 
-# ask, bid
-df["ask"] = price + np.abs(np.random.normal(0, 1, size=len(date_range)))
-df["bid"] = price - np.abs(np.random.normal(0, 1, size=len(date_range)))
-display(df.head(5))
+# diff = np.random.normal(0, 1, size=len(date_range))
+# diff = diff.cumsum()
+# price = 100.0 + diff
+# df = pd.DataFrame(price, index=date_range, columns=["price"])
+
+# # ask, bid
+# df["ask"] = price + np.abs(np.random.normal(0, 1, size=len(date_range)))
+# df["bid"] = price - np.abs(np.random.normal(0, 1, size=len(date_range)))
+#display(df)
+display(df.head(3))
+display(df.tail(3))
 
 # %% [markdown]
 # ## Case 1: instantaneous, no costs
@@ -59,55 +64,37 @@ display(df.head(5))
 # %%
 # Sample on 5 minute bars labeling and close on the right
 
-df_5mins = df.resample("5T", closed="right", label="right").last()
+# df_5mins = df.resample("5T", closed="right", label="right").last()
     
-df_5mins["ret_0"] = df_5mins["price"].pct_change()
+# df_5mins["ret_0"] = df_5mins["price"].pct_change()
 
-np.random.seed(42)
-df_5mins["preds"] = (np.random.random(df_5mins.shape[0]) >= 0.5) * 2.0 - 1.0
+# np.random.seed(42)
+# df_5mins["preds"] = (np.random.random(df_5mins.shape[0]) >= 0.5) * 2.0 - 1.0
+
+mode = "instantaneous"
+df_5mins = pnl.resample_data(df, mode)
 display(df_5mins)
 
 # %%
 df.plot()
 
 # %%
-# Naive pnl
-
 w0 = 100.0
-w = w0
-for ts, row in df_5mins[:-2].iterrows():
-    _LOG.debug("ts=%s", ts)
-    pred = row["preds"]
-    price_5 = df.loc[ts + pd.DateOffset(minutes=5)]["price"]
-    price_10 = df.loc[ts + pd.DateOffset(minutes=10)]["price"]
-    _LOG.debug("# pred=%s price_5=%s price_10=%s", pred, price_5, price_10)
-    # 
-    num_shares = w / price_5
-    if pred == 1:
-        # Go long.
-        buy_pnl = num_shares * price_5
-        sell_pnl = num_shares * price_10
-        diff = -buy_pnl + sell_pnl
-    elif pred == -1:
-        # Short sell.
-        sell_pnl = num_shares * price_5
-        buy_pnl = num_shares * price_10
-        diff = sell_pnl - buy_pnl
-    else:
-        raise ValueError
-    _LOG.debug("  w=%s num_shares=%s", w, num_shares)
-    w += diff
-    _LOG.debug("  diff=%s -> w=%s", diff, w)
-        
-print(w)
-print((w - w0) / w0)
+final_w, tot_ret = pnl.compute_pnl_for_instantaneous_no_cost_case(w0, df, df_5mins)
 
+print(final_w, tot_ret)
+
+# %%
 # Use lags.
 df_5mins["pnl"] = df_5mins["preds"] * df_5mins["ret_0"].shift(-2)
-pnls = df_5mins["pnl"][:-1]
+pnls = df_5mins["pnl"]
 
-print((1 + pnls).prod() - 1)
+tot_ret2 = (1 + pnls).prod() - 1
 
+print("tot_ret=", tot_ret)
+print("tot_ret2=", tot_ret2)
+
+np.testing.assert_almost_equal(tot_ret, tot_ret2)
 display(df_5mins[:-1])
 
 # %%
