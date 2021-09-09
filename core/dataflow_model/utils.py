@@ -524,6 +524,7 @@ def load_experiment_artifacts(
     :param selected_idxs: specific experiment indices to load. `None` (default)
         loads all available indices
     """
+    _LOG.info("Before load_experiment_artifacts: memory_usage=%s", dbg.get_memory_usage_as_str(None))
     if experiment_type == "ins_oos":
         iterator = _yield_experiment_artifacts
     elif experiment_type == "rolling_oos":
@@ -541,4 +542,5 @@ def load_experiment_artifacts(
     for key, artifact in iter:
         artifacts[key] = artifact
     dbg.dassert(artifacts, "No data read from '%s'", src_dir)
+    _LOG.info("After load_experiment_artifacts: memory_usage=%s", dbg.get_memory_usage_as_str(None))
     return artifacts

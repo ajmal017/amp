@@ -124,6 +124,9 @@ evaluator = modeval.ModelEvaluator.from_result_bundle_dict(
 # Build the ModelPlotter.
 plotter = modplot.ModelPlotter(evaluator)
 
+# %%
+evaluator._data["0"]
+
 # %% [markdown]
 # # Analysis
 

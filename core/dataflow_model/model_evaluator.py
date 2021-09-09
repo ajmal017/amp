@@ -108,6 +108,7 @@ class ModelEvaluator:
         :return: `ModelEvaluator` initialized with returns and predictions from
            result bundles
         """
+        _LOG.info("Before building ModelEvaluator: memory_usage=%s", dbg.get_memory_usage_as_str(None))
         data_dict: Dict[Key, pd.DataFrame] = {}
         # Convert each `ResultBundle` dict into a `ResultBundle` class object.
         for key, result_bundle in result_bundle_dict.items():
@@ -134,6 +135,7 @@ class ModelEvaluator:
                     raise e
                 else:
                     _LOG.warning("Continuing as per user request")
+        print(data_dict)
         # Initialize `ModelEvaluator`.
         evaluator = cls(
             data=data_dict,
@@ -141,6 +143,7 @@ class ModelEvaluator:
             target_col=target_col,
             oos_start=oos_start,
         )
+        _LOG.info("After building ModelEvaluator: memory_usage=%s", dbg.get_memory_usage_as_str(None))
         return evaluator
 
     # TODO(gp): Maybe `resolve_keys()` is a better name.
@@ -408,16 +411,6 @@ def _validate_series(srs: pd.Series, oos_start: Optional[float] = None) -> None:
             not srs[oos_start:].dropna().empty,  # type: ignore[misc]
             "Empty OOS series",
         )
-    dbg.dassert(srs.index.freq)
-
-
-def _validate_series(srs: pd.Series, oos_start: Optional[float] = None) -> None:
-    dbg.dassert_isinstance(srs, pd.Series)
-    dbg.dassert(not srs.empty, "Empty series")
-    dbg.dassert(not srs.dropna().empty, "Series with only nans")
-    if oos_start is not None:
-        dbg.dassert(not srs[:oos_start].dropna().empty, "Empty in-sample series")
-        dbg.dassert(not srs[oos_start:].dropna().empty, "Empty OOS series")
     dbg.dassert(srs.index.freq)
 
 

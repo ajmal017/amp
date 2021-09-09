@@ -226,7 +226,6 @@ class ResultBundle(abc.ABC):
         #  extension(s) depend on the format used.
         io_.create_enclosing_dir(file_name, incremental=True)
         # Convert to a dict.
-        #obj = self.to_config().to_dict()
         obj = copy.copy(self)
         if use_pq:
             # Split the object in two pieces.
@@ -240,7 +239,13 @@ class ResultBundle(abc.ABC):
             # Save the `result_df` as parquet.
             file_name_pq = io_.change_filename_extension(file_name, "pkl", "v2_0.pq")
             hparquet.to_parquet(result_df, file_name_pq, log_level=logging.DEBUG)
-            res = [file_name_rb, file_name_pq]
+            file_name_metadata_df = io_.change_filename_extension(file_name, "pkl", "v2_0.metadata_df.pkl")
+            metadata_df = {
+                "index.freq": result_df.index.freq
+            }
+            hpickle.to_pickle(metadata_df, file_name_metadata_df, log_level=logging.DEBUG)
+            #
+            res = [file_name_rb, file_name_pq, file_name_metadata_df]
         else:
             # Save the entire object as pickle.
             file_name = io_.change_filename_extension(file_name, "pkl", "v1_0.pkl")
@@ -269,7 +274,7 @@ class ResultBundle(abc.ABC):
             # Load the part of the `ResultBundle` stored as pickle.
             dbg.dassert(file_name.endswith("v2_0.pkl"), "Invalid file_name='%s'", file_name)
             obj = hpickle.from_pickle(
-                file_name, log_level=logging.INFO
+                file_name, log_level=logging.DEBUG
             )
             dbg.dassert_isinstance(obj, ResultBundle)
             # Load the `result_df` as parquet.
@@ -277,13 +282,20 @@ class ResultBundle(abc.ABC):
             if columns is None:
                 _LOG.warning("Loading the entire `result_df` without filtering by columns: this is slow and requires a lot of memory")
             obj.result_df = hparquet.from_parquet(file_name_pq, columns=columns,
-                                                  log_level=logging.INFO)
+                                                  log_level=logging.DEBUG)
+            file_name_metadata_df = io_.change_filename_extension(file_name, "pkl", "metadata_df.pkl")
+            metadata_df = hpickle.from_pickle(file_name_metadata_df, log_level=logging.DEBUG)
+            # metadata_df = {
+            #     "index.freq": result_df.index.freq
+            # }
+            obj.result_df.index.freq = metadata_df.pop("index.freq")
+            dbg.dassert(not metadata_df, "metadata_df='%s' is not empty", str(metadata_df))
         else:
             # Load the `ResultBundle` as a single pickle.
             dbg.dassert(file_name.endswith("v1_0.pkl"), "Invalid file_name='%s'", file_name)
             dbg.dassert_is(columns, None, "`columns` can be specified only with `use_pq=True`")
             file_name = io_.change_filename_extension(file_name, "pkl", "v1_0.pkl")
-            obj = hpickle.from_pickle(file_name, log_level=logging.INFO)
+            obj = hpickle.from_pickle(file_name, log_level=logging.DEBUG)
         return obj
 
     @staticmethod
