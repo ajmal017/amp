@@ -36,7 +36,7 @@ import helpers.printing as hprint
 
 # %%
 dbg.init_logger(verbosity=logging.INFO)
-#dbg.init_logger(verbosity=logging.DEBUG)
+# dbg.init_logger(verbosity=logging.DEBUG)
 
 _LOG = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ hprint.config_notebook()
 # obj = hpickle.from_pickle(file_name)
 
 # %%
-#obj.keys()
+# obj.keys()
 
 # %%
 # import helpers.introspection as hintro
@@ -61,18 +61,18 @@ hprint.config_notebook()
 #     print(k, hintro.get_size_in_bytes(obj[k]))
 
 # %%
-#obj["payload"]["fit_result_bundle"]["result_df"]
+# obj["payload"]["fit_result_bundle"]["result_df"]
 
 # %% [markdown]
 # # Notebook config
 
 # %%
-#config = cconfig.Config.from_env_var("AM_CONFIG_CODE")
+# config = cconfig.Config.from_env_var("AM_CONFIG_CODE")
 config = None
 
 if config is None:
     # exp_dir = "s3://eglp-spm-sasm/experiments/experiment.RH2Ef.v1_9-all.5T.20210831-004747.run1.tgz"
-    #exp_dir = "/app/oos_experiment.RH2Eg.v2_0-top10.5T.run1_test"
+    # exp_dir = "/app/oos_experiment.RH2Eg.v2_0-top10.5T.run1_test"
     exp_dir = "/app/oos_experiment.RH2Eg.v2_0-top100.5T.run1_test"
     aws_profile = None
 
@@ -97,7 +97,7 @@ if config is None:
             "target_volatility": 0.1,
         }
     )
-   
+
 print(str(eval_config))
 
 # %% [markdown]
@@ -108,16 +108,17 @@ load_config = eval_config["load_experiment_kwargs"].to_dict()
 
 # Load only the columns needed by the ModelEvaluator.
 load_config["load_rb_kwargs"] = {
-    "columns": 
-    [eval_config["model_evaluator_kwargs"]["target_col"],
-    eval_config["model_evaluator_kwargs"]["predictions_col"]]
+    "columns": [
+        eval_config["model_evaluator_kwargs"]["target_col"],
+        eval_config["model_evaluator_kwargs"]["predictions_col"],
+    ]
 }
 result_bundle_dict = cdmu.load_experiment_artifacts(**load_config)
 
 # Build the ModelEvaluator.
 evaluator = modeval.ModelEvaluator.from_result_bundle_dict(
     result_bundle_dict,
-    #abort_on_error=False,
+    # abort_on_error=False,
     abort_on_error=True,
     **eval_config["model_evaluator_kwargs"].to_dict(),
 )

@@ -23,7 +23,7 @@ import helpers.printing as prnt
 
 prnt.config_notebook()
 
-#dbg.init_logger(verbosity=logging.DEBUG)
+# dbg.init_logger(verbosity=logging.DEBUG)
 dbg.init_logger(verbosity=logging.INFO)
 # dbg.test_logger()
 _LOG = logging.getLogger(__name__)
@@ -37,6 +37,7 @@ _LOG.debug = _LOG.info
 # %%
 import numpy as np
 import pandas as pd
+
 import core.dataflow_model.pnl as pnl
 
 df = pnl.compute_data(21)
@@ -57,7 +58,9 @@ df.plot()
 
 # %%
 w0 = 100.0
-final_w, tot_ret = pnl.compute_pnl_for_instantaneous_no_cost_case(w0, df, df_5mins)
+final_w, tot_ret = pnl.compute_pnl_for_instantaneous_no_cost_case(
+    w0, df, df_5mins
+)
 
 print(final_w, tot_ret)
 
@@ -99,8 +102,9 @@ for ts, row in df_5mins[:-2].iterrows():
     order = (ts + pd.DateOffset(minutes=10), action_10)
     print(order)
     orders.append(order)
-    
+
 w0 = 100.0
+
 
 def compute_pnl_from_orders(orders):
     # Assume the orders are in chronological order.
@@ -111,9 +115,11 @@ def compute_pnl_from_orders(orders):
         _LOG.debug("# ts=%s action=%s", ts, action)
         price = df.loc[ts]["price"]
         _LOG.debug("  price=%s", price)
-        # 
+        #
         wealth = holdings * price + cash
-        _LOG.debug("  before: cash=%s holdings=%s wealth=%s", cash, holdings, wealth)
+        _LOG.debug(
+            "  before: cash=%s holdings=%s wealth=%s", cash, holdings, wealth
+        )
         # Assume that we invest always all the wealth.
         num_shares = wealth / price
         if action == "buy":
@@ -124,7 +130,9 @@ def compute_pnl_from_orders(orders):
             holdings -= num_shares
         else:
             raise ValueError
-        _LOG.debug("  after: cash=%s holdings=%s wealth=%s", cash, holdings, wealth)
+        _LOG.debug(
+            "  after: cash=%s holdings=%s wealth=%s", cash, holdings, wealth
+        )
     # We don't necessary liquidate the portfolio.
     return holdings * price + cash
 
@@ -142,9 +150,9 @@ df_5mins = df.resample("5T", closed="right", label="right").mean()
 if True:
     a = df.iloc[1:6]["price"].mean()
     b = df_5mins.iloc[1]["price"]
-    #print(a, b)
+    # print(a, b)
     assert a == b
-    
+
 df_5mins["ret_0"] = df_5mins["price"].pct_change()
 
 np.random.seed(42)

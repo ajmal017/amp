@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import functools
 import logging
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -24,7 +24,7 @@ import helpers.introspection as hintro
 
 _LOG = logging.getLogger(__name__)
 
-#_LOG.debug = _LOG.info
+# _LOG.debug = _LOG.info
 
 # #############################################################################
 # ModelEvaluator
@@ -46,7 +46,7 @@ class ModelEvaluator:
         *,
         prediction_col: str,
         target_col: str,
-        oos_start: Optional[pd.Timestamp]
+        oos_start: Optional[pd.Timestamp],
     ) -> None:
         """
         Constructor.
@@ -97,14 +97,18 @@ class ModelEvaluator:
         abort_on_error: bool = True,
     ) -> ModelEvaluator:
         """
-        Initialize a `ModelEvaluator` from a dictionary `key` -> `ResultBundle`.
+        Initialize a `ModelEvaluator` from a dictionary `key` ->
+        `ResultBundle`.
 
         :param result_bundle_dict: mapping from key to `ResultBundle`
         :param *: as in `ModelEvaluator` constructor
         :return: `ModelEvaluator` initialized with returns and predictions from
            result bundles
         """
-        _LOG.info("Before building ModelEvaluator: memory_usage=%s", dbg.get_memory_usage_as_str(None))
+        _LOG.info(
+            "Before building ModelEvaluator: memory_usage=%s",
+            dbg.get_memory_usage_as_str(None),
+        )
         data_dict: Dict[Key, pd.DataFrame] = {}
         # Convert each `ResultBundle` dict into a `ResultBundle` class object.
         for key, result_bundle in result_bundle_dict.items():
@@ -115,7 +119,9 @@ class ModelEvaluator:
                 dbg.dassert_is_not(df, None)
                 _LOG.debug(
                     "result_df.memory_usage=%s",
-                    hintro.format_size(df.memory_usage(index=True, deep=True).sum()),
+                    hintro.format_size(
+                        df.memory_usage(index=True, deep=True).sum()
+                    ),
                 )
                 # Extract the needed columns.
                 dbg.dassert_in(target_col, df.columns)
@@ -139,7 +145,10 @@ class ModelEvaluator:
             target_col=target_col,
             oos_start=oos_start,
         )
-        _LOG.info("After building ModelEvaluator: memory_usage=%s", dbg.get_memory_usage_as_str(None))
+        _LOG.info(
+            "After building ModelEvaluator: memory_usage=%s",
+            dbg.get_memory_usage_as_str(None),
+        )
         return evaluator
 
     # TODO(gp): Maybe `resolve_keys()` is a better name.
@@ -668,5 +677,3 @@ class TransactionCostModeler:
         else:
             raise ValueError(f"Invalid mode `{mode}`!")
         return ret
-
-

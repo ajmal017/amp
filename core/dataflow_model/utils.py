@@ -267,9 +267,9 @@ def save_experiment_result_bundle(
 
 
 def _retrieve_archived_experiment_artifacts_from_S3(
-        s3_file_name: str,
-        dst_dir: str,
-        aws_profile: str,
+    s3_file_name: str,
+    dst_dir: str,
+    aws_profile: str,
 ) -> str:
     """
     Retrieve a package containing experiment artifacts from S3.
@@ -296,9 +296,9 @@ def _retrieve_archived_experiment_artifacts_from_S3(
 
 
 def _get_experiment_subdirs(
-        src_dir: str,
-        selected_idxs: Optional[Iterable[int]] = None,
-        aws_profile: Optional[str] = None,
+    src_dir: str,
+    selected_idxs: Optional[Iterable[int]] = None,
+    aws_profile: Optional[str] = None,
 ) -> Tuple[str, Dict[int, str]]:
     """
     Get the subdirectories under `src_dir` with a format like `result_*`.
@@ -385,20 +385,16 @@ def _load_experiment_artifact(
     if base_name == "result_bundle.v2_0.pkl":
         # Load a `ResultBundle` stored in `rb` format.
         res = dtf.ResultBundle.from_pickle(
-                file_name,
-                use_pq=True,
-                **load_rb_kwargs)
+            file_name, use_pq=True, **load_rb_kwargs
+        )
     elif base_name == "result_bundle.v1_0.pkl":
         # Load `ResultBundle` stored as a single pickle.
         res = dtf.ResultBundle.from_pickle(
-            file_name,
-            use_pq=False,
-            **load_rb_kwargs)
+            file_name, use_pq=False, **load_rb_kwargs
+        )
     elif base_name == "config.pkl":
         # Load a `Config` stored as a pickle file.
-        res = hpickle.from_pickle(
-            file_name, log_level=logging.DEBUG
-        )
+        res = hpickle.from_pickle(file_name, log_level=logging.DEBUG)
         # TODO(gp): We should convert it to a `Config`.
     elif base_name.endswith(".json"):
         # Load JSON files.
@@ -439,9 +435,7 @@ def _yield_experiment_artifacts(
         if not os.path.exists(file_name_tmp):
             _LOG.warning("Can't find '%s': skipping", file_name_tmp)
             continue
-        obj = _load_experiment_artifact(
-                file_name_tmp,
-                load_rb_kwargs)
+        obj = _load_experiment_artifact(file_name_tmp, load_rb_kwargs)
         yield str(key), obj
 
 
@@ -461,7 +455,9 @@ def _yield_rolling_experiment_out_of_sample_df(
     Same inputs as `load_experiment_artifacts()`.
     """
     # TODO(gp): Not sure what are the acceptable prefixes.
-    dbg.dassert_in(file_name_prefix, ("result_bundle.v1_0.pkl", "result_bundle.v2_0.pkl"))
+    dbg.dassert_in(
+        file_name_prefix, ("result_bundle.v1_0.pkl", "result_bundle.v2_0.pkl")
+    )
     # TODO(Paul): Generalize to loading fit `ResultBundle`s.
     _LOG.info("# Load artifacts '%s' from '%s'", file_name_prefix, src_dir)
     # Get the experiment subdirs.
@@ -482,9 +478,7 @@ def _yield_rolling_experiment_out_of_sample_df(
                 _LOG.warning("Can't find '%s': skipping", file_name_tmp)
                 continue
             dbg.dassert(os.path.basename(file_name_tmp))
-            rb = _load_experiment_artifact(
-                file_name_tmp,
-                load_rb_kwargs)
+            rb = _load_experiment_artifact(file_name_tmp, load_rb_kwargs)
             dfs.append(rb["result_df"])
         if dfs:
             df = pd.concat(dfs, axis=0)
@@ -524,7 +518,10 @@ def load_experiment_artifacts(
     :param selected_idxs: specific experiment indices to load. `None` (default)
         loads all available indices
     """
-    _LOG.info("Before load_experiment_artifacts: memory_usage=%s", dbg.get_memory_usage_as_str(None))
+    _LOG.info(
+        "Before load_experiment_artifacts: memory_usage=%s",
+        dbg.get_memory_usage_as_str(None),
+    )
     if experiment_type == "ins_oos":
         iterator = _yield_experiment_artifacts
     elif experiment_type == "rolling_oos":
@@ -536,11 +533,15 @@ def load_experiment_artifacts(
         file_name,
         load_rb_kwargs=load_rb_kwargs,
         selected_idxs=selected_idxs,
-        aws_profile=aws_profile)
+        aws_profile=aws_profile,
+    )
     # TODO(gp): We might want also to compare to the original experiments Configs.
     artifacts = collections.OrderedDict()
     for key, artifact in iter:
         artifacts[key] = artifact
     dbg.dassert(artifacts, "No data read from '%s'", src_dir)
-    _LOG.info("After load_experiment_artifacts: memory_usage=%s", dbg.get_memory_usage_as_str(None))
+    _LOG.info(
+        "After load_experiment_artifacts: memory_usage=%s",
+        dbg.get_memory_usage_as_str(None),
+    )
     return artifacts
