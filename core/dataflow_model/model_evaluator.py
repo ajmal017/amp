@@ -39,11 +39,12 @@ class ModelEvaluator:
 
     def __init__(
         self,
+        # TODO(gp): data -> df_dict or data_dict? Make it uniform across the code.
         data: Dict[Key, pd.DataFrame],
         *,
-        prediction_col: Optional[str] = None,
-        target_col: Optional[str] = None,
-        oos_start: Optional[Any] = None,
+        prediction_col: str,
+        target_col: str,
+        oos_start: Optional[pd.Timestamp]
     ) -> None:
         """
         Constructor.
@@ -77,13 +78,67 @@ class ModelEvaluator:
             target_col,
             "Prediction and target columns need to be different",
         )
-        # TODO(Paul): Add setters for `prediction_col` and `target_col`.
         self.prediction_col = prediction_col
         self.target_col = target_col
         self.oos_start = oos_start
         # The valid keys are the keys in the data dict.
         self.valid_keys = list(self._data.keys())
         self._stats_computer = cstats.StatsComputer()
+
+    @classmethod
+    def from_result_bundle_dict(
+        cls,
+        result_bundle_dict: Dict[Key, cdataf.ResultBundle],
+        predictions_col: str,
+        target_col: str,
+        oos_start: Optional[pd.Timestamp],
+        abort_on_error: bool = True,
+    ) -> ModelEvaluator:
+        """
+        Initialize a `ModelEvaluator` from a dictionary `key` -> `ResultBundle`.
+
+        :param result_bundle_dict: mapping from key to `ResultBundle`
+        :param *: as in `ModelEvaluator` constructor
+        :return: `ModelEvaluator` initialized with returns and predictions from
+           result bundles
+        """
+        _LOG.info("Before building ModelEvaluator: memory_usage=%s", dbg.get_memory_usage_as_str(None))
+        data_dict: Dict[Key, pd.DataFrame] = {}
+        # Convert each `ResultBundle` dict into a `ResultBundle` class object.
+        for key, result_bundle in result_bundle_dict.items():
+            _LOG.debug("Loading key=%s", key)
+            try:
+                _LOG.debug("memory_usage=%s", dbg.get_memory_usage_as_str(None))
+                df = result_bundle.result_df
+                dbg.dassert_is_not(df, None)
+                _LOG.debug(
+                    "result_df.memory_usage=%s",
+                    hintro.format_size(df.memory_usage(index=True, deep=True).sum()),
+                )
+                # Extract the needed columns.
+                dbg.dassert_in(target_col, df.columns)
+                dbg.dassert_in(predictions_col, df.columns)
+                dbg.dassert_not_in(key, data_dict.keys())
+                data_dict[key] = df[[target_col, predictions_col]]
+            except Exception as e:
+                _LOG.error(
+                    "Error while loading ResultBundle for config %s with exception:\n%s"
+                    % (key, str(e))
+                )
+                if abort_on_error:
+                    raise e
+                else:
+                    _LOG.warning("Continuing as per user request")
+        print(data_dict)
+        # Initialize `ModelEvaluator`.
+        evaluator = cls(
+            data=data_dict,
+            prediction_col=predictions_col,
+            target_col=target_col,
+            oos_start=oos_start,
+        )
+        _LOG.info("After building ModelEvaluator: memory_usage=%s", dbg.get_memory_usage_as_str(None))
+        return evaluator
 
     # TODO(gp): Maybe `resolve_keys()` is a better name.
     def get_keys(self, keys: Optional[List[Key]]) -> List[Any]:
@@ -170,6 +225,7 @@ class ModelEvaluator:
         )
         return pnl_srs, pos_srs, aggregate_stats
 
+    # TODO(gp): This is second.
     def calculate_stats(
         self,
         keys: Optional[List[Any]] = None,
@@ -190,6 +246,7 @@ class ModelEvaluator:
         :param mode: "all_available", "ins", or "oos"
         :return: Dataframe of statistics with `keys` as columns
         """
+        #
         pnl_dict = self.compute_pnl(
             keys,
             position_method=position_method,
@@ -225,6 +282,7 @@ class ModelEvaluator:
         stats_df = pd.concat([stats_df, adj_pvals], axis=0)
         return stats_df
 
+    # TODO(gp): This is first.
     def compute_pnl(
         self,
         keys: Optional[List[Key]] = None,
@@ -307,6 +365,7 @@ class ModelEvaluator:
         pnl_dict = self._trim_time_range(pnl_dict, mode=mode)
         return pnl_dict
 
+    # TODO(gp): Maybe trim when they are generated so we can discard.
     def _trim_time_range(
         self,
         data_dict: Dict[Key, Union[pd.Series, pd.DataFrame]],
@@ -349,6 +408,8 @@ def _validate_series(srs: pd.Series, oos_start: Optional[float] = None) -> None:
     dbg.dassert(srs.index.freq)
 
 
+# TODO(gp): This goes first.
+# TODO(gp): -> _?
 class PnlComputer:
     """
     Compute PnL from returns and positions (i.e., holdings).
@@ -386,6 +447,8 @@ class PnlComputer:
 # #############################################################################
 
 
+# TODO(gp): This goes second.
+# TODO(gp): -> _?
 class PositionComputer:
     """
     Compute target positions from returns, predictions, and constraints.
@@ -411,6 +474,9 @@ class PositionComputer:
         _validate_series(predictions, self.oos_start)
         self.predictions = predictions
 
+    # TODO(gp): Use None only when the default parameter needs to be propagated
+    #  above in the call chain.
+    # TODO(gp): "all_available" -> "all"
     def compute_positions(
         self,
         target_volatility: Optional[float] = None,
@@ -522,6 +588,8 @@ class PositionComputer:
             raise ValueError(f"Invalid strategy `{volatility_strategy}`")
         return ret
 
+    # TODO(gp): -> _extract_srs
+    # TODO(gp): Extract and reuse it.
     def _return_srs(self, srs: pd.Series, mode: str) -> pd.Series:
         """
         Extract part of the time series depending on which period is selected.
@@ -573,7 +641,7 @@ class TransactionCostModeler:
         mode: Optional[str] = None,
     ) -> pd.Series:
         """
-        Estimate transaction costs by estimating the bid-ask spread.
+        Estimate transaction costs using bid-ask spread.
         """
         mode = mode or "ins"
         tick_size = tick_size or 0.01
@@ -600,58 +668,3 @@ class TransactionCostModeler:
         return ret
 
 
-# #############################################################################
-
-
-# TODO(gp): Maybe make it a classmethod builder for ModelEvaluator called
-#  `build_from_result_bundles`.
-def build_model_evaluator_from_result_bundles(
-    result_bundle_pairs: Iterable[Tuple[int, cdataf.ResultBundle]],
-    # TODO(gp): -> target_col, also keep the same order as in the ctor
-    returns_col: str,
-    predictions_col: str,
-    oos_start: Optional[Any] = None,
-    abort_on_error: bool = True,
-) -> ModelEvaluator:
-    """
-    Initialize a `ModelEvaluator` from `ResultBundle`s.
-
-    :param result_bundle_pairs: iterators with key and `ResultBundle`
-    :param *: as in `ModelEvaluator`
-    :return: `ModelEvaluator` initialized with returns and predictions from
-       result bundles
-    """
-    data_dict: Dict[Key, pd.DataFrame] = {}
-    # Convert each `ResultBundle` dict into a `ResultBundle` class object.
-    for key, value in result_bundle_pairs:
-        _LOG.debug("Loading key=%s", key)
-        try:
-            _LOG.debug("memory_usage=%s", dbg.get_memory_usage(None))
-            result_bundle = cdataf.ResultBundle.from_dict(value)
-            df = result_bundle.result_df
-            _LOG.debug(
-                "result_df.memory_usage=%s",
-                hintro.format_size(df.memory_usage(index=True, deep=True).sum()),
-            )
-            # Extract the needed columns.
-            dbg.dassert_in(returns_col, df.columns)
-            dbg.dassert_in(predictions_col, df.columns)
-            dbg.dassert_not_in(key, data_dict.keys())
-            data_dict[key] = df[[returns_col, predictions_col]]
-        except Exception as e:
-            _LOG.error(
-                "Error while loading ResultBundle for config %d with exception:\n%s"
-                % (key, str(e))
-            )
-            if abort_on_error:
-                raise e
-            else:
-                _LOG.warning("Continuing as per user request")
-    # Initialize `ModelEvaluator`.
-    evaluator = ModelEvaluator(
-        data=data_dict,
-        prediction_col=predictions_col,
-        target_col=returns_col,
-        oos_start=oos_start,
-    )
-    return evaluator
