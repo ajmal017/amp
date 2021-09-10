@@ -24,12 +24,14 @@ import helpers.introspection as hintro
 
 _LOG = logging.getLogger(__name__)
 
+# _LOG.debug = _LOG.info
+
 # #############################################################################
 # ModelEvaluator
 # #############################################################################
 
-# A model / experiment is represented by a key, encoded as a string.
-Key = str
+# A model / experiment is represented by a key, encoded as an int.
+Key = int
 
 
 class ModelEvaluator:
@@ -134,7 +136,6 @@ class ModelEvaluator:
                     raise e
                 else:
                     _LOG.warning("Continuing as per user request")
-        print(data_dict)
         # Initialize `ModelEvaluator`.
         evaluator = cls(
             data=data_dict,

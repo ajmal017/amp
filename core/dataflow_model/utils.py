@@ -436,7 +436,7 @@ def _yield_experiment_artifacts(
             _LOG.warning("Can't find '%s': skipping", file_name_tmp)
             continue
         obj = _load_experiment_artifact(file_name_tmp, load_rb_kwargs)
-        yield str(key), obj
+        yield key, obj
 
 
 def _yield_rolling_experiment_out_of_sample_df(
@@ -484,7 +484,7 @@ def _yield_rolling_experiment_out_of_sample_df(
             df = pd.concat(dfs, axis=0)
             dbg.dassert_strictly_increasing_index(df)
             df = csigna.resample(df, rule=dfs[0].index.freq).sum(min_count=1)
-            yield str(key), df
+            yield key, df
 
 
 def load_experiment_artifacts(
@@ -538,6 +538,10 @@ def load_experiment_artifacts(
     # TODO(gp): We might want also to compare to the original experiments Configs.
     artifacts = collections.OrderedDict()
     for key, artifact in iter:
+        _LOG.info(
+            "load_experiment_artifacts: memory_usage=%s",
+            dbg.get_memory_usage_as_str(None),
+        )
         artifacts[key] = artifact
     dbg.dassert(artifacts, "No data read from '%s'", src_dir)
     _LOG.info(
