@@ -282,6 +282,9 @@ class ResultBundle(abc.ABC):
                 file_name,
             )
             obj = hpickle.from_pickle(file_name, log_level=logging.DEBUG)
+            # TODO(gp): This is a workaround waiting for LimeTask164.
+            #  We load 200MB of data and then discard 198MB.
+            obj.payload = None
             dbg.dassert_isinstance(obj, ResultBundle)
             # Load the `result_df` as parquet.
             file_name_pq = io_.change_filename_extension(file_name, "pkl", "pq")
