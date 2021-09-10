@@ -75,7 +75,8 @@ def to_pickle(
     # Report time and size.
     _, elapsed_time = htimer.dtimer_stop(dtmr)
     file_size = hintro.format_size(os.path.getsize(file_name))
-    _LOG.log(log_level,
+    _LOG.log(
+        log_level,
         "Saved '%s' (size=%s, time=%.1fs)",
         file_name,
         file_size,
@@ -121,7 +122,8 @@ def from_pickle(
     # Report time and size.
     _, elapsed_time = htimer.dtimer_stop(dtmr)
     file_size = hintro.format_size(os.path.getsize(file_name))
-    _LOG.log(log_level,
+    _LOG.log(
+        log_level,
         "Read '%s' (size=%s, time=%.1fs)",
         file_name,
         file_size,

@@ -339,16 +339,18 @@ def compare_df(df1: pd.DataFrame, df2: pd.DataFrame) -> None:
     full_test_name = "dummy"
     test_dir = "."
     _assert_equal(
-        _compute_df_signature(df1), _compute_df_signature(df2), full_test_name,
-        test_dir
+        _compute_df_signature(df1),
+        _compute_df_signature(df2),
+        full_test_name,
+        test_dir,
     )
 
 
-# ################################################################################
+# #############################################################################
 
 
 def create_test_dir(
-        dir_name: str, incremental: bool, file_dict: Dict[str, str]
+    dir_name: str, incremental: bool, file_dict: Dict[str, str]
 ) -> None:
     """
     Create a directory `dir_name` with the files from `file_dict`.
