@@ -67,43 +67,43 @@ hprint.config_notebook()
 # # Notebook config
 
 # %%
-# exp_dir = "s3://eglp-spm-sasm/experiments/experiment.RH2Ef.v1_9-all.5T.20210831-004747.run1.tgz"
-exp_dir = "/app/oos_experiment.RH2Eg.v2_0-top10.5T.run1_test"
-aws_profile = None
+#config = cconfig.Config.from_env_var("AM_CONFIG_CODE")
+config = None
 
-eval_config = cconfig.get_config_from_nested_dict(
-    {
-        "load_experiment_kwargs": {
-            "src_dir": exp_dir,
-            "file_name": "result_bundle.v2_0.pkl",
-            "experiment_type": "ins_oos",
-            "selected_idxs": None,
-            "aws_profile": aws_profile,
-        },
-        "model_evaluator_kwargs": {
-            "predictions_col": "mid_ret_0_vol_adj_clipped_2_hat",
-            "target_col": "mid_ret_0_vol_adj_clipped_2",
-            # "oos_start": "2017-01-01",
-        },
-        "bh_adj_threshold": 0.1,
-        "resample_rule": "W",
-        "mode": "ins",
-        "target_volatility": 0.1,
-    }
-)
+if config is None:
+    # exp_dir = "s3://eglp-spm-sasm/experiments/experiment.RH2Ef.v1_9-all.5T.20210831-004747.run1.tgz"
+    #exp_dir = "/app/oos_experiment.RH2Eg.v2_0-top10.5T.run1_test"
+    exp_dir = "/app/oos_experiment.RH2Eg.v2_0-top100.5T.run1_test"
+    aws_profile = None
+
+    eval_config = cconfig.get_config_from_nested_dict(
+        {
+            "load_experiment_kwargs": {
+                "src_dir": exp_dir,
+                "file_name": "result_bundle.v2_0.pkl",
+                "experiment_type": "ins_oos",
+                "selected_idxs": None,
+                "aws_profile": aws_profile,
+            },
+            "model_evaluator_kwargs": {
+                "predictions_col": "mid_ret_0_vol_adj_clipped_2_hat",
+                "target_col": "mid_ret_0_vol_adj_clipped_2",
+                # "oos_start": "2017-01-01",
+                "oos_start": None,
+            },
+            "bh_adj_threshold": 0.1,
+            "resample_rule": "W",
+            "mode": "ins",
+            "target_volatility": 0.1,
+        }
+    )
+   
+print(str(eval_config))
 
 # %% [markdown]
 # # Initialize ModelEvaluator and ModelPlotter
 
 # %%
-# # Load the data.
-# #selected_idxs = list(range(4))
-# result_bundles = cdmu.yield_experiment_artifacts(
-#     eval_config["exp_dir"],
-#     "result_bundle.pkl",
-#     #selected_idxs=selected_idxs,
-# )
-
 load_config = eval_config["load_experiment_kwargs"].to_dict()
 
 # Load only the columns needed by the ModelEvaluator.
@@ -123,9 +123,6 @@ evaluator = modeval.ModelEvaluator.from_result_bundle_dict(
 )
 # Build the ModelPlotter.
 plotter = modplot.ModelPlotter(evaluator)
-
-# %%
-evaluator._data["0"]
 
 # %% [markdown]
 # # Analysis
