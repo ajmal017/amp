@@ -97,8 +97,7 @@ class ModelEvaluator:
         abort_on_error: bool = True,
     ) -> ModelEvaluator:
         """
-        Initialize a `ModelEvaluator` from a dictionary `key` ->
-        `ResultBundle`.
+        Initialize a `ModelEvaluator` from a dictionary `key` -> `ResultBundle`.
 
         :param result_bundle_dict: mapping from key to `ResultBundle`
         :param *: as in `ModelEvaluator` constructor
