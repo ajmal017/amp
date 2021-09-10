@@ -749,6 +749,8 @@ class Calculator(cdnb.Transformer):
         out_col_name: cdtfu.NodeColumn,
         operation: str,
         arithmetic_kwargs: Optional[Dict[str, Any]] = None,
+        term1_delay: Optional[int] = 0,
+        term2_delay: Optional[int] = 0,
     ) -> None:
         super().__init__(nid)
         self._term1 = term1
@@ -761,6 +763,8 @@ class Calculator(cdnb.Transformer):
         )
         self._operation = operation
         self._arithmetic_kwargs = arithmetic_kwargs or {}
+        self._term1_delay = term1_delay
+        self._term2_delay = term2_delay
 
     def _transform(
         self, df: pd.DataFrame
@@ -769,9 +773,9 @@ class Calculator(cdnb.Transformer):
         dbg.dassert_in(self._term2, df.columns.to_list())
         dbg.dassert_not_in(self._out_col_name, df.columns.to_list())
         df_out = df.copy()
-        result = getattr(df[self._term1], self._operation)(
-            df[self._term2], **self._arithmetic_kwargs
-        )
+        result = getattr(
+            df[self._term1].shift(self._term1_delay), self._operation
+        )(df[self._term2].shift(self._term2_delay), **self._arithmetic_kwargs)
         df_out[self._out_col_name] = result
         # Update `info`.
         info: collections.OrderedDict[str, Any] = collections.OrderedDict()
