@@ -593,6 +593,7 @@ def dassert_not_exists(
         _dfatal(txt, msg, *args)
 
 
+# TODO(gp): Does it work for a file ending in ".pkl.gz"? Add unit test.
 def dassert_file_extension(
     file_name: str, extensions: Union[str, List[str]]
 ) -> None:
