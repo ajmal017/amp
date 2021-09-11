@@ -51,12 +51,13 @@ def resample_data(df: pd.DataFrame, mode: str, seed: int = 42) -> pd.DataFrame:
 def compute_pnl_for_instantaneous_no_cost_case(
     w0: float, df: pd.DataFrame, df_5mins: pd.DataFrame
 ):
-    w_history = []
     num_shares_history = []
+    w_history = []
+    pnl_history = []
+    #
     w = w0
     # Skip the last two rows since we need two rows to enter / exit the position.
-    df_5mins = df_5mins[:-2]
-    for ts, row in df_5mins.iterrows():
+    for ts, row in df_5mins[:-2].iterrows():
         _LOG.debug("# ts=%s", ts)
         pred = row["preds"]
         #
@@ -89,15 +90,24 @@ def compute_pnl_for_instantaneous_no_cost_case(
             raise ValueError
         _LOG.debug("  w=%s num_shares=%s", w, num_shares)
         w += diff
-        w_history.append(w)
         num_shares_history.append(num_shares)
+        w_history.append(w)
+        pnl_history.append(diff)
         _LOG.debug("  diff=%s -> w=%s", diff, w)
     # Update the df with intermediate results.
-    df_5mins["w"] = w_history
-    df_5mins["num_shares"] = num_shares_history
+    buffer = [np.nan] * 2
+    df_5mins["num_shares"] = num_shares_history + buffer
+    df_5mins["w"] = w_history + buffer
+    df_5mins["pnl_sim"] = pnl_history + buffer
     # Compute total return.
     total_ret = (w - w0) / w0
     return w, total_ret, df_5mins
+
+
+def compute_lag_pnl(df_5mins: pd.DataFrame) -> pd.DataFrame:
+    df_5mins["pnl_lag"] = df_5mins["preds"] * df_5mins["ret_0"].shift(-2)
+    tot_ret_lag = (1 + df_5mins["pnl_lag"]).prod() - 1
+    return tot_ret_lag, df_5mins
 
 
 import dataclasses
