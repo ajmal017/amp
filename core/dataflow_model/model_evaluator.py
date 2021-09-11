@@ -596,3 +596,24 @@ class PositionComputer:
         else:
             raise ValueError(f"Invalid strategy `{volatility_strategy}`")
         return ret
+
+    # TODO(gp): -> _extract_srs
+    # TODO(gp): Extract and reuse it.
+    def _return_srs(self, srs: pd.Series, mode: str) -> pd.Series:
+        """
+        Extract part of the time series depending on which period is selected.
+        :param mode: "ins", "oos", "all"
+        """
+        if mode == "ins":
+            ret = srs[: self.oos_start]  # type: ignore[misc]
+        elif mode == "oos":
+            dbg.dassert(
+                self.oos_start,
+                msg="Must set `oos_start` to run `oos`",
+            )
+            ret = srs[self.oos_start :]  # type: ignore[misc]
+        elif mode == "all_available":
+            ret = srs
+        else:
+            raise ValueError(f"Invalid mode `{mode}`")
+        return ret
