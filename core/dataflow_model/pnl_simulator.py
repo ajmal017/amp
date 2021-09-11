@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 
 import helpers.dbg as dbg
+import helpers.printing as hprint
 
 _LOG = logging.getLogger(__name__)
 
@@ -111,18 +112,27 @@ def compute_lag_pnl(df_5mins: pd.DataFrame) -> pd.DataFrame:
     return tot_ret_lag, df_5mins
 
 
-
-def get_instantaneous_price(ts, df) -> float:
+def get_instantaneous_price(df: pd.DataFrame, ts: pd.Timestamp, column: str) -> float:
     dbg.dassert_in(ts, df.index)
-    price = df.loc[ts]["price"]
+    dbg.dassert_in(column, df.columns)
+    price = df.loc[ts][column]
     return price
 
 
-def get_twap_price(ts_start, ts_end, df) -> float:
+def get_twap_price(df: pd.DataFrame, ts_start: pd.Timestamp, ts_end: pd.Timestamp, column: str) -> float:
+    """
+    Compute TWAP of the column `column` in (ts_start, ts_end].
+    """
     dbg.dassert_in(ts_start, df.index)
     dbg.dassert_in(ts_end, df.index)
-    #price = df.loc[ts]["price"]
-    #return price
+    dbg.dassert_lt(ts_start, ts_end)
+    dbg.dassert_in(column, df.columns)
+    prices = df[ts_start:ts_end][column]
+    # Remove the first row to represent `(ts_start, ...`.
+    prices = prices.iloc[1:]
+    dbg.dassert_lte(1, prices.shape[0])
+    price = prices.mean()
+    return price
 
 
 class Order:
@@ -141,70 +151,116 @@ class Order:
         #    - at end of interval
         #    - twap
         #    - vwap
-        dbg.dassert_in(type_, ["trade.start", "trade.end",
-                               "trade.twap", "trade.vwap"])
+        dbg.dassert_in(type_, ["price.start", "price.end",
+                               "price.twap", "price.vwap"])
         self.type_ = type_
         dbg.dassert_lte(ts_start, ts_end)
         self.ts_start = ts_start
         self.ts_end = ts_end
         self.num_shares = num_shares
 
-    # def __str__
+    def __str__(self) -> str:
+        return (f"Order: type={self.type_} " +
+                f"ts=[{self.ts_start}, {self.ts_end}] " +
+                f"num_shares={self.num_shares}")
 
-    def get_execution_price(self):
-        if self.type_ == "market_at_end":
-            price = get_price(self.ts_end, df)
-        elif self.type_ == "market_at_start":
-            price = get_price(self.ts_start, df)
-        elif self.type_ == "twap":
+    def get_execution_price(self) -> float:
+        if self.type_ == "price.start":
+            price = get_instantaneous_price(self._df, self.ts_start, "price")
+        elif self.type_ == "price.end":
+            price = get_instantaneous_price(self._df, self.ts_end, "price")
+        elif self.type_ == "price.twap":
             # Price is the average of price in (ts_start, ts_end].
             #price =
             price = np.nan
         else:
-            raise ValueError("Invalid type='%s'", self._type)
+            raise ValueError("Invalid type='%s'", self.type_)
+        return price
+
+    def is_mergeable(self, rhs: "Order") -> bool:
+        return ((self.type_ == rhs.type_) and (self.ts_start == rhs.ts_start) and
+                (self.ts_end == rhs.ts_end))
 
     def merge(self, rhs: "Order") -> "Order":
+        """
+        Accumulate current order with `rhs`, if compatible, and return the merged order.
+        """
         # Only orders for the same type / interval, with different num_shares can
         # be merged.
-        dbg.dassert_eq(self.type_, rhs.type_)
+        dbg.dassert(self.is_mergeable(rhs))
+        num_shares = self.num_shares + rhs.num_shares
+        order = Order(self._df, self.type_, self.ts_start, self.ts_end, num_shares)
+        return order
+
+    def copy(self) -> "Order":
+        return copy.copy(self)
 
 
-
-def get_active_orders(orders, ts: pd.Timestamp) -> List[Order]:
-    orders.sort(lambda x: x.ts_start)
-    dbg.dassert_lte(ts
+def get_orders_to_execute(orders: List[Order], ts: pd.Timestamp) -> List[Order]:
+    orders.sort(key=lambda x: x.ts_start, reverse=False)
+    dbg.dassert_lte(orders[0].ts_start, ts)
     # TODO(gp): This is inefficient. Use binary search.
     curr_orders = []
-    for i i
+    for order in orders:
+        if order.ts_start == ts:
+            curr_orders.append(order)
+    return curr_orders
 
 
+def orders_to_string(orders: List[Order]) -> str:
+    return str(list(map(str, orders)))
 
 
-def get_total_wealth(df, ts, cash, holdings) -> float:
+def get_total_wealth(df: pd.DataFrame, ts: pd.Timestamp, cash: float, holdings: float, column: str) -> float:
     """
     Return the value of the portfolio at time ts.
     """
-    pass
+    wealth = cash + holdings * get_instantaneous_price(df, ts, column)
+    return wealth
 
+import collections
 
-def place_orders_from_predictions(df: pd.DataFrame, df_5mins: pd.DataFrame) -> List[Order]:
-    num_shares_history = []
-    w_history = []
-    pnl_history = []
+def simulate(df: pd.DataFrame, df_5mins: pd.DataFrame, initial_wealth: float) -> List[Order]:
+    columns = [
+        "n_shares.before",
+        "cash.before",
+        "holdings.before",
+        "wealth.before",
+        #
+        "n_shares.after",
+        "cash.after",
+        "holdings.after",
+        "wealth.after",
+    ]
+    accounting = collections.OrderedDict()
+    for column in columns:
+        accounting[column] = []
+    def _update(key: str, value: float) -> None:
+        prev_value = accounting[key][-1] if accounting[key] else None
+        _LOG.debug("%s=%s -> %s", key, prev_value, value)
+        accounting[key].append(value)
+
     orders: List[Order] = []
     # Initial balance.
     holdings = 0.0
-    cash = w0
+    cash = initial_wealth
     for ts, row in df_5mins[:-2].iterrows():
-        _LOG.debug("# ts=%s", ts)
-        # Place orders based on the predictions, if needed.
+        _LOG.debug(hprint.frame("# ts=%s" % ts))
+        # 1) Place orders based on the predictions, if needed.
         pred = row["preds"]
+        _LOG.debug("pred=%s" % pred)
         # Mark the portfolio to market.
-        w = get_total_wealth(df, ts, cash, holdings)
+        _LOG.debug("# Mark portfolio to market")
+        wealth = get_total_wealth(df, ts, cash, holdings, "price")
+        _update("wealth.before", wealth)
         # Use current price to convert forecasts in position intents.
-        price_0 = get_price(ts, df)
-        num_shares = w / price_0
+        _LOG.debug("# Decide how much to trade")
+        price_0 = get_instantaneous_price(df, ts, "price")
+        num_shares = wealth / price_0
         num_shares *= abs(pred)
+        _update("n_shares.before", num_shares)
+        _update("cash.before", cash)
+        _update("holdings.before", holdings)
         if pred > 0:
             # Go long.
             num_shares_5 = num_shares
@@ -217,36 +273,64 @@ def place_orders_from_predictions(df: pd.DataFrame, df_5mins: pd.DataFrame) -> L
             num_shares_5 = num_shares_10 = 0
         else:
             raise ValueError
+        _LOG.debug("# Place orders")
         # Enter position between [0, 5].
         ts_start = ts + pd.DateOffset(minutes=0)
         ts_end = ts + pd.DateOffset(minutes=5)
         type_ = "price.end"
         order = Order(df, type_, ts_start, ts_end, num_shares_5)
+        _LOG.debug("order1=%s", order)
         orders.append(order)
         # Exit position between [5, 10].
         ts_start = ts + pd.DateOffset(minutes=5)
         ts_end = ts + pd.DateOffset(minutes=10)
         type_ = "price.end"
         order = Order(df, type_, ts_start, ts_end, num_shares_10)
+        _LOG.debug("order2=%s", order)
         orders.append(order)
-        # Execute the orders.
+        # 2) Execute the orders.
         # INV: When we get here all the orders for the current timestamp `ts` have
-        # been placed since we acted on the predictions for ts and we can't place
+        # been placed since we acted on the predictions for `ts` and we can't place
         # orders in the past.
         # Find all the orders with the current timestamp.
-
-        # Merge the orders.
-
-    return orders
-
-
-def internal_cross_orders(orders: List[Order]) -> List[Order]:
-    pass
-
-
-# w = 100
-# t = 9:30
-# pred = 1.0
-# price_0 = 10
-# Buy w / price_0 shares
-#
+        _LOG.debug("# Get orders to execute")
+        orders_to_execute = get_orders_to_execute(orders, ts)
+        _LOG.debug("orders_to_execute=%s", orders_to_string(orders_to_execute))
+        # Merge the mergeable orders.
+        merged_orders = []
+        while orders_to_execute:
+            order = orders_to_execute.pop()
+            orders_to_execute_tmp = orders_to_execute[:]
+            for next_order in orders_to_execute_tmp:
+                if order.is_mergeable(next_order):
+                    order = order.merge(next_order)
+                    orders_to_execute_tmp.remove(next_order)
+            merged_orders.append(order)
+            orders_to_execute = orders_to_execute_tmp
+        _LOG.debug("After merging:\n  merged_orders=%s\n  orders_to_execute=%s",
+                   orders_to_string(merged_orders),
+                   orders_to_string(orders_to_execute))
+        # Execute the merged orders.
+        _LOG.debug("# Execute orders")
+        # TODO(gp): We rely on the assumption that order span only one time step.
+        #  so we can evaluate an order starting now and ending in the next time step.
+        #  A more accurate simulation requires to attach "callbacks" representing actions
+        #  to timestamp.
+        # TODO(gp): For now there should be at most one order.j
+        dbg.dassert_lte(len(merged_orders), 1)
+        order = merged_orders[0]
+        _LOG.debug("order=%s", order)
+        num_shares = order.num_shares
+        _update("n_shares.after", num_shares)
+        holdings += num_shares
+        _update("holdings.after", holdings)
+        executed_price = order.get_execution_price()
+        cash -= executed_price * num_shares
+        _update("cash.after", cash)
+        wealth = get_total_wealth(df, ts, cash, holdings, "price")
+        _update("wealth.after", wealth)
+    # Update the df with intermediate results.
+    buffer = [np.nan] * 2
+    for key, value in accounting.items():
+        df_5mins[key] = value + buffer
+    return df_5mins
