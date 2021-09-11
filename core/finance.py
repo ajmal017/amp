@@ -504,8 +504,9 @@ def process_bid_ask(
     df: pd.DataFrame,
     bid_col: str,
     ask_col: str,
-    bid_volume_col: Optional[str] = None,
-    ask_volume_col: Optional[str] = None,
+    bid_volume_col: str,
+    ask_volume_col: str,
+    requested_cols: Optional[List[str]] = None,
     join_output_with_input: bool = False,
 ) -> pd.DataFrame:
     """
@@ -514,31 +515,93 @@ def process_bid_ask(
     dbg.dassert_isinstance(df, pd.DataFrame)
     dbg.dassert_in(bid_col, df.columns)
     dbg.dassert_in(ask_col, df.columns)
+    dbg.dassert_in(bid_volume_col, df.columns)
+    dbg.dassert_in(ask_volume_col, df.columns)
     dbg.dassert(not (df[bid_col] > df[ask_col]).any())
+    supported_cols = [
+        "mid",
+        "geometric_mid",
+        "quoted_spread",
+        "relative_spread",
+        "log_relative_spread",
+        "weighted_mid",
+        "order_book_imbalance",
+        "bid_value",
+        "ask_value",
+        "mid_value",
+    ]
+    requested_cols = requested_cols or supported_cols
+    dbg.dassert_is_subset(requested_cols, supported_cols)
+    dbg.dassert(requested_cols)
+    requested_cols = set(requested_cols)
     results = []
-    # Compute the geometric mean of the bid and ask.
-    midpoint = np.sqrt(df[bid_col] * df[ask_col]).rename("mid")
-    results.append(midpoint)
-    # Compute the relative spread.
-    spread = (np.log(df[ask_col]) - np.log(df[bid_col])).rename("spread")
-    results.append(spread)
-    # Compute the value (e.g., dollars) at the top of the book.
-    if bid_volume_col is not None:
-        dbg.dassert_in(bid_volume_col, df.columns)
-        bid_value = (df[bid_col] * df[bid_volume_col]).rename("bid_value")
-        results.append(bid_value)
-    if ask_volume_col is not None:
-        dbg.dassert_in(ask_volume_col, df.columns)
-        ask_value = (df[ask_col] * df[ask_volume_col]).rename("ask_value")
-        results.append(ask_value)
-    if bid_volume_col is not None and ask_volume_col is not None:
-        mid_value = np.sqrt(bid_value * ask_value).rename("mid_value")
-        results.append(mid_value)
+    if "mid" in requested_cols:
+        srs = ((df[bid_col] + df[ask_col]) / 2).rename("mid")
+        results.append(srs)
+    if "geometric_mid" in requested_cols:
+        srs = np.sqrt(df[bid_col] * df[ask_col]).rename("geometric_mid")
+        results.append(srs)
+    if "quoted_spread" in requested_cols:
+        srs = (df[bid_col] - df[ask_col]).rename("quoted_spread")
+        results.append(srs)
+    if "relative_spread" in requested_cols:
+        pass
+    if "log_relative_spread" in requested_cols:
+        srs = (np.log(df[ask_col]) - np.log(df[bid_col])).rename("log_relative_spread")
+        results.append(srs)
+    if "weighted_mid" in requested_cols:
+        srs = (df[bid_col] * df[ask_volume_col] + df[ask_col] * df[bid_volume_col]) / (df[ask_volume_col] + df[bid_volume_col])
+        srs = srs.rename("weighted_mid")
+        results.append(srs)
+    if "order_book_imbalance" in requested_cols:
+        srs = (df[bid_volume_col] / (df[bid_volume_col] + df[ask_volume_col])).rename("order_book_imbalance")
+    if "bid_value" in requested_cols:
+        srs = (df[bid_col] * df[bid_volume_col]).rename("bid_value")
+        results.append(srs)
+    if "ask_value" in requested_cols:
+        srs = (df[ask_col] * df[ask_volume_col]).rename("ask_value")
+        results.append(srs)
+    if "mid_value" in requested_cols:
+        srs = (df[bid_col] * df[bid_volume_col] + df[ask_col] * df[ask_volume_col]) / 2
+        srs = srs.rename("mid_value")
+        results.append(srs)
     out_df = pd.concat(results, axis=1)
     if join_output_with_input:
         out_df = out_df.merge(df, left_index=True, right_index=True, how="outer")
         dbg.dassert(not out_df.columns.has_duplicates)
     return out_df
+
+
+def compute_spread_costs(
+    df: pd.DataFrame,
+    position_col: str,
+    spread_col: str,
+    spread_fraction_paid: float,
+    position_delay: int = 0,
+    spread_delay: int = 1,
+) -> pd.Series:
+    """
+    Compute spread costs incurred by changing position values.
+
+    The default delays assume that timestamped positions and spreads represent
+    the state of the world at that timestamp.
+
+    :param position_col: series of positions
+    :param spread_col: series of spreads
+    :param spread_fraction_paid: number indicating the fraction of the spread
+        paid, e.g., `0.5` means that 50% of the spread is paid
+    :param position_delay: number of shifts to pre-apply to `position_col`
+    :param spread_delay: number of shifts to pre-apply to `spread_col`
+    """
+    dbg.dassert_isinstance(df, pd.DataFrame)
+    dbg.dassert_in(position_col, df.columns)
+    dbg.dassert_in(spread_col, df.columns)
+    dbg.dassert_lte(0, spread_fraction_paid)
+    dbg.dassert_lte(1, spread_fraction_paid)
+    adjusted_spread = spread_fraction_paid * df[spread_col].shift(spread_delay)
+    position_delta = df[position_col].shift(position_delay).diff()
+    spread_costs = position_delta.multiply(adjusted_spread)
+    return spread_costs
 
 
 # #############################################################################
