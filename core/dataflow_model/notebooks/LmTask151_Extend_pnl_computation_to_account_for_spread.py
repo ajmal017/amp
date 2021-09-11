@@ -78,7 +78,7 @@ print("tot_ret2=", tot_ret2)
 np.testing.assert_almost_equal(tot_ret, tot_ret2)
 
 # %%
-orders = pnl.place_orders_from_predictions(df_5mins)
+orders = pnlsim.place_orders_from_predictions(df_5mins)
 
 orders
 
