@@ -38,9 +38,9 @@ _LOG.debug = _LOG.info
 import numpy as np
 import pandas as pd
 
-import core.dataflow_model.pnl as pnl
+import core.dataflow_model.pnl_simulator as pnlsim
 
-df = pnl.compute_data(21)
+df = pnlsim.compute_data(21)
 
 display(df.head(3))
 display(df.tail(3))
@@ -50,69 +50,95 @@ display(df.tail(3))
 
 # %%
 mode = "instantaneous"
-df_5mins = pnl.resample_data(df, mode)
+df_5mins = pnlsim.resample_data(df, mode)
 display(df_5mins)
 
 # %%
 df.plot()
 
 # %%
+# Compute pnl using simulation.
 w0 = 100.0
-final_w, tot_ret = pnl.compute_pnl_for_instantaneous_no_cost_case(
+final_w, tot_ret = pnlsim.compute_pnl_for_instantaneous_no_cost_case(
     w0, df, df_5mins
 )
 
 print(final_w, tot_ret)
 
 # %%
-# Use lags.
+# Compute pnl using lags.
 df_5mins["pnl"] = df_5mins["preds"] * df_5mins["ret_0"].shift(-2)
-pnls = df_5mins["pnl"]
+tot_ret2 = (1 + df_5mins["pnl"]).prod() - 1
+display(df_5mins[:-1])
 
-tot_ret2 = (1 + pnls).prod() - 1
-
+# Check that the results are the same.
 print("tot_ret=", tot_ret)
 print("tot_ret2=", tot_ret2)
 
 np.testing.assert_almost_equal(tot_ret, tot_ret2)
-display(df_5mins[:-1])
+
+# %%
+orders = pnl.place_orders_from_predictions(df_5mins)
+
+orders
+
+# %%
+# Merge the orders.
+orders.sort(key=lambda x: x.ts, reverse=False)
+
+
+def to_sign(order):
+    return 
+
+def merge_order(order1, order2):
+    dbg.dassert_eq(order1.ts, order2.ts)
+    
+    
+
+current_ts = None
+next_order = None
+for order in orders:
+    if current_ts is None or 
 
 # %%
 # Show that the previous approach (which trades two times per interval) is equivalent to trading once with the
 # sum of the position.
 
-orders = []
+# # Place the orders.
+# orders = []
+# for ts, row in df_5mins[:-2].iterrows():
+#     _LOG.debug("# ts=%s", ts)
+#     pred = row["preds"]
+#     if pred == 1:
+#         # Go long.
+#         action_5 = "buy"
+#         action_10 = "sell"
+#     elif pred == -1:
+#         # Short sell.
+#         action_5 = "sell"
+#         action_10 = "buy"
+#     else:
+#         raise ValueError
+#     # Create two orders to enter / exit the position.
+#     order = (ts + pd.DateOffset(minutes=5), action_5)
+#     print(order)
+#     orders.append(order)
+#     order = (ts + pd.DateOffset(minutes=10), action_10)
+#     print(order)
+#     orders.append(order)
+    
+    
+# Merge the orders.
+orders = orders.sort(lambda x: x[0])
 
-for ts, row in df_5mins[:-2].iterrows():
-    _LOG.debug("ts=%s", ts)
-    pred = row["preds"]
-    if pred == 1:
-        # Go long.
-        action_5 = "buy"
-        action_10 = "sell"
-    elif pred == -1:
-        # Short sell.
-        action_5 = "sell"
-        action_10 = "buy"
-    else:
-        raise ValueError
-    order = (ts + pd.DateOffset(minutes=5), action_5)
-    print(order)
-    orders.append(order)
-    order = (ts + pd.DateOffset(minutes=10), action_10)
-    print(order)
-    orders.append(order)
 
-w0 = 100.0
-
-
-def compute_pnl_from_orders(orders):
+def compute_pnl_from_orders(w0, orders):
     # Assume the orders are in chronological order.
     holdings = 0.0
     cash = w0
     for order in orders:
         ts, action = order
-        _LOG.debug("# ts=%s action=%s", ts, action)
+        _LOG.debug("# ts=%s -> action=%s", ts, action)
         price = df.loc[ts]["price"]
         _LOG.debug("  price=%s", price)
         #
@@ -137,7 +163,7 @@ def compute_pnl_from_orders(orders):
     return holdings * price + cash
 
 
-w = compute_pnl_from_orders(orders)
+w = compute_pnl_from_orders(w0, orders)
 print((w - w0) / w0)
 
 
