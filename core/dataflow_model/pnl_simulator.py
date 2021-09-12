@@ -1,5 +1,5 @@
 import logging
-from typing import List
+from typing import Any, Dict, List
 
 import numpy as np
 import pandas as pd
@@ -25,6 +25,9 @@ def compute_data(num_samples: int, seed: int = 42) -> pd.DataFrame:
     df["ask"] = price + np.abs(np.random.normal(0, 1, size=len(date_range)))
     df["bid"] = price - np.abs(np.random.normal(0, 1, size=len(date_range)))
     return df
+
+
+#def get_example_data1() -> pd.DataFrame:
 
 
 def resample_data(df: pd.DataFrame, mode: str, seed: int = 42) -> pd.DataFrame:
@@ -137,7 +140,7 @@ def get_twap_price(df: pd.DataFrame, ts_start: pd.Timestamp, ts_end: pd.Timestam
 
 class Order:
 
-    def __init__(self, df, type_: str, ts_start: pd.Timestamp, ts_end: pd.Timestamp,
+    def __init__(self, df: pd.DataFrame, type_: str, ts_start: pd.Timestamp, ts_end: pd.Timestamp,
                  num_shares: float):
         self._df = df
         # An order has 2 characteristics:
@@ -164,17 +167,24 @@ class Order:
                 f"ts=[{self.ts_start}, {self.ts_end}] " +
                 f"num_shares={self.num_shares}")
 
-    def get_execution_price(self) -> float:
-        if self.type_ == "price.start":
-            price = get_instantaneous_price(self._df, self.ts_start, "price")
-        elif self.type_ == "price.end":
-            price = get_instantaneous_price(self._df, self.ts_end, "price")
-        elif self.type_ == "price.twap":
+    @staticmethod
+    def get_price(df: pd.DataFrame, type_: str, ts_start: pd.Timestamp, ts_end: pd.Timestamp) -> float:
+        if type_ == "price.start":
+            price = get_instantaneous_price(df, ts_start, "price")
+        elif type_ == "price.end":
+            price = get_instantaneous_price(df, ts_end, "price")
+        elif type_ == "price.twap":
             # Price is the average of price in (ts_start, ts_end].
             #price =
             price = np.nan
         else:
-            raise ValueError("Invalid type='%s'", self.type_)
+            raise ValueError("Invalid type='%s'", type_)
+        _LOG.debug("type=%s, ts_start=%s, ts_end=%s -> execution_price=%s", type_,
+                   ts_start, ts_end, price)
+        return price
+
+    def get_execution_price(self) -> float:
+        price = self.get_price(self._df, self.type_, self.ts_start, self.ts_end)
         return price
 
     def is_mergeable(self, rhs: "Order") -> bool:
@@ -215,19 +225,24 @@ def get_total_wealth(df: pd.DataFrame, ts: pd.Timestamp, cash: float, holdings: 
     """
     Return the value of the portfolio at time ts.
     """
-    wealth = cash + holdings * get_instantaneous_price(df, ts, column)
+    price = get_instantaneous_price(df, ts, column)
+    holdings_value = holdings * price
+    _LOG.debug("Marking at ts=%s holdings=%s at %s -> value=%s", ts, holdings, price, holdings_value)
+    wealth = cash + holdings_value
     return wealth
 
 import collections
 
-def simulate(df: pd.DataFrame, df_5mins: pd.DataFrame, initial_wealth: float) -> List[Order]:
+def simulate(df: pd.DataFrame, df_5mins: pd.DataFrame, initial_wealth: float,
+             config: Dict[str, Any]) -> List[Order]:
     columns = [
-        "n_shares.before",
+        "target_n_shares",
         "cash.before",
         "holdings.before",
         "wealth.before",
+        "diff_n_shares",
         #
-        "n_shares.after",
+        "filled_n_shares",
         "cash.after",
         "holdings.after",
         "wealth.after",
@@ -244,7 +259,7 @@ def simulate(df: pd.DataFrame, df_5mins: pd.DataFrame, initial_wealth: float) ->
     # Initial balance.
     holdings = 0.0
     cash = initial_wealth
-    for ts, row in df_5mins[:-2].iterrows():
+    for ts, row in df_5mins[:-1].iterrows():
         _LOG.debug(hprint.frame("# ts=%s" % ts))
         # 1) Place orders based on the predictions, if needed.
         pred = row["preds"]
@@ -255,38 +270,34 @@ def simulate(df: pd.DataFrame, df_5mins: pd.DataFrame, initial_wealth: float) ->
         _update("wealth.before", wealth)
         # Use current price to convert forecasts in position intents.
         _LOG.debug("# Decide how much to trade")
-        price_0 = get_instantaneous_price(df, ts, "price")
-        num_shares = wealth / price_0
-        num_shares *= abs(pred)
-        _update("n_shares.before", num_shares)
-        _update("cash.before", cash)
-        _update("holdings.before", holdings)
-        if pred > 0:
-            # Go long.
-            num_shares_5 = num_shares
-            num_shares_10 = -num_shares
-        elif pred < 0:
-            # Short sell.
-            num_shares_5 = -num_shares
-            num_shares_10 = num_shares
-        elif pred == 0:
-            num_shares_5 = num_shares_10 = 0
-        else:
-            raise ValueError
-        _LOG.debug("# Place orders")
         # Enter position between [0, 5].
         ts_start = ts + pd.DateOffset(minutes=0)
         ts_end = ts + pd.DateOffset(minutes=5)
-        type_ = "price.end"
-        order = Order(df, type_, ts_start, ts_end, num_shares_5)
-        _LOG.debug("order1=%s", order)
-        orders.append(order)
-        # Exit position between [5, 10].
-        ts_start = ts + pd.DateOffset(minutes=5)
-        ts_end = ts + pd.DateOffset(minutes=10)
-        type_ = "price.end"
-        order = Order(df, type_, ts_start, ts_end, num_shares_10)
-        _LOG.debug("order2=%s", order)
+        # NOTE:
+        # - in the vectorized PnL case we assume we work in terms of wealth and not
+        #   shares, so we assume we can buy the entire amount of wealth at the
+        #   execution price.
+        # - in the real set-up, we need to place order for a certain number of shares
+        #   before we know what price we will get. Thus we use the price at the
+        #   decision time to estimate the number of shares, which means that we
+        #   can't always invest exactly the whole available wealth.
+        order_type = config["order_type"]
+        if config.get("use_current_price_for_target_n_shares", True):
+            price_0 = get_instantaneous_price(df, ts, config["price_column"])
+        else:
+            price_0 = Order.get_price(df, order_type, ts_start, ts_end)
+        _LOG.debug("price_0=%s", price_0)
+        target_num_shares = wealth / price_0
+        target_num_shares *= pred
+        _update("target_n_shares", target_num_shares)
+        _update("cash.before", cash)
+        _update("holdings.before", holdings)
+        _LOG.debug("# Place orders")
+        diff = target_num_shares - holdings
+        _update("diff_n_shares", diff)
+        # Create order.
+        order = Order(df, order_type, ts_start, ts_end, diff)
+        _LOG.debug("order=%s", order)
         orders.append(order)
         # 2) Execute the orders.
         # INV: When we get here all the orders for the current timestamp `ts` have
@@ -296,7 +307,7 @@ def simulate(df: pd.DataFrame, df_5mins: pd.DataFrame, initial_wealth: float) ->
         _LOG.debug("# Get orders to execute")
         orders_to_execute = get_orders_to_execute(orders, ts)
         _LOG.debug("orders_to_execute=%s", orders_to_string(orders_to_execute))
-        # Merge the mergeable orders.
+        # Merge the orders.
         merged_orders = []
         while orders_to_execute:
             order = orders_to_execute.pop()
@@ -316,21 +327,22 @@ def simulate(df: pd.DataFrame, df_5mins: pd.DataFrame, initial_wealth: float) ->
         #  so we can evaluate an order starting now and ending in the next time step.
         #  A more accurate simulation requires to attach "callbacks" representing actions
         #  to timestamp.
-        # TODO(gp): For now there should be at most one order.j
+        # TODO(gp): For now there should be at most one order.
         dbg.dassert_lte(len(merged_orders), 1)
         order = merged_orders[0]
         _LOG.debug("order=%s", order)
         num_shares = order.num_shares
-        _update("n_shares.after", num_shares)
+        _update("filled_n_shares", num_shares)
         holdings += num_shares
         _update("holdings.after", holdings)
         executed_price = order.get_execution_price()
         cash -= executed_price * num_shares
         _update("cash.after", cash)
-        wealth = get_total_wealth(df, ts, cash, holdings, "price")
+        wealth = get_total_wealth(df, ts, cash, holdings, config["price_column"])
         _update("wealth.after", wealth)
     # Update the df with intermediate results.
-    buffer = [np.nan] * 2
+    buffer = [np.nan] * (df_5mins.shape[0] - len(accounting["wealth.before"]))
     for key, value in accounting.items():
         df_5mins[key] = value + buffer
+    df_5mins["pnl.sim"] = (df_5mins["wealth.after"] - df_5mins["wealth.before"]) / df_5mins["wealth.before"]
     return df_5mins

@@ -52,3 +52,8 @@ class TestPnlSimulator1(hut.TestCase):
         num_samples = 5 * 20 + 1
         seed = 44
         self._helper(num_samples, seed)
+
+
+    # Without costs, the pnl is the same as the lag accounting.
+
+    # Without

@@ -59,7 +59,7 @@ df.plot()
 # %%
 # Compute pnl using simulation.
 w0 = 100.0
-final_w, tot_ret = pnlsim.compute_pnl_for_instantaneous_no_cost_case(
+final_w, tot_ret, df_5mins = pnlsim.compute_pnl_for_instantaneous_no_cost_case(
     w0, df, df_5mins
 )
 
@@ -67,25 +67,37 @@ print(final_w, tot_ret)
 
 # %%
 # Compute pnl using lags.
-df_5mins["pnl"] = df_5mins["preds"] * df_5mins["ret_0"].shift(-2)
-tot_ret2 = (1 + df_5mins["pnl"]).prod() - 1
-display(df_5mins[:-1])
+# df_5mins["pnl"] = df_5mins["preds"] * df_5mins["ret_0"].shift(-2)
+# tot_ret2 = (1 + df_5mins["pnl"]).prod() - 1
+# display(df_5mins[:-1])
+
+tot_ret2, df_5mins = pnlsim.compute_lag_pnl(df_5mins)
 
 # Check that the results are the same.
 print("tot_ret=", tot_ret)
 print("tot_ret2=", tot_ret2)
-
 np.testing.assert_almost_equal(tot_ret, tot_ret2)
 
 # %%
 mode = "instantaneous"
 df_5mins = pnlsim.resample_data(df, mode)
-#display(df_5mins)
+display(df_5mins)
+
+config = {
+    "price_column": "price",
+    "use_current_price_for_target_n_shares": False,
+    "order_type": "price.end",
+    
+}
 
 initial_wealth = 1000
-df_5mins = pnlsim.simulate(df, df_5mins, initial_wealth)
+df_5mins = pnlsim.simulate(df, df_5mins, initial_wealth, config)
 
 df_5mins
+
+# %%
+_, df_5mins = pnlsim.compute_lag_pnl(df_5mins)
+display(df_5mins)
 
 # %% [markdown]
 # ## Case 2: interval trading, no costs
