@@ -872,16 +872,71 @@ datetime,mid_value
 
     @staticmethod
     def _get_df() -> pd.DataFrame:
-        """
-        Return a df without NaNs.
-        """
-        # From `s3://*****-data/data/kibot/all_stocks_1min/AAPL.csv.gz`.
         txt = """
 datetime,bid,ask,bid_volume,ask_volume
 2016-01-04 12:00:00,100.01,100.02,200,200
 2016-01-04 12:01:00,100.01,100.02,200,300
 2016-01-04 12:02:00,99.99,100.01,300,300
 2016-01-04 12:03:00,99.98,100.02,200,400
+"""
+        df = pd.read_csv(io.StringIO(txt), index_col=0, parse_dates=True)
+        return df
+
+
+class Test_compute_spread_cost(hut.TestCase):
+    def test_half_spread(self) -> None:
+        df = self._get_df()
+        actual = fin.compute_spread_cost(
+            df, "position", "spread", 0.5
+        )
+        txt = """
+datetime,spread_cost
+2016-01-04 12:00:00,NaN
+2016-01-04 12:01:00,0.005
+2016-01-04 12:02:00,0.015
+2016-01-04 12:03:00,0.020
+"""
+        expected = pd.read_csv(io.StringIO(txt), index_col=0, parse_dates=True)
+        np.testing.assert_allclose(actual, expected)
+
+    def test_third_spread(self) -> None:
+        df = self._get_df()
+        actual = fin.compute_spread_cost(
+            df, "position", "spread", 0.33
+        )
+        txt = """
+datetime,spread_cost
+2016-01-04 12:00:00,NaN
+2016-01-04 12:01:00,0.0033
+2016-01-04 12:02:00,0.0099
+2016-01-04 12:03:00,0.0132
+"""
+        expected = pd.read_csv(io.StringIO(txt), index_col=0, parse_dates=True)
+        np.testing.assert_allclose(actual, expected)
+
+    def test_one_step_forward_target_positions(self) -> None:
+        df = self._get_df()
+        actual = fin.compute_spread_cost(
+            df, "position", "spread", 0.5, spread_delay=0
+        )
+        txt = """
+datetime,spread_cost
+2016-01-04 12:00:00,NaN
+2016-01-04 12:01:00,0.005
+2016-01-04 12:02:00,0.030
+2016-01-04 12:03:00,0.040
+"""
+        expected = pd.read_csv(io.StringIO(txt), index_col=0, parse_dates=True)
+        np.testing.assert_allclose(actual, expected)
+
+    @staticmethod
+    def _get_df() -> pd.DataFrame:
+        txt = """
+datetime,spread,position
+2016-01-04 12:00:00,0.0001,100
+2016-01-04 12:01:00,0.0001,200
+2016-01-04 12:02:00,0.0002,-100
+2016-01-04 12:03:00,0.0004,100
 """
         df = pd.read_csv(io.StringIO(txt), index_col=0, parse_dates=True)
         return df
