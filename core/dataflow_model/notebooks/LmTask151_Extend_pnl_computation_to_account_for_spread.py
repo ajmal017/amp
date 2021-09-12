@@ -57,6 +57,12 @@ display(df_5mins)
 df.plot()
 
 # %%
+df_5mins = pnlsim.get_example_data1()
+df = df_5mins
+
+display(df_5mins)
+
+# %%
 # Compute pnl using simulation.
 w0 = 100.0
 final_w, tot_ret, df_5mins = pnlsim.compute_pnl_for_instantaneous_no_cost_case(
@@ -87,7 +93,6 @@ config = {
     "price_column": "price",
     "use_current_price_for_target_n_shares": False,
     "order_type": "price.end",
-    
 }
 
 initial_wealth = 1000

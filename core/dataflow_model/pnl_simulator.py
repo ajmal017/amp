@@ -1,3 +1,4 @@
+import collections
 import logging
 from typing import Any, Dict, List
 
@@ -27,7 +28,17 @@ def compute_data(num_samples: int, seed: int = 42) -> pd.DataFrame:
     return df
 
 
-#def get_example_data1() -> pd.DataFrame:
+def get_example_data1() -> pd.DataFrame:
+    date_range = pd.date_range("09:30", periods=5, freq="5T")
+    df_5mins = pd.DataFrame([
+        [100, 1.0],
+        [90, -1.0],
+        [80, 1.0],
+        [90, 0.0],
+        [70, 0.0],
+    ], index=date_range, columns=["price", "preds"])
+    df_5mins["ret_0"] = df_5mins["price"].pct_change()
+    return df_5mins
 
 
 def resample_data(df: pd.DataFrame, mode: str, seed: int = 42) -> pd.DataFrame:
@@ -56,9 +67,21 @@ def resample_data(df: pd.DataFrame, mode: str, seed: int = 42) -> pd.DataFrame:
 def compute_pnl_for_instantaneous_no_cost_case(
     w0: float, df: pd.DataFrame, df_5mins: pd.DataFrame
 ):
-    num_shares_history = []
-    w_history = []
-    pnl_history = []
+    columns = [
+        "num_shares",
+        "diff",
+        "wealth",
+    ]
+    # accounting = collections.OrderedDict()
+    # for column in columns:
+    #     accounting[column] = []
+    accounting = _create_accounting_stats(columns)
+
+    def _update(key: str, value: float) -> None:
+        prev_value = accounting[key][-1] if accounting[key] else None
+        _LOG.debug("%s=%s -> %s", key, prev_value, value)
+        accounting[key].append(value)
+
     # Initial balance.
     w = w0
     # Skip the last two rows since we need two rows to enter / exit the position.
@@ -95,25 +118,29 @@ def compute_pnl_for_instantaneous_no_cost_case(
             raise ValueError
         _LOG.debug("  w=%s num_shares=%s", w, num_shares)
         w += diff
-        num_shares_history.append(num_shares)
-        w_history.append(w)
-        pnl_history.append(diff)
+        _update("num_shares", num_shares)
+        _update("wealth", w)
+        _update("diff", diff)
+        #_update("pnl.sim")
         _LOG.debug("  diff=%s -> w=%s", diff, w)
     # Update the df with intermediate results.
-    buffer = [np.nan] * 2
-    df_5mins["num_shares"] = num_shares_history + buffer
-    df_5mins["w"] = w_history + buffer
-    df_5mins["pnl_sim"] = pnl_history + buffer
+    df_5mins = _append_accounting_df(df_5mins, accounting)
+    df_5mins["pnl.sim"] = df_5mins["wealth"].pct_change()
+    # buffer = [np.nan] * 2
+    # df_5mins["num_shares"] = num_shares_history + buffer
+    # df_5mins["wealth"] = wealth_history + buffer
+    # df_5mins["pnl.simplesim"] = pnl_history + buffer
     # Compute total return.
     total_ret = (w - w0) / w0
     return w, total_ret, df_5mins
 
 
 def compute_lag_pnl(df_5mins: pd.DataFrame) -> pd.DataFrame:
-    df_5mins["pnl_lag"] = df_5mins["preds"] * df_5mins["ret_0"].shift(-2)
-    tot_ret_lag = (1 + df_5mins["pnl_lag"]).prod() - 1
+    df_5mins["pnl.lag"] = df_5mins["preds"] * df_5mins["ret_0"].shift(-2)
+    tot_ret_lag = (1 + df_5mins["pnl.lag"]).prod() - 1
     return tot_ret_lag, df_5mins
 
+# ##########################################################################
 
 def get_instantaneous_price(df: pd.DataFrame, ts: pd.Timestamp, column: str) -> float:
     dbg.dassert_in(ts, df.index)
@@ -136,6 +163,9 @@ def get_twap_price(df: pd.DataFrame, ts_start: pd.Timestamp, ts_end: pd.Timestam
     dbg.dassert_lte(1, prices.shape[0])
     price = prices.mean()
     return price
+
+
+# ##########################################################################
 
 
 class Order:
@@ -220,6 +250,7 @@ def get_orders_to_execute(orders: List[Order], ts: pd.Timestamp) -> List[Order]:
 def orders_to_string(orders: List[Order]) -> str:
     return str(list(map(str, orders)))
 
+# ##########################################################################
 
 def get_total_wealth(df: pd.DataFrame, ts: pd.Timestamp, cash: float, holdings: float, column: str) -> float:
     """
@@ -231,7 +262,32 @@ def get_total_wealth(df: pd.DataFrame, ts: pd.Timestamp, cash: float, holdings: 
     wealth = cash + holdings_value
     return wealth
 
-import collections
+
+# ######################################################
+# Accounting functions.
+
+def _create_accounting_stats(columns: List[str]) -> Dict[str, List[float]]:
+    accounting = collections.OrderedDict()
+    for column in columns:
+        accounting[column] = []
+    return accounting
+
+
+def _append_accounting_df(df_5mins: pd.DataFrame, accounting: Dict[str, List[float]]) -> pd.DataFrame:
+    """
+    Update the df with intermediate results.
+    """
+    key = list(accounting.keys())[0]
+    _LOG.debug("key=%s", key)
+    num_vals = len(accounting[key])
+    buffer = [np.nan] * (df_5mins.shape[0] - num_vals)
+    for key, value in accounting.items():
+        dbg.dassert_eq(num_vals, len(value), "key=%s", key)
+        df_5mins[key] = value + buffer
+    return df_5mins
+
+
+# ######################################################
 
 def simulate(df: pd.DataFrame, df_5mins: pd.DataFrame, initial_wealth: float,
              config: Dict[str, Any]) -> List[Order]:
@@ -247,9 +303,11 @@ def simulate(df: pd.DataFrame, df_5mins: pd.DataFrame, initial_wealth: float,
         "holdings.after",
         "wealth.after",
     ]
-    accounting = collections.OrderedDict()
-    for column in columns:
-        accounting[column] = []
+    # accounting = collections.OrderedDict()
+    # for column in columns:
+    #     accounting[column] = []
+    accounting = _create_accounting_stats(columns)
+
     def _update(key: str, value: float) -> None:
         prev_value = accounting[key][-1] if accounting[key] else None
         _LOG.debug("%s=%s -> %s", key, prev_value, value)
@@ -341,8 +399,9 @@ def simulate(df: pd.DataFrame, df_5mins: pd.DataFrame, initial_wealth: float,
         wealth = get_total_wealth(df, ts, cash, holdings, config["price_column"])
         _update("wealth.after", wealth)
     # Update the df with intermediate results.
-    buffer = [np.nan] * (df_5mins.shape[0] - len(accounting["wealth.before"]))
-    for key, value in accounting.items():
-        df_5mins[key] = value + buffer
+    # buffer = [np.nan] * (df_5mins.shape[0] - len(accounting["wealth.before"]))
+    # for key, value in accounting.items():
+    #     df_5mins[key] = value + buffer
+    df_5mins = _append_accounting_df(df_5mins, accounting)
     df_5mins["pnl.sim"] = (df_5mins["wealth.after"] - df_5mins["wealth.before"]) / df_5mins["wealth.before"]
     return df_5mins
