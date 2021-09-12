@@ -95,7 +95,7 @@ tot_ret2, df_5mins = pnlsim.compute_lag_pnl(df_5mins)
 
 config = {
     "price_column": "price",
-    "use_current_price_for_target_n_shares": False,
+    "future_snoop_allocation": True,
     "order_type": "price.end",
 }
 

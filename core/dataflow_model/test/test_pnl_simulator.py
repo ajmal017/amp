@@ -24,10 +24,11 @@ class TestPnlSimulator1(hut.TestCase):
         num_samples = 5 * 20 + 1
         seed = 44
         self._helper(num_samples, seed)
+
     def _helper(self, num_samples: int, seed: int) -> None:
         act = []
         # Generate some random data.
-        df = pnlsim.compute_data(num_samples)
+        df = pnlsim.compute_data(num_samples, seed=seed)
         act.append("df=\n%s" % hut.convert_df_to_string(df, index=True))
         mode = "instantaneous"
         df_5mins = pnlsim.resample_data(df, mode)
@@ -56,9 +57,15 @@ class TestPnlSimulator1(hut.TestCase):
         #
         act = "\n".join(act)
         self.check_string(act)
+        # Check that all the realized PnL are the same.
+        np.testing.assert_array_almost_equal(
+            df_5mins["pnl.lag"].replace(np.nan, 0), df_5mins["pnl.sim1"].replace(np.nan, 0))
         # Check that the results are the same.
         np.testing.assert_almost_equal(tot_ret, tot_ret_lag)
 
     # Without costs, the pnl is the same as the lag accounting.
 
     # Without
+
+
+#class TestPnlSimulator1(hut.TestCase):

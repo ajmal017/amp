@@ -318,12 +318,10 @@ def _append_accounting_df(
     """
     Update the df with intermediate results.
     """
-    key = list(accounting.keys())[0]
-    _LOG.debug("key=%s", key)
-    num_vals = len(accounting[key])
-    buffer = [np.nan] * (df_5mins.shape[0] - num_vals)
     for key, value in accounting.items():
-        dbg.dassert_eq(num_vals, len(value), "key=%s", key)
+        _LOG.debug("key=%s", key)
+        num_vals = len(accounting[key])
+        buffer = [np.nan] * (df_5mins.shape[0] - num_vals)
         df_5mins[key] = value + buffer
     return df_5mins
 
@@ -356,6 +354,15 @@ def simulate(
     initial_wealth: float,
     config: Dict[str, Any],
 ) -> pd.DataFrame:
+    """
+    In this implementation we use the prediction to place orders, that are realized
+    over the span of two intervals of time (i.e., lag)
+
+    - The PnL is realized two intervals of time after the corresponding prediction
+    - The quantities reported are for the beginning of the interval of time
+    - The quantities ending with `+1` represent what happens in the next interval
+      of time
+    """
     columns = [
         "target_n_shares",
         "cash",
@@ -379,35 +386,40 @@ def simulate(
     # Initial balance.
     holdings = 0.0
     cash = initial_wealth
-    for ts, row in df_5mins[:-1].iterrows():
+    for ts, row in df_5mins.iterrows():
         _LOG.debug(hprint.frame("# ts=%s" % _ts_to_str(ts)))
         # 1) Place orders based on the predictions, if needed.
         pred = row["preds"]
         _LOG.debug("pred=%s" % pred)
         # Mark the portfolio to market.
         _LOG.debug("# Mark portfolio to market")
-        wealth = get_total_wealth(df, ts, cash, holdings, "price")
+        wealth = get_total_wealth(df, ts, cash, holdings, config["price_column"])
         _update("wealth", wealth)
+        if ts == df_5mins.index[-1]:
+            # For the last timestamp we only need to mark to market, but not post
+            # any more orders.
+            continue
         # Use current price to convert forecasts in position intents.
         _LOG.debug("# Decide how much to trade")
         # Enter position between [0, 5].
         ts_start = ts + pd.DateOffset(minutes=0)
         ts_end = ts + pd.DateOffset(minutes=5)
-        # NOTE:
-        # - in the vectorized PnL case we assume we work in terms of wealth and not
-        #   shares, so we assume we can buy the entire amount of wealth at the
-        #   execution price.
-        # - in the real set-up, we need to place order for a certain number of shares
-        #   before we know what price we will get. Thus we use the price at the
-        #   decision time to estimate the number of shares, which means that we
-        #   can't always invest exactly the whole available wealth.
         order_type = config["order_type"]
-        if config.get("use_current_price_for_target_n_shares", True):
-            price_0 = get_instantaneous_price(df, ts, config["price_column"])
-        else:
+        if config.get("future_snoop_allocation", False):
+            # - In the vectorized PnL case we assume we work in terms of wealth and not
+            #   shares, so we assume we can buy the entire amount of wealth at the
+            #   execution price.
+            # - In the real set-up, we need to place order for a certain number of shares
+            #   before we know what price we will get. Thus we use the price at the
+            #   decision time to estimate the number of shares, which means that we
+            #   can't always invest exactly the whole available wealth.
             price_0 = Order.get_price(df, order_type, ts_start, ts_end)
+            wealth_to_allocate = get_total_wealth(df, ts_end, cash, holdings, config["price_column"])
+        else:
+            price_0 = get_instantaneous_price(df, ts, config["price_column"])
+            wealth_to_allocate = wealth
         _LOG.debug("price_0=%s", price_0)
-        target_num_shares = wealth / price_0
+        target_num_shares = wealth_to_allocate / price_0
         target_num_shares *= pred
         _update("target_n_shares", target_num_shares)
         _update("cash", cash)
@@ -460,8 +472,6 @@ def simulate(
         executed_price = order.get_execution_price()
         cash -= executed_price * num_shares
         _update("cash+1", cash)
-        #wealth = get_total_wealth(df, ts, cash, holdings, config["price_column"])
-        #_update("wealth.after", wealth)
     # Update the df with intermediate results.
     df_5mins = _append_accounting_df(df_5mins, accounting)
     df_5mins["pnl.sim"] = df_5mins["wealth"].pct_change()
