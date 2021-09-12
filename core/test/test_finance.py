@@ -886,9 +886,7 @@ datetime,bid,ask,bid_volume,ask_volume
 class Test_compute_spread_cost(hut.TestCase):
     def test_half_spread(self) -> None:
         df = self._get_df()
-        actual = fin.compute_spread_cost(
-            df, "position", "spread", 0.5
-        )
+        actual = fin.compute_spread_cost(df, "position", "spread", 0.5)
         txt = """
 datetime,spread_cost
 2016-01-04 12:00:00,NaN
@@ -901,9 +899,7 @@ datetime,spread_cost
 
     def test_third_spread(self) -> None:
         df = self._get_df()
-        actual = fin.compute_spread_cost(
-            df, "position", "spread", 0.33
-        )
+        actual = fin.compute_spread_cost(df, "position", "spread", 0.33)
         txt = """
 datetime,spread_cost
 2016-01-04 12:00:00,NaN

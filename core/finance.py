@@ -552,8 +552,12 @@ def process_bid_ask(
         "mid_value",
     ]
     requested_cols = requested_cols or supported_cols
-    dbg.dassert_is_subset(requested_cols, supported_cols,
-                          "The available columns to request are %s", supported_cols)
+    dbg.dassert_is_subset(
+        requested_cols,
+        supported_cols,
+        "The available columns to request are %s",
+        supported_cols,
+    )
     dbg.dassert(requested_cols)
     requested_cols = set(requested_cols)
     results = []
