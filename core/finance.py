@@ -511,6 +511,27 @@ def process_bid_ask(
 ) -> pd.DataFrame:
     """
     Process top-of-book bid/ask quotes.
+
+    :param df: dataframe with columns for top-of-book bid/ask info
+    :param bid_col: bid price column
+    :param ask_col: ask price column
+    :param bid_volume_col: column with quoted volume at bid
+    :param ask_volume_col: column with quoted volume at ask
+    :requested_cols: the requested output columns; `None` returns all
+        available. Options are:
+      - "mid": the mid price as defined by (ask - bid) / 2
+      - "geometric_mid": the geometric mid price sqrt(ask * bid)
+      - "quoted_spread": ask - bid
+      - "relative_spread": (ask - bid ) / mid
+      - "log_relative_spread": log(ask) - log(bid)
+      - "weighted_mid": (ask * bid_volume + bid * ask_volume) /
+        (ask_volume + bid_volume)
+      - "order_book_imbalance": bid_volume / (bid_volume + ask_volume)
+      - "bid_value": bid * bid_volume
+      - "ask_value": ask * ask_volume
+      - "mid_value": (bid_value + ask_value) / 2
+    :join_output_with_input: whether to only return the requested columns or to
+        join the requested columns to the input dataframe
     """
     dbg.dassert_isinstance(df, pd.DataFrame)
     dbg.dassert_in(bid_col, df.columns)
@@ -531,7 +552,8 @@ def process_bid_ask(
         "mid_value",
     ]
     requested_cols = requested_cols or supported_cols
-    dbg.dassert_is_subset(requested_cols, supported_cols)
+    dbg.dassert_is_subset(requested_cols, supported_cols,
+                          "The available columns to request are %s", supported_cols)
     dbg.dassert(requested_cols)
     requested_cols = set(requested_cols)
     results = []
