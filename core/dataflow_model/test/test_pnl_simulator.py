@@ -108,7 +108,8 @@ class TestPnlSimulator2(hut.TestCase):
     def test1(self):
         act = []
         #
-        df = df_5mins = pnlsim.get_example_data1()
+        df, df_5mins = pnlsim.get_example_data1()
+        initial_wealth = 1000.0
         #
         config = {
             "price_column": "price",
@@ -122,11 +123,3 @@ class TestPnlSimulator2(hut.TestCase):
         #
         act = "\n".join(act)
         self.check_string(act)
-        # Check that all the realized PnL are the same.
-        df_5mins["pnl.sim2.shifted(-2)"] = df_5mins["pnl.sim2"].shift(-2)
-        for col in ["pnl.lag", "pnl.sim1", "pnl.sim2.shifted(-2)"]:
-            df_5mins[col] = df_5mins[col].replace(np.nan, 0)
-        np.testing.assert_array_almost_equal(
-            df_5mins["pnl.lag"], df_5mins["pnl.sim1"])
-        np.testing.assert_array_almost_equal(
-            df_5mins["pnl.lag"], df_5mins["pnl.sim2.shifted(-2)"])
