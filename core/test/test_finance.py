@@ -884,43 +884,38 @@ datetime,bid,ask,bid_volume,ask_volume
 
 
 class Test_compute_spread_cost(hut.TestCase):
-    def test_half_spread(self) -> None:
-        df = self._get_df()
-        actual = fin.compute_spread_cost(df, "position", "spread", 0.5)
-        txt = """
-datetime,spread_cost
-2016-01-04 12:00:00,NaN
-2016-01-04 12:01:00,0.005
-2016-01-04 12:02:00,0.015
-2016-01-04 12:03:00,0.020
-"""
-        expected = pd.read_csv(io.StringIO(txt), index_col=0, parse_dates=True)
-        np.testing.assert_allclose(actual, expected)
-
-    def test_third_spread(self) -> None:
-        df = self._get_df()
-        actual = fin.compute_spread_cost(df, "position", "spread", 0.33)
-        txt = """
-datetime,spread_cost
-2016-01-04 12:00:00,NaN
-2016-01-04 12:01:00,0.0033
-2016-01-04 12:02:00,0.0099
-2016-01-04 12:03:00,0.0132
-"""
-        expected = pd.read_csv(io.StringIO(txt), index_col=0, parse_dates=True)
-        np.testing.assert_allclose(actual, expected)
-
-    def test_one_step_forward_target_positions(self) -> None:
+    def test_one_half_spread(self) -> None:
         df = self._get_df()
         actual = fin.compute_spread_cost(
-            df, "position", "spread", 0.5, spread_delay=0
+            df,
+            target_position_col="position",
+            spread_col="spread",
+            spread_fraction_paid=0.5
         )
         txt = """
 datetime,spread_cost
 2016-01-04 12:00:00,NaN
-2016-01-04 12:01:00,0.005
-2016-01-04 12:02:00,0.030
-2016-01-04 12:03:00,0.040
+2016-01-04 12:01:00,NaN
+2016-01-04 12:02:00,0.01
+2016-01-04 12:03:00,0.06
+"""
+        expected = pd.read_csv(io.StringIO(txt), index_col=0, parse_dates=True)
+        np.testing.assert_allclose(actual, expected)
+
+    def test_one_third_spread(self) -> None:
+        df = self._get_df()
+        actual = fin.compute_spread_cost(
+            df,
+            target_position_col="position",
+            spread_col="spread",
+            spread_fraction_paid=0.33
+        )
+        txt = """
+datetime,spread_cost
+2016-01-04 12:00:00,NaN
+2016-01-04 12:01:00,NaN
+2016-01-04 12:02:00,0.0066
+2016-01-04 12:03:00,0.0396
 """
         expected = pd.read_csv(io.StringIO(txt), index_col=0, parse_dates=True)
         np.testing.assert_allclose(actual, expected)
@@ -933,6 +928,37 @@ datetime,spread,position
 2016-01-04 12:01:00,0.0001,200
 2016-01-04 12:02:00,0.0002,-100
 2016-01-04 12:03:00,0.0004,100
+"""
+        df = pd.read_csv(io.StringIO(txt), index_col=0, parse_dates=True)
+        return df
+
+
+class Test_compute_pnl(hut.TestCase):
+    def test1(self) -> None:
+        df = self._get_df()
+        actual = fin.compute_pnl(
+            df,
+            target_position_col="position",
+            return_col="rets",
+        )
+        txt = """
+datetime,pnl
+2016-01-04 12:00:00,0.10
+2016-01-04 12:01:00,-0.16
+2016-01-04 12:02:00,-0.06
+2016-01-04 12:03:00,0.12
+"""
+        expected = pd.read_csv(io.StringIO(txt), index_col=0, parse_dates=True)
+        np.testing.assert_allclose(actual, expected)
+
+    @staticmethod
+    def _get_df() -> pd.DataFrame:
+        txt = """
+datetime,rets,position
+2016-01-04 12:00:00,0.0010,100
+2016-01-04 12:01:00,-0.0008,200
+2016-01-04 12:02:00,0.0006,-100
+2016-01-04 12:03:00,0.0012,100
 """
         df = pd.read_csv(io.StringIO(txt), index_col=0, parse_dates=True)
         return df
