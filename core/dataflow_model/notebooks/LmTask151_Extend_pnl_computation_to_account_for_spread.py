@@ -62,7 +62,7 @@ display(df_5mins)
 # %%
 # Compute pnl using simulation.
 w0 = 100.0
-final_w, tot_ret, df_5mins = pnlsim.compute_pnl_for_instantaneous_no_cost_case(
+final_w, tot_ret, df_5mins = pnlsim.compute_pnl_level1(
     w0, df, df_5mins
 )
 
@@ -87,7 +87,7 @@ df = df_5mins = pnlsim.get_example_data1()
 #df_5mins = pnlsim.resample_data(df, mode)
 
 initial_wealth = 1000
-final_w, tot_ret, df_5mins = pnlsim.compute_pnl_for_instantaneous_no_cost_case(
+final_w, tot_ret, df_5mins = pnlsim.compute_pnl_level1(
     initial_wealth, df, df_5mins
 )
 tot_ret2, df_5mins = pnlsim.compute_lag_pnl(df_5mins)
@@ -99,7 +99,7 @@ config = {
     "order_type": "price.end",
 }
 
-df_5mins = pnlsim.simulate(df, df_5mins, initial_wealth, config)
+df_5mins = pnlsim.compute_pnl_level2(df, df_5mins, initial_wealth, config)
 
 df_5mins
 

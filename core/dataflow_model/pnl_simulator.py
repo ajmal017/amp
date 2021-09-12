@@ -73,18 +73,23 @@ def resample_data(df: pd.DataFrame, mode: str, seed: int = 42) -> pd.DataFrame:
     return df_5mins
 
 
+# #################################################################################
+
 # TODO(gp): Extend for multiple stocks.
 
 
-def compute_pnl_for_instantaneous_no_cost_case(
-    w0: float, df: pd.DataFrame, df_5mins: pd.DataFrame
+def compute_pnl_level1(
+    initial_wealth: float, df: pd.DataFrame, df_5mins: pd.DataFrame
 ) -> Tuple[float, float, pd.DataFrame]:
     """
-    In this implementation we act on each prediction at the time the prediction
-    is available, by buying / selling (looking into the future prices).
+    In this implementation:
+    - we act on each prediction at the time the prediction is available, by
+      buying / selling looking into the future prices. Thus for each timestamp, we
+      record the prediction and the PnL associated to that prediction.
+    - the execution is instantaneous at the end of the trading interval
+    - there are no costs
 
-    Thus for each timestamp, we record the prediction and the PnL associated to
-    that prediction.
+    This is equivalent to the `compute_lag_pnl()`
     """
     columns = [
         "num_shares",
@@ -99,7 +104,7 @@ def compute_pnl_for_instantaneous_no_cost_case(
         accounting[key].append(value)
 
     # Initial balance.
-    wealth = w0
+    wealth = initial_wealth
     # Skip the last two rows since we need two rows to enter / exit the position.
     for ts, row in df_5mins[:-2].iterrows():
         _LOG.debug(hprint.frame("# ts=%s" % _ts_to_str(ts), char1="<"))
@@ -145,11 +150,11 @@ def compute_pnl_for_instantaneous_no_cost_case(
     df_5mins = _append_accounting_df(df_5mins, accounting)
     # Little index gymnastic to introduce the initial value, given that the
     # semantic of the interval is at the end of the interval.
-    wealth_srs = pd.Series([w0] + df_5mins["wealth"].values.tolist())
+    wealth_srs = pd.Series([initial_wealth] + df_5mins["wealth"].values.tolist())
     #_LOG.debug("wealth_srs=%s", wealth_srs)
     df_5mins["pnl.sim1"] = wealth_srs.pct_change().values[1:]
     # Compute total return.
-    total_ret = (wealth - w0) / w0
+    total_ret = (wealth - initial_wealth) / initial_wealth
     return wealth, total_ret, df_5mins
 
 
@@ -348,7 +353,7 @@ def get_total_wealth(
 # #############################################################################
 
 
-def simulate(
+def compute_pnl_level2(
     df: pd.DataFrame,
     df_5mins: pd.DataFrame,
     initial_wealth: float,
@@ -474,5 +479,5 @@ def simulate(
         _update("cash+1", cash)
     # Update the df with intermediate results.
     df_5mins = _append_accounting_df(df_5mins, accounting)
-    df_5mins["pnl.sim"] = df_5mins["wealth"].pct_change()
+    df_5mins["pnl.sim2"] = df_5mins["wealth"].pct_change()
     return df_5mins
