@@ -28,14 +28,12 @@ dbg.init_logger(verbosity=logging.INFO)
 # dbg.test_logger()
 _LOG = logging.getLogger(__name__)
 
-# %%
-_LOG.debug = _LOG.info
-
 # %% [markdown]
 # # Generate random data
 
 # %%
 import numpy as np
+import pandas as pd
 
 import core.dataflow_model.pnl_simulator as pnlsim
 
@@ -85,8 +83,15 @@ np.testing.assert_almost_equal(tot_ret, tot_ret2)
 
 # %%
 mode = "instantaneous"
-df_5mins = pnlsim.resample_data(df, mode)
-display(df_5mins)
+df = df_5mins = pnlsim.get_example_data1()
+#df_5mins = pnlsim.resample_data(df, mode)
+
+initial_wealth = 1000
+final_w, tot_ret, df_5mins = pnlsim.compute_pnl_for_instantaneous_no_cost_case(
+    initial_wealth, df, df_5mins
+)
+tot_ret2, df_5mins = pnlsim.compute_lag_pnl(df_5mins)
+#display(df_5mins)
 
 config = {
     "price_column": "price",
@@ -94,7 +99,6 @@ config = {
     "order_type": "price.end",
 }
 
-initial_wealth = 1000
 df_5mins = pnlsim.simulate(df, df_5mins, initial_wealth, config)
 
 df_5mins

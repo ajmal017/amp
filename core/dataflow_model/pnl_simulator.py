@@ -14,6 +14,11 @@ _LOG = logging.getLogger(__name__)
 _LOG.debug = _LOG.info
 
 
+def _ts_to_str(ts: pd.Timestamp) -> str:
+    val = "'%s'" % str(ts.time())
+    return val
+
+
 def compute_data(num_samples: int, seed: int = 42) -> pd.DataFrame:
     np.random.seed(seed)
     date_range = pd.date_range("09:30", periods=num_samples, freq="1T")
@@ -74,6 +79,13 @@ def resample_data(df: pd.DataFrame, mode: str, seed: int = 42) -> pd.DataFrame:
 def compute_pnl_for_instantaneous_no_cost_case(
     w0: float, df: pd.DataFrame, df_5mins: pd.DataFrame
 ) -> Tuple[float, float, pd.DataFrame]:
+    """
+    In this implementation we act on each prediction at the time the prediction
+    is available, by buying / selling (looking into the future prices).
+
+    Thus for each timestamp, we record the prediction and the PnL associated to
+    that prediction.
+    """
     columns = [
         "num_shares",
         "diff",
@@ -87,11 +99,12 @@ def compute_pnl_for_instantaneous_no_cost_case(
         accounting[key].append(value)
 
     # Initial balance.
-    w = w0
+    wealth = w0
     # Skip the last two rows since we need two rows to enter / exit the position.
     for ts, row in df_5mins[:-2].iterrows():
-        _LOG.debug("# ts=%s", ts)
+        _LOG.debug(hprint.frame("# ts=%s" % _ts_to_str(ts), char1="<"))
         pred = row["preds"]
+        _LOG.debug("wealth=%s", wealth)
         #
         ts_5 = ts + pd.DateOffset(minutes=5)
         dbg.dassert_in(ts_5, df.index)
@@ -100,39 +113,44 @@ def compute_pnl_for_instantaneous_no_cost_case(
         ts_10 = ts + pd.DateOffset(minutes=10)
         dbg.dassert_in(ts_10, df.index)
         price_10 = df.loc[ts_10]["price"]
-        _LOG.debug("  pred=%s price_5=%s price_10=%s", pred, price_5, price_10)
+        _LOG.debug("pred=%s price_5=%s price_10=%s", pred, price_5, price_10)
         #
-        num_shares = w / price_5
+        num_shares = wealth / price_5
         # The magnitude of the prediction is interpreted as amount of leverage.
         num_shares *= abs(pred)
+        _update("num_shares", num_shares)
         if pred > 0:
             # Go long.
             buy_pnl = num_shares * price_5
+            _LOG.debug("Buy: @ ts_5=%s for price_5=$%s -> buy_pnl=$%s", _ts_to_str(ts_5), price_5, buy_pnl)
             sell_pnl = num_shares * price_10
+            _LOG.debug("Sell: @ ts_10=%s for price_10=$%s -> sell_pnl=$%s", _ts_to_str(ts_10), price_10, sell_pnl)
             diff = -buy_pnl + sell_pnl
         elif pred < 0:
             # Short sell.
             sell_pnl = num_shares * price_5
+            _LOG.debug("Short sell: @ ts_5=%s for price_5=$%s -> sell_pnl=$%s", _ts_to_str(ts_5), price_5, sell_pnl)
             buy_pnl = num_shares * price_10
+            _LOG.debug("Cover: @ ts_10=%s for price_10=$%s -> buy_pnl=$%s", _ts_to_str(ts_10), price_10, buy_pnl)
             diff = sell_pnl - buy_pnl
         elif pred == 0:
             # Stay flat.
             diff = 0.0
         else:
             raise ValueError
-        _LOG.debug("  w=%s num_shares=%s", w, num_shares)
-        w += diff
-        _update("num_shares", num_shares)
-        _update("wealth", w)
         _update("diff", diff)
-        # _update("pnl.sim")
-        _LOG.debug("  diff=%s -> w=%s", diff, w)
+        wealth += diff
+        _update("wealth", wealth)
     # Update the df with intermediate results.
     df_5mins = _append_accounting_df(df_5mins, accounting)
-    df_5mins["pnl.sim"] = df_5mins["wealth"].pct_change()
+    # Little index gymnastic to introduce the initial value, given that the
+    # semantic of the interval is at the end of the interval.
+    wealth_srs = pd.Series([w0] + df_5mins["wealth"].values.tolist())
+    #_LOG.debug("wealth_srs=%s", wealth_srs)
+    df_5mins["pnl.sim1"] = wealth_srs.pct_change().values[1:]
     # Compute total return.
-    total_ret = (w - w0) / w0
-    return w, total_ret, df_5mins
+    total_ret = (wealth - w0) / w0
+    return wealth, total_ret, df_5mins
 
 
 def compute_lag_pnl(df_5mins: pd.DataFrame) -> pd.DataFrame:
@@ -320,7 +338,7 @@ def get_total_wealth(
     holdings_value = holdings * price
     _LOG.debug(
         "Marking at ts=%s holdings=%s at %s -> value=%s",
-        ts,
+        _ts_to_str(ts),
         holdings,
         price,
         holdings_value,
@@ -340,15 +358,15 @@ def simulate(
 ) -> pd.DataFrame:
     columns = [
         "target_n_shares",
-        "cash.before",
-        "holdings.before",
-        "wealth.before",
+        "cash",
+        "holdings",
+        "wealth",
         "diff_n_shares",
         #
         "filled_n_shares",
-        "cash.after",
-        "holdings.after",
-        "wealth.after",
+        "cash+1",
+        "holdings+1",
+        #"wealth.after",
     ]
     accounting = _create_accounting_stats(columns)
 
@@ -362,14 +380,14 @@ def simulate(
     holdings = 0.0
     cash = initial_wealth
     for ts, row in df_5mins[:-1].iterrows():
-        _LOG.debug(hprint.frame("# ts=%s" % ts))
+        _LOG.debug(hprint.frame("# ts=%s" % _ts_to_str(ts)))
         # 1) Place orders based on the predictions, if needed.
         pred = row["preds"]
         _LOG.debug("pred=%s" % pred)
         # Mark the portfolio to market.
         _LOG.debug("# Mark portfolio to market")
         wealth = get_total_wealth(df, ts, cash, holdings, "price")
-        _update("wealth.before", wealth)
+        _update("wealth", wealth)
         # Use current price to convert forecasts in position intents.
         _LOG.debug("# Decide how much to trade")
         # Enter position between [0, 5].
@@ -392,8 +410,8 @@ def simulate(
         target_num_shares = wealth / price_0
         target_num_shares *= pred
         _update("target_n_shares", target_num_shares)
-        _update("cash.before", cash)
-        _update("holdings.before", holdings)
+        _update("cash", cash)
+        _update("holdings", holdings)
         _LOG.debug("# Place orders")
         diff = target_num_shares - holdings
         _update("diff_n_shares", diff)
@@ -438,15 +456,13 @@ def simulate(
         num_shares = order.num_shares
         _update("filled_n_shares", num_shares)
         holdings += num_shares
-        _update("holdings.after", holdings)
+        _update("holdings+1", holdings)
         executed_price = order.get_execution_price()
         cash -= executed_price * num_shares
-        _update("cash.after", cash)
-        wealth = get_total_wealth(df, ts, cash, holdings, config["price_column"])
-        _update("wealth.after", wealth)
+        _update("cash+1", cash)
+        #wealth = get_total_wealth(df, ts, cash, holdings, config["price_column"])
+        #_update("wealth.after", wealth)
     # Update the df with intermediate results.
     df_5mins = _append_accounting_df(df_5mins, accounting)
-    df_5mins["pnl.sim"] = (
-        df_5mins["wealth.after"] - df_5mins["wealth.before"]
-    ) / df_5mins["wealth.before"]
+    df_5mins["pnl.sim"] = df_5mins["wealth"].pct_change()
     return df_5mins
