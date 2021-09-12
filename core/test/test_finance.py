@@ -943,10 +943,10 @@ class Test_compute_pnl(hut.TestCase):
         )
         txt = """
 datetime,pnl
-2016-01-04 12:00:00,0.10
-2016-01-04 12:01:00,-0.16
-2016-01-04 12:02:00,-0.06
-2016-01-04 12:03:00,0.12
+2016-01-04 12:00:00,NaN
+2016-01-04 12:01:00,NaN
+2016-01-04 12:02:00,0.06
+2016-01-04 12:03:00,0.24
 """
         expected = pd.read_csv(io.StringIO(txt), index_col=0, parse_dates=True)
         np.testing.assert_allclose(actual, expected)
