@@ -890,7 +890,7 @@ class Test_compute_spread_cost(hut.TestCase):
             df,
             target_position_col="position",
             spread_col="spread",
-            spread_fraction_paid=0.5
+            spread_fraction_paid=0.5,
         )
         txt = """
 datetime,spread_cost
@@ -908,7 +908,7 @@ datetime,spread_cost
             df,
             target_position_col="position",
             spread_col="spread",
-            spread_fraction_paid=0.33
+            spread_fraction_paid=0.33,
         )
         txt = """
 datetime,spread_cost
