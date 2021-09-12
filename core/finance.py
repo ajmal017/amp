@@ -542,7 +542,7 @@ def process_bid_ask(
         srs = np.sqrt(df[bid_col] * df[ask_col]).rename("geometric_mid")
         results.append(srs)
     if "quoted_spread" in requested_cols:
-        srs = (df[bid_col] - df[ask_col]).rename("quoted_spread")
+        srs = (df[ask_col] - df[bid_col]).rename("quoted_spread")
         results.append(srs)
     if "relative_spread" in requested_cols:
         pass
@@ -561,6 +561,7 @@ def process_bid_ask(
         srs = (
             df[bid_volume_col] / (df[bid_volume_col] + df[ask_volume_col])
         ).rename("order_book_imbalance")
+        results.append(srs)
     if "bid_value" in requested_cols:
         srs = (df[bid_col] * df[bid_volume_col]).rename("bid_value")
         results.append(srs)
