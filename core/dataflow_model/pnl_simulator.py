@@ -1,6 +1,7 @@
 import collections
+import copy
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -30,13 +31,17 @@ def compute_data(num_samples: int, seed: int = 42) -> pd.DataFrame:
 
 def get_example_data1() -> pd.DataFrame:
     date_range = pd.date_range("09:30", periods=5, freq="5T")
-    df_5mins = pd.DataFrame([
-        [100, 1.0],
-        [90, -1.0],
-        [80, 1.0],
-        [90, 0.0],
-        [70, 0.0],
-    ], index=date_range, columns=["price", "preds"])
+    df_5mins = pd.DataFrame(
+        [
+            [100, 1.0],
+            [90, -1.0],
+            [80, 1.0],
+            [90, 0.0],
+            [70, 0.0],
+        ],
+        index=date_range,
+        columns=["price", "preds"],
+    )
     df_5mins["ret_0"] = df_5mins["price"].pct_change()
     return df_5mins
 
@@ -62,19 +67,18 @@ def resample_data(df: pd.DataFrame, mode: str, seed: int = 42) -> pd.DataFrame:
     df_5mins["preds"] = vals
     return df_5mins
 
+
 # TODO(gp): Extend for multiple stocks.
+
 
 def compute_pnl_for_instantaneous_no_cost_case(
     w0: float, df: pd.DataFrame, df_5mins: pd.DataFrame
-):
+) -> Tuple[float, float, pd.DataFrame]:
     columns = [
         "num_shares",
         "diff",
         "wealth",
     ]
-    # accounting = collections.OrderedDict()
-    # for column in columns:
-    #     accounting[column] = []
     accounting = _create_accounting_stats(columns)
 
     def _update(key: str, value: float) -> None:
@@ -121,15 +125,11 @@ def compute_pnl_for_instantaneous_no_cost_case(
         _update("num_shares", num_shares)
         _update("wealth", w)
         _update("diff", diff)
-        #_update("pnl.sim")
+        # _update("pnl.sim")
         _LOG.debug("  diff=%s -> w=%s", diff, w)
     # Update the df with intermediate results.
     df_5mins = _append_accounting_df(df_5mins, accounting)
     df_5mins["pnl.sim"] = df_5mins["wealth"].pct_change()
-    # buffer = [np.nan] * 2
-    # df_5mins["num_shares"] = num_shares_history + buffer
-    # df_5mins["wealth"] = wealth_history + buffer
-    # df_5mins["pnl.simplesim"] = pnl_history + buffer
     # Compute total return.
     total_ret = (w - w0) / w0
     return w, total_ret, df_5mins
@@ -140,16 +140,24 @@ def compute_lag_pnl(df_5mins: pd.DataFrame) -> pd.DataFrame:
     tot_ret_lag = (1 + df_5mins["pnl.lag"]).prod() - 1
     return tot_ret_lag, df_5mins
 
-# ##########################################################################
 
-def get_instantaneous_price(df: pd.DataFrame, ts: pd.Timestamp, column: str) -> float:
+# #############################################################################
+# Price computation.
+# #############################################################################
+
+
+def get_instantaneous_price(
+    df: pd.DataFrame, ts: pd.Timestamp, column: str
+) -> float:
     dbg.dassert_in(ts, df.index)
     dbg.dassert_in(column, df.columns)
-    price = df.loc[ts][column]
+    price: float = df.loc[ts][column]
     return price
 
 
-def get_twap_price(df: pd.DataFrame, ts_start: pd.Timestamp, ts_end: pd.Timestamp, column: str) -> float:
+def get_twap_price(
+    df: pd.DataFrame, ts_start: pd.Timestamp, ts_end: pd.Timestamp, column: str
+) -> float:
     """
     Compute TWAP of the column `column` in (ts_start, ts_end].
     """
@@ -161,17 +169,24 @@ def get_twap_price(df: pd.DataFrame, ts_start: pd.Timestamp, ts_end: pd.Timestam
     # Remove the first row to represent `(ts_start, ...`.
     prices = prices.iloc[1:]
     dbg.dassert_lte(1, prices.shape[0])
-    price = prices.mean()
+    price: float = prices.mean()
     return price
 
 
-# ##########################################################################
+# #############################################################################
+# Order
+# #############################################################################
 
 
 class Order:
-
-    def __init__(self, df: pd.DataFrame, type_: str, ts_start: pd.Timestamp, ts_end: pd.Timestamp,
-                 num_shares: float):
+    def __init__(
+        self,
+        df: pd.DataFrame,
+        type_: str,
+        ts_start: pd.Timestamp,
+        ts_end: pd.Timestamp,
+        num_shares: float,
+    ):
         self._df = df
         # An order has 2 characteristics:
         # 1) what price is executed
@@ -184,8 +199,9 @@ class Order:
         #    - at end of interval
         #    - twap
         #    - vwap
-        dbg.dassert_in(type_, ["price.start", "price.end",
-                               "price.twap", "price.vwap"])
+        dbg.dassert_in(
+            type_, ["price.start", "price.end", "price.twap", "price.vwap"]
+        )
         self.type_ = type_
         dbg.dassert_lte(ts_start, ts_end)
         self.ts_start = ts_start
@@ -193,24 +209,33 @@ class Order:
         self.num_shares = num_shares
 
     def __str__(self) -> str:
-        return (f"Order: type={self.type_} " +
-                f"ts=[{self.ts_start}, {self.ts_end}] " +
-                f"num_shares={self.num_shares}")
+        return (
+            f"Order: type={self.type_} "
+            + f"ts=[{self.ts_start}, {self.ts_end}] "
+            + f"num_shares={self.num_shares}"
+        )
 
     @staticmethod
-    def get_price(df: pd.DataFrame, type_: str, ts_start: pd.Timestamp, ts_end: pd.Timestamp) -> float:
+    def get_price(
+        df: pd.DataFrame, type_: str, ts_start: pd.Timestamp, ts_end: pd.Timestamp
+    ) -> float:
         if type_ == "price.start":
             price = get_instantaneous_price(df, ts_start, "price")
         elif type_ == "price.end":
             price = get_instantaneous_price(df, ts_end, "price")
         elif type_ == "price.twap":
             # Price is the average of price in (ts_start, ts_end].
-            #price =
+            # price =
             price = np.nan
         else:
             raise ValueError("Invalid type='%s'", type_)
-        _LOG.debug("type=%s, ts_start=%s, ts_end=%s -> execution_price=%s", type_,
-                   ts_start, ts_end, price)
+        _LOG.debug(
+            "type=%s, ts_start=%s, ts_end=%s -> execution_price=%s",
+            type_,
+            ts_start,
+            ts_end,
+            price,
+        )
         return price
 
     def get_execution_price(self) -> float:
@@ -218,18 +243,24 @@ class Order:
         return price
 
     def is_mergeable(self, rhs: "Order") -> bool:
-        return ((self.type_ == rhs.type_) and (self.ts_start == rhs.ts_start) and
-                (self.ts_end == rhs.ts_end))
+        return (
+            (self.type_ == rhs.type_)
+            and (self.ts_start == rhs.ts_start)
+            and (self.ts_end == rhs.ts_end)
+        )
 
     def merge(self, rhs: "Order") -> "Order":
         """
-        Accumulate current order with `rhs`, if compatible, and return the merged order.
+        Accumulate current order with `rhs`, if compatible, and return the
+        merged order.
         """
         # Only orders for the same type / interval, with different num_shares can
         # be merged.
         dbg.dassert(self.is_mergeable(rhs))
         num_shares = self.num_shares + rhs.num_shares
-        order = Order(self._df, self.type_, self.ts_start, self.ts_end, num_shares)
+        order = Order(
+            self._df, self.type_, self.ts_start, self.ts_end, num_shares
+        )
         return order
 
     def copy(self) -> "Order":
@@ -250,21 +281,11 @@ def get_orders_to_execute(orders: List[Order], ts: pd.Timestamp) -> List[Order]:
 def orders_to_string(orders: List[Order]) -> str:
     return str(list(map(str, orders)))
 
-# ##########################################################################
 
-def get_total_wealth(df: pd.DataFrame, ts: pd.Timestamp, cash: float, holdings: float, column: str) -> float:
-    """
-    Return the value of the portfolio at time ts.
-    """
-    price = get_instantaneous_price(df, ts, column)
-    holdings_value = holdings * price
-    _LOG.debug("Marking at ts=%s holdings=%s at %s -> value=%s", ts, holdings, price, holdings_value)
-    wealth = cash + holdings_value
-    return wealth
-
-
-# ######################################################
+# #############################################################################
 # Accounting functions.
+# #############################################################################
+
 
 def _create_accounting_stats(columns: List[str]) -> Dict[str, List[float]]:
     accounting = collections.OrderedDict()
@@ -273,7 +294,9 @@ def _create_accounting_stats(columns: List[str]) -> Dict[str, List[float]]:
     return accounting
 
 
-def _append_accounting_df(df_5mins: pd.DataFrame, accounting: Dict[str, List[float]]) -> pd.DataFrame:
+def _append_accounting_df(
+    df_5mins: pd.DataFrame, accounting: Dict[str, List[float]]
+) -> pd.DataFrame:
     """
     Update the df with intermediate results.
     """
@@ -287,10 +310,34 @@ def _append_accounting_df(df_5mins: pd.DataFrame, accounting: Dict[str, List[flo
     return df_5mins
 
 
-# ######################################################
+def get_total_wealth(
+    df: pd.DataFrame, ts: pd.Timestamp, cash: float, holdings: float, column: str
+) -> float:
+    """
+    Return the value of the portfolio at time ts.
+    """
+    price = get_instantaneous_price(df, ts, column)
+    holdings_value = holdings * price
+    _LOG.debug(
+        "Marking at ts=%s holdings=%s at %s -> value=%s",
+        ts,
+        holdings,
+        price,
+        holdings_value,
+    )
+    wealth = cash + holdings_value
+    return wealth
 
-def simulate(df: pd.DataFrame, df_5mins: pd.DataFrame, initial_wealth: float,
-             config: Dict[str, Any]) -> List[Order]:
+
+# #############################################################################
+
+
+def simulate(
+    df: pd.DataFrame,
+    df_5mins: pd.DataFrame,
+    initial_wealth: float,
+    config: Dict[str, Any],
+) -> pd.DataFrame:
     columns = [
         "target_n_shares",
         "cash.before",
@@ -303,9 +350,6 @@ def simulate(df: pd.DataFrame, df_5mins: pd.DataFrame, initial_wealth: float,
         "holdings.after",
         "wealth.after",
     ]
-    # accounting = collections.OrderedDict()
-    # for column in columns:
-    #     accounting[column] = []
     accounting = _create_accounting_stats(columns)
 
     def _update(key: str, value: float) -> None:
@@ -376,9 +420,11 @@ def simulate(df: pd.DataFrame, df_5mins: pd.DataFrame, initial_wealth: float,
                     orders_to_execute_tmp.remove(next_order)
             merged_orders.append(order)
             orders_to_execute = orders_to_execute_tmp
-        _LOG.debug("After merging:\n  merged_orders=%s\n  orders_to_execute=%s",
-                   orders_to_string(merged_orders),
-                   orders_to_string(orders_to_execute))
+        _LOG.debug(
+            "After merging:\n  merged_orders=%s\n  orders_to_execute=%s",
+            orders_to_string(merged_orders),
+            orders_to_string(orders_to_execute),
+        )
         # Execute the merged orders.
         _LOG.debug("# Execute orders")
         # TODO(gp): We rely on the assumption that order span only one time step.
@@ -399,9 +445,8 @@ def simulate(df: pd.DataFrame, df_5mins: pd.DataFrame, initial_wealth: float,
         wealth = get_total_wealth(df, ts, cash, holdings, config["price_column"])
         _update("wealth.after", wealth)
     # Update the df with intermediate results.
-    # buffer = [np.nan] * (df_5mins.shape[0] - len(accounting["wealth.before"]))
-    # for key, value in accounting.items():
-    #     df_5mins[key] = value + buffer
     df_5mins = _append_accounting_df(df_5mins, accounting)
-    df_5mins["pnl.sim"] = (df_5mins["wealth.after"] - df_5mins["wealth.before"]) / df_5mins["wealth.before"]
+    df_5mins["pnl.sim"] = (
+        df_5mins["wealth.after"] - df_5mins["wealth.before"]
+    ) / df_5mins["wealth.before"]
     return df_5mins
