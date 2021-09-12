@@ -11,7 +11,10 @@ import helpers.printing as hprint
 
 _LOG = logging.getLogger(__name__)
 
-_LOG.debug = _LOG.info
+#_LOG.debug = _LOG.info
+
+# TODO(gp): Generalize for different intervals, besides 5 mins trading.
+# TODO(gp): Extend for computing PnL on multiple stocks.
 
 
 def _ts_to_str(ts: pd.Timestamp) -> str:
@@ -31,6 +34,9 @@ def compute_data(num_samples: int, seed: int = 42) -> pd.DataFrame:
     # Add ask, bid, where price is not the midpoint.
     df["ask"] = price + np.abs(np.random.normal(0, 1, size=len(date_range)))
     df["bid"] = price - np.abs(np.random.normal(0, 1, size=len(date_range)))
+    # TODO(gp): Use functions in core/finance.py.
+    #df["midpoint"] = (df["ask"] + df["bid"]) / 2
+    #df["spread"] = df["ask"] - df["bid"]
     return df
 
 
@@ -86,8 +92,6 @@ def get_example_data2(num_samples: int, seed: int) -> Tuple[pd.DataFrame, pd.Dat
 
 
 # #################################################################################
-
-# TODO(gp): Extend for multiple stocks.
 
 
 def compute_pnl_level1(
@@ -195,14 +199,17 @@ def get_twap_price(
 ) -> float:
     """
     Compute TWAP of the column `column` in (ts_start, ts_end].
+
+    The function should be called `get_twa_price()` or `get_twap()`.
     """
     dbg.dassert_in(ts_start, df.index)
     dbg.dassert_in(ts_end, df.index)
     dbg.dassert_lt(ts_start, ts_end)
     dbg.dassert_in(column, df.columns)
+    # Get the slice (ts_start, ts_end] of prices.
     prices = df[ts_start:ts_end][column]
-    # Remove the first row to represent `(ts_start, ...`.
     prices = prices.iloc[1:]
+    _LOG.debug("prices=\n%s", prices)
     dbg.dassert_lte(1, prices.shape[0])
     price: float = prices.mean()
     return price
@@ -222,6 +229,9 @@ class Order:
         ts_end: pd.Timestamp,
         num_shares: float,
     ):
+        """
+        Represent an order executed in (ts_start, ts_end].
+        """
         self._df = df
         # An order has 2 characteristics:
         # 1) what price is executed
@@ -234,11 +244,8 @@ class Order:
         #    - at end of interval
         #    - twap
         #    - vwap
-        dbg.dassert_in(
-            type_, ["price.start", "price.end", "price.twap", "price.vwap"]
-        )
         self.type_ = type_
-        dbg.dassert_lte(ts_start, ts_end)
+        dbg.dassert_lt(ts_start, ts_end)
         self.ts_start = ts_start
         self.ts_end = ts_end
         self.num_shares = num_shares
@@ -252,16 +259,45 @@ class Order:
 
     @staticmethod
     def get_price(
-        df: pd.DataFrame, type_: str, ts_start: pd.Timestamp, ts_end: pd.Timestamp
+        df: pd.DataFrame, type_: str, ts_start: pd.Timestamp, ts_end: pd.Timestamp,
+        num_shares: float
     ) -> float:
-        if type_ == "price.start":
-            price = get_instantaneous_price(df, ts_start, "price")
-        elif type_ == "price.end":
-            price = get_instantaneous_price(df, ts_end, "price")
-        elif type_ == "price.twap":
-            # Price is the average of price in (ts_start, ts_end].
-            # price =
-            price = np.nan
+        """
+        Get price that one order with given parameters would achieve.
+        """
+        # Parse the type.
+        config = type_.split(".")
+        dbg.dassert_eq(len(config), 2, "Invalid type_='%s'", type_)
+        price_type, timing = config
+        # Get the price depending on the price_type.
+        if price_type in ("price", "midpoint"):
+            column = price_type
+            price = Order._get_price(df, ts_start, ts_end, column, timing)
+        elif price_type == "full_spread":
+            # Cross the spread depending on buy / sell.
+            if num_shares >= 0:
+                column = "ask"
+            else:
+                column = "bid"
+            price = Order._get_price(df, ts_start, ts_end, column, timing)
+        elif price_type.startswith("partial_spread"):
+            perc = float(price_type.split("_")[2])
+            dbg.dassert_lte(0, perc)
+            dbg.dassert_lte(perc, 1.0)
+            bid_price = Order._get_price(df, ts_start, ts_end, column, "bid")
+            ask_price = Order._get_price(df, ts_start, ts_end, column, "ask")
+            if num_shares >= 0:
+                # We need to buy:
+                # - if perc == 1.0 pay ask (i.e., pay full-spread)
+                # - if perc == 0.5 pay midpoint
+                # - if perc == 0.0 pay bid
+                price = perc * ask_price + (1.0 - perc) * bid_price
+            else:
+                # We need to sell:
+                # - if perc == 1.0 pay bid
+                # - if perc == 0.5 pay midpoint
+                # - if perc == 0.0 pay ask
+                price = (1.0 - perc) * ask_price + perc * bid_price
         else:
             raise ValueError("Invalid type='%s'", type_)
         _LOG.debug(
@@ -274,10 +310,16 @@ class Order:
         return price
 
     def get_execution_price(self) -> float:
-        price = self.get_price(self._df, self.type_, self.ts_start, self.ts_end)
+        """
+        Get price that this order executes at.
+        """
+        price = self.get_price(self._df, self.type_, self.ts_start, self.ts_end, self.num_shares)
         return price
 
     def is_mergeable(self, rhs: "Order") -> bool:
+        """
+        Return whether this order can be merged (i.e., internal crossed) with `rhs`.
+        """
         return (
             (self.type_ == rhs.type_)
             and (self.ts_start == rhs.ts_start)
@@ -286,8 +328,7 @@ class Order:
 
     def merge(self, rhs: "Order") -> "Order":
         """
-        Accumulate current order with `rhs`, if compatible, and return the
-        merged order.
+        Accumulate current order with `rhs` and return the merged order.
         """
         # Only orders for the same type / interval, with different num_shares can
         # be merged.
@@ -301,8 +342,27 @@ class Order:
     def copy(self) -> "Order":
         return copy.copy(self)
 
+    @staticmethod
+    def _get_price(df: pd.DataFrame, ts_start: pd.Timestamp, ts_end: pd.Timestamp,
+                   column: str, timing: str) -> float:
+        """
+        Get the price corresponding to a certain column and timing.
+        """
+        if timing == "start":
+            price = get_instantaneous_price(df, ts_start, column)
+        elif timing == "end":
+            price = get_instantaneous_price(df, ts_end, column)
+        elif timing == "twap":
+            price = get_twap_price(df, ts_start, ts_end, column)
+        else:
+            raise ValueError("Invalid timing='%s'", timing)
+        return price
+
 
 def get_orders_to_execute(orders: List[Order], ts: pd.Timestamp) -> List[Order]:
+    """
+    Return the orders from `orders` that can be executed at timestamp `ts`.
+    """
     orders.sort(key=lambda x: x.ts_start, reverse=False)
     dbg.dassert_lte(orders[0].ts_start, ts)
     # TODO(gp): This is inefficient. Use binary search.
@@ -430,7 +490,9 @@ def compute_pnl_level2(
             #   before we know what price we will get. Thus we use the price at the
             #   decision time to estimate the number of shares, which means that we
             #   can't always invest exactly the whole available wealth.
-            price_0 = Order.get_price(df, order_type, ts_start, ts_end)
+            # The direction of the trade is enough to determine the price.
+            num_shares_proxy = pred
+            price_0 = Order.get_price(df, order_type, ts_start, ts_end, num_shares_proxy)
             wealth_to_allocate = get_total_wealth(df, ts_end, cash, holdings, config["price_column"])
         else:
             price_0 = get_instantaneous_price(df, ts, config["price_column"])
