@@ -36,13 +36,13 @@ import numpy as np
 
 import core.dataflow_model.pnl_simulator as pnlsim
 
-df = pnlsim.compute_data(21)
+df = pnlsim.get_random_market_data(21)
 
 display(df.head(3))
 display(df.tail(3))
 
 # %% [markdown]
-# ## Case 1: instantaneous, no costs
+# ## Lag-based PnL vs Level1 simulation
 
 # %%
 mode = "instantaneous"
@@ -53,8 +53,7 @@ display(df_5mins)
 df.plot()
 
 # %%
-df_5mins = pnlsim.get_example_data1()
-df = df_5mins
+df, df_5mins = pnlsim.get_example_market_data1()
 
 display(df_5mins)
 
@@ -78,18 +77,22 @@ print("tot_ret=", tot_ret)
 print("tot_ret2=", tot_ret2)
 np.testing.assert_almost_equal(tot_ret, tot_ret2)
 
+# %% [markdown]
+# ## Lag-based PnL vs Level1 vs Level2 simulation
+
 # %%
 mode = "instantaneous"
-df = df_5mins = pnlsim.get_example_data1()
-# df_5mins = pnlsim.resample_data(df, mode)
+df, df_5mins = pnlsim.get_example_market_data1()
 
+# Level 1 sim.
 initial_wealth = 1000
 final_w, tot_ret, df_5mins = pnlsim.compute_pnl_level1(
     initial_wealth, df, df_5mins
 )
+# Lag-based sim.
 tot_ret2, df_5mins = pnlsim.compute_lag_pnl(df_5mins)
-# display(df_5mins)
 
+# Level 2 sim.
 config = {
     "price_column": "price",
     "future_snoop_allocation": True,
@@ -99,25 +102,3 @@ config = {
 df_5mins = pnlsim.compute_pnl_level2(df, df_5mins, initial_wealth, config)
 
 df_5mins
-
-# %%
-_, df_5mins = pnlsim.compute_lag_pnl(df_5mins)
-display(df_5mins)
-
-# %% [markdown]
-# ## Case 2: interval trading, no costs
-
-# %%
-df_5mins = df.resample("5T", closed="right", label="right").mean()
-
-if True:
-    a = df.iloc[1:6]["price"].mean()
-    b = df_5mins.iloc[1]["price"]
-    # print(a, b)
-    assert a == b
-
-df_5mins["ret_0"] = df_5mins["price"].pct_change()
-
-np.random.seed(42)
-df_5mins["preds"] = (np.random.random(df_5mins.shape[0]) >= 0.5) * 2.0 - 1.0
-display(df_5mins)

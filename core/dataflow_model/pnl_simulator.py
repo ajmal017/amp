@@ -15,37 +15,58 @@ _LOG = logging.getLogger(__name__)
 
 # TODO(gp): Generalize for different intervals, besides 5 mins trading.
 # TODO(gp): Extend for computing PnL on multiple stocks.
+# TODO(gp): Consider ts -> datetime_, {start,end}_ts -> {start,end}_datetime for
+#  uniformity with the rest of the code.
 
 
 def _ts_to_str(ts: pd.Timestamp) -> str:
+    """
+    Print timestamp as string only in terms of time.
+
+    This is useful to simplify the debug output of intraday trading.
+    """
     val = "'%s'" % str(ts.time())
     return val
 
 
-def compute_data(num_samples: int, seed: int = 42) -> pd.DataFrame:
+def get_random_market_data(num_samples: int, seed: int = 42) -> pd.DataFrame:
+    """
+    Generate random 1-minute market data in terms of `price`, `ask`, `bid`.
+    """
     np.random.seed(seed)
-    date_range = pd.date_range("09:30", periods=num_samples, freq="1T")
-    # Random walk.
+    date_range = pd.date_range("2021-09-12 09:30", periods=num_samples, freq="1T")
+    # Random walk for `price`.
     diff = np.random.normal(0, 1, size=len(date_range))
     diff = diff.cumsum()
     price = 100.0 + diff
-    #
     df = pd.DataFrame(price, index=date_range, columns=["price"])
-    # Add ask, bid, where price is not the midpoint.
+    # Add `ask`, `bid` (note that `price` is not the midpoint).
     df["ask"] = price + np.abs(np.random.normal(0, 1, size=len(date_range)))
     df["bid"] = price - np.abs(np.random.normal(0, 1, size=len(date_range)))
-    # TODO(gp): Use functions in core/finance.py.
-    # df["midpoint"] = (df["ask"] + df["bid"]) / 2
-    # df["spread"] = df["ask"] - df["bid"]
     return df
 
 
 def resample_data(df: pd.DataFrame, mode: str, seed: int = 42) -> pd.DataFrame:
+    """
+    Resample 1-min market data to 5 minutes to match the trading pattern and add
+    random predictions.
+
+    This data is used by the lag-based computation and has the same semantic as
+    Dataflow approach.
+    - intervals are (a, b]
+    - everything is computed by the end of the interval whose timestamp is the label
+      of the row
+    - predictions are computed instantaneously using the data available up to b for
+      an interval (a, b]
+    """
     # Sample on 5 minute bars, labeling and close interval on the right.
     df_5mins = df.resample("5T", closed="right", label="right")
     if mode == "instantaneous":
         df_5mins = df_5mins.last()
     elif mode == "twap":
+        # This allows to use TWAP prices instead of instantaneous prices, using the
+        # same lag-based PnL code.
+        # TODO(gp): We might need to delay 1 min to make it more similar to real-time.
         df_5mins = df_5mins.mean()
     else:
         raise ValueError("Invalid mode='%s'" % mode)
@@ -56,7 +77,6 @@ def resample_data(df: pd.DataFrame, mode: str, seed: int = 42) -> pd.DataFrame:
     vals = (np.random.random(df_5mins.shape[0]) >= 0.5) * 2.0 - 1.0
     # Zero out the last two predictions since we need two lags to realize (enter /
     # exit) a prediction.
-    # vals[-2:] = np.nan
     vals[-2:] = 0
     df_5mins["preds"] = vals
     return df_5mins
@@ -65,8 +85,11 @@ def resample_data(df: pd.DataFrame, mode: str, seed: int = 42) -> pd.DataFrame:
 # #############################################################################
 
 
-def get_example_data1() -> Tuple[pd.DataFrame, pd.DataFrame]:
-    date_range = pd.date_range("09:30", periods=5, freq="5T")
+def get_example_market_data1() -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Handcrafted small example.
+    """
+    date_range = pd.date_range("2021-09-12 09:30", periods=5, freq="5T")
     df_5mins = pd.DataFrame(
         [
             [100, 1.0],
@@ -83,11 +106,14 @@ def get_example_data1() -> Tuple[pd.DataFrame, pd.DataFrame]:
     return df, df_5mins
 
 
-def get_example_data2(
+def get_example_market_data2(
     num_samples: int, seed: int
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Fixed random example.
+    """
     # Generate some random data.
-    df = compute_data(num_samples, seed=seed)
+    df = get_random_market_data(num_samples, seed=seed)
     mode = "instantaneous"
     df_5mins = resample_data(df, mode)
     return df, df_5mins
@@ -104,11 +130,11 @@ def compute_pnl_level1(
 
     - we act on each prediction at the time the prediction is available, by
       buying / selling looking into the future prices. Thus for each timestamp, we
-      record the prediction and the PnL associated to that prediction.
+      can associate each PnL to that prediction.
     - the execution is instantaneous at the end of the trading interval
     - there are no costs
 
-    This is equivalent to the `compute_lag_pnl()`
+    This is equivalent to the `compute_lag_pnl()` but using a little more detail.
     """
     columns = [
         "num_shares",
@@ -198,6 +224,9 @@ def compute_pnl_level1(
 
 
 def compute_lag_pnl(df_5mins: pd.DataFrame) -> pd.DataFrame:
+    """
+    Compute PnL using vectorized equation as in post-processing of `ResultBundles`.
+    """
     df_5mins["pnl.lag"] = df_5mins["preds"] * df_5mins["ret_0"].shift(-2)
     tot_ret_lag = (1 + df_5mins["pnl.lag"]).prod() - 1
     return tot_ret_lag, df_5mins
@@ -222,6 +251,8 @@ def get_twap_price(
 ) -> float:
     """
     Compute TWAP of the column `column` in (ts_start, ts_end].
+
+    E.g., TWAP for (9:30, 9:35] means avg(p(9:31), ..., p(9:35)).
 
     The function should be called `get_twa_price()` or `get_twap()`.
     """
@@ -257,16 +288,16 @@ class Order:
         """
         self._df = df
         # An order has 2 characteristics:
-        # 1) what price is executed
+        # 1) what price is executed at, e.g.,
         #    - price: the (historical) realized price
         #    - midpoint: the midpoint
         #    - full_spread: always cross the spread to hit ask or lift bid
         #    - partial_spread: pay a percentage of spread
-        # 2) timing semantic
+        # 2) timing semantic, i.e., when it is executed
         #    - at beginning of interval
         #    - at end of interval
-        #    - twap
-        #    - vwap
+        #    - TWAP
+        #    - VWAP
         self.type_ = type_
         dbg.dassert_lt(ts_start, ts_end)
         self.ts_start = ts_start
@@ -467,11 +498,11 @@ def compute_pnl_level2(
 ) -> pd.DataFrame:
     """
     In this implementation we use the prediction to place orders, that are
-    realized over the span of two intervals of time (i.e., lag)
+    realized over the span of two intervals of time (i.e., two lags).
 
     - The PnL is realized two intervals of time after the corresponding prediction
-    - The quantities reported are for the beginning of the interval of time
-    - The quantities ending with `+1` represent what happens in the next interval
+    - The columns reported in the df are for the beginning of the interval of time
+    - The columns ending with `+1` represent what happens in the next interval
       of time
     """
     columns = [
@@ -501,7 +532,7 @@ def compute_pnl_level2(
         _LOG.debug(hprint.frame("# ts=%s" % _ts_to_str(ts)))
         # 1) Place orders based on the predictions, if needed.
         pred = row["preds"]
-        _LOG.debug("pred=%s" % pred)
+        _LOG.debug("pred=%s", pred)
         # Mark the portfolio to market.
         _LOG.debug("# Mark portfolio to market")
         wealth = get_total_wealth(df, ts, cash, holdings, config["price_column"])
@@ -517,13 +548,13 @@ def compute_pnl_level2(
         ts_end = ts + pd.DateOffset(minutes=5)
         order_type = config["order_type"]
         if config.get("future_snoop_allocation", False):
-            # - In the vectorized PnL case we assume we work in terms of wealth and not
-            #   shares, so we assume we can buy the entire amount of wealth at the
-            #   execution price.
-            # - In the real set-up, we need to place order for a certain number of shares
-            #   before we know what price we will get. Thus we use the price at the
-            #   decision time to estimate the number of shares, which means that we
-            #   can't always invest exactly the whole available wealth.
+            # - In the vectorized PnL case we assume we work in terms of dollar and
+            #   not shares: we assume we can buy the entire amount of wealth in terms
+            #   of shares (i.e., we assume that we know the future execution price)
+            # - In the real set-up, we need to place order for a certain number of
+            #   shares before we know what price we will get. Thus we use the price
+            #   at the decision time to estimate the number of shares, which means
+            #   that we can't always invest exactly the whole available wealth.
             # The direction of the trade is enough to determine the price.
             num_shares_proxy = pred
             price_0 = Order.get_price(
@@ -576,8 +607,8 @@ def compute_pnl_level2(
         _LOG.debug("# Execute orders")
         # TODO(gp): We rely on the assumption that order span only one time step.
         #  so we can evaluate an order starting now and ending in the next time step.
-        #  A more accurate simulation requires to attach "callbacks" representing actions
-        #  to timestamp.
+        #  A more accurate simulation requires to attach "callbacks" representing
+        #  actions to timestamp.
         # TODO(gp): For now there should be at most one order.
         dbg.dassert_lte(len(merged_orders), 1)
         order = merged_orders[0]

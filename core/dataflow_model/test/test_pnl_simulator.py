@@ -11,14 +11,21 @@ _LOG = logging.getLogger(__name__)
 
 
 class TestPnlSimulatorFunctions1(hut.TestCase):
-    def get_data(self) -> pd.DataFrame:
+
+    def _get_data(self) -> pd.DataFrame:
+        """
+        Return fixed random data for the other unit tests.
+        """
         num_samples = 21
         seed = 42
-        df = pnlsim.compute_data(num_samples, seed)
+        df = pnlsim.get_random_market_data(num_samples, seed)
         return df
 
-    def test1(self):
-        df = self.get_data()
+    def test_get_data1(self):
+        """
+        Freeze the output of `_get_data()` as reference for other unit tests.
+        """
+        df = self._get_data()
         df = df["price ask bid".split()]
         actual_result = hut.convert_df_to_string(df, index=True)
         expected_result = """
@@ -49,7 +56,10 @@ class TestPnlSimulatorFunctions1(hut.TestCase):
         self.assert_equal(actual_result, expected_result)
 
     def test_get_twap_price1(self):
-        df = self.get_data()
+        """
+        Test that TWAP is computed properly.
+        """
+        df = self._get_data()
         ts_start = pd.Timestamp("2021-09-12 09:30:00")
         ts_end = pd.Timestamp("2021-09-12 09:35:00")
         column = "price"
@@ -72,40 +82,46 @@ class TestPnlSimulator1(hut.TestCase):
 
     def test1(self):
         """
-        Run PnL on an handcrafted example.
+        Compute PnL on an handcrafted example.
         """
-        df, df_5mins = pnlsim.get_example_data1()
+        df, df_5mins = pnlsim.get_example_market_data1()
         # Execute.
         self._run(df, df_5mins)
 
     def test_random1(self) -> None:
         """
-        Run on a random example.
+        Compute PnL on a random example.
         """
         num_samples = 5 * 3 + 1
         seed = 42
-        df, df_5mins = pnlsim.get_example_data2(num_samples, seed)
+        df, df_5mins = pnlsim.get_example_market_data2(num_samples, seed)
         # Execute.
         self._run(df, df_5mins)
 
     def test_random2(self) -> None:
+        """
+        Compute PnL on a random example.
+        """
         num_samples = 5 * 10 + 1
         seed = 43
-        df, df_5mins = pnlsim.get_example_data2(num_samples, seed)
+        df, df_5mins = pnlsim.get_example_market_data2(num_samples, seed)
         # Execute.
         self._run(df, df_5mins)
 
     def test_random3(self) -> None:
+        """
+        Compute PnL on a random example.
+        """
         num_samples = 5 * 20 + 1
         seed = 44
-        df, df_5mins = pnlsim.get_example_data2(num_samples, seed)
+        df, df_5mins = pnlsim.get_example_market_data2(num_samples, seed)
         # Execute.
         self._run(df, df_5mins)
 
     def _run(self, df: pd.DataFrame, df_5mins: pd.DataFrame) -> None:
         """
-        Compute pnl using level1 simulation and lag-based approach, checking
-        that:
+        Compute PnL using lag-based approach, level1 simulation, and level2
+        simulations, checking that:
 
         - the intermediate PnL stream match
         - the total return from the different approaches matches
@@ -158,15 +174,19 @@ class TestPnlSimulator1(hut.TestCase):
         np.testing.assert_array_almost_equal(
             df_5mins["pnl.lag"], df_5mins["pnl.sim2.shifted(-2)"]
         )
-        # Check that the results are the same.
+        # Check that the total returns are the same.
         np.testing.assert_almost_equal(tot_ret, tot_ret_lag)
 
 
 class TestPnlSimulator2(hut.TestCase):
     def test1(self):
+        """
+        Run level2 simulation using future information to use invest all the working
+        capital.
+        """
         act = []
         #
-        df, df_5mins = pnlsim.get_example_data1()
+        df, df_5mins = pnlsim.get_example_market_data1()
         initial_wealth = 1000.0
         #
         config = {
@@ -183,9 +203,12 @@ class TestPnlSimulator2(hut.TestCase):
         self.check_string(act)
 
     def test2(self):
+        """
+        Same as `test1()` but without future information.
+        """
         act = []
         #
-        df, df_5mins = pnlsim.get_example_data1()
+        df, df_5mins = pnlsim.get_example_market_data1()
         initial_wealth = 1000.0
         #
         config = {
@@ -200,3 +223,7 @@ class TestPnlSimulator2(hut.TestCase):
         #
         act = "\n".join(act)
         self.check_string(act)
+
+
+# TODO(gp): Add unit tests for computing PnL with level2 sim using midpoint price,
+#  and different spread amount.
