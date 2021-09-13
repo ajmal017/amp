@@ -504,37 +504,159 @@ def process_bid_ask(
     df: pd.DataFrame,
     bid_col: str,
     ask_col: str,
-    bid_volume_col: Optional[str] = None,
-    ask_volume_col: Optional[str] = None,
+    bid_volume_col: str,
+    ask_volume_col: str,
+    requested_cols: Optional[List[str]] = None,
     join_output_with_input: bool = False,
 ) -> pd.DataFrame:
     """
     Process top-of-book bid/ask quotes.
+
+    :param df: dataframe with columns for top-of-book bid/ask info
+    :param bid_col: bid price column
+    :param ask_col: ask price column
+    :param bid_volume_col: column with quoted volume at bid
+    :param ask_volume_col: column with quoted volume at ask
+    :requested_cols: the requested output columns; `None` returns all
+        available. Options are:
+      - "mid": the mid price as defined by (ask - bid) / 2
+      - "geometric_mid": the geometric mid price sqrt(ask * bid)
+      - "quoted_spread": ask - bid
+      - "relative_spread": (ask - bid ) / mid
+      - "log_relative_spread": log(ask) - log(bid)
+      - "weighted_mid": (ask * bid_volume + bid * ask_volume) /
+        (ask_volume + bid_volume)
+      - "order_book_imbalance": bid_volume / (bid_volume + ask_volume)
+      - "bid_value": bid * bid_volume
+      - "ask_value": ask * ask_volume
+      - "mid_value": (bid_value + ask_value) / 2
+    :join_output_with_input: whether to only return the requested columns or to
+        join the requested columns to the input dataframe
     """
     dbg.dassert_isinstance(df, pd.DataFrame)
     dbg.dassert_in(bid_col, df.columns)
     dbg.dassert_in(ask_col, df.columns)
+    dbg.dassert_in(bid_volume_col, df.columns)
+    dbg.dassert_in(ask_volume_col, df.columns)
     dbg.dassert(not (df[bid_col] > df[ask_col]).any())
+    supported_cols = [
+        "mid",
+        "geometric_mid",
+        "quoted_spread",
+        "relative_spread",
+        "log_relative_spread",
+        "weighted_mid",
+        "order_book_imbalance",
+        "bid_value",
+        "ask_value",
+        "mid_value",
+    ]
+    requested_cols = requested_cols or supported_cols
+    dbg.dassert_is_subset(
+        requested_cols,
+        supported_cols,
+        "The available columns to request are %s",
+        supported_cols,
+    )
+    dbg.dassert(requested_cols)
+    requested_cols = set(requested_cols)
     results = []
-    # Compute the geometric mean of the bid and ask.
-    midpoint = np.sqrt(df[bid_col] * df[ask_col]).rename("mid")
-    results.append(midpoint)
-    # Compute the relative spread.
-    spread = (np.log(df[ask_col]) - np.log(df[bid_col])).rename("spread")
-    results.append(spread)
-    # Compute the value (e.g., dollars) at the top of the book.
-    if bid_volume_col is not None:
-        dbg.dassert_in(bid_volume_col, df.columns)
-        bid_value = (df[bid_col] * df[bid_volume_col]).rename("bid_value")
-        results.append(bid_value)
-    if ask_volume_col is not None:
-        dbg.dassert_in(ask_volume_col, df.columns)
-        ask_value = (df[ask_col] * df[ask_volume_col]).rename("ask_value")
-        results.append(ask_value)
-    if bid_volume_col is not None and ask_volume_col is not None:
-        mid_value = np.sqrt(bid_value * ask_value).rename("mid_value")
-        results.append(mid_value)
+    if "mid" in requested_cols:
+        srs = ((df[bid_col] + df[ask_col]) / 2).rename("mid")
+        results.append(srs)
+    if "geometric_mid" in requested_cols:
+        srs = np.sqrt(df[bid_col] * df[ask_col]).rename("geometric_mid")
+        results.append(srs)
+    if "quoted_spread" in requested_cols:
+        srs = (df[ask_col] - df[bid_col]).rename("quoted_spread")
+        results.append(srs)
+    if "relative_spread" in requested_cols:
+        srs = 2 * (df[ask_col] - df[bid_col]) / (df[ask_col] + df[bid_col])
+        srs = srs.rename("relative_spread")
+        results.append(srs)
+    if "log_relative_spread" in requested_cols:
+        srs = (np.log(df[ask_col]) - np.log(df[bid_col])).rename(
+            "log_relative_spread"
+        )
+        results.append(srs)
+    if "weighted_mid" in requested_cols:
+        srs = (
+            df[bid_col] * df[ask_volume_col] + df[ask_col] * df[bid_volume_col]
+        ) / (df[ask_volume_col] + df[bid_volume_col])
+        srs = srs.rename("weighted_mid")
+        results.append(srs)
+    if "order_book_imbalance" in requested_cols:
+        srs = df[bid_volume_col] / (df[bid_volume_col] + df[ask_volume_col])
+        srs = srs.rename("order_book_imbalance")
+        results.append(srs)
+    if "bid_value" in requested_cols:
+        srs = (df[bid_col] * df[bid_volume_col]).rename("bid_value")
+        results.append(srs)
+    if "ask_value" in requested_cols:
+        srs = (df[ask_col] * df[ask_volume_col]).rename("ask_value")
+        results.append(srs)
+    if "mid_value" in requested_cols:
+        srs = (
+            df[bid_col] * df[bid_volume_col] + df[ask_col] * df[ask_volume_col]
+        ) / 2
+        srs = srs.rename("mid_value")
+        results.append(srs)
     out_df = pd.concat(results, axis=1)
+    if join_output_with_input:
+        out_df = out_df.merge(df, left_index=True, right_index=True, how="outer")
+        dbg.dassert(not out_df.columns.has_duplicates)
+    return out_df
+
+
+def compute_spread_cost(
+    df: pd.DataFrame,
+    *,
+    target_position_col: str,
+    spread_col: str,
+    spread_fraction_paid: float,
+    join_output_with_input: bool = False,
+) -> pd.DataFrame:
+    """
+    Compute spread costs incurred by changing position values.
+
+    :param target_position_col: series of one-step-ahead target positions
+    :param spread_col: series of spreads
+    :param spread_fraction_paid: number indicating the fraction of the spread
+        paid, e.g., `0.5` means that 50% of the spread is paid
+    """
+    dbg.dassert_isinstance(df, pd.DataFrame)
+    dbg.dassert_in(target_position_col, df.columns)
+    dbg.dassert_in(spread_col, df.columns)
+    dbg.dassert_lte(0, spread_fraction_paid)
+    dbg.dassert_lte(spread_fraction_paid, 1)
+    adjusted_spread = spread_fraction_paid * df[spread_col]
+    target_position_delta = df[target_position_col].diff().shift(1)
+    spread_costs = target_position_delta.abs().multiply(adjusted_spread)
+    out_df = spread_costs.rename("spread_cost").to_frame()
+    if join_output_with_input:
+        out_df = out_df.merge(df, left_index=True, right_index=True, how="outer")
+        dbg.dassert(not out_df.columns.has_duplicates)
+    return out_df
+
+
+def compute_pnl(
+    df: pd.DataFrame,
+    *,
+    target_position_col: str,
+    return_col: str,
+    join_output_with_input: bool = False,
+) -> pd.DataFrame:
+    """
+    Compute PnL from a stream of target positions and returns.
+
+    :param target_position_col: series of one-step-ahead target positions
+    :param return_col: series of returns
+    """
+    dbg.dassert_isinstance(df, pd.DataFrame)
+    dbg.dassert_in(target_position_col, df.columns)
+    dbg.dassert_in(return_col, df.columns)
+    pnl = df[target_position_col].shift(2).multiply(df[return_col])
+    out_df = pnl.rename("pnl").to_frame()
     if join_output_with_input:
         out_df = out_df.merge(df, left_index=True, right_index=True, how="outer")
         dbg.dassert(not out_df.columns.has_duplicates)
