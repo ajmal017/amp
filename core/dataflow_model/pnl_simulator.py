@@ -48,8 +48,8 @@ def get_random_market_data(num_samples: int, seed: int = 42) -> pd.DataFrame:
 
 def resample_data(df: pd.DataFrame, mode: str, seed: int = 42) -> pd.DataFrame:
     """
-    Resample 1-min market data to 5 minutes to match the trading pattern and add
-    random predictions.
+    Resample 1-min market data to 5 minutes to match the trading pattern and
+    add random predictions.
 
     This data is used by the lag-based computation and has the same semantic as
     Dataflow approach.
@@ -225,7 +225,8 @@ def compute_pnl_level1(
 
 def compute_lag_pnl(df_5mins: pd.DataFrame) -> pd.DataFrame:
     """
-    Compute PnL using vectorized equation as in post-processing of `ResultBundles`.
+    Compute PnL using vectorized equation as in post-processing of
+    `ResultBundles`.
     """
     df_5mins["pnl.lag"] = df_5mins["preds"] * df_5mins["ret_0"].shift(-2)
     tot_ret_lag = (1 + df_5mins["pnl.lag"]).prod() - 1

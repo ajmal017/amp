@@ -12,16 +12,7 @@ _LOG = logging.getLogger(__name__)
 
 class TestPnlSimulatorFunctions1(hut.TestCase):
 
-    def _get_data(self) -> pd.DataFrame:
-        """
-        Return fixed random data for the other unit tests.
-        """
-        num_samples = 21
-        seed = 42
-        df = pnlsim.get_random_market_data(num_samples, seed)
-        return df
-
-    def test_get_data1(self):
+    def test_get_data1(self) -> None:
         """
         Freeze the output of `_get_data()` as reference for other unit tests.
         """
@@ -55,7 +46,7 @@ class TestPnlSimulatorFunctions1(hut.TestCase):
         expected_result = hprint.dedent(expected_result)
         self.assert_equal(actual_result, expected_result)
 
-    def test_get_twap_price1(self):
+    def test_get_twap_price1(self) -> None:
         """
         Test that TWAP is computed properly.
         """
@@ -73,6 +64,15 @@ class TestPnlSimulatorFunctions1(hut.TestCase):
         ) / 5.0
         np.testing.assert_almost_equal(act, exp)
 
+    def _get_data(self) -> pd.DataFrame:
+        """
+        Return fixed random data for the other unit tests.
+        """
+        num_samples = 21
+        seed = 42
+        df = pnlsim.get_random_market_data(num_samples, seed)
+        return df
+
 
 class TestPnlSimulator1(hut.TestCase):
     """
@@ -80,7 +80,7 @@ class TestPnlSimulator1(hut.TestCase):
     and `compute_pnl_level2()` yield the same results.
     """
 
-    def test1(self):
+    def test1(self) -> None:
         """
         Compute PnL on an handcrafted example.
         """
@@ -179,10 +179,10 @@ class TestPnlSimulator1(hut.TestCase):
 
 
 class TestPnlSimulator2(hut.TestCase):
-    def test1(self):
+    def test1(self) -> None:
         """
-        Run level2 simulation using future information to use invest all the working
-        capital.
+        Run level2 simulation using future information to use invest all the
+        working capital.
         """
         act = []
         #
@@ -202,7 +202,7 @@ class TestPnlSimulator2(hut.TestCase):
         act = "\n".join(act)
         self.check_string(act)
 
-    def test2(self):
+    def test2(self) -> None:
         """
         Same as `test1()` but without future information.
         """
