@@ -11,7 +11,7 @@ import helpers.printing as hprint
 
 _LOG = logging.getLogger(__name__)
 
-#_LOG.debug = _LOG.info
+# _LOG.debug = _LOG.info
 
 # TODO(gp): Generalize for different intervals, besides 5 mins trading.
 # TODO(gp): Extend for computing PnL on multiple stocks.
@@ -35,8 +35,8 @@ def compute_data(num_samples: int, seed: int = 42) -> pd.DataFrame:
     df["ask"] = price + np.abs(np.random.normal(0, 1, size=len(date_range)))
     df["bid"] = price - np.abs(np.random.normal(0, 1, size=len(date_range)))
     # TODO(gp): Use functions in core/finance.py.
-    #df["midpoint"] = (df["ask"] + df["bid"]) / 2
-    #df["spread"] = df["ask"] - df["bid"]
+    # df["midpoint"] = (df["ask"] + df["bid"]) / 2
+    # df["spread"] = df["ask"] - df["bid"]
     return df
 
 
@@ -62,7 +62,7 @@ def resample_data(df: pd.DataFrame, mode: str, seed: int = 42) -> pd.DataFrame:
     return df_5mins
 
 
-# #################################################################################
+# #############################################################################
 
 
 def get_example_data1() -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -83,7 +83,9 @@ def get_example_data1() -> Tuple[pd.DataFrame, pd.DataFrame]:
     return df, df_5mins
 
 
-def get_example_data2(num_samples: int, seed: int) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def get_example_data2(
+    num_samples: int, seed: int
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
     # Generate some random data.
     df = compute_data(num_samples, seed=seed)
     mode = "instantaneous"
@@ -91,7 +93,7 @@ def get_example_data2(num_samples: int, seed: int) -> Tuple[pd.DataFrame, pd.Dat
     return df, df_5mins
 
 
-# #################################################################################
+# #############################################################################
 
 
 def compute_pnl_level1(
@@ -99,6 +101,7 @@ def compute_pnl_level1(
 ) -> Tuple[float, float, pd.DataFrame]:
     """
     In this implementation:
+
     - we act on each prediction at the time the prediction is available, by
       buying / selling looking into the future prices. Thus for each timestamp, we
       record the prediction and the PnL associated to that prediction.
@@ -143,16 +146,36 @@ def compute_pnl_level1(
         if pred > 0:
             # Go long.
             buy_pnl = num_shares * price_5
-            _LOG.debug("Buy: @ ts_5=%s for price_5=$%s -> buy_pnl=$%s", _ts_to_str(ts_5), price_5, buy_pnl)
+            _LOG.debug(
+                "Buy: @ ts_5=%s for price_5=$%s -> buy_pnl=$%s",
+                _ts_to_str(ts_5),
+                price_5,
+                buy_pnl,
+            )
             sell_pnl = num_shares * price_10
-            _LOG.debug("Sell: @ ts_10=%s for price_10=$%s -> sell_pnl=$%s", _ts_to_str(ts_10), price_10, sell_pnl)
+            _LOG.debug(
+                "Sell: @ ts_10=%s for price_10=$%s -> sell_pnl=$%s",
+                _ts_to_str(ts_10),
+                price_10,
+                sell_pnl,
+            )
             diff = -buy_pnl + sell_pnl
         elif pred < 0:
             # Short sell.
             sell_pnl = num_shares * price_5
-            _LOG.debug("Short sell: @ ts_5=%s for price_5=$%s -> sell_pnl=$%s", _ts_to_str(ts_5), price_5, sell_pnl)
+            _LOG.debug(
+                "Short sell: @ ts_5=%s for price_5=$%s -> sell_pnl=$%s",
+                _ts_to_str(ts_5),
+                price_5,
+                sell_pnl,
+            )
             buy_pnl = num_shares * price_10
-            _LOG.debug("Cover: @ ts_10=%s for price_10=$%s -> buy_pnl=$%s", _ts_to_str(ts_10), price_10, buy_pnl)
+            _LOG.debug(
+                "Cover: @ ts_10=%s for price_10=$%s -> buy_pnl=$%s",
+                _ts_to_str(ts_10),
+                price_10,
+                buy_pnl,
+            )
             diff = sell_pnl - buy_pnl
         elif pred == 0:
             # Stay flat.
@@ -167,7 +190,7 @@ def compute_pnl_level1(
     # Little index gymnastic to introduce the initial value, given that the
     # semantic of the interval is at the end of the interval.
     wealth_srs = pd.Series([initial_wealth] + df_5mins["wealth"].values.tolist())
-    #_LOG.debug("wealth_srs=%s", wealth_srs)
+    # _LOG.debug("wealth_srs=%s", wealth_srs)
     df_5mins["pnl.sim1"] = wealth_srs.pct_change().values[1:]
     # Compute total return.
     total_ret = (wealth - initial_wealth) / initial_wealth
@@ -259,8 +282,11 @@ class Order:
 
     @staticmethod
     def get_price(
-        df: pd.DataFrame, type_: str, ts_start: pd.Timestamp, ts_end: pd.Timestamp,
-        num_shares: float
+        df: pd.DataFrame,
+        type_: str,
+        ts_start: pd.Timestamp,
+        ts_end: pd.Timestamp,
+        num_shares: float,
     ) -> float:
         """
         Get price that one order with given parameters would achieve.
@@ -313,12 +339,15 @@ class Order:
         """
         Get price that this order executes at.
         """
-        price = self.get_price(self._df, self.type_, self.ts_start, self.ts_end, self.num_shares)
+        price = self.get_price(
+            self._df, self.type_, self.ts_start, self.ts_end, self.num_shares
+        )
         return price
 
     def is_mergeable(self, rhs: "Order") -> bool:
         """
-        Return whether this order can be merged (i.e., internal crossed) with `rhs`.
+        Return whether this order can be merged (i.e., internal crossed) with
+        `rhs`.
         """
         return (
             (self.type_ == rhs.type_)
@@ -343,8 +372,13 @@ class Order:
         return copy.copy(self)
 
     @staticmethod
-    def _get_price(df: pd.DataFrame, ts_start: pd.Timestamp, ts_end: pd.Timestamp,
-                   column: str, timing: str) -> float:
+    def _get_price(
+        df: pd.DataFrame,
+        ts_start: pd.Timestamp,
+        ts_end: pd.Timestamp,
+        column: str,
+        timing: str,
+    ) -> float:
         """
         Get the price corresponding to a certain column and timing.
         """
@@ -432,8 +466,8 @@ def compute_pnl_level2(
     config: Dict[str, Any],
 ) -> pd.DataFrame:
     """
-    In this implementation we use the prediction to place orders, that are realized
-    over the span of two intervals of time (i.e., lag)
+    In this implementation we use the prediction to place orders, that are
+    realized over the span of two intervals of time (i.e., lag)
 
     - The PnL is realized two intervals of time after the corresponding prediction
     - The quantities reported are for the beginning of the interval of time
@@ -450,7 +484,7 @@ def compute_pnl_level2(
         "filled_n_shares",
         "cash+1",
         "holdings+1",
-        #"wealth.after",
+        # "wealth.after",
     ]
     accounting = _create_accounting_stats(columns)
 
@@ -492,8 +526,12 @@ def compute_pnl_level2(
             #   can't always invest exactly the whole available wealth.
             # The direction of the trade is enough to determine the price.
             num_shares_proxy = pred
-            price_0 = Order.get_price(df, order_type, ts_start, ts_end, num_shares_proxy)
-            wealth_to_allocate = get_total_wealth(df, ts_end, cash, holdings, config["price_column"])
+            price_0 = Order.get_price(
+                df, order_type, ts_start, ts_end, num_shares_proxy
+            )
+            wealth_to_allocate = get_total_wealth(
+                df, ts_end, cash, holdings, config["price_column"]
+            )
         else:
             price_0 = get_instantaneous_price(df, ts, config["price_column"])
             wealth_to_allocate = wealth

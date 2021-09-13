@@ -4,14 +4,13 @@ import numpy as np
 import pandas as pd
 
 import core.dataflow_model.pnl_simulator as pnlsim
-import helpers.unit_test as hut
 import helpers.printing as hprint
+import helpers.unit_test as hut
 
 _LOG = logging.getLogger(__name__)
 
 
 class TestPnlSimulatorFunctions1(hut.TestCase):
-
     def get_data(self) -> pd.DataFrame:
         num_samples = 21
         seed = 42
@@ -56,14 +55,13 @@ class TestPnlSimulatorFunctions1(hut.TestCase):
         column = "price"
         act = pnlsim.get_twap_price(df, ts_start, ts_end, column)
         #
-        exp = df.loc[ts_start + pd.Timedelta(minutes=1):ts_end]["price"].mean()
+        exp = df.loc[ts_start + pd.Timedelta(minutes=1) : ts_end]["price"].mean()
         np.testing.assert_almost_equal(act, exp)
         #
-        exp = (100.358450 + 101.006138 + 102.529168 + 102.295015 + 102.060878) / 5.0
+        exp = (
+            100.358450 + 101.006138 + 102.529168 + 102.295015 + 102.060878
+        ) / 5.0
         np.testing.assert_almost_equal(act, exp)
-
-
-
 
 
 class TestPnlSimulator1(hut.TestCase):
@@ -106,7 +104,9 @@ class TestPnlSimulator1(hut.TestCase):
 
     def _run(self, df: pd.DataFrame, df_5mins: pd.DataFrame) -> None:
         """
-        Compute pnl using level1 simulation and lag-based approach, checking that:
+        Compute pnl using level1 simulation and lag-based approach, checking
+        that:
+
         - the intermediate PnL stream match
         - the total return from the different approaches matches
         """
@@ -153,15 +153,16 @@ class TestPnlSimulator1(hut.TestCase):
         for col in ["pnl.lag", "pnl.sim1", "pnl.sim2.shifted(-2)"]:
             df_5mins[col] = df_5mins[col].replace(np.nan, 0)
         np.testing.assert_array_almost_equal(
-            df_5mins["pnl.lag"], df_5mins["pnl.sim1"])
+            df_5mins["pnl.lag"], df_5mins["pnl.sim1"]
+        )
         np.testing.assert_array_almost_equal(
-            df_5mins["pnl.lag"], df_5mins["pnl.sim2.shifted(-2)"])
+            df_5mins["pnl.lag"], df_5mins["pnl.sim2.shifted(-2)"]
+        )
         # Check that the results are the same.
         np.testing.assert_almost_equal(tot_ret, tot_ret_lag)
 
 
 class TestPnlSimulator2(hut.TestCase):
-
     def test1(self):
         act = []
         #

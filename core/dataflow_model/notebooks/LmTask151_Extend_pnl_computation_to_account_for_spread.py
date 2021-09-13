@@ -33,7 +33,6 @@ _LOG = logging.getLogger(__name__)
 
 # %%
 import numpy as np
-import pandas as pd
 
 import core.dataflow_model.pnl_simulator as pnlsim
 
@@ -62,9 +61,7 @@ display(df_5mins)
 # %%
 # Compute pnl using simulation.
 w0 = 100.0
-final_w, tot_ret, df_5mins = pnlsim.compute_pnl_level1(
-    w0, df, df_5mins
-)
+final_w, tot_ret, df_5mins = pnlsim.compute_pnl_level1(w0, df, df_5mins)
 
 print(final_w, tot_ret)
 
@@ -84,14 +81,14 @@ np.testing.assert_almost_equal(tot_ret, tot_ret2)
 # %%
 mode = "instantaneous"
 df = df_5mins = pnlsim.get_example_data1()
-#df_5mins = pnlsim.resample_data(df, mode)
+# df_5mins = pnlsim.resample_data(df, mode)
 
 initial_wealth = 1000
 final_w, tot_ret, df_5mins = pnlsim.compute_pnl_level1(
     initial_wealth, df, df_5mins
 )
 tot_ret2, df_5mins = pnlsim.compute_lag_pnl(df_5mins)
-#display(df_5mins)
+# display(df_5mins)
 
 config = {
     "price_column": "price",
