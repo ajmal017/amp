@@ -162,7 +162,7 @@ class StrategyEvaluator:
             pnl = (
                 fin.compute_pnl(
                     df,
-                    target_position_col="position_intent_1",
+                    position_intent_col="position_intent_1",
                     return_col="ret_0",
                 )
                 .squeeze()
