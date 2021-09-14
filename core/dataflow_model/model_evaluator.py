@@ -52,7 +52,9 @@ class StrategyEvaluator:
         # start: Optional[pd.Timestamp] = None,
         # end: Optional[pd.Timestamp] = None,
     ) -> None:
-        """"""
+        """
+        
+        """
         self._data = data
         dbg.dassert(data, msg="Data set must be nonempty.")
         # This is required by the current implementation otherwise when we extract
@@ -80,12 +82,12 @@ class StrategyEvaluator:
         returns_col: str,
         spread_col: str,
         abort_on_error: bool = True,
-    ) -> ModelEvaluator:
+    ) -> StrategyEvaluator:
         """
-        Initialize a `ModelEvaluator` from a dictionary `key` -> `ResultBundle`.
+        Initialize a `StrategyEvaluator` from a result bundle dictionary.
         """
         _LOG.info(
-            "Before building ModelEvaluator: memory_usage=%s",
+            "Before building StrategyEvaluator: memory_usage=%s",
             dbg.get_memory_usage_as_str(None),
         )
         data_dict: Dict[Key, pd.DataFrame] = {}
@@ -127,7 +129,7 @@ class StrategyEvaluator:
             spread_col=spread_col,
         )
         _LOG.info(
-            "After building ModelEvaluator: memory_usage=%s",
+            "After building StrategyEvaluator: memory_usage=%s",
             dbg.get_memory_usage_as_str(None),
         )
         return evaluator
@@ -136,8 +138,11 @@ class StrategyEvaluator:
         self,
         keys: Optional[List[Key]] = None,
         spread_fraction_paid: float = 0,
+        key_type: str = "instrument",
     ) -> Dict[Any, pd.DataFrame]:
-        """"""
+        """
+        Compute pnl from position intents, ret_0, and spread.
+        """
         keys = keys or self.valid_keys
         dbg.dassert_is_subset(keys, self.valid_keys)
         pnl_dict = {}
@@ -158,9 +163,6 @@ class StrategyEvaluator:
                 },
                 inplace=True,
             )
-            # TODO(Paul): Consider adding a "position" column for realized
-            # positions (instead of making the assumption that our target
-            # position is perfectly realized).
             pnl = (
                 fin.compute_pnl(
                     df,
@@ -184,6 +186,20 @@ class StrategyEvaluator:
             df["spread_cost_0"] = spread_cost
             df["ex_cost_pnl_0"] = pnl - spread_cost
             pnl_dict[key] = df
+        if key_type == "instrument":
+            pass
+        if key_type == "attribute":
+            pnl_dict_pivoted = {}
+            for attribute in ["ret_0", "position_intent_1", "spread_0",
+                              "spread_cost_0", "pnl_0", "ex_cost_pnl_0"]:
+                data = []
+                for key in pnl_dict.keys():
+                    data.append(pnl_dict[key][attribute].rename(key))
+                df = pd.concat(data, axis=0)
+                pnl_dict_pivoted[attribute] = df
+            pnl_dict = pnl_dict_pivoted
+        else:
+            raise ValueError()
         return pnl_dict
 
     def calculate_stats(
@@ -799,6 +815,7 @@ class PositionComputer:
     def _return_srs(self, srs: pd.Series, mode: str) -> pd.Series:
         """
         Extract part of the time series depending on which period is selected.
+
         :param mode: "ins", "oos", "all"
         """
         if mode == "ins":
