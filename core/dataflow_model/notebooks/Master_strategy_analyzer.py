@@ -30,7 +30,6 @@ import logging
 
 import core.config as cconfig
 import core.dataflow_model.model_evaluator as modeval
-import core.dataflow_model.model_plotter as modplot
 import core.dataflow_model.utils as cdmu
 import helpers.dbg as dbg
 import helpers.printing as hprint

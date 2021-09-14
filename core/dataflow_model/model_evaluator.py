@@ -107,7 +107,9 @@ class StrategyEvaluator:
                 dbg.dassert_in(returns_col, df.columns)
                 dbg.dassert_in(spread_col, df.columns)
                 dbg.dassert_not_in(key, data_dict.keys())
-                data_dict[key] = df[[position_intent_col, returns_col, spread_col]]
+                data_dict[key] = df[
+                    [position_intent_col, returns_col, spread_col]
+                ]
             except Exception as e:
                 _LOG.error(
                     "Error while loading ResultBundle for config %s with exception:\n%s"
@@ -169,12 +171,16 @@ class StrategyEvaluator:
                 .rename("pnl_0")
             )
             df["pnl_0"] = pnl
-            spread_cost = fin.compute_spread_cost(
-                df,
-                target_position_col="position_intent_1",
-                spread_col="spread_0",
-                spread_fraction_paid=spread_fraction_paid,
-            ).squeeze().rename("spread_cost_0")
+            spread_cost = (
+                fin.compute_spread_cost(
+                    df,
+                    target_position_col="position_intent_1",
+                    spread_col="spread_0",
+                    spread_fraction_paid=spread_fraction_paid,
+                )
+                .squeeze()
+                .rename("spread_cost_0")
+            )
             df["spread_cost_0"] = spread_cost
             df["ex_cost_pnl_0"] = pnl - spread_cost
             pnl_dict[key] = df
