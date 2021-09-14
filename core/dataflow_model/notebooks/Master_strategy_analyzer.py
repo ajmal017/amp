@@ -80,7 +80,7 @@ print(str(eval_config))
 # %%
 load_config = eval_config["load_experiment_kwargs"].to_dict()
 
-# Load only the columns needed by the ModelEvaluator.
+# Load only the columns needed by the StrategyEvaluator.
 load_config["load_rb_kwargs"] = {
     "columns": [
         eval_config["strategy_evaluator_kwargs"]["returns_col"],
