@@ -38,6 +38,7 @@ class StrategyEvaluator:
     """
     Evaluate the performance of a strategy driven by an alpha.
     """
+
     def __init__(
         self,
         data: Dict[Key, pd.DataFrame],
@@ -51,8 +52,7 @@ class StrategyEvaluator:
         # start: Optional[pd.Timestamp] = None,
         # end: Optional[pd.Timestamp] = None,
     ) -> None:
-        """
-        """
+        """"""
         self._data = data
         dbg.dassert(data, msg="Data set must be nonempty.")
         # This is required by the current implementation otherwise when we extract
@@ -135,8 +135,7 @@ class StrategyEvaluator:
         keys: Optional[List[Key]] = None,
         spread_fraction_paid: float = 0,
     ) -> Dict[Any, pd.DataFrame]:
-        """
-        """
+        """"""
         keys = keys or self.valid_keys
         dbg.dassert_is_subset(keys, self.valid_keys)
         pnl_dict = {}
@@ -146,10 +145,17 @@ class StrategyEvaluator:
             dbg.dassert_in(self.returns_col, self._data[key].columns)
             dbg.dassert_in(self.alpha_col, self._data[key].columns)
             dbg.dassert_in(self.spread_col, self._data[key].columns)
-            df = self._data[key][[self.returns_col, self.alpha_col, self.spread_col]]
-            df.rename(columns={self.returns_col: "returns",
-                               self.alpha_col: "alpha",
-                               self.spread_col: "spread"}, inplace=True)
+            df = self._data[key][
+                [self.returns_col, self.alpha_col, self.spread_col]
+            ]
+            df.rename(
+                columns={
+                    self.returns_col: "returns",
+                    self.alpha_col: "alpha",
+                    self.spread_col: "spread",
+                },
+                inplace=True,
+            )
             # TODO(Paul): Introduce various strategies for generating target
             # positions from an alpha.
             target_position = df["alpha"].rename("target_position")
@@ -157,11 +163,15 @@ class StrategyEvaluator:
             # TODO(Paul): Consider adding a "position" column for realized
             # positions (instead of making the assumption that our target
             # position is perfectly realized).
-            pnl = fin.compute_pnl(
-                df,
-                target_position_col="target_position",
-                return_col="returns",
-            ).squeeze().rename("pnl")
+            pnl = (
+                fin.compute_pnl(
+                    df,
+                    target_position_col="target_position",
+                    return_col="returns",
+                )
+                .squeeze()
+                .rename("pnl")
+            )
             df["pnl"] = pnl
             spread_cost = fin.compute_spread_cost(
                 df,
