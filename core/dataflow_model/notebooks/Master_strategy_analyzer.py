@@ -67,7 +67,7 @@ if config is None:
             },
             "strategy_evaluator_kwargs": {
                 "returns_col": "mid_ret_0",
-                "alpha_col": "mid_ret_2_hat",
+                "position_intent_col": "position_intent_1",
                 "spread_col": "spread",
             },
             "bh_adj_threshold": 0.1,
@@ -84,7 +84,7 @@ load_config = eval_config["load_experiment_kwargs"].to_dict()
 load_config["load_rb_kwargs"] = {
     "columns": [
         eval_config["strategy_evaluator_kwargs"]["returns_col"],
-        eval_config["strategy_evaluator_kwargs"]["alpha_col"],
+        eval_config["strategy_evaluator_kwargs"]["position_intent_col"],
         eval_config["strategy_evaluator_kwargs"]["spread_col"],
     ]
 }

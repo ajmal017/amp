@@ -43,7 +43,7 @@ class StrategyEvaluator:
         self,
         data: Dict[Key, pd.DataFrame],
         *,
-        alpha_col: str,
+        position_intent_col: str,
         returns_col: str,
         spread_col: str,
         # TODO: Allow specification of start and end times for stats.
@@ -61,7 +61,7 @@ class StrategyEvaluator:
             returns_col,
             spread_col,
         )
-        self.alpha_col = alpha_col
+        self.position_intent = position_intent_col
         self.returns_col = returns_col
         self.spread_col = spread_col
         # self.start = start
@@ -76,7 +76,7 @@ class StrategyEvaluator:
     def from_result_bundle_dict(
         cls,
         result_bundle_dict: Dict[Key, cdataf.ResultBundle],
-        alpha_col: str,
+        position_intent_col: str,
         returns_col: str,
         spread_col: str,
         abort_on_error: bool = True,
@@ -103,11 +103,11 @@ class StrategyEvaluator:
                     ),
                 )
                 # Extract the needed columns.
-                dbg.dassert_in(alpha_col, df.columns)
+                dbg.dassert_in(position_intent_col, df.columns)
                 dbg.dassert_in(returns_col, df.columns)
                 dbg.dassert_in(spread_col, df.columns)
                 dbg.dassert_not_in(key, data_dict.keys())
-                data_dict[key] = df[[alpha_col, returns_col, spread_col]]
+                data_dict[key] = df[[position_intent_col, returns_col, spread_col]]
             except Exception as e:
                 _LOG.error(
                     "Error while loading ResultBundle for config %s with exception:\n%s"
@@ -120,7 +120,7 @@ class StrategyEvaluator:
         # Initialize `StrategyEvaluator`.
         evaluator = cls(
             data=data_dict,
-            alpha_col=alpha_col,
+            position_intent_col=position_intent_col,
             returns_col=returns_col,
             spread_col=spread_col,
         )
@@ -143,44 +143,40 @@ class StrategyEvaluator:
             _LOG.debug("Process key=%s", key)
             # Extract the returns and alpha columns.
             dbg.dassert_in(self.returns_col, self._data[key].columns)
-            dbg.dassert_in(self.alpha_col, self._data[key].columns)
+            dbg.dassert_in(self.position_intent_col, self._data[key].columns)
             dbg.dassert_in(self.spread_col, self._data[key].columns)
             df = self._data[key][
-                [self.returns_col, self.alpha_col, self.spread_col]
+                [self.returns_col, self.position_intent_col, self.spread_col]
             ]
             df.rename(
                 columns={
-                    self.returns_col: "returns",
-                    self.alpha_col: "alpha",
-                    self.spread_col: "spread",
+                    self.returns_col: "ret_0",
+                    self.position_intent_col: "position_intent_1",
+                    self.spread_col: "spread_0",
                 },
                 inplace=True,
             )
-            # TODO(Paul): Introduce various strategies for generating target
-            # positions from an alpha.
-            target_position = df["alpha"].rename("target_position")
-            df["target_position"] = target_position
             # TODO(Paul): Consider adding a "position" column for realized
             # positions (instead of making the assumption that our target
             # position is perfectly realized).
             pnl = (
                 fin.compute_pnl(
                     df,
-                    target_position_col="target_position",
-                    return_col="returns",
+                    target_position_col="position_intent_1",
+                    return_col="ret_0",
                 )
                 .squeeze()
-                .rename("pnl")
+                .rename("pnl_0")
             )
-            df["pnl"] = pnl
+            df["pnl_0"] = pnl
             spread_cost = fin.compute_spread_cost(
                 df,
-                target_position_col="target_position",
-                spread_col="spread",
+                target_position_col="position_intent_1",
+                spread_col="spread_0",
                 spread_fraction_paid=spread_fraction_paid,
-            ).squeeze().rename("spread_cost")
-            df["spread_cost"] = spread_cost
-            df["ex_cost_pnl"] = pnl - spread_cost
+            ).squeeze().rename("spread_cost_0")
+            df["spread_cost_0"] = spread_cost
+            df["ex_cost_pnl_0"] = pnl - spread_cost
             pnl_dict[key] = df
         return pnl_dict
 
@@ -211,7 +207,7 @@ class StrategyEvaluator:
                 continue
             stats_dict[key] = self._stats_computer.compute_finance_stats(
                 pnl_dict[key],
-                pnl_col="ex_cost_pnl",
+                pnl_col="ex_cost_pnl_0",
             )
         stats_df = pd.concat(stats_dict, axis=1)
         # Calculate BH adjustment of pvals.
