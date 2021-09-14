@@ -267,7 +267,7 @@ class MarketInterface:
             #idx = df.index.searchsorted(ts)
             #price: float = df.iloc[idx][column]
         dbg.dassert(np.isfinite(price), "price=%s at ts=%s", price, ts)
-    return price
+        return price
 
     def get_twap_price(
         self, ts_start: pd.Timestamp, ts_end: pd.Timestamp
@@ -361,6 +361,7 @@ class Order:
             else:
                 column = "bid"
             price = Order._get_price(mi, ts_start, ts_end, column, timing)
+            assert 0
         elif price_type.startswith("partial_spread"):
             perc = float(price_type.split("_")[2])
             if debug_mode: dbg.dassert_lte(0, perc)
@@ -696,8 +697,8 @@ def _compute_pnl_level2(
     return accounting
 
 
-#use_profiler = False
-use_profiler = True
+use_profiler = False
+#use_profiler = True
 
 if use_profiler:
     import line_profiler
