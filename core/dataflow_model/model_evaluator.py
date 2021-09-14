@@ -34,9 +34,200 @@ _LOG = logging.getLogger(__name__)
 Key = int
 
 
+class StrategyEvaluator:
+    """
+    Evaluate the performance of a strategy driven by an alpha.
+    """
+
+    def __init__(
+        self,
+        data: Dict[Key, pd.DataFrame],
+        *,
+        alpha_col: str,
+        returns_col: str,
+        spread_col: str,
+        # TODO: Allow specification of start and end times for stats.
+        # This is useful for interactive analysis and/or zooming in on a
+        # specific time period.
+        # start: Optional[pd.Timestamp] = None,
+        # end: Optional[pd.Timestamp] = None,
+    ) -> None:
+        """"""
+        self._data = data
+        dbg.dassert(data, msg="Data set must be nonempty.")
+        # This is required by the current implementation otherwise when we extract
+        # columns from dataframes we get dataframes and not series.
+        dbg.dassert_ne(
+            returns_col,
+            spread_col,
+        )
+        self.alpha_col = alpha_col
+        self.returns_col = returns_col
+        self.spread_col = spread_col
+        # self.start = start
+        # self.end = end
+        # The valid keys are the keys in the data dict.
+        self.valid_keys = list(self._data.keys())
+        self._stats_computer = cstats.StatsComputer()
+
+    # TODO(*): This looks like the corresponding method for `ModelEvaluator`
+    # except for the columns needed. Factor out the common part.
+    @classmethod
+    def from_result_bundle_dict(
+        cls,
+        result_bundle_dict: Dict[Key, cdataf.ResultBundle],
+        alpha_col: str,
+        returns_col: str,
+        spread_col: str,
+        abort_on_error: bool = True,
+    ) -> ModelEvaluator:
+        """
+        Initialize a `ModelEvaluator` from a dictionary `key` -> `ResultBundle`.
+        """
+        _LOG.info(
+            "Before building ModelEvaluator: memory_usage=%s",
+            dbg.get_memory_usage_as_str(None),
+        )
+        data_dict: Dict[Key, pd.DataFrame] = {}
+        # Convert each `ResultBundle` dict into a `ResultBundle` class object.
+        for key, result_bundle in result_bundle_dict.items():
+            _LOG.debug("Loading key=%s", key)
+            try:
+                _LOG.debug("memory_usage=%s", dbg.get_memory_usage_as_str(None))
+                df = result_bundle.result_df
+                dbg.dassert_is_not(df, None)
+                _LOG.debug(
+                    "result_df.memory_usage=%s",
+                    hintro.format_size(
+                        df.memory_usage(index=True, deep=True).sum()
+                    ),
+                )
+                # Extract the needed columns.
+                dbg.dassert_in(alpha_col, df.columns)
+                dbg.dassert_in(returns_col, df.columns)
+                dbg.dassert_in(spread_col, df.columns)
+                dbg.dassert_not_in(key, data_dict.keys())
+                data_dict[key] = df[[alpha_col, returns_col, spread_col]]
+            except Exception as e:
+                _LOG.error(
+                    "Error while loading ResultBundle for config %s with exception:\n%s"
+                    % (key, str(e))
+                )
+                if abort_on_error:
+                    raise e
+                else:
+                    _LOG.warning("Continuing as per user request")
+        # Initialize `StrategyEvaluator`.
+        evaluator = cls(
+            data=data_dict,
+            alpha_col=alpha_col,
+            returns_col=returns_col,
+            spread_col=spread_col,
+        )
+        _LOG.info(
+            "After building ModelEvaluator: memory_usage=%s",
+            dbg.get_memory_usage_as_str(None),
+        )
+        return evaluator
+
+    def compute_pnl(
+        self,
+        keys: Optional[List[Key]] = None,
+        spread_fraction_paid: float = 0,
+    ) -> Dict[Any, pd.DataFrame]:
+        """"""
+        keys = keys or self.valid_keys
+        dbg.dassert_is_subset(keys, self.valid_keys)
+        pnl_dict = {}
+        for key in tqdm(keys):
+            _LOG.debug("Process key=%s", key)
+            # Extract the returns and alpha columns.
+            dbg.dassert_in(self.returns_col, self._data[key].columns)
+            dbg.dassert_in(self.alpha_col, self._data[key].columns)
+            dbg.dassert_in(self.spread_col, self._data[key].columns)
+            df = self._data[key][
+                [self.returns_col, self.alpha_col, self.spread_col]
+            ]
+            df.rename(
+                columns={
+                    self.returns_col: "returns",
+                    self.alpha_col: "alpha",
+                    self.spread_col: "spread",
+                },
+                inplace=True,
+            )
+            # TODO(Paul): Introduce various strategies for generating target
+            # positions from an alpha.
+            target_position = df["alpha"].rename("target_position")
+            df["target_position"] = target_position
+            # TODO(Paul): Consider adding a "position" column for realized
+            # positions (instead of making the assumption that our target
+            # position is perfectly realized).
+            pnl = (
+                fin.compute_pnl(
+                    df,
+                    target_position_col="target_position",
+                    return_col="returns",
+                )
+                .squeeze()
+                .rename("pnl")
+            )
+            df["pnl"] = pnl
+            spread_cost = fin.compute_spread_cost(
+                df,
+                target_position_col="target_position",
+                spread_col="spread",
+                spread_fraction_paid=spread_fraction_paid,
+            ).squeeze().rename("spread_cost")
+            df["spread_cost"] = spread_cost
+            df["ex_cost_pnl"] = pnl - spread_cost
+            pnl_dict[key] = df
+        return pnl_dict
+
+    def calculate_stats(
+        self,
+        keys: Optional[List[Any]] = None,
+        spread_fraction_paid: float = 0,
+    ) -> pd.DataFrame:
+        """
+        Calculate performance characteristics of selected models.
+
+        :param keys: Use all available if `None`
+        :return: Dataframe of statistics with `keys` as columns
+        """
+        #
+        pnl_dict = self.compute_pnl(
+            keys,
+            spread_fraction_paid=spread_fraction_paid,
+        )
+        stats_dict = {}
+        for key in tqdm(pnl_dict.keys(), desc="Calculating stats"):
+            _LOG.debug("key=%s", key)
+            if pnl_dict[key].empty:
+                _LOG.warning("PnL series for key=%i is empty.", key)
+                continue
+            if pnl_dict[key].dropna().empty:
+                _LOG.warning("PnL series for key=%i is all-NaN.", key)
+                continue
+            stats_dict[key] = self._stats_computer.compute_finance_stats(
+                pnl_dict[key],
+                pnl_col="ex_cost_pnl",
+            )
+        stats_df = pd.concat(stats_dict, axis=1)
+        # Calculate BH adjustment of pvals.
+        adj_pvals = stats.multipletests(
+            stats_df.loc["signal_quality"].loc["sr.pval"], nan_mode="drop"
+        ).rename("sr.adj_pval")
+        adj_pvals = pd.concat(
+            [adj_pvals.to_frame().transpose()], keys=["signal_quality"]
+        )
+        stats_df = pd.concat([stats_df, adj_pvals], axis=0)
+        return stats_df
+
+
 class ModelEvaluator:
     """
-    Evaluate performance of financial models for returns.
+    Evaluate returns predictions.
     """
 
     def __init__(
@@ -50,6 +241,10 @@ class ModelEvaluator:
     ) -> None:
         """
         Constructor.
+
+        The `prediction_col` and `target_col` should be aligned, i.e., the
+        prediction at a given index location should be a prediction for the
+        target at that same index location.
 
         :param data: a dict key (tag of model / experiment) -> dataframe (containing
             `ResultBundle.result_df`). Each model / experiment is represented by
