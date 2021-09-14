@@ -1,3 +1,8 @@
+"""
+Import as:
+
+import helpers.htqdm as htqdm
+"""
 import logging
 from typing import Any, Optional
 

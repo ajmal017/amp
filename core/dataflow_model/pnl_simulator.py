@@ -5,13 +5,13 @@ from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
+from tqdm.autonotebook import tqdm
 
 import helpers.dbg as dbg
+import helpers.htqdm as htqdm
 import helpers.printing as hprint
 
 _LOG = logging.getLogger(__name__)
-
-# _LOG.debug = _LOG.info
 
 # TODO(gp): Generalize for different intervals, besides 5 mins trading.
 # TODO(gp): Extend for computing PnL on multiple stocks.
@@ -151,7 +151,9 @@ def compute_pnl_level1(
     # Initial balance.
     wealth = initial_wealth
     # Skip the last two rows since we need two rows to enter / exit the position.
-    for ts, row in df_5mins[:-2].iterrows():
+    tqdm_out = htqdm.TqdmToLogger(_LOG, level=logging.INFO)
+    num_rows = df_5mins.shape[0] - 2
+    for ts, row in tqdm(df_5mins[:-2].iterrows(), total=num_rows, file=tqdm_out):
         _LOG.debug(hprint.frame("# ts=%s" % _ts_to_str(ts), char1="<"))
         pred = row["preds"]
         _LOG.debug("wealth=%s", wealth)
@@ -237,13 +239,29 @@ def compute_lag_pnl(df_5mins: pd.DataFrame) -> pd.DataFrame:
 # Price computation.
 # #############################################################################
 
+speed_up = True
+
+_cached = None
+
+# _LOG.debug = _LOG.info
+#_LOG.debug = lambda *_: 0
+
+#dbg.dassert
 
 def get_instantaneous_price(
     df: pd.DataFrame, ts: pd.Timestamp, column: str
 ) -> float:
+    if speed_up:
+        global _cached
+        if _cached is None:
+            _cached = df[column].to_dict()
+        return _cached[ts]
+    #assert 0, df.index.is_monotonic
     dbg.dassert_in(ts, df.index)
     dbg.dassert_in(column, df.columns)
     price: float = df.loc[ts][column]
+    #idx = df.index.searchsorted(ts)
+    #price: float = df.iloc[idx][column]
     return price
 
 
@@ -477,13 +495,13 @@ def get_total_wealth(
     """
     price = get_instantaneous_price(df, ts, column)
     holdings_value = holdings * price
-    _LOG.debug(
-        "Marking at ts=%s holdings=%s at %s -> value=%s",
-        _ts_to_str(ts),
-        holdings,
-        price,
-        holdings_value,
-    )
+    # _LOG.debug(
+    #     "Marking at ts=%s holdings=%s at %s -> value=%s",
+    #     _ts_to_str(ts),
+    #     holdings,
+    #     price,
+    #     holdings_value,
+    # )
     wealth = cash + holdings_value
     return wealth
 
@@ -491,6 +509,40 @@ def get_total_wealth(
 # #############################################################################
 
 
+def _get_orders_to_execute(ts: pd.Timestamp, orders: List[Order]) -> List[Order]:
+    if speed_up:
+        if orders[0].ts_start == ts:
+            return [orders.pop()]
+        #dbg.dassert_eq(len(orders), 1, "%s", orders_to_string(orders))
+        assert 0
+    orders_to_execute = get_orders_to_execute(orders, ts)
+    _LOG.debug("orders_to_execute=%s", orders_to_string(orders_to_execute))
+    # Merge the orders.
+    merged_orders = []
+    while orders_to_execute:
+        order = orders_to_execute.pop()
+        orders_to_execute_tmp = orders_to_execute[:]
+        for next_order in orders_to_execute_tmp:
+            if order.is_mergeable(next_order):
+                order = order.merge(next_order)
+                orders_to_execute_tmp.remove(next_order)
+        merged_orders.append(order)
+        orders_to_execute = orders_to_execute_tmp
+    _LOG.debug(
+        "After merging:\n  merged_orders=%s\n  orders_to_execute=%s",
+        orders_to_string(merged_orders),
+        orders_to_string(orders_to_execute),
+    )
+    return merged_orders
+
+import numba
+
+import line_profiler
+
+profiler = line_profiler.LineProfiler()
+
+#@numba.jit(nopython=True)
+#@profiler
 def compute_pnl_level2(
     df: pd.DataFrame,
     df_5mins: pd.DataFrame,
@@ -506,6 +558,8 @@ def compute_pnl_level2(
     - The columns ending with `+1` represent what happens in the next interval
       of time
     """
+    df.sort_index(inplace=True)
+
     columns = [
         "target_n_shares",
         "cash",
@@ -519,35 +573,54 @@ def compute_pnl_level2(
         # "wealth.after",
     ]
     accounting = _create_accounting_stats(columns)
+    # accounting = collections.OrderedDict()
+    # for column in columns:
+    #     accounting[column] = []
 
     def _update(key: str, value: float) -> None:
         prev_value = accounting[key][-1] if accounting[key] else None
         _LOG.debug("%s=%s -> %s", key, prev_value, value)
         accounting[key].append(value)
+    # def _update(key: str, value: float) -> None:
+    #     pass
 
     orders: List[Order] = []
     # Initial balance.
     holdings = 0.0
     cash = initial_wealth
-    for ts, row in df_5mins.iterrows():
-        _LOG.debug(hprint.frame("# ts=%s" % _ts_to_str(ts)))
+    tqdm_out = htqdm.TqdmToLogger(_LOG, level=logging.INFO)
+    num_rows = df_5mins.shape[0]
+    preds = zip(df_5mins.index, df_5mins["preds"].values)
+    last_index = df_5mins.index[-1]
+    price_column = config["price_column"]
+    global _cached
+    _cached = df[price_column].to_dict()
+    offset_5min = pd.DateOffset(minutes=5)
+    order_type = config["order_type"]
+    for ts, pred in tqdm(preds, total=num_rows, file=tqdm_out):
+        #_LOG.debug(hprint.frame("# ts=%s" % _ts_to_str(ts)))
         # 1) Place orders based on the predictions, if needed.
-        pred = row["preds"]
+        #pred = row["preds"]
         _LOG.debug("pred=%s", pred)
         # Mark the portfolio to market.
         _LOG.debug("# Mark portfolio to market")
-        wealth = get_total_wealth(df, ts, cash, holdings, config["price_column"])
+        #wealth = get_total_wealth(df, ts, cash, holdings, price_column)
+        price = get_instantaneous_price(df, ts, price_column)
+        holdings_value = holdings * price
+        wealth = cash + holdings_value
+
         _update("wealth", wealth)
-        if ts == df_5mins.index[-1]:
+        if ts == last_index:
             # For the last timestamp we only need to mark to market, but not post
             # any more orders.
             continue
         # Use current price to convert forecasts in position intents.
         _LOG.debug("# Decide how much to trade")
         # Enter position between [0, 5].
-        ts_start = ts + pd.DateOffset(minutes=0)
-        ts_end = ts + pd.DateOffset(minutes=5)
-        order_type = config["order_type"]
+        #ts_start = ts + pd.DateOffset(minutes=0)
+        ts_start = ts
+        #ts_end = ts + pd.DateOffset(minutes=5)
+        ts_end = ts + offset_5min
         if config.get("future_snoop_allocation", False):
             # - In the vectorized PnL case we assume we work in terms of dollar and
             #   not shares: we assume we can buy the entire amount of wealth in terms
@@ -562,10 +635,10 @@ def compute_pnl_level2(
                 df, order_type, ts_start, ts_end, num_shares_proxy
             )
             wealth_to_allocate = get_total_wealth(
-                df, ts_end, cash, holdings, config["price_column"]
+                df, ts_end, cash, holdings, price_column
             )
         else:
-            price_0 = get_instantaneous_price(df, ts, config["price_column"])
+            price_0 = get_instantaneous_price(df, ts, price_column)
             wealth_to_allocate = wealth
         _LOG.debug("price_0=%s", price_0)
         target_num_shares = wealth_to_allocate / price_0
@@ -586,24 +659,7 @@ def compute_pnl_level2(
         # orders in the past.
         # Find all the orders with the current timestamp.
         _LOG.debug("# Get orders to execute")
-        orders_to_execute = get_orders_to_execute(orders, ts)
-        _LOG.debug("orders_to_execute=%s", orders_to_string(orders_to_execute))
-        # Merge the orders.
-        merged_orders = []
-        while orders_to_execute:
-            order = orders_to_execute.pop()
-            orders_to_execute_tmp = orders_to_execute[:]
-            for next_order in orders_to_execute_tmp:
-                if order.is_mergeable(next_order):
-                    order = order.merge(next_order)
-                    orders_to_execute_tmp.remove(next_order)
-            merged_orders.append(order)
-            orders_to_execute = orders_to_execute_tmp
-        _LOG.debug(
-            "After merging:\n  merged_orders=%s\n  orders_to_execute=%s",
-            orders_to_string(merged_orders),
-            orders_to_string(orders_to_execute),
-        )
+        merged_orders = _get_orders_to_execute(ts, orders)
         # Execute the merged orders.
         _LOG.debug("# Execute orders")
         # TODO(gp): We rely on the assumption that order span only one time step.
@@ -624,4 +680,7 @@ def compute_pnl_level2(
     # Update the df with intermediate results.
     df_5mins = _append_accounting_df(df_5mins, accounting)
     df_5mins["pnl.sim2"] = df_5mins["wealth"].pct_change()
+    #profiler.print_stats()
     return df_5mins
+
+

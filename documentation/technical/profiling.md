@@ -63,15 +63,43 @@
 
 ## `line_profiler`
 - Profile a function line by line
-- Decorate target function with `@profile`
-  - Check `kernprof.py -h` for more ways of marking the interesting parts of
-    code
+
+- GitHub: https://github.com/pyutils/line_profiler
+
+### Install
+- Install with:
   ```bash
-  > kernprof -l -o line_profile.lprof $CMD
-  > python -m line_profiler line_profile.lprof
+  > pip install line_profiler
   ```
 
-- TODO(*): Finish this
+### How to use
+
+- Instrument the code to profile:
+  ```bash
+  import line_profiler
+
+  profiler = line_profiler.LineProfiler()
+
+  @profiler
+  def function():
+    ...
+    profiler.print_stats()
+  ```
+
+## `pytest-profiling`
+
+- Webpage: https://pypi.org/project/pytest-profiling
+
+### Install
+- Install with:
+  ```bash
+  > pip install pytest-profiling
+  ```
+
+### How to use
+  ```bash
+  > pytest --profile ./amp/core/dataflow_model/test/test_pnl_simulator.py::TestPnlSimulator2::test_perf1 -s
+  ```
 
 ## `cProfile`
 - You need to run the code first with profiling enabled
@@ -80,9 +108,6 @@
   ```bash
   # Profile a python script.
   > python -m cProfile -o prof.bin CMD
-
-  # Profile with run_tests.py.
-  > python -m cProfile -o prof.bin test/run_tests.py -v 10 TestComputeDerivedFeatures2.test3
 
   # Profile a unit test.
   > python -m cProfile -o profile edgar/forms8/test/test_edgar_utils.py
