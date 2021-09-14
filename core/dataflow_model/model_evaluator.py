@@ -178,7 +178,7 @@ class StrategyEvaluator:
                 target_position_col="target_position",
                 spread_col="spread",
                 spread_fraction_paid=spread_fraction_paid,
-            ).rename("spread_cost")
+            ).squeeze().rename("spread_cost")
             df["spread_cost"] = spread_cost
             df["ex_cost_pnl"] = pnl - spread_cost
             pnl_dict[key] = df
@@ -211,7 +211,7 @@ class StrategyEvaluator:
                 continue
             stats_dict[key] = self._stats_computer.compute_finance_stats(
                 pnl_dict[key],
-                pnl_col="pnl",
+                pnl_col="ex_cost_pnl",
             )
         stats_df = pd.concat(stats_dict, axis=1)
         # Calculate BH adjustment of pvals.
