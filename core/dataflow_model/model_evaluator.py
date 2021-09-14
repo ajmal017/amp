@@ -63,7 +63,7 @@ class StrategyEvaluator:
             returns_col,
             spread_col,
         )
-        self.position_intent = position_intent_col
+        self.position_intent_col = position_intent_col
         self.returns_col = returns_col
         self.spread_col = spread_col
         # self.start = start
