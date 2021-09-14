@@ -195,7 +195,7 @@ class StrategyEvaluator:
                 data = []
                 for key in pnl_dict.keys():
                     data.append(pnl_dict[key][attribute].rename(key))
-                df = pd.concat(data, axis=0)
+                df = pd.concat(data, axis=1)
                 pnl_dict_pivoted[attribute] = df
             pnl_dict = pnl_dict_pivoted
         else:
