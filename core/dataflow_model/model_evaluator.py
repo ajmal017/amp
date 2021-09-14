@@ -24,7 +24,7 @@ import helpers.introspection as hintro
 
 _LOG = logging.getLogger(__name__)
 
-# _LOG.debug = _LOG.info
+#_LOG.debug = _LOG.info
 
 # #############################################################################
 # ModelEvaluator
