@@ -1,9 +1,9 @@
 import logging
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
 import pytest
-from typing import Any, Dict, List, Tuple
 
 import core.dataflow_model.pnl_simulator as pnlsim
 import helpers.printing as hprint
@@ -13,71 +13,224 @@ _LOG = logging.getLogger(__name__)
 
 
 class TestPnlSimulatorFunctions1(hut.TestCase):
-
     def test_get_data1(self) -> None:
         """
         Freeze the output of `_get_data()` as reference for other unit tests.
         """
         df = self._get_data()
-        df = df["price ask bid".split()]
         actual_result = hut.convert_df_to_string(df, index=True)
         expected_result = """
-                                  price         ask         bid
-        2021-09-12 09:30:00  100.496714  100.722490  100.381066
-        2021-09-12 09:31:00  100.358450  100.425978  100.057346
-        2021-09-12 09:32:00  101.006138  102.430887   99.527616
-        2021-09-12 09:33:00  102.529168  103.073551  101.809324
-        2021-09-12 09:34:00  102.295015  102.405937  101.834376
-        2021-09-12 09:35:00  102.060878  103.211871  101.003756
-        2021-09-12 09:36:00  103.640091  104.015789  103.296472
-        2021-09-12 09:37:00  104.407525  105.008164  102.644485
-        2021-09-12 09:38:00  103.938051  104.229745  103.613967
-        2021-09-12 09:39:00  104.480611  105.082318  104.095529
-        2021-09-12 09:40:00  104.017193  105.869472  103.340271
-        2021-09-12 09:41:00  103.551464  103.564961  102.939787
-        2021-09-12 09:42:00  103.793426  104.851137  102.762426
-        2021-09-12 09:43:00  101.880146  102.702691  100.948866
-        2021-09-12 09:44:00  100.155228  101.376072   99.316010
-        2021-09-12 09:45:00   99.592940   99.801804   99.283728
-        2021-09-12 09:46:00   98.580109  100.539779   98.248846
-        2021-09-12 09:47:00   98.894357  100.222543   97.918811
-        2021-09-12 09:48:00   97.986332   98.183194   97.507158
-        2021-09-12 09:49:00   96.574029   97.312495   96.388370
-        2021-09-12 09:50:00   98.039678   98.211046   96.933343
-        """
+                                  price         ask         bid    midpoint
+        2021-09-12 09:30:00  100.496714  100.722490  100.381066  100.551778
+        2021-09-12 09:31:00  100.358450  100.425978  100.057346  100.241662
+        2021-09-12 09:32:00  101.006138  102.430887   99.527616  100.979251
+        2021-09-12 09:33:00  102.529168  103.073551  101.809324  102.441438
+        2021-09-12 09:34:00  102.295015  102.405937  101.834376  102.120157
+        2021-09-12 09:35:00  102.060878  103.211871  101.003756  102.107814
+        2021-09-12 09:36:00  103.640091  104.015789  103.296472  103.656131
+        2021-09-12 09:37:00  104.407525  105.008164  102.644485  103.826325
+        2021-09-12 09:38:00  103.938051  104.229745  103.613967  103.921856
+        2021-09-12 09:39:00  104.480611  105.082318  104.095529  104.588923
+        2021-09-12 09:40:00  104.017193  105.869472  103.340271  104.604872
+        2021-09-12 09:41:00  103.551464  103.564961  102.939787  103.252374
+        2021-09-12 09:42:00  103.793426  104.851137  102.762426  103.806782
+        2021-09-12 09:43:00  101.880146  102.702691  100.948866  101.825778
+        2021-09-12 09:44:00  100.155228  101.376072   99.316010  100.346041
+        2021-09-12 09:45:00   99.592940   99.801804   99.283728   99.542766
+        2021-09-12 09:46:00   98.580109  100.539779   98.248846   99.394313
+        2021-09-12 09:47:00   98.894357  100.222543   97.918811   99.070677
+        2021-09-12 09:48:00   97.986332   98.183194   97.507158   97.845176
+        2021-09-12 09:49:00   96.574029   97.312495   96.388370   96.850433
+        2021-09-12 09:50:00   98.039678   98.211046   96.933343   97.572194"""
         expected_result = hprint.dedent(expected_result)
         self.assert_equal(actual_result, expected_result)
-
-    def _test_get_twap_price1(self, use_cache: bool) -> None:
-        """
-        Test that TWAP is computed properly.
-        """
-        df = self._get_data()
-        column = "price"
-        mi = pnlsim.MarketInterface(df, column, use_cache=use_cache)
-        ts_start = pd.Timestamp("2021-09-12 09:30:00")
-        ts_end = pd.Timestamp("2021-09-12 09:35:00")
-        act = mi.get_twap_price(ts_start, ts_end)
-        #
-        exp = df.loc[ts_start + pd.Timedelta(minutes=1) : ts_end]["price"].mean()
-        np.testing.assert_almost_equal(act, exp)
-        #
-        exp = (
-              100.358450 + 101.006138 + 102.529168 + 102.295015 + 102.060878
-              ) / 5.0
-        np.testing.assert_almost_equal(act, exp)
 
     def test_get_twap_price1(self) -> None:
         """
         Test that TWAP is computed properly.
         """
-        self._test_get_twap_price1(use_cache=True)
+        df = self._get_data()
+        for use_cache in [True, False]:
+            columns: Optional[List[str]]
+            if use_cache:
+                columns = ["price", "ask", "bid"]
+            else:
+                columns = None
+            mi = pnlsim.MarketInterface(df, use_cache, columns=columns)
+            ts_start = pd.Timestamp("2021-09-12 09:30:00")
+            ts_end = pd.Timestamp("2021-09-12 09:35:00")
+            act = mi.get_twap_price(ts_start, ts_end, "price")
+            #
+            exp = df.loc[ts_start + pd.Timedelta(minutes=1) : ts_end][
+                "price"
+            ].mean()
+            np.testing.assert_almost_equal(act, exp)
+            #
+            exp = (
+                100.358450 + 101.006138 + 102.529168 + 102.295015 + 102.060878
+            ) / 5.0
+            np.testing.assert_almost_equal(act, exp)
 
-    def test_get_twap_price2(self) -> None:
+    def test_order_price1(self) -> None:
+        df = self._get_data()
+        type_ = "price@start"
+        num_shares = 100
+        ts_start = pd.Timestamp("2021-09-12 09:30:00")
+        exp: float = df.loc[ts_start]["price"]
+        np.testing.assert_almost_equal(exp, 100.496714)
+        self._test_order(type_, num_shares, exp)
+
+    def test_order_price2(self) -> None:
+        df = self._get_data()
+        type_ = "price@end"
+        num_shares = 100
+        ts_start = pd.Timestamp("2021-09-12 09:35:00")
+        exp = df.loc[ts_start]["price"]
+        np.testing.assert_almost_equal(exp, 102.060878)
+        self._test_order(type_, num_shares, exp)
+
+    def test_order_price3(self) -> None:
+        self._get_data()
+        type_ = "price@twap"
+        num_shares = 100
+        exp = (
+            100.358450 + 101.006138 + 102.529168 + 102.295015 + 102.060878
+        ) / 5.0
+        self._test_order(type_, num_shares, exp)
+
+    def test_order_midpoint1(self) -> None:
+        self._get_data()
+        type_ = "midpoint@start"
+        num_shares = 100
+        exp = 100.551778
+        self._test_order(type_, num_shares, exp)
+
+    def test_order_midpoint2(self) -> None:
+        self._get_data()
+        type_ = "midpoint@end"
+        num_shares = 100
+        exp = 102.107814
+        self._test_order(type_, num_shares, exp)
+
+    def test_order_midpoint3(self) -> None:
+        self._get_data()
+        type_ = "midpoint@twap"
+        num_shares = 100
+        exp = (
+            100.241662 + 100.979251 + 102.441438 + 102.120157 + 102.107814
+        ) / 5.0
+        self._test_order(type_, num_shares, exp)
+
+    def test_order_full_spread1(self) -> None:
+        self._get_data()
+        type_ = "full_spread@end"
+        num_shares = 100
+        exp = 103.211871
+        self._test_order(type_, num_shares, exp)
+
+    def test_order_full_spread2(self) -> None:
+        self._get_data()
+        type_ = "full_spread@end"
+        num_shares = -100
+        exp = 101.003756
+        self._test_order(type_, num_shares, exp)
+
+    def test_order_full_spread3(self) -> None:
+        self._get_data()
+        type_ = "full_spread@twap"
+        num_shares = 100
+        exp = (100.425978 + 102.430887 + 103.073551 + 102.405937 + 103.211871) / 5
+        self._test_order(type_, num_shares, exp)
+
+    def test_order_full_spread4(self) -> None:
+        self._get_data()
+        type_ = "full_spread@twap"
+        num_shares = -100
+        exp = (100.057346 + 99.527616 + 101.809324 + 101.834376 + 101.003756) / 5
+        self._test_order(type_, num_shares, exp)
+
+    def test_order_partial_spread1(self) -> None:
         """
-        Like `test_get_twap_price1` but without cache.
+        Same as full_spread.
         """
-        self._test_get_twap_price1(use_cache=False)
+        self._get_data()
+        type_ = "partial_spread_1.0@twap"
+        num_shares = 100
+        exp = (100.425978 + 102.430887 + 103.073551 + 102.405937 + 103.211871) / 5
+        self._test_order(type_, num_shares, exp)
+
+    def test_order_partial_spread2(self) -> None:
+        self._get_data()
+        type_ = "partial_spread_1.0@twap"
+        num_shares = -100
+        exp = (100.057346 + 99.527616 + 101.809324 + 101.834376 + 101.003756) / 5
+        self._test_order(type_, num_shares, exp)
+
+    def test_order_partial_spread3(self) -> None:
+        """
+        Same as midpoint.
+        """
+        self._get_data()
+        type_ = "partial_spread_0.5@twap"
+        num_shares = 100
+        exp = (
+            100.425978
+            + 100.057346
+            + 102.430887
+            + 99.527616
+            + 103.073551
+            + 101.809324
+            + 102.405937
+            + 101.834376
+            + 103.211871
+            + 101.003756
+        ) / 10.0
+        self._test_order(type_, num_shares, exp)
+
+    def test_order_partial_spread4(self) -> None:
+        self._get_data()
+        type_ = "partial_spread_0.5@twap"
+        num_shares = -100
+        exp = (
+            100.241662 + 100.979251 + 102.441438 + 102.120157 + 102.107814
+        ) / 5.0
+        self._test_order(type_, num_shares, exp)
+
+    def test_order_partial_spread5(self) -> None:
+        """
+        No spread.
+        """
+        self._get_data()
+        type_ = "partial_spread_0.0@twap"
+        num_shares = 100
+        exp = (
+            100.057346 + 99.527616 + 101.809324 + 101.834376 + 101.003756
+        ) / 5.0
+        self._test_order(type_, num_shares, exp)
+
+    def test_order_partial_spread6(self) -> None:
+        self._get_data()
+        type_ = "partial_spread_0.0@twap"
+        num_shares = -100
+        exp = (
+            100.425978 + 102.430887 + 103.073551 + 102.405937 + 103.211871
+        ) / 5.0
+        self._test_order(type_, num_shares, exp)
+
+    def _test_order(self, type_: str, num_shares: float, exp: float) -> None:
+        df = self._get_data()
+        for use_cache in [True, False]:
+            columns: Optional[List[str]]
+            if use_cache:
+                columns = ["price", "ask", "bid", "midpoint"]
+            else:
+                columns = None
+            mi = pnlsim.MarketInterface(df, use_cache, columns=columns)
+            ts_start = pd.Timestamp("2021-09-12 09:30:00")
+            ts_end = pd.Timestamp("2021-09-12 09:35:00")
+            order = pnlsim.Order(mi, type_, ts_start, ts_end, num_shares)
+            act = order.get_execution_price()
+            np.testing.assert_almost_equal(act, exp, decimal=5)
 
     def _get_data(self) -> pd.DataFrame:
         """
@@ -86,20 +239,30 @@ class TestPnlSimulatorFunctions1(hut.TestCase):
         num_samples = 21
         seed = 42
         df = pnlsim.get_random_market_data(num_samples, seed)
+        df["midpoint"] = (df["ask"] + df["bid"]) / 2
+        df = df.round(6)
         return df
 
 
+# #############################################################################
+
+
 def _compute_pnl_level2(
-        self_: Any,
-        df: pd.DataFrame,
-        df_5mins: pd.DataFrame,
-        initial_wealth: float,
-        config: Dict[str, Any]):
+    self_: Any,
+    df: pd.DataFrame,
+    df_5mins: pd.DataFrame,
+    initial_wealth: float,
+    config: Dict[str, Any],
+) -> pd.DataFrame:
     # Check that with / without cache we get the same results.
-    config["use_cache"] = False
-    df_5mins_no_cache = pnlsim.compute_pnl_level2(df, df_5mins, initial_wealth, config)
-    config["use_cache"] = True
-    df_5mins = pnlsim.compute_pnl_level2(df, df_5mins, initial_wealth, config)
+    config_ = config.copy()
+    config_["use_cache"] = False
+    df_5mins_no_cache = pnlsim.compute_pnl_level2(
+        df, df_5mins, initial_wealth, config_
+    )
+    config_ = config.copy()
+    config_["use_cache"] = True
+    df_5mins = pnlsim.compute_pnl_level2(df, df_5mins, initial_wealth, config_)
     self_.assert_equal(str(df_5mins_no_cache), str(df_5mins))
     pd.testing.assert_frame_equal(df_5mins_no_cache, df_5mins)
     return df_5mins
@@ -186,6 +349,7 @@ class TestPnlSimulator1(hut.TestCase):
             "price_column": "price",
             "future_snoop_allocation": True,
             "order_type": "price.end",
+            "cached_columns": ["price"],
         }
         # Check that with / without cache we get the same results.
         df_5mins = _compute_pnl_level2(self, df, df_5mins, initial_wealth, config)
@@ -216,53 +380,51 @@ class TestPnlSimulator2(hut.TestCase):
         Run level2 simulation using future information to use invest all the
         working capital.
         """
-        act = []
-        #
         df, df_5mins = pnlsim.get_example_market_data1()
         initial_wealth = 1000.0
-        #
         config = {
             "price_column": "price",
             "future_snoop_allocation": True,
             "order_type": "price.end",
+            "cached_columns": ["price"],
         }
-        df_5mins = _compute_pnl_level2(self, df, df_5mins, initial_wealth, config)
-        act.append(
-            "df_5mins=\n%s" % hut.convert_df_to_string(df_5mins, index=True)
-        )
-        #
-        act = "\n".join(act)
-        self.check_string(act)
+        self._run(df, df_5mins, initial_wealth, config)
 
     def test2(self) -> None:
         """
         Same as `test1()` but without future information.
         """
-        act = []
-        #
         df, df_5mins = pnlsim.get_example_market_data1()
         initial_wealth = 1000.0
-        #
         config = {
             "price_column": "price",
             "future_snoop_allocation": False,
             "order_type": "price.end",
+            "cached_columns": ["price"],
         }
-        df_5mins = _compute_pnl_level2(self, df, df_5mins, initial_wealth, config)
-        act.append(
-            "df_5mins=\n%s" % hut.convert_df_to_string(df_5mins, index=True)
-        )
-        #
-        act = "\n".join(act)
-        self.check_string(act)
+        self._run(df, df_5mins, initial_wealth, config)
+
+    def test3(self) -> None:
+        """
+        Same as `test1()` but without future information.
+        """
+        num_samples = 5 * 30 + 1
+        seed = 45
+        df, df_5mins = pnlsim.get_example_market_data2(num_samples, seed)
+        initial_wealth = 10000.0
+        config = {
+            "price_column": "price",
+            "future_snoop_allocation": False,
+            "order_type": "price.end",
+            "cached_columns": ["price"],
+        }
+        self._run(df, df_5mins, initial_wealth, config)
 
     @pytest.mark.skip("For performance measurement")
     def test_perf1(self) -> None:
         """
         Same as `test1()` but without future information.
         """
-        act = []
-        #
         num_samples = 5 * 100000 + 1
         seed = 43
         df, df_5mins = pnlsim.get_example_market_data2(num_samples, seed)
@@ -276,6 +438,26 @@ class TestPnlSimulator2(hut.TestCase):
             "use_cache": True,
         }
         df_5mins = pnlsim.compute_pnl_level2(df, df_5mins, initial_wealth, config)
+
+    def _run(
+        self,
+        df: pd.DataFrame,
+        df_5mins: pd.DataFrame,
+        initial_wealth: float,
+        config: Dict[str, Any],
+    ) -> None:
+        """
+        Run level2 simulation using future information to use invest all the
+        working capital.
+        """
+        act = []
+        df_5mins = _compute_pnl_level2(self, df, df_5mins, initial_wealth, config)
+        act.append(
+            "df_5mins=\n%s" % hut.convert_df_to_string(df_5mins, index=True)
+        )
+        # Check.
+        act = "\n".join(act)
+        self.check_string(act)
 
 
 # TODO(gp): Add unit tests for computing PnL with level2 sim using midpoint price,
