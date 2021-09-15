@@ -938,8 +938,8 @@ class Test_compute_pnl(hut.TestCase):
         df = self._get_df()
         actual = fin.compute_pnl(
             df,
-            target_position_col="position",
-            return_col="rets",
+            position_intent_col="position_intent_1",
+            return_col="ret_0",
         )
         txt = """
 datetime,pnl
@@ -954,7 +954,7 @@ datetime,pnl
     @staticmethod
     def _get_df() -> pd.DataFrame:
         txt = """
-datetime,rets,position
+datetime,ret_0,position_intent_1
 2016-01-04 12:00:00,0.0010,100
 2016-01-04 12:01:00,-0.0008,200
 2016-01-04 12:02:00,0.0006,-100
