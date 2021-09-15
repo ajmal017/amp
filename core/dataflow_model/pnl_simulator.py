@@ -1,3 +1,8 @@
+"""
+Import as:
+
+import core.dataflow_model.pnl_simulator as pnlsim
+"""
 import collections
 import copy
 import logging
@@ -12,6 +17,8 @@ import helpers.htqdm as htqdm
 import helpers.printing as hprint
 
 _LOG = logging.getLogger(__name__)
+
+#_LOG.debug = _LOG.info
 
 # TODO(gp): Generalize for different intervals, besides 5 mins trading.
 # TODO(gp): Extend for computing PnL on multiple stocks.
