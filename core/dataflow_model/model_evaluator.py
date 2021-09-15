@@ -27,10 +27,10 @@ _LOG = logging.getLogger(__name__)
 # _LOG.debug = _LOG.info
 
 # #############################################################################
-# ModelEvaluator
+# StrategyEvaluator
 # #############################################################################
 
-# A model / experiment is represented by a key, encoded as an int.
+# Each model / experiment is represented by a key, encoded as an int.
 Key = int
 
 
@@ -42,18 +42,28 @@ class StrategyEvaluator:
     def __init__(
         self,
         data: Dict[Key, pd.DataFrame],
-        *,
         position_intent_col: str,
         returns_col: str,
         spread_col: str,
-        # TODO: Allow specification of start and end times for stats.
+        # TODO(Paul): Allow specification of start and end times for stats.
         # This is useful for interactive analysis and/or zooming in on a
         # specific time period.
         # start: Optional[pd.Timestamp] = None,
         # end: Optional[pd.Timestamp] = None,
     ) -> None:
         """
-        
+        Constructor.
+
+        We assume that the passed time series are aligned, in the sense that they
+        are shifted so that the `pnl = position_intent * returns_col`. In our
+        nomenclature they correspond to `position_intent_1` and `ret_0`.
+
+        :param data: same meaning as in `ModelEvaluator`
+        :param position_intent_col: column storing the position intent for the
+            corresponding returns. This is derived from the alpha of the model
+        :param returns_col: column with the return that we are predicting
+        :param spread_col: column with the spread associated to the corresponding
+            `returns_col`
         """
         self._data = data
         dbg.dassert(data, msg="Data set must be nonempty.")
@@ -72,8 +82,8 @@ class StrategyEvaluator:
         self.valid_keys = list(self._data.keys())
         self._stats_computer = cstats.StatsComputer()
 
-    # TODO(*): This looks like the corresponding method for `ModelEvaluator`
-    # except for the columns needed. Factor out the common part.
+    # TODO(Paul): This looks like the corresponding method for `ModelEvaluator`
+    #  except for the columns needed. Factor out the common part.
     @classmethod
     def from_result_bundle_dict(
         cls,
@@ -105,9 +115,8 @@ class StrategyEvaluator:
                     ),
                 )
                 # Extract the needed columns.
-                dbg.dassert_in(position_intent_col, df.columns)
-                dbg.dassert_in(returns_col, df.columns)
-                dbg.dassert_in(spread_col, df.columns)
+                for col in (position_intent_col, returns_col, spread_col):
+                    dbg.dassert_in(col, df.columns)
                 dbg.dassert_not_in(key, data_dict.keys())
                 data_dict[key] = df[
                     [position_intent_col, returns_col, spread_col]
@@ -134,27 +143,36 @@ class StrategyEvaluator:
         )
         return evaluator
 
+    # TODO(gp): Maybe we should separate the pivoting logic in a different function
+    #  to avoid to complicate the types.
     def compute_pnl(
         self,
         keys: Optional[List[Key]] = None,
         spread_fraction_paid: float = 0,
         key_type: str = "instrument",
-    ) -> Dict[Any, pd.DataFrame]:
+    ) -> Dict[Union[Key, str], pd.DataFrame]:
         """
-        Compute pnl from position intents, ret_0, and spread.
+        Compute PnL from position intents, ret_0, and spread.
+
+        :param key_type:
+
         """
         keys = keys or self.valid_keys
         dbg.dassert_is_subset(keys, self.valid_keys)
-        pnl_dict = {}
+        # Build the
+        pnl_dict: Dict[Union[Key, str], pd.DataFrame] = {}
         for key in tqdm(keys):
             _LOG.debug("Process key=%s", key)
-            # Extract the returns and alpha columns.
-            dbg.dassert_in(self.returns_col, self._data[key].columns)
-            dbg.dassert_in(self.position_intent_col, self._data[key].columns)
-            dbg.dassert_in(self.spread_col, self._data[key].columns)
+            # Extract the needed data from the current dataframe.
+            for col in (self.returns_col, self.position_intent_col, self.spread_col):
+                dbg.dassert_in(col, self._data[key].columns)
             df = self._data[key][
                 [self.returns_col, self.position_intent_col, self.spread_col]
             ]
+            # TODO(gp): Not sure about renaming the columns, since it might prevent
+            #  re-running on the same data. It might be simpler to leave the data
+            #  as it is and use meaningful vars for the cols, e.g.,
+            #  `ret_0 = self.returns_col`.
             df.rename(
                 columns={
                     self.returns_col: "ret_0",
@@ -163,6 +181,7 @@ class StrategyEvaluator:
                 },
                 inplace=True,
             )
+            # Compute PnL.
             pnl = (
                 fin.compute_pnl(
                     df,
@@ -173,6 +192,7 @@ class StrategyEvaluator:
                 .rename("pnl_0")
             )
             df["pnl_0"] = pnl
+            # Compute spread cost.
             spread_cost = (
                 fin.compute_spread_cost(
                     df,
@@ -188,7 +208,7 @@ class StrategyEvaluator:
             pnl_dict[key] = df
         if key_type == "instrument":
             pass
-        if key_type == "attribute":
+        elif key_type == "attribute":
             pnl_dict_pivoted = {}
             for attribute in ["ret_0", "position_intent_1", "spread_0",
                               "spread_cost_0", "pnl_0", "ex_cost_pnl_0"]:
@@ -199,7 +219,7 @@ class StrategyEvaluator:
                 pnl_dict_pivoted[attribute] = df
             pnl_dict = pnl_dict_pivoted
         else:
-            raise ValueError()
+            raise ValueError("Invalid key_type='%s'" % key_type)
         return pnl_dict
 
     def calculate_stats(
@@ -243,6 +263,11 @@ class StrategyEvaluator:
         return stats_df
 
 
+# #############################################################################
+# ModelEvaluator
+# #############################################################################
+
+
 class ModelEvaluator:
     """
     Evaluate returns predictions.
@@ -278,10 +303,8 @@ class ModelEvaluator:
              2009-01-02 09:15:00-05:00                              NaN ...
             ```
 
-        :param prediction_col: column of `ResultBundle.result_df` to use as
-            predictions
-        :param target_col: column of `ResultBundle.result_df` to use as targets
-            (e.g., returns)
+        :param prediction_col: column of to use as predictions
+        :param target_col: column of to use as targets (e.g., returns)
         :param oos_start: start of the OOS period, or None for nothing
         """
         self._data = data
