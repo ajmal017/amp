@@ -316,7 +316,9 @@ class GroupedColDfToDfColTransformer(cdnb.Transformer):
         #
         df_in = df.copy()
         #
-        in_dfs = cdnb.GroupedColDfToDfColProcessor.preprocess(df, self._in_col_groups)
+        in_dfs = cdnb.GroupedColDfToDfColProcessor.preprocess(
+            df, self._in_col_groups
+        )
         self._leaf_cols = list(in_dfs.keys())
         #
         info = collections.OrderedDict()  # type: ignore
@@ -337,7 +339,9 @@ class GroupedColDfToDfColTransformer(cdnb.Transformer):
         info["func_info"] = func_info
         # Combine the series representing leaf col transformations back into a
         # single dataframe.
-        df = cdnb.GroupedColDfToDfColProcessor.postprocess(out_dfs, self._out_col_group)
+        df = cdnb.GroupedColDfToDfColProcessor.postprocess(
+            out_dfs, self._out_col_group
+        )
         df = df.reindex(df_in.index)
         df = cdtfu.merge_dataframes(df_in, df)
         info["df_transformed_info"] = cdtfu.get_df_info_as_string(df)
