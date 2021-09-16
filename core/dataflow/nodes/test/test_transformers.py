@@ -65,6 +65,149 @@ class TestSeriesToSeriesTransformer(hut.TestCase):
         return data
 
 
+class TestGroupedColDfToDfTransformer(hut.TestCase):
+    def test1(self) -> None:
+        data = self._get_data()
+
+        def divide(df: pd.DataFrame, col1: str, col2: str) -> pd.DataFrame:
+            quotient = (df[col1] / df[col2]).rename("div")
+            return quotient.to_frame()
+
+        config = cconfig.get_config_from_nested_dict(
+            {
+                "in_col_groups": [("ret",), ("vol",)],
+                "out_col_group": (),
+                "transformer_func": divide,
+                "transformer_kwargs": {
+                    "col1": "ret",
+                    "col2": "vol",
+                },
+            },
+        )
+        node = cdnt.GroupedColDfToDfTransformer("adj", **config.to_dict())
+        actual = node.fit(data)["df_out"]
+        expected_txt = """
+,div,div,ret,ret,vol,vol
+,MN0,MN1,MN0,MN1,MN0,MN1
+2016-01-04 09:30:00,0.4,-0.4,0.5,-0.5,1.25,1.25
+2016-01-04 09:31:00,0.25,0.25,0.25,0.25,1.0,1.0
+2016-01-04 09:32:00,-0.8,0.8,-1.0,1.0,1.25,1.25
+"""
+        expected = pd.read_csv(
+            io.StringIO(expected_txt),
+            index_col=0,
+            parse_dates=True,
+            header=[0, 1],
+        )
+        np.testing.assert_allclose(actual, expected)
+
+    def _get_data(self) -> pd.DataFrame:
+        txt = """
+,ret,ret,vol,vol
+datetime,MN0,MN1,MN0,MN1
+2016-01-04 09:30:00,0.5,-0.5,1.25,1.25
+2016-01-04 09:31:00,0.25,0.25,1,1
+2016-01-04 09:32:00,-1,1,1.25,1.25
+"""
+        df = pd.read_csv(
+            io.StringIO(txt), index_col=0, parse_dates=True, header=[0, 1]
+        )
+        return df
+
+
+class TestSeriesToDfTransformer(hut.TestCase):
+    def test1(self) -> None:
+        def add_lags(srs: pd.Series, num_lags: int) -> pd.DataFrame:
+            lags = []
+            for lag in range(0, num_lags):
+                lags.append(srs.shift(lag).rename("lag_" + str(lag)))
+            out_df = pd.concat(lags, axis=1)
+            return out_df
+
+        data = self._get_data()
+        config = cconfig.get_config_from_nested_dict(
+            {
+                "in_col_group": ("close",),
+                "out_col_group": (),
+                "transformer_func": add_lags,
+                "transformer_kwargs": {
+                    "num_lags": 3,
+                },
+            }
+        )
+        node = cdnt.SeriesToDfTransformer("add_lags", **config.to_dict())
+        actual = node.fit(data)["df_out"]
+        expected_txt = """
+,lag_0,lag_0,lag_1,lag_1,lag_2,lag_2,close,close,volume,volume
+,MN0,MN1,MN0,MN1,MN0,MN1,MN0,MN1,MN0,MN1
+2016-01-04 09:30:00,94.7,100.2,,,,,94.7,100.2,30000,40000
+2016-01-04 09:31:00,94.9,100.25,94.7,100.2,,,94.9,100.25,35000,44000
+2016-01-04 09:32:00,95.35,100.23,94.9,100.25,94.7,100.2,95.35,100.23,40000,45000
+"""
+        expected = pd.read_csv(
+            io.StringIO(expected_txt),
+            index_col=0,
+            parse_dates=True,
+            header=[0, 1],
+        )
+        hut.compare_df(actual, expected)
+
+    def _get_data(self) -> pd.DataFrame:
+        txt = """
+,close,close,volume,volume
+datetime,MN0,MN1,MN0,MN1
+2016-01-04 09:30:00,94.70,100.20,30000,40000
+2016-01-04 09:31:00,94.90,100.25,35000,44000
+2016-01-04 09:32:00,95.35,100.23,40000,45000
+"""
+        df = pd.read_csv(
+            io.StringIO(txt), index_col=0, parse_dates=True, header=[0, 1]
+        )
+        return df
+
+
+class TestSeriesToSeriesTransformer(hut.TestCase):
+    def test1(self) -> None:
+        data = self._get_data()
+        config = cconfig.get_config_from_nested_dict(
+            {
+                "in_col_group": ("close",),
+                "out_col_group": ("ret_0",),
+                "transformer_func": lambda x: x.pct_change(),
+            }
+        )
+        node = cdnt.SeriesToSeriesTransformer("add_lags", **config.to_dict())
+        actual = node.fit(data)["df_out"]
+        expected_txt = """
+,ret_0,ret_0,close,close,volume,volume
+,MN0,MN1,MN0,MN1,MN0,MN1
+2016-01-04 09:30:00,,,100.0,100.0,30000,40000
+2016-01-04 09:31:00,0.05,-0.02,105.0,98.0,35000,44000
+2016-01-04 09:32:00,-0.5,-0.5,52.5,49.0,40000,45000
+"""
+        expected = pd.read_csv(
+            io.StringIO(expected_txt),
+            index_col=0,
+            parse_dates=True,
+            header=[0, 1],
+        )
+        # NOTE: `hut.compare_df()` is unstable due to round-off errors.
+        np.testing.assert_allclose(actual, expected)
+
+    def _get_data(self) -> pd.DataFrame:
+        txt = """
+,close,close,volume,volume
+datetime,MN0,MN1,MN0,MN1
+2016-01-04 09:30:00,100.00,100.00,30000,40000
+2016-01-04 09:31:00,105.00,98.00,35000,44000
+2016-01-04 09:32:00,52.50,49.00,40000,45000
+"""
+        df = pd.read_csv(
+            io.StringIO(txt), index_col=0, parse_dates=True, header=[0, 1]
+        )
+        return df
+
+
 class TestFunctionWrapper(hut.TestCase):
     def test1(self) -> None:
         """
