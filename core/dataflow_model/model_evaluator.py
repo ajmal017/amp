@@ -34,6 +34,16 @@ _LOG = logging.getLogger(__name__)
 Key = int
 
 
+import datetime
+
+def _trim_df_trading_hours(df) -> pd.DataFrame:
+    df_time = df.index.time
+    mask = (df_time >= datetime.time(9, 25)) & (df_time <= datetime.time(16, 0))
+    _LOG.debug(mask.sum() / len(mask))
+    dbg.dassert_eq(len(df[~mask].dropna()), 0)
+    return df[mask]
+
+
 class StrategyEvaluator:
     """
     Evaluate the performance of a strategy driven by an alpha.
@@ -118,9 +128,11 @@ class StrategyEvaluator:
                 for col in (position_intent_col, returns_col, spread_col):
                     dbg.dassert_in(col, df.columns)
                 dbg.dassert_not_in(key, data_dict.keys())
-                data_dict[key] = df[
+                df_tmp = df[
                     [position_intent_col, returns_col, spread_col]
                 ]
+                df_tmp = _trim_df_trading_hours(df_tmp)
+                data_dict[key] = df_tmp
             except Exception as e:
                 _LOG.error(
                     "Error while loading ResultBundle for config %s with exception:\n%s"
@@ -147,8 +159,8 @@ class StrategyEvaluator:
     #  to avoid to complicate the types.
     def compute_pnl(
         self,
+        spread_fraction_paid: float,
         keys: Optional[List[Key]] = None,
-        spread_fraction_paid: float = 0,
         key_type: str = "instrument",
     ) -> Dict[Union[Key, str], pd.DataFrame]:
         """
@@ -159,6 +171,7 @@ class StrategyEvaluator:
         :param key_type: how to index the output data structure (e.g., by instrument
             or by attribute)
         """
+        # TODO(gp): Avoid to recompute
         _LOG.info(
             "Before StrategyEvaluator.compute_pnl: memory_usage=%s",
             dbg.get_memory_usage_as_str(None),
@@ -211,13 +224,16 @@ class StrategyEvaluator:
             )
             # Add the info.
             df["spread_cost_0"] = spread_cost
-            df["ex_cost_pnl_0"] = pnl - spread_cost
+            #df["ex_cost_pnl_0"] = pnl - spread_cost
             pnl_dict[key] = df
             _LOG.info(
                 "StrategyEvaluator.compute_pnl: memory_usage=%s",
                 dbg.get_memory_usage_as_str(None),
             )
-
+            #print(df)
+            #mem = df.memory_usage().sum()
+            #print(mem)
+            #assert 0
         # Organize the resulting output.
         if key_type == "instrument":
             pass
@@ -247,20 +263,25 @@ class StrategyEvaluator:
         :return: dataframe of statistics with `keys` as columns
         """
         pnl_dict = self.compute_pnl(
-            keys,
-            spread_fraction_paid=spread_fraction_paid,
+            spread_fraction_paid,
+            keys=keys,
         )
+        #
         stats_dict = {}
         for key in tqdm(pnl_dict.keys(), desc="Calculating stats"):
             _LOG.debug("key=%s", key)
-            if pnl_dict[key].empty:
+            pnl_df = pnl_dict[key]
+            if pnl_df.empty:
                 _LOG.warning("PnL series for key=%i is empty", key)
                 continue
-            if pnl_dict[key].dropna().empty:
+            if pnl_df.dropna().empty:
                 _LOG.warning("PnL series for key=%i is all-NaN", key)
                 continue
+            # Compute PnL without spread cost.
+            ex_cost_pnl_0 = pnl_df["pnl_0"] - pnl_df["spread_cost_0"]
+            ex_cost_pnl_0 = ex_cost_pnl_0.to_frame().rename("ex_cost_pnl_0")
             stats_dict[key] = self._stats_computer.compute_finance_stats(
-                pnl_dict[key],
+                ex_cost_pnl_0,
                 pnl_col="ex_cost_pnl_0",
             )
         # TODO(gp): Factor out this piece since it's common to `ModelEvaluator`.

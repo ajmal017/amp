@@ -18,6 +18,7 @@ import helpers.git as git
 import helpers.hparquet as hparquet
 import helpers.io_ as io_
 import helpers.pickle_ as hpickle
+import helpers.timer as htimer
 
 _LOG = logging.getLogger(__name__)
 
@@ -281,20 +282,22 @@ class ResultBundle(abc.ABC):
                 "Invalid file_name='%s'",
                 file_name,
             )
-            obj = hpickle.from_pickle(file_name, log_level=logging.DEBUG)
-            # TODO(gp): This is a workaround waiting for LimeTask164.
-            #  We load 200MB of data and then discard 198MB.
-            obj.payload = None
-            dbg.dassert_isinstance(obj, ResultBundle)
+            with htimer.TimedScope(logging.DEBUG, "Load pickle"):
+                obj = hpickle.from_pickle(file_name, log_level=logging.DEBUG)
+                # TODO(gp): This is a workaround waiting for LimeTask164.
+                #  We load 200MB of data and then discard 198MB.
+                obj.payload = None
+                dbg.dassert_isinstance(obj, ResultBundle)
             # Load the `result_df` as parquet.
             file_name_pq = io_.change_filename_extension(file_name, "pkl", "pq")
             if columns is None:
                 _LOG.warning(
                     "Loading the entire `result_df` without filtering by columns: this is slow and requires a lot of memory"
                 )
-            obj.result_df = hparquet.from_parquet(
-                file_name_pq, columns=columns, log_level=logging.DEBUG
-            )
+            with htimer.TimedScope(logging.DEBUG, "Load parquet"):
+                obj.result_df = hparquet.from_parquet(
+                    file_name_pq, columns=columns, log_level=logging.DEBUG
+                )
             file_name_metadata_df = io_.change_filename_extension(
                 file_name, "pkl", "metadata_df.pkl"
             )

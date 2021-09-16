@@ -52,9 +52,10 @@ hprint.config_notebook()
 config = None
 
 if config is None:
-    experiment_dir = "/cache/experiments/oos_experiment.RH2Eg.v2_0-all.5T.run2"
+    experiment_dir = "/cache/experiments/oos_experiment.RH2Eg.v2_0-all.5T.run2.hacked"
     aws_profile = None
-    selected_idxs = range(3)
+    #selected_idxs = range(200)
+    selected_idxs = None
 
     eval_config = cconfig.get_config_from_nested_dict(
         {
@@ -78,6 +79,9 @@ if config is None:
 print(str(eval_config))
 
 # %%
+#result_bundle_dict
+
+# %%
 load_config = eval_config["load_experiment_kwargs"].to_dict()
 
 # Load only the columns needed by the StrategyEvaluator.
@@ -99,4 +103,81 @@ evaluator = modeval.StrategyEvaluator.from_result_bundle_dict(
 )
 
 # %%
-result = evaluator.compute_pnl(key_type="attribute")
+spread_fraction_paid = 0
+#keys = range(3)
+keys = None
+#result = evaluator.compute_pnl(key_type="attribute", keys=keys)
+pnl_dict = evaluator.compute_pnl(spread_fraction_paid, keys=keys, key_type="instrument")
+
+#pnl_dict[0]
+
+# %%
+#spread_fraction_paid = 0
+#evaluator.calculate_stats(spread_fraction_paid)
+
+# %%
+import pandas as pd
+
+# %%
+df.shape
+
+# %%
+print(dbg.get_memory_usage_as_str(None))
+
+#del pnl_dict
+
+import gc
+
+gc.collect()
+
+print(dbg.get_memory_usage_as_str(None))
+
+# %%
+dfs = []
+for key in list(pnl_dict.keys()):
+    srs = pnl_dict[key]["pnl_0"] + pnl_dict[key]["spread_cost_0"]
+    srs.name = key
+    dfs.append(srs)
+df = pd.concat(dfs, axis=1)
+
+print(df.shape)
+df.head()
+
+# %%
+pnl_ = df.resample("1B").sum().diff()
+
+pos = abs(pnl_).max()
+pos
+#mask = pnl_.tail(1) < 0
+#pnl_.tail(1)[mask]
+
+# %%
+#pos.iloc[0].sort_values()
+pos.sort_values().tail(10)
+
+# %%
+df.resample("1B").sum().sum(axis=0).argmin()
+
+# %%
+dbg.get_memory_usage_as_str(None)
+
+# %%
+#df.sum(axis=1).resample("1B").sum().cumsum().plot(color="k")
+df.resample("1B").sum().sum(axis=1).cumsum().plot(color="k")
+
+# %%
+aggr_pnl = df.resample("1B").sum().drop([224, 554, 311, 384, 589, 404], axis=1).sum(axis=1).cumsum()
+
+aggr_pnl.plot(color="k")
+
+# %%
+import numpy as np
+
+def sr(srs):
+    return srs.mean() / srs.std() * np.sqrt(252)
+    
+print("ins", sr(aggr_pnl[:"2017-01-01"].diff()))
+print("oos", sr(aggr_pnl["2017-01-01":].diff()))
+
+# %%
+aggr_pnl["2018-06-06":].plot()
