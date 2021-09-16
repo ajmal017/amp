@@ -134,6 +134,7 @@ def combine_columns(
     dbg.dassert_in(term2_col, df.columns.to_list())
     dbg.dassert_not_in(out_col, df.columns.to_list())
     dbg.dassert_in(operation, ["add", "sub", "mul", "div"])
+    arithmetic_kwargs = arithmetic_kwargs or {}
     #
     term1 = df[term1_col].shift(term1_delay)
     term2 = df[term2_col].shift(term2_delay)
