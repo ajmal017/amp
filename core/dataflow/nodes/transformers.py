@@ -280,6 +280,7 @@ class GroupedColDfToDfTransformer(cdnb.Transformer):
         transformer_func: Callable[..., Union[pd.Series, pd.DataFrame]],
         transformer_kwargs: Optional[Dict[str, Any]] = None,
         nan_mode: Optional[str] = None,
+        join_output_with_input: bool = True,
     ) -> None:
         """
         For reference, let
@@ -297,6 +298,9 @@ class GroupedColDfToDfTransformer(cdnb.Transformer):
         :param nan_mode: `leave_unchanged` or `drop`. If `drop`, applies to
             keyed dfs individually (across all cols in the `in_col_groups` for
             the given key).
+        join_output_with_input: whether to join the output with the input. A
+            common case where this should typically be set to `False` is in
+            resampling.
         """
         super().__init__(nid)
         # TODO(Paul): Add more checks here.
@@ -307,6 +311,7 @@ class GroupedColDfToDfTransformer(cdnb.Transformer):
         self._transformer_func = transformer_func
         self._transformer_kwargs = transformer_kwargs or {}
         self._nan_mode = nan_mode or "leave_unchanged"
+        self._join_output_with_input = join_output_with_input
         # The leaf col names are determined from the dataframe at runtime.
         self._leaf_cols = None
 
@@ -340,8 +345,9 @@ class GroupedColDfToDfTransformer(cdnb.Transformer):
         df = cdnb.GroupedColDfToDfColProcessor.postprocess(
             out_dfs, self._out_col_group
         )
-        df = df.reindex(df_in.index)
-        df = cdtfu.merge_dataframes(df_in, df)
+        if self._join_output_with_input:
+            df = df.reindex(df_in.index)
+            df = cdtfu.merge_dataframes(df_in, df)
         info["df_transformed_info"] = cdtfu.get_df_info_as_string(df)
         return df, info
 
@@ -631,42 +637,6 @@ class FunctionWrapper(cdnb.Transformer):
         info: collections.OrderedDict[str, Any] = collections.OrderedDict()
         info["df_transformed_info"] = cdtfu.get_df_info_as_string(df_out)
         return df_out, info
-
-
-class MultiindexFunctionWrapper(cdnb.Transformer):
-    def __init__(
-        self,
-        nid: cdtfc.NodeId,
-        in_col_groups: List[Tuple[cdtfu.NodeColumn]],
-        out_col_group: Tuple[cdtfu.NodeColumn],
-        func: Callable,
-        func_kwargs: Optional[Dict[str, Any]] = None,
-    ) -> None:
-        """"""
-        super().__init__(nid)
-        self._in_col_groups = in_col_groups
-        self._out_col_group = out_col_group
-        self._func = func
-        self._func_kwargs = func_kwargs or {}
-
-    def _transform(
-        self, df: pd.DataFrame
-    ) -> Tuple[pd.DataFrame, collections.OrderedDict]:
-        # Get a dict of dataframes
-        in_dfs = cdnb.GroupedColDfToDfColProcessor.preprocess(
-            df, self._in_col_groups
-        )
-        out_dfs = {}
-        for key, df in in_dfs.items():
-            df_out = self._func(df, **self._func_kwargs)
-            dbg.dassert_isinstance(df_out, pd.DataFrame)
-            out_dfs[key] = df_out
-        out_df = cdnb.GroupedColDfToDfColProcessor.postprocess(
-            out_dfs, self._out_col_group
-        )
-        info: collections.OrderedDict[str, Any] = collections.OrderedDict()
-        info["df_transformed_info"] = cdtfu.get_df_info_as_string(out_df)
-        return out_df, info
 
 
 # #############################################################################

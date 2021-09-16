@@ -65,7 +65,7 @@ class TestSeriesToSeriesTransformer(hut.TestCase):
         return data
 
 
-class TestGroupedColDfToDfTransformer(hut.TestCase):
+class TestGroupedColDfToDfTransformer1(hut.TestCase):
     def test1(self) -> None:
         data = self._get_data()
 
@@ -108,6 +108,54 @@ datetime,MN0,MN1,MN0,MN1
 2016-01-04 09:30:00,0.5,-0.5,1.25,1.25
 2016-01-04 09:31:00,0.25,0.25,1,1
 2016-01-04 09:32:00,-1,1,1.25,1.25
+"""
+        df = pd.read_csv(
+            io.StringIO(txt), index_col=0, parse_dates=True, header=[0, 1]
+        )
+        return df
+
+
+class TestGroupedColDfToDfTransformer2(hut.TestCase):
+    def test1(self) -> None:
+        data = self._get_data()
+
+        def resample(df: pd.DataFrame, rule: str) -> pd.DataFrame:
+            return df.resample(rule=rule).sum(min_count=1)
+
+        config = cconfig.get_config_from_nested_dict(
+            {
+                "in_col_groups": [("ret",), ("vol",)],
+                "out_col_group": (),
+                "transformer_func": resample,
+                "transformer_kwargs": {
+                    "rule": "5T",
+                },
+                "join_output_with_input": False,
+            },
+        )
+        node = cdnt.GroupedColDfToDfTransformer("resample", **config.to_dict())
+        actual = node.fit(data)["df_out"]
+        expected_txt = """
+,ret,ret,vol,vol
+,MN0,MN1,MN0,MN1
+2016-01-04 09:35:00,0.75,-0.25,2.25,2.25
+2016-01-04 09:40:00,-1,1,1.25,1.25
+"""
+        expected = pd.read_csv(
+            io.StringIO(expected_txt),
+            index_col=0,
+            parse_dates=True,
+            header=[0, 1],
+        )
+        np.testing.assert_allclose(actual, expected)
+
+    def _get_data(self) -> pd.DataFrame:
+        txt = """
+,ret,ret,vol,vol
+datetime,MN0,MN1,MN0,MN1
+2016-01-04 09:30:00,0.5,-0.5,1.25,1.25
+2016-01-04 09:31:00,0.25,0.25,1,1
+2016-01-04 09:36:00,-1,1,1.25,1.25
 """
         df = pd.read_csv(
             io.StringIO(txt), index_col=0, parse_dates=True, header=[0, 1]
