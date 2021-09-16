@@ -277,7 +277,7 @@ class GroupedColDfToDfTransformer(cdnb.Transformer):
         nid: cdtfc.NodeId,
         in_col_groups: List[Tuple[cdtfu.NodeColumn]],
         out_col_group: Tuple[cdtfu.NodeColumn],
-        transformer_func: Callable[..., pd.Series],
+        transformer_func: Callable[..., Union[pd.Series, pd.DataFrame]],
         transformer_kwargs: Optional[Dict[str, Any]] = None,
         nan_mode: Optional[str] = None,
     ) -> None:
@@ -288,15 +288,16 @@ class GroupedColDfToDfTransformer(cdnb.Transformer):
           - leaf_cols = df[in_col_group].columns
 
         :param nid: unique node id
-        :param in_col_group: a group of cols specified by the first N - 1
-            levels
+        :param in_col_groups: a list of group of cols specified by the first
+            N - 1 levels
         :param out_col_group: new output col group names. This specifies the
             names of the first N - 1 levels. The leaf_cols names remain the
             same.
-        :param transformer_func: srs -> srs
+        :param transformer_func: df -> {df, srs}
         :param transformer_kwargs: transformer_func kwargs
         :param nan_mode: `leave_unchanged` or `drop`. If `drop`, applies to
-            columns individually.
+            keyed dfs individually (across all cols in the `in_col_groups` for
+            the given key).
         """
         super().__init__(nid)
         # TODO(Paul): Add more checks here.
@@ -337,8 +338,6 @@ class GroupedColDfToDfTransformer(cdnb.Transformer):
                 func_info[key] = key_info
             out_dfs[key] = df_out
         info["func_info"] = func_info
-        # Combine the series representing leaf col transformations back into a
-        # single dataframe.
         df = cdnb.GroupedColDfToDfColProcessor.postprocess(
             out_dfs, self._out_col_group
         )
