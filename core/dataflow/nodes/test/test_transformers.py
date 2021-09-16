@@ -99,7 +99,6 @@ class TestGroupedColDfToDfTransformer(hut.TestCase):
             parse_dates=True,
             header=[0, 1],
         )
-        # NOTE: `hut.compare_df()` is unstable due to round-off errors.
         np.testing.assert_allclose(actual, expected)
 
     def _get_data(self) -> pd.DataFrame:
