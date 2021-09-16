@@ -229,7 +229,7 @@ class SeriesTransformer(cdnb.Transformer, cdnb.ColModeMixin):
         func_info = info["func_info"]
         srs_list = []
         for col in self._leaf_cols:
-            srs, col_info = _apply_func_to_series(
+            srs, col_info = _apply_func_to_data(
                 df[col],
                 self._nan_mode,
                 self._transformer_func,
@@ -267,7 +267,7 @@ class SeriesTransformer(cdnb.Transformer, cdnb.ColModeMixin):
 # #############################################################################
 
 
-class GroupedColDfToDfColTransformer(cdnb.Transformer):
+class GroupedColDfToDfTransformer(cdnb.Transformer):
     """
     Wrap transformers using the `GroupedColDfToDfColProcessor` pattern.
     """
@@ -302,7 +302,7 @@ class GroupedColDfToDfColTransformer(cdnb.Transformer):
         # TODO(Paul): Add more checks here.
         dbg.dassert_isinstance(in_col_groups, list)
         dbg.dassert_isinstance(out_col_group, tuple)
-        self._in_col_group = in_col_groups
+        self._in_col_groups = in_col_groups
         self._out_col_group = out_col_group
         self._transformer_func = transformer_func
         self._transformer_kwargs = transformer_kwargs or {}
@@ -326,7 +326,7 @@ class GroupedColDfToDfColTransformer(cdnb.Transformer):
         func_info = info["func_info"]
         out_dfs = {}
         for key in self._leaf_cols:
-            df_out, key_info = _apply_func_to_series(
+            df_out, key_info = _apply_func_to_data(
                 in_dfs[key],
                 self._nan_mode,
                 self._transformer_func,
@@ -407,7 +407,7 @@ class SeriesToDfTransformer(cdnb.Transformer):
         leaf_cols = self._leaf_cols
         leaf_cols = cast(List[str], leaf_cols)
         for col in leaf_cols:
-            df_out, col_info = _apply_func_to_series(
+            df_out, col_info = _apply_func_to_data(
                 df[col],
                 self._nan_mode,
                 self._transformer_func,
@@ -521,7 +521,7 @@ class SeriesToSeriesTransformer(cdnb.Transformer):
         leaf_cols = self._leaf_cols
         leaf_cols = cast(List[str], leaf_cols)
         for col in leaf_cols:
-            srs, col_info = _apply_func_to_series(
+            srs, col_info = _apply_func_to_data(
                 df[col],
                 self._nan_mode,
                 self._transformer_func,
@@ -543,8 +543,8 @@ class SeriesToSeriesTransformer(cdnb.Transformer):
         return df, info
 
 
-def _apply_func_to_series(
-    srs: pd.Series,
+def _apply_func_to_data(
+    data: Union[pd.Series, pd.DataFrame],
     nan_mode: str,
     func: Callable,
     func_kwargs: Dict[str, Any],
@@ -561,7 +561,7 @@ def _apply_func_to_series(
     if nan_mode == "leave_unchanged":
         pass
     elif nan_mode == "drop":
-        srs = srs.dropna()
+        data = data.dropna()
     else:
         raise ValueError(f"Unrecognized `nan_mode` {nan_mode}")
     info: Optional[collections.OrderedDict] = collections.OrderedDict()
@@ -572,12 +572,12 @@ def _apply_func_to_series(
     func_sig = inspect.signature(func)
     if "info" in func_sig.parameters:
         result = func(
-            srs,
+            data,
             info=info,
             **func_kwargs,
         )
     else:
-        result = func(srs, **func_kwargs)
+        result = func(data, **func_kwargs)
         info = None
     return result, info
 
