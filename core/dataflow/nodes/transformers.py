@@ -280,10 +280,10 @@ class GroupedColDfToDfTransformer(cdnb.Transformer):
         transformer_func: Callable[..., Union[pd.Series, pd.DataFrame]],
         transformer_kwargs: Optional[Dict[str, Any]] = None,
         nan_mode: Optional[str] = None,
+        join_output_with_input: bool = True,
     ) -> None:
         """
-        For reference, let:
-
+        For reference, let
           - N = df.columns.nlevels
           - leaf_cols = df[in_col_group].columns
 
@@ -298,6 +298,9 @@ class GroupedColDfToDfTransformer(cdnb.Transformer):
         :param nan_mode: `leave_unchanged` or `drop`. If `drop`, applies to
             keyed dfs individually (across all cols in the `in_col_groups` for
             the given key).
+        join_output_with_input: whether to join the output with the input. A
+            common case where this should typically be set to `False` is in
+            resampling.
         """
         super().__init__(nid)
         # TODO(Paul): Add more checks here.
@@ -308,6 +311,7 @@ class GroupedColDfToDfTransformer(cdnb.Transformer):
         self._transformer_func = transformer_func
         self._transformer_kwargs = transformer_kwargs or {}
         self._nan_mode = nan_mode or "leave_unchanged"
+        self._join_output_with_input = join_output_with_input
         # The leaf col names are determined from the dataframe at runtime.
         self._leaf_cols = None
 
@@ -341,8 +345,9 @@ class GroupedColDfToDfTransformer(cdnb.Transformer):
         df = cdnb.GroupedColDfToDfColProcessor.postprocess(
             out_dfs, self._out_col_group
         )
-        df = df.reindex(df_in.index)
-        df = cdtfu.merge_dataframes(df_in, df)
+        if self._join_output_with_input:
+            df = df.reindex(df_in.index)
+            df = cdtfu.merge_dataframes(df_in, df)
         info["df_transformed_info"] = cdtfu.get_df_info_as_string(df)
         return df, info
 
@@ -362,8 +367,7 @@ class SeriesToDfTransformer(cdnb.Transformer):
         nan_mode: Optional[str] = None,
     ) -> None:
         """
-        For reference, let:
-
+        For reference, let
           - N = df.columns.nlevels
           - leaf_cols = df[in_col_group].columns
 
@@ -471,8 +475,7 @@ class SeriesToSeriesTransformer(cdnb.Transformer):
         nan_mode: Optional[str] = None,
     ) -> None:
         """
-        For reference, let:
-
+        For reference, let
           - N = df.columns.nlevels
           - leaf_cols = df[in_col_group].columns
 

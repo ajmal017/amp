@@ -13,59 +13,7 @@ import helpers.unit_test as hut
 _LOG = logging.getLogger(__name__)
 
 
-class TestSeriesToSeriesTransformer(hut.TestCase):
-    def test1(self) -> None:
-        """
-        Test `fit()` call.
-        """
-        data = self._get_data()
-        config = cconfig.get_config_from_nested_dict(
-            {
-                "in_col_group": ("close",),
-                "out_col_group": ("ret_0",),
-                "transformer_func": lambda x: x.pct_change(),
-            }
-        )
-        node = cdnt.SeriesToSeriesTransformer("sklearn", **config.to_dict())
-        df_out = node.fit(data)["df_out"]
-        df_str = hut.convert_df_to_string(df_out.round(3), index=True, decimals=3)
-        self.check_string(df_str)
-
-    def test2(self) -> None:
-        """
-        Test `predict()` call.
-        """
-        data = self._get_data()
-        config = cconfig.get_config_from_nested_dict(
-            {
-                "in_col_group": ("close",),
-                "out_col_group": ("ret_0",),
-                "transformer_func": lambda x: x.pct_change(),
-            }
-        )
-        node = cdnt.SeriesToSeriesTransformer("sklearn", **config.to_dict())
-        expected, actual = cdnth.get_fit_predict_outputs(data, node)
-        self.assert_equal(actual, expected)
-
-    def _get_data(self) -> pd.DataFrame:
-        """
-        Generate multivariate normal returns.
-        """
-        mn_process = casgen.MultivariateNormalProcess()
-        mn_process.set_cov_from_inv_wishart_draw(dim=4, seed=342)
-        realization = mn_process.generate_sample(
-            {"start": "2000-01-01", "periods": 40, "freq": "B"}, seed=134
-        )
-        realization = realization.rename(columns=lambda x: "MN" + str(x))
-        realization = np.exp(0.1 * realization.cumsum())
-        volume = pd.DataFrame(
-            index=realization.index, columns=realization.columns, data=100
-        )
-        data = pd.concat([realization, volume], axis=1, keys=["close", "volume"])
-        return data
-
-
-class TestGroupedColDfToDfTransformer(hut.TestCase):
+class TestGroupedColDfToDfTransformer1(hut.TestCase):
     def test1(self) -> None:
         data = self._get_data()
 
@@ -108,6 +56,54 @@ datetime,MN0,MN1,MN0,MN1
 2016-01-04 09:30:00,0.5,-0.5,1.25,1.25
 2016-01-04 09:31:00,0.25,0.25,1,1
 2016-01-04 09:32:00,-1,1,1.25,1.25
+"""
+        df = pd.read_csv(
+            io.StringIO(txt), index_col=0, parse_dates=True, header=[0, 1]
+        )
+        return df
+
+
+class TestGroupedColDfToDfTransformer2(hut.TestCase):
+    def test1(self) -> None:
+        data = self._get_data()
+
+        def resample(df: pd.DataFrame, rule: str) -> pd.DataFrame:
+            return df.resample(rule=rule).sum(min_count=1)
+
+        config = cconfig.get_config_from_nested_dict(
+            {
+                "in_col_groups": [("ret",), ("vol",)],
+                "out_col_group": (),
+                "transformer_func": resample,
+                "transformer_kwargs": {
+                    "rule": "5T",
+                },
+                "join_output_with_input": False,
+            },
+        )
+        node = cdnt.GroupedColDfToDfTransformer("resample", **config.to_dict())
+        actual = node.fit(data)["df_out"]
+        expected_txt = """
+,ret,ret,vol,vol
+,MN0,MN1,MN0,MN1
+2016-01-04 09:35:00,0.75,-0.25,2.25,2.25
+2016-01-04 09:40:00,-1,1,1.25,1.25
+"""
+        expected = pd.read_csv(
+            io.StringIO(expected_txt),
+            index_col=0,
+            parse_dates=True,
+            header=[0, 1],
+        )
+        np.testing.assert_allclose(actual, expected)
+
+    def _get_data(self) -> pd.DataFrame:
+        txt = """
+,ret,ret,vol,vol
+datetime,MN0,MN1,MN0,MN1
+2016-01-04 09:30:00,0.5,-0.5,1.25,1.25
+2016-01-04 09:31:00,0.25,0.25,1,1
+2016-01-04 09:36:00,-1,1,1.25,1.25
 """
         df = pd.read_csv(
             io.StringIO(txt), index_col=0, parse_dates=True, header=[0, 1]
@@ -166,7 +162,7 @@ datetime,MN0,MN1,MN0,MN1
         return df
 
 
-class TestSeriesToSeriesTransformer(hut.TestCase):
+class TestSeriesToSeriesTransformer1(hut.TestCase):
     def test1(self) -> None:
         data = self._get_data()
         config = cconfig.get_config_from_nested_dict(
@@ -206,6 +202,58 @@ datetime,MN0,MN1,MN0,MN1
             io.StringIO(txt), index_col=0, parse_dates=True, header=[0, 1]
         )
         return df
+
+
+class TestSeriesToSeriesTransformer2(hut.TestCase):
+    def test1(self) -> None:
+        """
+        Test `fit()` call.
+        """
+        data = self._get_data()
+        config = cconfig.get_config_from_nested_dict(
+            {
+                "in_col_group": ("close",),
+                "out_col_group": ("ret_0",),
+                "transformer_func": lambda x: x.pct_change(),
+            }
+        )
+        node = cdnt.SeriesToSeriesTransformer("sklearn", **config.to_dict())
+        df_out = node.fit(data)["df_out"]
+        df_str = hut.convert_df_to_string(df_out.round(3), index=True, decimals=3)
+        self.check_string(df_str)
+
+    def test2(self) -> None:
+        """
+        Test `predict()` call.
+        """
+        data = self._get_data()
+        config = cconfig.get_config_from_nested_dict(
+            {
+                "in_col_group": ("close",),
+                "out_col_group": ("ret_0",),
+                "transformer_func": lambda x: x.pct_change(),
+            }
+        )
+        node = cdnt.SeriesToSeriesTransformer("sklearn", **config.to_dict())
+        expected, actual = cdnth.get_fit_predict_outputs(data, node)
+        self.assert_equal(actual, expected)
+
+    def _get_data(self) -> pd.DataFrame:
+        """
+        Generate multivariate normal returns.
+        """
+        mn_process = casgen.MultivariateNormalProcess()
+        mn_process.set_cov_from_inv_wishart_draw(dim=4, seed=342)
+        realization = mn_process.generate_sample(
+            {"start": "2000-01-01", "periods": 40, "freq": "B"}, seed=134
+        )
+        realization = realization.rename(columns=lambda x: "MN" + str(x))
+        realization = np.exp(0.1 * realization.cumsum())
+        volume = pd.DataFrame(
+            index=realization.index, columns=realization.columns, data=100
+        )
+        data = pd.concat([realization, volume], axis=1, keys=["close", "volume"])
+        return data
 
 
 class TestFunctionWrapper(hut.TestCase):
