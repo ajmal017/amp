@@ -66,7 +66,7 @@ class StrategyEvaluator:
             `returns_col`
         """
         self._data = data
-        dbg.dassert(data, msg="Data set must be nonempty.")
+        dbg.dassert(data, msg="Data set must be nonempty")
         # This is required by the current implementation otherwise when we extract
         # columns from dataframes we get dataframes and not series.
         dbg.dassert_ne(
@@ -154,9 +154,15 @@ class StrategyEvaluator:
         """
         Compute PnL from position intents, ret_0, and spread.
 
-        :param key_type:
-
+        :param keys: use all available keys if `None`
+        :param spread_fraction_paid: same interpretation as in `compute_spread_cost()`
+        :param key_type: how to index the output data structure (e.g., by instrument
+            or by attribute)
         """
+        _LOG.info(
+            "Before StrategyEvaluator.compute_pnl: memory_usage=%s",
+            dbg.get_memory_usage_as_str(None),
+        )
         keys = keys or self.valid_keys
         dbg.dassert_is_subset(keys, self.valid_keys)
         # Build the
@@ -203,9 +209,16 @@ class StrategyEvaluator:
                 .squeeze()
                 .rename("spread_cost_0")
             )
+            # Add the info.
             df["spread_cost_0"] = spread_cost
             df["ex_cost_pnl_0"] = pnl - spread_cost
             pnl_dict[key] = df
+            _LOG.info(
+                "StrategyEvaluator.compute_pnl: memory_usage=%s",
+                dbg.get_memory_usage_as_str(None),
+            )
+
+        # Organize the resulting output.
         if key_type == "instrument":
             pass
         elif key_type == "attribute":
@@ -230,10 +243,9 @@ class StrategyEvaluator:
         """
         Calculate performance characteristics of selected models.
 
-        :param keys: Use all available if `None`
-        :return: Dataframe of statistics with `keys` as columns
+        :param keys: use all available if `None`
+        :return: dataframe of statistics with `keys` as columns
         """
-        #
         pnl_dict = self.compute_pnl(
             keys,
             spread_fraction_paid=spread_fraction_paid,
@@ -242,15 +254,16 @@ class StrategyEvaluator:
         for key in tqdm(pnl_dict.keys(), desc="Calculating stats"):
             _LOG.debug("key=%s", key)
             if pnl_dict[key].empty:
-                _LOG.warning("PnL series for key=%i is empty.", key)
+                _LOG.warning("PnL series for key=%i is empty", key)
                 continue
             if pnl_dict[key].dropna().empty:
-                _LOG.warning("PnL series for key=%i is all-NaN.", key)
+                _LOG.warning("PnL series for key=%i is all-NaN", key)
                 continue
             stats_dict[key] = self._stats_computer.compute_finance_stats(
                 pnl_dict[key],
                 pnl_col="ex_cost_pnl_0",
             )
+        # TODO(gp): Factor out this piece since it's common to `ModelEvaluator`.
         stats_df = pd.concat(stats_dict, axis=1)
         # Calculate BH adjustment of pvals.
         adj_pvals = stats.multipletests(
@@ -308,7 +321,7 @@ class ModelEvaluator:
         :param oos_start: start of the OOS period, or None for nothing
         """
         self._data = data
-        dbg.dassert(data, msg="Data set must be nonempty.")
+        dbg.dassert(data, msg="Data set must be nonempty")
         # This is required by the current implementation otherwise when we extract
         # columns from dataframes we get dataframes and not series.
         dbg.dassert_ne(
@@ -321,6 +334,8 @@ class ModelEvaluator:
         self.oos_start = oos_start
         # The valid keys are the keys in the data dict.
         self.valid_keys = list(self._data.keys())
+        # TODO(gp): This is used only in `calculate_stats`, so it doesn't have to be
+        #  part of the state.
         self._stats_computer = cstats.StatsComputer()
 
     @classmethod
@@ -504,10 +519,10 @@ class ModelEvaluator:
         for key in tqdm(pnl_dict.keys(), desc="Calculating stats"):
             _LOG.debug("key=%s", key)
             if pnl_dict[key].empty:
-                _LOG.warning("PnL series for key=%i is empty.", key)
+                _LOG.warning("PnL series for key=%i is empty", key)
                 continue
             if pnl_dict[key].dropna().empty:
-                _LOG.warning("PnL series for key=%i is all-NaN.", key)
+                _LOG.warning("PnL series for key=%i is all-NaN", key)
                 continue
             stats_dict[key] = self._stats_computer.compute_finance_stats(
                 pnl_dict[key],

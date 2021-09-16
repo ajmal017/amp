@@ -52,8 +52,9 @@ hprint.config_notebook()
 config = None
 
 if config is None:
-    experiment_dir = ""
+    experiment_dir = "/cache/experiments/oos_experiment.RH2Eg.v2_0-all.5T.run2"
     aws_profile = None
+    selected_idxs = range(3)
 
     eval_config = cconfig.get_config_from_nested_dict(
         {
@@ -61,7 +62,7 @@ if config is None:
                 "src_dir": experiment_dir,
                 "file_name": "result_bundle.v2_0.pkl",
                 "experiment_type": "ins_oos",
-                "selected_idxs": None,
+                "selected_idxs": selected_idxs,
                 "aws_profile": aws_profile,
             },
             "strategy_evaluator_kwargs": {
@@ -98,3 +99,4 @@ evaluator = modeval.StrategyEvaluator.from_result_bundle_dict(
 )
 
 # %%
+result = evaluator.compute_pnl(key_type="attribute")
