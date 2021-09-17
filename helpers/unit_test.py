@@ -20,6 +20,7 @@ import helpers.git as git
 import helpers.introspection as hintro
 import helpers.io_ as hio
 import helpers.printing as hprint
+import helpers.s3 as hs3
 import helpers.system_interaction as hsinte
 import helpers.timer as htimer
 
@@ -158,7 +159,7 @@ def convert_df_to_string(
     Convert DataFrame or Series to string for verifying test results.
 
     :param df: DataFrame to be verified
-    :param n_rows: number of rows in expected output
+    :param n_rows: number of rows in expected output. If `None` all rows are shown.
     :param title: title for test output
     :param decimals: number of decimal points
     :return: string representation of input
@@ -166,7 +167,6 @@ def convert_df_to_string(
     if isinstance(df, pd.Series):
         df = df.to_frame()
     dbg.dassert_isinstance(df, pd.DataFrame)
-    n_rows = n_rows or len(df)
     output = []
     # Add title in the beginning if provided.
     if title is not None:
@@ -182,11 +182,22 @@ def convert_df_to_string(
         "display.precision",
         decimals,
     ):
+        n_rows = n_rows or len(df)
         # Add N top rows.
         output.append(df.head(n_rows).to_string(index=index))
     # Convert into string.
     output_str = "\n".join(output)
     return output_str
+
+
+def subset_df(df: pd.DataFrame, nrows: int, seed: int = 42) -> pd.DataFrame:
+    dbg.dassert_lte(1, nrows)
+    dbg.dassert_lte(nrows, df.shape[0])
+    idx = list(range(df.shape[0]))
+    random.seed(seed)
+    random.shuffle(idx)
+    idx = sorted(idx[nrows:])
+    return df.iloc[idx]
 
 
 # TODO(gp): Is this dataflow Info? If so it should go somewhere else.
@@ -278,6 +289,8 @@ def to_string(var: str) -> str:
     return """f"%s={%s}""" % (var, var)
 
 
+# TODO(gp): Maybe we should move it to hpandas.py so we can limit the dependencies
+#  from pandas.
 def get_random_df(
     num_cols: int,
     seed: Optional[int] = None,
@@ -307,6 +320,35 @@ def get_df_signature(df: "pd.DataFrame", num_rows: int = 3) -> str:
     return txt
 
 
+def compare_df(df1: pd.DataFrame, df2: pd.DataFrame) -> None:
+    """
+    Compare two dfs including their metadata.
+    """
+    if not df1.equals(df2):
+        print(df1.compare(df2))
+        raise ValueError("Dfs are different")
+
+    def _compute_df_signature(df: pd.DataFrame) -> str:
+        txt = []
+        txt.append("df1=\n%s" % str(df))
+        txt.append("df1.dtypes=\n%s" % str(df.dtypes))
+        if hasattr(df.index, "freq"):
+            txt.append("df1.index.freq=\n%s" % str(df.index.freq))
+        return "\n".join(txt)
+
+    full_test_name = "dummy"
+    test_dir = "."
+    _assert_equal(
+        _compute_df_signature(df1),
+        _compute_df_signature(df2),
+        full_test_name,
+        test_dir,
+    )
+
+
+# #############################################################################
+
+
 def create_test_dir(
     dir_name: str, incremental: bool, file_dict: Dict[str, str]
 ) -> None:
@@ -327,7 +369,7 @@ def create_test_dir(
 
 
 def get_dir_signature(
-    dir_name: str, include_file_content: bool, num_lines: Optional[int]
+    dir_name: str, include_file_content: bool, num_lines: Optional[int] = None
 ) -> str:
     """
     Compute a string with the content of the files in `dir_name`.
@@ -881,13 +923,19 @@ class TestCase(unittest.TestCase):
     """
 
     def setUp(self) -> None:
+        """
+        Execute before any test method.
+        """
         # Print banner to signal the start of a new test.
         func_name = "%s.%s" % (self.__class__.__name__, self._testMethodName)
         _LOG.debug("\n%s", hprint.frame(func_name))
         # Set the random seed.
-        random.seed(20000101)
+        random_seed = 20000101
+        _LOG.debug("Resetting random.seed to %s", random_seed)
+        random.seed(random_seed)
         if _HAS_NUMPY:
-            np.random.seed(20000101)
+            _LOG.debug("Resetting np.random.seed to %s", random_seed)
+            np.random.seed(random_seed)
         # Disable matplotlib plotting by overwriting the `show` function.
         if _HAS_MATPLOTLIB:
             plt.show = lambda: 0
@@ -964,18 +1012,34 @@ class TestCase(unittest.TestCase):
 
     def get_input_dir(
         self,
+        use_only_test_class: bool = False,
         test_class_name: Optional[str] = None,
         test_method_name: Optional[str] = None,
+        use_absolute_path: bool = True,
     ) -> str:
         """
         Return the path of the directory storing input data for this test
         class.
 
+        E.g., `TestLinearRegression1.test1`.
+
+        :param use_only_test_class: use only the name on the test class and not of
+            the method. E.g., when one wants all the test methods to use a single
+            file for testing
+        :param test_class_name: `None` uses the current test class name
+        :param test_method_name: `None` uses the current test method name
+        :param use_absolute_path: use the path from the file containing the test
         :return: dir name
         """
-        dir_name = os.path.join(
-            self._get_current_path(test_class_name, test_method_name), "input"
+        # Get the dir of the test.
+        dir_name = self._get_current_path(
+            use_only_test_class,
+            test_class_name,
+            test_method_name,
+            use_absolute_path,
         )
+        # Add `input` to the dir.
+        dir_name = os.path.join(dir_name, "input")
         return dir_name
 
     def get_output_dir(self) -> str:
@@ -985,7 +1049,19 @@ class TestCase(unittest.TestCase):
 
         :return: dir name
         """
-        dir_name = os.path.join(self._get_current_path(), "output")
+        # The output dir is specific of this dir.
+        use_only_test_class = False
+        test_class_name = None
+        test_method_name = None
+        use_absolute_path = True
+        dir_name = self._get_current_path(
+            use_only_test_class,
+            test_class_name,
+            test_method_name,
+            use_absolute_path,
+        )
+        # Add `output` to the dir.
+        dir_name = os.path.join(dir_name, "output")
         return dir_name
 
     # TODO(gp): -> get_scratch_dir().
@@ -996,23 +1072,59 @@ class TestCase(unittest.TestCase):
         use_absolute_path: bool = True,
     ) -> str:
         """
-        Return the path of the directory storing scratch data for this test
-        class. The directory is also created and cleaned up based on whether
-        the incremental behavior is enabled or not.
+        Return the path of the directory storing scratch data for this test.
 
-        :return: dir name
+        The directory is also created and cleaned up based on whether
+        the incremental behavior is enabled or not.
         """
         if self._scratch_dir is None:
             # Create the dir on the first invocation on a given test.
-            curr_path = self._get_current_path(
-                test_class_name=test_class_name,
-                test_method_name=test_method_name,
-                use_absolute_path=use_absolute_path,
+            use_only_test_class = False
+            dir_name = self._get_current_path(
+                use_only_test_class,
+                test_class_name,
+                test_method_name,
+                use_absolute_path,
             )
-            dir_name = os.path.join(curr_path, "tmp.scratch")
+            # Add `tmp.scratch` to the dir.
+            dir_name = os.path.join(dir_name, "tmp.scratch")
+            # On the first invocation create the dir.
             hio.create_dir(dir_name, incremental=get_incremental_tests())
+            # Store the value.
             self._scratch_dir = dir_name
         return self._scratch_dir
+
+    def get_s3_scratch_dir(
+        self,
+        test_class_name: Optional[str] = None,
+        test_method_name: Optional[str] = None,
+    ) -> str:
+        """
+        Return the path of a directory storing scratch data on S3 for this
+        test.
+
+        E.g.,
+            s3://alphamatic-data/tmp/cache.unit_test/
+                root.98e1cf5b88c3.amp.TestTestCase1.test_get_s3_scratch_dir1
+        """
+        # Make the path unique for the test.
+        use_only_test_class = False
+        use_absolute_path = False
+        test_path = self._get_current_path(
+            use_only_test_class,
+            test_class_name,
+            test_method_name,
+            use_absolute_path,
+        )
+        # Make the path unique for the current user.
+        user_name = hsinte.get_user_name()
+        server_name = hsinte.get_server_name()
+        project_dirname = git.get_project_dirname()
+        dir_name = f"{user_name}.{server_name}.{project_dirname}"
+        # Assemble everything in a single path.
+        s3_bucket = hs3.get_path()
+        scratch_dir = f"{s3_bucket}/tmp/cache.unit_test/{dir_name}.{test_path}"
+        return scratch_dir
 
     def assert_equal(
         self,
@@ -1038,7 +1150,17 @@ class TestCase(unittest.TestCase):
         _LOG.debug(hprint.to_str("fuzzy_match abort_on_error dst_dir"))
         dbg.dassert_in(type(actual), (bytes, str), "actual=%s", str(actual))
         dbg.dassert_in(type(expected), (bytes, str), "expected=%s", str(expected))
-        dir_name = self._get_current_path()
+        # Get the current dir name.
+        use_only_test_class = False
+        test_class_name = None
+        test_method_name = None
+        use_absolute_path = True
+        dir_name = self._get_current_path(
+            use_only_test_class,
+            test_class_name,
+            test_method_name,
+            use_absolute_path,
+        )
         _LOG.debug("dir_name=%s", dir_name)
         hio.create_dir(dir_name, incremental=True)
         dbg.dassert_exists(dir_name)
@@ -1387,7 +1509,17 @@ class TestCase(unittest.TestCase):
     # #########################################################################
 
     def _get_golden_outcome_file_name(self, tag: str) -> Tuple[str, str]:
-        dir_name = self._get_current_path()
+        # Get the current dir name.
+        use_only_test_class = False
+        test_class_name = None
+        test_method_name = None
+        use_absolute_path = True
+        dir_name = self._get_current_path(
+            use_only_test_class,
+            test_class_name,
+            test_method_name,
+            use_absolute_path,
+        )
         _LOG.debug("dir_name=%s", dir_name)
         hio.create_dir(dir_name, incremental=True)
         dbg.dassert_exists(dir_name)
@@ -1403,22 +1535,30 @@ class TestCase(unittest.TestCase):
 
     def _get_current_path(
         self,
-        test_class_name: Optional[str] = None,
-        test_method_name: Optional[str] = None,
-        use_absolute_path: bool = True,
+        use_only_class_name: bool,
+        test_class_name: Optional[str],
+        test_method_name: Optional[str],
+        use_absolute_path: bool,
     ) -> str:
         """
         Return the name of the directory containing the input / output data
         (e.g., ./core/dataflow/test/TestContinuousSarimaxModel.test_compare)
+
+        The parameters have the same meaning as in `get_input_dir()`.
         """
         if test_class_name is None:
             test_class_name = self.__class__.__name__
-        if test_method_name is None:
-            test_method_name = self._testMethodName
-        dir_name = "%s.%s" % (
-            test_class_name,
-            test_method_name,
-        )
+        if use_only_class_name:
+            # Use only class name.
+            dir_name = test_class_name
+        else:
+            # Use both class and test method.
+            if test_method_name is None:
+                test_method_name = self._testMethodName
+            dir_name = "%s.%s" % (
+                test_class_name,
+                test_method_name,
+            )
         if use_absolute_path:
             # E.g., .../dataflow/test/TestContinuousSarimaxModel.test_compare
             dir_name = os.path.join(self._base_dir_name, dir_name)

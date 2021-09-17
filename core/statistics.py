@@ -23,6 +23,7 @@ import core.finance as cfinan
 import core.signal_processing as csigna
 import helpers.dataframe as hdataf
 import helpers.dbg as dbg
+import helpers.hpandas as hpandas
 
 _LOG = logging.getLogger(__name__)
 
@@ -51,7 +52,7 @@ def summarize_time_index_info(
     original_index = srs.index
     # Assert that input series has a sorted datetime index.
     dbg.dassert_isinstance(original_index, pd.DatetimeIndex)
-    dbg.dassert_strictly_increasing_index(original_index)
+    hpandas.dassert_strictly_increasing_index(original_index)
     freq = original_index.freq
     clear_srs = hdataf.apply_nan_mode(srs, mode=nan_mode)
     clear_index = clear_srs.index
@@ -307,7 +308,7 @@ def compute_dyadic_scale(num: float) -> int:
 
 
 # #############################################################################
-# Summary statistics: location, spread, shape
+# Summary statistics: location, spread, shape, diversity, cardinality, entropy
 # #############################################################################
 
 
@@ -448,11 +449,146 @@ def compute_t_distribution_j_2(nu: float):
         if nu > 300:
             _LOG.warning("Computation is unstable for large values of `nu`.")
         const = 2 / np.sqrt(np.pi)
-        dist = sp.special.gamma((nu + 1) / 2) / (sp.special.gamma(nu / 2) * (nu - 1))
+        dist = sp.special.gamma((nu + 1) / 2) / (
+            sp.special.gamma(nu / 2) * (nu - 1)
+        )
         jensen_2 = const * dist * np.sqrt(nu - 2)
     return jensen_2
 
 
+def _check_alpha_and_normalize_data(data: pd.Series, alpha: float) -> pd.Series:
+    """
+    Check assumptions used in surprise, diversity, and entropy functions.
+
+    :param data: series of nonnegative numbers
+    :param alpha: parameter in [0, np.inf]
+    """
+    dbg.dassert_lte(
+        0, alpha, "Parameter `alpha` must be greater than or equal to 0."
+    )
+    dbg.dassert_isinstance(data, pd.Series)
+    dbg.dassert(
+        (data >= 0).all(), "Series `data` must have only nonnegative values."
+    )
+    # Normalize nonnegative data so that it sums to one.
+    normalized_data = data / data.sum()
+    return normalized_data
+
+
+def compute_surprise(data: pd.Series, alpha: float) -> float:
+    """
+    Compute the alpha-surprise per entry after probability normalizing `data`.
+
+    This treats `data` as a probability space. All values of `data` must be
+    nonnegative. Before calculating surprise, the data is renormalized so that
+    its sum is one.
+
+    See the following for details:
+    https://golem.ph.utexas.edu/category/2008/11/entropy_diversity_and_cardinal_1.html
+
+    :param data: series of nonnegative numbers
+    :param alpha: parameter in [0, np.inf]
+    """
+    dbg.dassert_ne(
+        1, alpha, "The special case `alpha=1` must be handled separately."
+    )
+    normalized_data = _check_alpha_and_normalize_data(data, alpha)
+    surprise = (1 - normalized_data ** (alpha - 1)) / (alpha - 1)
+    return surprise
+
+
+def compute_diversity(data: pd.Series, alpha: float) -> float:
+    """
+    Compute the alpha-diversity of `data` after probability normalizing.
+
+    Special cases:
+      - alpha = 0: `data.count() - 1`
+      - alpha = 1: Shannon entropy
+      - alpha = 2: Simpson diversity
+      - alpha = np.inf: 0
+
+    Conceptually, this can be calculated by
+        ```
+        surpise = compute_surprise(data, alpha)
+        normalized_data = data / data.sum()
+        diversity = (normalized_data * surprise).sum()
+        ```
+    We implement the function differently so as to avoid numerical instability.
+
+    :param data: series of nonnegative numbers
+    :param alpha: parameter in [0, np.inf]
+    :return: a number between 0 and the surprise of `1 / data.count()`.
+    """
+    normalized_data = _check_alpha_and_normalize_data(data, alpha)
+    if alpha == 1:
+        log_normalized_data = np.log(normalized_data)
+        entropy = -(normalized_data * log_normalized_data).sum()
+        diversity = np.exp(entropy)
+    else:
+        sum_of_powers = (normalized_data ** alpha).sum()
+        diversity = (1 - sum_of_powers) / (alpha - 1)
+    return diversity
+
+
+def compute_cardinality(data: pd.Series, alpha: float) -> float:
+    """
+    Compute the alpha-cardinality of `data` after probability normalizing.
+
+    Special cases:
+      - alpha = 0: `data.count()`
+      - alpha = 1: exp(Shannon entropy)
+      - alpha = 2: reciprocal Simpson
+      - alpha = np.inf: 1 / max(normalized data)
+
+    This is the exponential of the alpha-entropy.
+
+    Conceptually, this can be calculated by
+        ```
+        diversity = compute_diversity(data, alpha)
+        inverse_surprise = (1 - (alpha - 1) * diversity) ** (1 / (alpha - 1))
+        cardinality = 1 / inverse_surprise
+        ```
+    We implement the function differently so as to avoid numerical instability.
+
+    :param data: series of nonnegative numbers
+    :param alpha: parameter in [0, np.inf]
+    :return: a number between 1 and `data.count()`
+    """
+    normalized_data = _check_alpha_and_normalize_data(data, alpha)
+    if np.isinf(alpha):
+        cardinality = 1 / normalized_data.max()
+    elif alpha == 1:
+        log_normalized_data = np.log(normalized_data)
+        entropy = -(normalized_data * log_normalized_data).sum()
+        cardinality = np.exp(entropy)
+    else:
+        sum_of_powers = (normalized_data ** alpha).sum()
+        cardinality = sum_of_powers ** (1 / (1 - alpha))
+    return cardinality
+
+
+def compute_entropy(data: pd.Series, alpha: float) -> float:
+    """
+    Compute the alpha-entropy of `data` after probability normalizing.
+
+    Special cases:
+      - alpha = 0: `log(data.count())`
+      - alpha = 1: Shannon entropy
+      - alpha = 2: log reciprocal Simpson
+      - alpha = np.inf: log reciprocal Berger-Parker
+
+    This is the log of of the alpha-cardinality.
+
+    :param data: series of nonnegative numbers
+    :param alpha: parameter in [0, np.inf]
+    :return: a number between 0 and `log(data.count())`
+    """
+    cardinality = compute_cardinality(data, alpha)
+    entropy = np.log(cardinality)
+    return entropy
+
+
+# TODO(Paul): Deprecate and replace with `compute_cardinality()`.
 def compute_hill_number(data: pd.Series, q: float) -> float:
     """
     Compute the Hill number as a measure of diversity.
@@ -481,18 +617,76 @@ def compute_hill_number(data: pd.Series, q: float) -> float:
     dbg.dassert(
         (data >= 0).all(), "Series `data` must have only nonnegative values."
     )
-    # Normalize nonnegative data so that its sums to one.
-    normalized_data = data / data.sum()
-    # Treat boundary points of `q` specially.
-    if np.isinf(q):
-        diversity = 1 / normalized_data.max()
-    elif q > 1:
-        diversity = (normalized_data ** q).sum() ** (1 / (1 - q))
-    elif q == 1:
-        log_normalized_data = np.log(normalized_data)
-        entropy = -(normalized_data * log_normalized_data).sum()
-        diversity = np.exp(entropy)
-    return diversity
+    hill_number = compute_cardinality(data, q)
+    return hill_number
+
+
+def get_symmetric_normal_quantiles(bin_width: float) -> list:
+    """
+    Get centered quantiles of normal distribution.
+
+    This function creates a centered bin of width `bin_width` about zero and
+    then adds bins on either side until the entire distribution is captured.
+    All bins carry an equal percentage of the normal distribution, with the
+    possible exception of the two tail bins.
+
+    :param bin_width: percentage of normal distribution to capture in each bin
+    :return: ordered endpoints of bins, including `-np.inf` and `np.inf`
+    """
+    dbg.dassert_lt(0, bin_width)
+    dbg.dassert_lt(bin_width, 1)
+    half_bin_width = bin_width / 2
+    positive_bin_boundaries = [
+        sp.stats.norm.ppf(x + 0.5)
+        for x in np.arange(half_bin_width, 0.5, bin_width)
+    ]
+    positive_bin_boundaries.append(np.inf)
+    negative_bin_boundaries = [-x for x in reversed(positive_bin_boundaries)]
+    bin_boundaries = negative_bin_boundaries + positive_bin_boundaries
+    return bin_boundaries
+
+
+def group_by_bin(
+    df: pd.DataFrame,
+    bin_col: Union[str, int],
+    bin_width: float,
+    aggregation_col: Union[str, int],
+) -> pd.DataFrame:
+    """
+    Compute aggregations in `aggregation_col` according to bins from `bin_col`.
+
+    :param df: dataframe with numerical cols
+    :param bin_col: a column used for binning; ideally the values are centered
+        and approximately normally distributed, though not necessarily
+        standardized
+    :param bin_width: the percentage of data to be captured by each (non-tail)
+        bin
+    :param aggregation_col: the numerical col to aggregate
+    :return: dataframe with count, mean, stdev of `aggregation_col` by bin
+    """
+    # Get bin boundaries assuming a normal distribution. Using theoretical
+    # boundaries rather than empirical ones facilities comparisons across
+    # different data.
+    bin_boundaries = get_symmetric_normal_quantiles(bin_width)
+    # Standardize the binning column and cut.
+    normalized_bin_col = df[bin_col] / df[bin_col].std()
+    cuts = pd.cut(normalized_bin_col, bin_boundaries)
+    # Group the aggregation column according to the bins.
+    grouped_col_values = df.groupby(cuts)[aggregation_col]
+    # Aggregate the grouped result.
+    count = grouped_col_values.count().rename("count")
+    mean = grouped_col_values.mean().rename("mean")
+    stdev = grouped_col_values.std().rename("stdev")
+    # Join aggregation and counts.
+    result_df = pd.concat(
+        [
+            count,
+            mean,
+            stdev,
+        ],
+        axis=1,
+    )
+    return result_df
 
 
 # #############################################################################
@@ -719,7 +913,7 @@ def compute_centered_gaussian_total_log_likelihood(
 
 
 # #############################################################################
-# Autocorrelation statistics
+# Autocorrelation and cross-correlation statistics
 # #############################################################################
 
 
@@ -778,6 +972,41 @@ def apply_ljung_box_test(
         df_result = pd.DataFrame(result).T
     df_result.columns = columns
     return df_result
+
+
+def compute_cross_correlation(
+    df: pd.DataFrame,
+    x_cols: List[Union[int, str]],
+    y_col: Union[int, str],
+    lags: List[int],
+) -> pd.DataFrame:
+    """
+    Compute cross-correlations between `x_cols` and `y_col` at `lags`.
+
+    :param df: data dataframe
+    :param x_cols: x variable columns
+    :param y_col: y variable column
+    :param lags: list of integer lags to shift `x_cols` by
+    :return: dataframe of cross correlation at lags
+    """
+    dbg.dassert(not df.empty, msg="Dataframe must be nonempty")
+    dbg.dassert_isinstance(x_cols, list)
+    dbg.dassert_is_subset(x_cols, df.columns)
+    dbg.dassert_isinstance(y_col, (int, str))
+    dbg.dassert_in(y_col, df.columns)
+    dbg.dassert_isinstance(lags, list)
+    # Drop rows with no y value.
+    _LOG.debug("y_col=`%s` count=%i", y_col, df[y_col].count())
+    df = df.dropna(subset=[y_col])
+    x_vars = df[x_cols]
+    y_var = df[y_col]
+    correlations = []
+    for lag in lags:
+        corr = x_vars.shift(lag).apply(lambda x: x.corr(y_var))
+        corr.name = lag
+        correlations.append(corr)
+    corr_df = pd.concat(correlations, axis=1)
+    return corr_df.transpose()
 
 
 # #############################################################################
@@ -923,41 +1152,6 @@ def compute_swt_covar_summary(
         np.sqrt(decomp[var1_col].multiply(decomp[var2_col]))
     )
     return decomp
-
-
-def compute_swt_coeffs(
-    srs1: pd.Series,
-    srs2: pd.Series,
-    wavelet: Optional[str] = None,
-    depth: Optional[int] = None,
-    timing_mode: Optional[str] = None,
-) -> pd.DataFrame:
-    """
-    Get approximate coefficients.
-    """
-    swt1 = csigna.get_swt(
-        srs1,
-        wavelet=wavelet,
-        depth=depth,
-        timing_mode=timing_mode,
-        output_mode="detail",
-    )
-    swt1 = swt1.dropna()
-    counts = swt1.count().rename("counts")
-    var = compute_swt_var_summary(
-        srs1, wavelet=wavelet, depth=depth, timing_mode=timing_mode
-    )["swt_var"]
-    covar = (
-        swt1.multiply(srs2, axis=0)
-        .sum(axis=0)
-        .divide(swt1.count())
-        .rename("covar")
-    )
-    rho = covar.divide(np.sqrt(var) * np.sqrt(srs2.var())).rename("rho")
-    beta = covar.divide(var).rename("beta")
-    beta_se = np.sqrt(srs2.var() / var.multiply(counts)).rename("SE(beta)")
-    zs = beta.divide(beta_se).rename("beta_z_scored")
-    return pd.concat([counts, var, covar, rho, beta, beta_se, zs], axis=1)
 
 
 # #############################################################################
@@ -1506,7 +1700,6 @@ def compute_annualized_return_and_volatility(
 def compute_bet_stats(
     positions: pd.Series,
     log_rets: pd.Series,
-    nan_mode: Optional[str] = None,
     prefix: Optional[str] = None,
 ) -> pd.Series:
     """
@@ -1514,7 +1707,6 @@ def compute_bet_stats(
 
     :param positions: series of long/short positions
     :param log_rets: log returns
-    :param nan_mode: argument for hdataf.apply_nan_mode()
     :param prefix: optional prefix for metrics' outcome
     :return: series of average returns for winning/losing and long/short bets,
         number of positions and bets. In `average_num_bets_per_year`, "year" is
@@ -1522,10 +1714,8 @@ def compute_bet_stats(
         year
     """
     prefix = prefix or ""
-    bet_lengths = cfinan.compute_signed_bet_lengths(positions, nan_mode=nan_mode)
-    log_rets_per_bet = cfinan.compute_returns_per_bet(
-        positions, log_rets, nan_mode=nan_mode
-    )
+    bet_lengths = cfinan.compute_signed_bet_lengths(positions)
+    log_rets_per_bet = cfinan.compute_returns_per_bet(positions, log_rets)
     #
     stats = dict()
     stats["num_positions"] = int(bet_lengths.abs().sum())
@@ -1647,7 +1837,7 @@ def compute_avg_turnover_and_holding_period(
     dbg.dassert(pos.index.freq)
     pos_freq = pos.index.freq
     unit = unit or pos_freq
-    nan_mode = nan_mode or "ffill"
+    nan_mode = nan_mode or "drop"
     prefix = prefix or ""
     result_index = [
         prefix + "avg_turnover_(%)",
@@ -1802,7 +1992,7 @@ def get_interarrival_time(
     # Check index of a series. We require that the input
     #     series have a sorted datetime index.
     dbg.dassert_isinstance(index, pd.DatetimeIndex)
-    dbg.dassert_strictly_increasing_index(index)
+    hpandas.dassert_strictly_increasing_index(index)
     # Compute a series of interrairival time.
     interrarival_time = pd.Series(index).diff()
     return interrarival_time
@@ -1857,8 +2047,153 @@ def compute_interarrival_time_stats(
 
 
 # #############################################################################
-# Local level model statistics
+# Models
 # #############################################################################
+
+
+def compute_regression_coefficients(
+    df: pd.DataFrame,
+    x_cols: List[Union[int, str]],
+    y_col: Union[int, str],
+    sample_weight_col: Optional[Union[int, str]] = None,
+) -> pd.DataFrame:
+    """
+    Regresses `y_col` on each `x_col` independently.
+
+    This function assumes (but does not check) that the x and y variables are
+    centered.
+
+    :param df: data dataframe
+    :param x_cols: x variable columns
+    :param y_col: y variable column
+    :param sample_weight_col: optional nonnegative sample observation weights.
+        If `None`, then equal weights are used. Weights do not need to be
+        normalized.
+    :return: dataframe of regression coefficients and related stats
+    """
+    dbg.dassert(not df.empty, msg="Dataframe must be nonempty")
+    dbg.dassert_isinstance(x_cols, list)
+    dbg.dassert_is_subset(x_cols, df.columns)
+    dbg.dassert_isinstance(y_col, (int, str))
+    dbg.dassert_in(y_col, df.columns)
+    # Sanity check weight column, if available. Set weights uniformly to 1 if
+    # not specified.
+    if sample_weight_col is not None:
+        dbg.dassert_in(sample_weight_col, df.columns)
+        weights = df[sample_weight_col].rename("weight")
+    else:
+        weights = pd.Series(index=df.index, data=1, name="weight")
+    # Ensure that no weights are negative.
+    dbg.dassert(not (weights < 0).any())
+    # Ensure that the total weight is positive.
+    dbg.dassert((weights > 0).any())
+    # Drop rows with no y value.
+    _LOG.debug("y_col=`%s` count=%i", y_col, df[y_col].count())
+    df = df.dropna(subset=[y_col])
+    # Reindex weights to reflect any dropped y values.
+    weights = weights.reindex(df.index)
+    # Extract x variables.
+    x_vars = df[x_cols]
+    x_var_counts = x_vars.count().rename("count")
+    # Create a per-`x_col` weight dataframe to reflect possibly different NaN
+    # positions. This is used to generate accurate weighted sums and effective
+    # sample sizes.
+    weight_df = pd.DataFrame(index=x_vars.index, columns=x_cols)
+    for col in x_cols:
+        weight_df[col] = weights.reindex(x_vars[col].dropna().index)
+    weight_sums = weight_df.sum(axis=0)
+    # We use the 2-cardinality of the weights. This is equivalent to using
+    # Kish's effective sample size.
+    x_var_eff_counts = weight_df.apply(
+        lambda x: compute_cardinality(x.dropna(), 2)
+    ).rename("eff_count")
+    # Calculate variance assuming x variables are centered at zero.
+    x_variance = (
+        x_vars.pow(2)
+        .multiply(weight_df, axis=0)
+        .sum(axis=0)
+        .divide(weight_sums)
+        .rename("var")
+    )
+    # Calculate covariance assuming x variables and y variable are centered.
+    covariance = (
+        x_vars.multiply(df[y_col], axis=0)
+        .multiply(weight_df, axis=0)
+        .sum(axis=0)
+        .divide(weight_sums)
+        .rename("covar")
+    )
+    # Calculate y variance assuming variable is centered.
+    # NOTE: We calculate only one estimate of the variance of y, using all
+    #     available data (regardless of whether a particular `x_col` is NaN or
+    #     not). If samples of `x_cols` are not substantially aligned, then this
+    #     may be undesirable.
+    y_variance = df[y_col].pow(2).multiply(weights).sum() / weights.sum()
+    _LOG.debug("y_col=`%s` variance=%f", y_col, y_variance)
+    # Calculate correlation from covariances and variances.
+    rho = covariance.divide(np.sqrt(x_variance) * np.sqrt(y_variance)).rename(
+        "rho"
+    )
+    # Calculate beta coefficients and associated statistics.
+    beta = covariance.divide(x_variance).rename("beta")
+    # The `x_var_eff_counts` term makes this invariant with respect to
+    # rescalings of the weight column.
+    beta_se = np.sqrt(
+        y_variance / (x_variance.multiply(x_var_eff_counts))
+    ).rename("SE(beta)")
+    z_scores = beta.divide(beta_se).rename("beta_z_scored")
+    # Calculate autocovariance-related stats of x variables.
+    autocovariance = (
+        x_vars.multiply(x_vars.shift(1), axis=0)
+        .multiply(weight_df, axis=0)
+        .sum(axis=0)
+        .divide(weight_sums)
+        .rename("autocovar")
+    )
+    # Normalize autocovariance to get autocorrelation.
+    autocorrelation = autocovariance.divide(x_variance).rename("autocorr")
+    turn = np.sqrt(2 * (1 - autocorrelation)).rename("turn")
+    # Consolidate stats.
+    coefficients = [
+        x_var_counts,
+        x_var_eff_counts,
+        x_variance,
+        covariance,
+        rho,
+        beta,
+        beta_se,
+        z_scores,
+        autocovariance,
+        autocorrelation,
+        turn,
+    ]
+    return pd.concat(coefficients, axis=1)
+
+
+def apply_smoothing_parameters(
+    rho: pd.Series, turn: pd.Series, parameters: List[float]
+) -> pd.DataFrame:
+    """
+    Estimate smoothing effects.
+
+    :param parameters: corresponds to (inverse) exponent of `turn`
+    """
+    rhos = []
+    turns = []
+    tsq = turn ** 2
+    for param in parameters:
+        rho_num = np.square(np.linalg.norm(tsq.pow(-1 * param / 4).multiply(rho)))
+        # TODO(Paul): Cross-check.
+        turn_num = np.linalg.norm(tsq.pow(0.5 - 2 * param / 4).multiply(rho))
+        denom = np.linalg.norm(tsq.pow(-2 * param / 4).multiply(rho))
+        rhos.append(rho_num / denom)
+        turns.append(turn_num / denom)
+    rho_srs = pd.Series(index=parameters, data=rhos, name="rho")
+    rho_frac = (rho_srs / rho_srs.max()).rename("rho_frac")
+    turn_srs = pd.Series(index=parameters, data=turns, name="turn")
+    rho_to_turn = (rho_srs / turn_srs).rename("rho_to_turn")
+    df = pd.concat([rho_srs, rho_frac, turn_srs, rho_to_turn], axis=1)
+    return df
 
 
 def compute_local_level_model_stats(
@@ -1943,7 +2278,7 @@ def get_rolling_splits(
     A typical use case is where the index is a monotonic increasing datetime
     index. For such cases, causality is respected by the splits.
     """
-    dbg.dassert_strictly_increasing_index(idx)
+    hpandas.dassert_strictly_increasing_index(idx)
     n_chunks = n_splits + 1
     dbg.dassert_lte(1, n_splits)
     # Split into equal chunks.
@@ -1962,7 +2297,7 @@ def get_oos_start_split(
     """
     Split index using OOS (out-of-sample) start datetime.
     """
-    dbg.dassert_strictly_increasing_index(idx)
+    hpandas.dassert_strictly_increasing_index(idx)
     ins_mask = idx < datetime_
     dbg.dassert_lte(1, ins_mask.sum())
     oos_mask = ~ins_mask
@@ -1979,7 +2314,7 @@ def get_train_test_pct_split(
     """
     Split index into train and test sets by percentage.
     """
-    dbg.dassert_strictly_increasing_index(idx)
+    hpandas.dassert_strictly_increasing_index(idx)
     dbg.dassert_lt(0.0, train_pct)
     dbg.dassert_lt(train_pct, 1.0)
     #
@@ -1996,7 +2331,7 @@ def get_expanding_window_splits(
     """
     Generate splits with expanding overlapping windows.
     """
-    dbg.dassert_strictly_increasing_index(idx)
+    hpandas.dassert_strictly_increasing_index(idx)
     dbg.dassert_lte(1, n_splits)
     tscv = sklearn.model_selection.TimeSeriesSplit(n_splits=n_splits)
     locs = list(tscv.split(idx))
@@ -2008,7 +2343,7 @@ def truncate_index(idx: pd.Index, min_idx: Any, max_idx: Any) -> pd.Index:
     """
     Return subset of idx with values >= min_idx and < max_idx.
     """
-    dbg.dassert_strictly_increasing_index(idx)
+    hpandas.dassert_strictly_increasing_index(idx)
     # TODO(*): PTask667: Consider using bisection to avoid linear scans.
     min_mask = idx >= min_idx
     max_mask = idx < max_idx
@@ -2027,7 +2362,7 @@ def combine_indices(idxs: Iterable[pd.Index]) -> pd.Index:
     TODO(Paul): Consider supporting multiple behaviors with `mode`.
     """
     for idx in idxs:
-        dbg.dassert_strictly_increasing_index(idx)
+        hpandas.dassert_strictly_increasing_index(idx)
     # Find the maximum start/end datetime overlap of all source indices.
     max_min = max([idx.min() for idx in idxs])
     _LOG.debug("Latest start datetime of indices=%s", max_min)

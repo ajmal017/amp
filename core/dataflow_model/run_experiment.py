@@ -136,9 +136,9 @@ def _parse() -> argparse.ArgumentParser:
         help="File storing the pipeline to iterate over",
     )
     parser.add_argument(
-        "--skip_archive_on_S3",
+        "--archive_on_S3",
         action="store_true",
-        help="Do not archive the results on S3",
+        help="Archive the results on S3",
     )
     parser = hs3.add_s3_args(parser)
     parser = prsr.add_json_output_metadata_args(parser)
@@ -179,10 +179,7 @@ def _main(parser: argparse.ArgumentParser) -> None:
     _LOG.info("dst_dir='%s'", dst_dir)
     _LOG.info("log_file='%s'", log_file)
     # Archive on S3.
-    if args.skip_archive_on_S3:
-        _LOG.warning("Skipping archiving results on S3 as per user request")
-        s3_path = None
-    else:
+    if args.archive_on_S3:
         _LOG.info("Archiving results to S3")
         aws_profile = hs3.get_aws_profile(args.aws_profile)
         _LOG.debug("aws_profile='%s'", aws_profile)
@@ -196,9 +193,12 @@ def _main(parser: argparse.ArgumentParser) -> None:
             s3_path = hs3.get_key_value(aws_profile, "aws_s3_bucket")
             dbg.dassert(not s3_path.startswith("s3://"), "Invalid value '%s'")
             s3_path = "s3://" + s3_path + "/experiments"
-        hs3.is_valid_s3_path(s3_path)
+        hs3.is_s3_path(s3_path)
         # Archive on S3.
         s3_path = hs3.archive_data_on_s3(dst_dir, s3_path, aws_profile)
+    else:
+        _LOG.warning("To archive results on S3 use --archive_on_S3")
+        s3_path = None
     # Save the metadata.
     output_metadata = {"s3_path": s3_path}
     ouput_metadata_file = prsr.process_json_output_metadata_args(

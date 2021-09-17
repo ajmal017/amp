@@ -10,7 +10,7 @@ import functools
 import logging
 import os
 import pprint
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 _WARNING = "\033[33mWARNING\033[0m"
 
@@ -30,32 +30,85 @@ import helpers.timer as htimer  # noqa: E402 module level import not at top of f
 _LOG = logging.getLogger(__name__)
 
 
-# Architecture of the AWS authentication
-#
-# - There can be two or more AWS S3 systems with different credentials, paths to
-#   bucket, and other properties
-# - Some code needs to refer always and only to the AM S3 bucket (e.g., for Kibot
-#   data)
-# - Other code needs to work with different AWS S3 systems (e.g., publish_notebooks,
-#   saving / retrieving experiments)
-#
-# - The different AWS S3 systems are selected through an `aws_profile` parameter
-#   (e.g., `am`)
-# - The value of AWS profile is obtained:
-#   - from the `--aws_profile` command line option; or
-#   - from the `AM_AWS_PROFILE` env var
-#
-# - The AWS profile is then used to access the `~/.aws` files and extract:
-#   - the credentials (e.g., `aws_access_key_id`, `aws_secret_access_key`,
-#     `aws_region`)
-#   - other variables (e.g., `aws_s3_bucket`)
-# - The variables that are extracted from the files can also be passed through
-#   env vars directly (mainly for GitHub Actions CI)
-#   - E.g., `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`,
-#     `AWS_S3_BUCKET`)
-#   - One can specify env vars conditioned to different profiles, using the AWS
-#     profile (e.g., `am` profile for `AWS_ACCESS_KEY_ID` corresponds to
-#     `AM_AWS_ACCESS_KEY_ID`)
+# #############################################################################
+# Basic utils.
+# #############################################################################
+
+
+def is_s3_path(s3_path: str) -> bool:
+    dbg.dassert_isinstance(s3_path, str)
+    valid = s3_path.startswith("s3://")
+    if s3_path.startswith("s3://s3://"):
+        valid = False
+    return valid
+
+
+def dassert_is_s3_path(s3_path: str) -> None:
+    """
+    Assert if a file is not a S3 path.
+    """
+    dbg.dassert(
+        is_s3_path(s3_path),
+        "Invalid S3 file='%s'",
+        s3_path,
+    )
+
+
+def dassert_is_not_s3_path(s3_path: str) -> None:
+    """
+    Assert if a file is a S3 path.
+    """
+    dbg.dassert(
+        not is_s3_path(s3_path),
+        "Passed an S3 file='%s' when it was not expected",
+        s3_path,
+    )
+
+
+def dassert_s3_exists(s3_path: str, s3fs_: s3fs.core.S3FileSystem) -> None:
+    """
+    Assert if an S3 file or dir doesn't exist.
+    """
+    dassert_is_s3_path(s3_path)
+    dbg.dassert(s3fs_.exists(s3_path), "S3 file '%s' doesn't exist", s3_path)
+
+
+def dassert_s3_not_exists(s3_path: str, s3fs_: s3fs.core.S3FileSystem) -> None:
+    """
+    Assert if an S3 file or dir exist.
+    """
+    dassert_is_s3_path(s3_path)
+    dbg.dassert(not s3fs_.exists(s3_path), "S3 file '%s' already exist", s3_path)
+
+
+def split_path(s3_path: str) -> Tuple[str, str]:
+    """
+    Separate an S3 path in the bucket and the rest of the path as absolute from
+    the root.
+
+    E.g., for `s3://alphamatic-data/tmp/hello` returns (`alphamatic-
+    data`, /tmp/hello`)
+    """
+    dassert_is_s3_path(s3_path)
+    # Remove the s3 prefix.
+    prefix = "s3://"
+    dbg.dassert(s3_path.startswith(prefix))
+    s3_path = s3_path[len(prefix) :]
+    # Break the path into dirs.
+    dirs = s3_path.split("/")
+    bucket = dirs[0]
+    abs_path = os.path.join("/", *dirs[1:])
+    dbg.dassert(
+        abs_path.startswith("/"),
+        "The path should be absolute instead of %s",
+        abs_path,
+    )
+    return bucket, abs_path
+
+
+# #############################################################################
+# Bucket
+# #############################################################################
 
 
 # TODO(gp): Merge with get_path() to create get_s3_am_bucket_path().
@@ -73,8 +126,12 @@ def get_bucket() -> str:
     env_var = "AM_S3_BUCKET"
     dbg.dassert_in(env_var, os.environ)
     s3_bucket = os.environ[env_var]
-    dbg.dassert(not s3_bucket.startswith("s3://"), "Invalid %s value '%s'",
-        env_var, s3_bucket)
+    dbg.dassert(
+        not s3_bucket.startswith("s3://"),
+        "Invalid %s value '%s'",
+        env_var,
+        s3_bucket,
+    )
     return s3_bucket
 
 
@@ -87,6 +144,8 @@ def get_path() -> str:
     return path
 
 
+# #############################################################################
+# Parser.
 # #############################################################################
 
 
@@ -151,7 +210,7 @@ def get_s3_path(s3_path: Optional[str] = None) -> Optional[str]:
     """
     env_var = "AM_S3_BUCKET"
     s3_path = _get_variable_value(s3_path, env_var)
-    is_valid_s3_path(s3_path)
+    dassert_is_s3_path(s3_path)
     return s3_path
 
 
@@ -166,6 +225,38 @@ def _get_aws_config(file_name: str) -> configparser.RawConfigParser:
     config.read(file_name)
     _LOG.debug("config.sections=%s", config.sections())
     return config
+
+
+# #############################################################################
+# Authentication.
+# #############################################################################
+
+# Architecture of the AWS authentication
+#
+# - There can be two or more AWS S3 systems with different credentials, paths to
+#   bucket, and other properties
+# - Some code needs to refer always and only to the AM S3 bucket (e.g., for Kibot
+#   data)
+# - Other code needs to work with different AWS S3 systems (e.g., publish_notebooks,
+#   saving / retrieving experiments, caching)
+#
+# - The different AWS S3 systems are selected through an `aws_profile` parameter
+#   (e.g., `am`)
+# - The value of AWS profile is obtained:
+#   - from the `--aws_profile` command line option; or
+#   - from the `AM_AWS_PROFILE` env var
+#
+# - The AWS profile is then used to access the `~/.aws` files and extract:
+#   - the credentials (e.g., `aws_access_key_id`, `aws_secret_access_key`,
+#     `aws_region`)
+#   - other variables (e.g., `aws_s3_bucket`)
+# - The variables that are extracted from the files can also be passed through
+#   env vars directly (mainly for GitHub Actions CI)
+#   - E.g., `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`,
+#     `AWS_S3_BUCKET`)
+#   - One can specify env vars conditioned to different profiles, using the AWS
+#     profile (e.g., `am` profile for `AWS_ACCESS_KEY_ID` corresponds to
+#     `AM_AWS_ACCESS_KEY_ID`)
 
 
 @functools.lru_cache()
@@ -289,11 +380,12 @@ def get_key_value(
     return value
 
 
-def is_s3_path(path: str) -> bool:
-    return path.startswith("s3://")
-
-
 def get_s3fs(*args: Any, **kwargs: Any) -> s3fs.core.S3FileSystem:
+    """
+    Return an s3fs object.
+
+    Same parameters as `get_aws_credentials()`.
+    """
     # From https://stackoverflow.com/questions/62562945
     aws_credentials = get_aws_credentials(*args, **kwargs)
     _LOG.debug("%s", pprint.pformat(aws_credentials))
@@ -305,43 +397,6 @@ def get_s3fs(*args: Any, **kwargs: Any) -> s3fs.core.S3FileSystem:
         client_kwargs={"region_name": aws_credentials["aws_region"]},
     )
     return s3
-
-
-# TODO(gp): -> is_s3_path()
-def is_valid_s3_path(s3_path: str) -> bool:
-    dbg.dassert_isinstance(s3_path, str)
-    valid = s3_path.startswith("s3://")
-    if s3_path.startswith("s3://s3://"):
-        valid = False
-    return valid
-
-
-# TODO(gp): -> dassert_is_s3_path
-def check_valid_s3_path(s3_path: str) -> None:
-    """
-    Assert if a file is not a S3 path.
-    """
-    dbg.dassert(
-        is_valid_s3_path(s3_path),
-        "Invalid S3 file='%s' since it doesn't start with 's3://'",
-        s3_path,
-    )
-
-
-def dassert_s3_exists(s3_path: str, s3fs_: s3fs.core.S3FileSystem) -> None:
-    """
-    Assert if an S3 file or dir doesn't exist.
-    """
-    check_valid_s3_path(s3_path)
-    dbg.dassert(s3fs_.exists(s3_path), "S3 file '%s' doesn't exist", s3_path)
-
-
-def dassert_s3_not_exists(s3_path: str, s3fs_: s3fs.core.S3FileSystem) -> None:
-    """
-    Assert if an S3 file or dir exist.
-    """
-    check_valid_s3_path(s3_path)
-    dbg.dassert(not s3fs_.exists(s3_path), "S3 file '%s' already exist", s3_path)
 
 
 # #############################################################################
@@ -371,7 +426,7 @@ def archive_data_on_s3(
         aws_profile,
     )
     dbg.dassert_dir_exists(src_dir)
-    check_valid_s3_path(s3_path)
+    dassert_is_s3_path(s3_path)
     _LOG.info(
         "The size of '%s' is %s", src_dir, hsyste.du(src_dir, human_format=True)
     )
@@ -423,17 +478,14 @@ def retrieve_archived_data_from_s3(
     incremental: bool = True,
 ) -> str:
     """
-    Retrieve archived tgz data from S3.
-
-    E.g.,
-    - given a tgz file like `s3://.../experiment.20210802-121908.tgz` (which is the
-      result of compressing a dir like `/app/.../experiment.RH1E`)
-    - expand it into a dir `{dst_dir}/experiment.RH1E`
+    Retrieve tgz file from S3, unless it's already present (incremental mode).
 
     :param s3_file_path: path to the S3 file with the archived data. E.g.,
        `s3://.../experiment.20210802-121908.tgz`
-    :param dst_dir: directory where expand the archive tarball
-    :return: dir with the expanded data (e.g., `{dst_dir/experiment.RH1E`)
+    :param dst_dir: destination directory where to save the data
+    :param aws_profile: AWS profile to use to access the data
+    :param incremental: skip if the tgz file is already present locally
+    :return: path with the local tgz file
     """
     aws_profile = get_aws_profile(aws_profile)
     _LOG.info(
@@ -442,36 +494,64 @@ def retrieve_archived_data_from_s3(
         dst_dir,
         aws_profile,
     )
-    check_valid_s3_path(s3_file_path)
+    dassert_is_s3_path(s3_file_path)
     # Download the tgz file.
     hio.create_dir(dst_dir, incremental=True)
     dst_file = os.path.join(dst_dir, os.path.basename(s3_file_path))
     _LOG.debug(hprint.to_str("s3_file_path dst_dir dst_file"))
     if incremental and os.path.exists(dst_file):
-        _LOG.info("Found '%s': skipping downloading", dst_file)
+        _LOG.warning("Found '%s': skipping downloading", dst_file)
     else:
+        # Download.
         s3fs_ = get_s3fs(aws_profile)
         dassert_s3_exists(s3_file_path, s3fs_)
         _LOG.debug("Getting from s3: '%s' -> '%s", s3_file_path, dst_file)
         s3fs_.get(s3_file_path, dst_file)
         _LOG.info("Saved to '%s'", dst_file)
-    # Expand the tgz file.
-    # The output should be the original compressed dir under `{dst_dir}`.
-    # E.g.,
-    # > tar tzf /app/.../TestRunExperimentArchiveOnS3.test_serial1/experiment.20210802-133901.tgz
-    # experiment.RH1E/
-    # experiment.RH1E/log.20210802-133859.txt
-    # experiment.RH1E/result_0/
-    with htimer.TimedScope(logging.INFO, "Decompressing"):
-        dbg.dassert_file_exists(dst_file)
-        cmd = f"cd {dst_dir} && tar xzf {dst_file}"
-        hsyste.system(cmd)
+    return dst_file
+
+
+def expand_archived_data(src_tgz_file: str, dst_dir: str) -> str:
+    """
+    Expand an S3 tarball storing results of an experiment.
+
+    E.g.,
+    - given a tgz file like `s3://.../experiment.20210802-121908.tgz` (which is the
+      result of compressing a dir like `/app/.../experiment.RH1E`)
+    - expand it into a dir `{dst_dir}/experiment.RH1E`
+
+    :param src_tgz_file: path to the local file with the archived data. E.g.,
+       `/.../experiment.20210802-121908.tgz`
+    :param dst_dir: directory where expand the archive tarball
+    :return: dir with the expanded data (e.g., `{dst_dir/experiment.RH1E`)
+    """
+    _LOG.debug("Expanding '%s'", src_tgz_file)
     # Get the name of the including dir, e.g., `experiment.RH1E`.
-    cmd = f"cd {dst_dir} && tar tzf {dst_file} | head -1"
+    cmd = f"cd {dst_dir} && tar tzf {src_tgz_file} | head -1"
     rc, enclosing_tgz_dir_name = hsyste.system_to_one_line(cmd)
     _ = rc
     _LOG.debug(hprint.to_str("enclosing_tgz_dir_name"))
     tgz_dst_dir = os.path.join(dst_dir, enclosing_tgz_dir_name)
+
+    if os.path.exists(tgz_dst_dir):
+        dbg.dassert_dir_exists(dst_dir)
+        _LOG.info(
+            "While expanding '%s' dst dir '%s' already exists: skipping",
+            src_tgz_file,
+            tgz_dst_dir,
+        )
+    else:
+        # Expand the tgz file.
+        # The output should be the original compressed dir under `{dst_dir}`.
+        # E.g.,
+        # > tar tzf /app/.../TestRunExperimentArchiveOnS3.test_serial1/experiment.20210802-133901.tgz
+        # experiment.RH1E/
+        # experiment.RH1E/log.20210802-133859.txt
+        # experiment.RH1E/result_0/
+        with htimer.TimedScope(logging.INFO, "Decompressing"):
+            dbg.dassert_file_exists(src_tgz_file)
+            cmd = f"cd {dst_dir} && tar xzf {src_tgz_file}"
+            hsyste.system(cmd)
     dbg.dassert_dir_exists(tgz_dst_dir)
     # Return `{dst_dir}/experiment.RH1E`.
     return tgz_dst_dir
