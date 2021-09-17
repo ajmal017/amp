@@ -279,6 +279,7 @@ class GroupedColDfToDfTransformer(cdnb.Transformer):
         out_col_group: Tuple[cdtfu.NodeColumn],
         transformer_func: Callable[..., Union[pd.Series, pd.DataFrame]],
         transformer_kwargs: Optional[Dict[str, Any]] = None,
+        col_mapping: Optional[Dict[cdtfu.NodeColumn, cdtfu.NodeColumn]] = None,
         nan_mode: Optional[str] = None,
         join_output_with_input: bool = True,
     ) -> None:
@@ -310,6 +311,7 @@ class GroupedColDfToDfTransformer(cdnb.Transformer):
         self._out_col_group = out_col_group
         self._transformer_func = transformer_func
         self._transformer_kwargs = transformer_kwargs or {}
+        self._col_mapping = col_mapping or {}
         self._nan_mode = nan_mode or "leave_unchanged"
         self._join_output_with_input = join_output_with_input
         # The leaf col names are determined from the dataframe at runtime.
@@ -340,6 +342,8 @@ class GroupedColDfToDfTransformer(cdnb.Transformer):
             dbg.dassert_isinstance(df_out, pd.DataFrame)
             if key_info is not None:
                 func_info[key] = key_info
+            if self._col_mapping:
+                df_out = df_out.rename(columns=self._col_mapping)
             out_dfs[key] = df_out
         info["func_info"] = func_info
         df = cdnb.GroupedColDfToDfColProcessor.postprocess(
