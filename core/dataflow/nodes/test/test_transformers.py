@@ -117,7 +117,10 @@ class TestGroupedColDfToDfTransformer3(hut.TestCase):
         data = self._get_data()
         config = cconfig.get_config_from_nested_dict(
             {
-                "in_col_groups": [("close",), ("mid",),],
+                "in_col_groups": [
+                    ("close",),
+                    ("mid",),
+                ],
                 "out_col_group": (),
                 "transformer_func": lambda x: x.pct_change(),
                 "col_mapping": {
@@ -126,7 +129,9 @@ class TestGroupedColDfToDfTransformer3(hut.TestCase):
                 },
             }
         )
-        node = cdnt.GroupedColDfToDfTransformer("compute_ret_0", **config.to_dict())
+        node = cdnt.GroupedColDfToDfTransformer(
+            "compute_ret_0", **config.to_dict()
+        )
         actual = node.fit(data)["df_out"]
         expected_txt = """
 ,close_ret_0,close_ret_0,mid_ret_0,mid_ret_0,close,close,mid,mid
@@ -147,7 +152,10 @@ class TestGroupedColDfToDfTransformer3(hut.TestCase):
         data = self._get_data()
         config = cconfig.get_config_from_nested_dict(
             {
-                "in_col_groups": [("close",), ("mid",),],
+                "in_col_groups": [
+                    ("close",),
+                    ("mid",),
+                ],
                 "out_col_group": (),
                 "transformer_func": lambda x: x.pct_change(),
                 "col_mapping": {
@@ -157,7 +165,9 @@ class TestGroupedColDfToDfTransformer3(hut.TestCase):
                 "join_output_with_input": False,
             }
         )
-        node = cdnt.GroupedColDfToDfTransformer("compute_ret_0", **config.to_dict())
+        node = cdnt.GroupedColDfToDfTransformer(
+            "compute_ret_0", **config.to_dict()
+        )
         actual = node.fit(data)["df_out"]
         expected_txt = """
 ,close_ret_0,close_ret_0,mid_ret_0,mid_ret_0
