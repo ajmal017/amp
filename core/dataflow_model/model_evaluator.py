@@ -24,7 +24,7 @@ import helpers.introspection as hintro
 
 _LOG = logging.getLogger(__name__)
 
-#_LOG.debug = _LOG.info
+# _LOG.debug = _LOG.info
 
 # #############################################################################
 # ModelEvaluator
@@ -46,13 +46,15 @@ class StrategyEvaluator:
         alpha_col: str,
         returns_col: str,
         spread_col: str,
-        # TODO: Allow specification of start and end times for stats.
+        # TODO(Paul): Allow specification of start and end times for stats.
         # This is useful for interactive analysis and/or zooming in on a
         # specific time period.
         # start: Optional[pd.Timestamp] = None,
         # end: Optional[pd.Timestamp] = None,
     ) -> None:
-        """"""
+        """
+        
+        """
         self._data = data
         dbg.dassert(data, msg="Data set must be nonempty.")
         # This is required by the current implementation otherwise when we extract
@@ -70,7 +72,7 @@ class StrategyEvaluator:
         self.valid_keys = list(self._data.keys())
         self._stats_computer = cstats.StatsComputer()
 
-    # TODO(*): This looks like the corresponding method for `ModelEvaluator`
+    # TODO(Paul): This looks like the corresponding method for `ModelEvaluator`
     # except for the columns needed. Factor out the common part.
     @classmethod
     def from_result_bundle_dict(
@@ -80,9 +82,10 @@ class StrategyEvaluator:
         returns_col: str,
         spread_col: str,
         abort_on_error: bool = True,
-    ) -> ModelEvaluator:
+    ) -> StrategyEvaluator:
         """
-        Initialize a `ModelEvaluator` from a dictionary `key` -> `ResultBundle`.
+        Initialize a `ModelEvaluator` from a dictionary `key` ->
+        `ResultBundle`.
         """
         _LOG.info(
             "Before building ModelEvaluator: memory_usage=%s",
@@ -135,7 +138,9 @@ class StrategyEvaluator:
         keys: Optional[List[Key]] = None,
         spread_fraction_paid: float = 0,
     ) -> Dict[Any, pd.DataFrame]:
-        """"""
+        """
+        
+        """
         keys = keys or self.valid_keys
         dbg.dassert_is_subset(keys, self.valid_keys)
         pnl_dict = {}
@@ -173,12 +178,16 @@ class StrategyEvaluator:
                 .rename("pnl")
             )
             df["pnl"] = pnl
-            spread_cost = fin.compute_spread_cost(
-                df,
-                target_position_col="target_position",
-                spread_col="spread",
-                spread_fraction_paid=spread_fraction_paid,
-            ).squeeze().rename("spread_cost")
+            spread_cost = (
+                fin.compute_spread_cost(
+                    df,
+                    target_position_col="target_position",
+                    spread_col="spread",
+                    spread_fraction_paid=spread_fraction_paid,
+                )
+                .squeeze()
+                .rename("spread_cost")
+            )
             df["spread_cost"] = spread_cost
             df["ex_cost_pnl"] = pnl - spread_cost
             pnl_dict[key] = df
@@ -798,6 +807,7 @@ class PositionComputer:
     def _return_srs(self, srs: pd.Series, mode: str) -> pd.Series:
         """
         Extract part of the time series depending on which period is selected.
+
         :param mode: "ins", "oos", "all"
         """
         if mode == "ins":
