@@ -14,7 +14,7 @@ _LOG = logging.getLogger(__name__)
 
 
 class TestGroupedColDfToDfTransformer1(hut.TestCase):
-    def test1(self) -> None:
+    def test_column_arithmetic(self) -> None:
         data = self._get_data()
 
         def divide(df: pd.DataFrame, col1: str, col2: str) -> pd.DataFrame:
@@ -64,7 +64,7 @@ datetime,MN0,MN1,MN0,MN1
 
 
 class TestGroupedColDfToDfTransformer2(hut.TestCase):
-    def test1(self) -> None:
+    def test_resampling(self) -> None:
         data = self._get_data()
 
         def resample(df: pd.DataFrame, rule: str) -> pd.DataFrame:
