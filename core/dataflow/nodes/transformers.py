@@ -229,7 +229,7 @@ class SeriesTransformer(cdnb.Transformer, cdnb.ColModeMixin):
         func_info = info["func_info"]
         srs_list = []
         for col in self._leaf_cols:
-            srs, col_info = _apply_func_to_data(
+            srs, col_info = _apply_func_to_series(
                 df[col],
                 self._nan_mode,
                 self._transformer_func,
@@ -280,7 +280,8 @@ class GroupedColDfToDfTransformer(cdnb.Transformer):
         transformer_func: Callable[..., Union[pd.Series, pd.DataFrame]],
         transformer_kwargs: Optional[Dict[str, Any]] = None,
         col_mapping: Optional[Dict[cdtfu.NodeColumn, cdtfu.NodeColumn]] = None,
-        nan_mode: Optional[str] = None,
+        drop_nans: bool = False,
+        reindex_like_input: bool = True,
         join_output_with_input: bool = True,
     ) -> None:
         """
@@ -296,9 +297,6 @@ class GroupedColDfToDfTransformer(cdnb.Transformer):
             same.
         :param transformer_func: df -> {df, srs}
         :param transformer_kwargs: transformer_func kwargs
-        :param nan_mode: `leave_unchanged` or `drop`. If `drop`, applies to
-            keyed dfs individually (across all cols in the `in_col_groups` for
-            the given key).
         join_output_with_input: whether to join the output with the input. A
             common case where this should typically be set to `False` is in
             resampling.
@@ -312,7 +310,8 @@ class GroupedColDfToDfTransformer(cdnb.Transformer):
         self._transformer_func = transformer_func
         self._transformer_kwargs = transformer_kwargs or {}
         self._col_mapping = col_mapping or {}
-        self._nan_mode = nan_mode or "leave_unchanged"
+        self._drop_nans = drop_nans
+        self._reindex_like_data = reindex_like_input
         self._join_output_with_input = join_output_with_input
         # The leaf col names are determined from the dataframe at runtime.
         self._leaf_cols = None
@@ -335,9 +334,10 @@ class GroupedColDfToDfTransformer(cdnb.Transformer):
         for key in self._leaf_cols:
             df_out, key_info = _apply_func_to_data(
                 in_dfs[key],
-                self._nan_mode,
                 self._transformer_func,
                 self._transformer_kwargs,
+                self._drop_nans,
+                self._reindex_like_data,
             )
             dbg.dassert_isinstance(df_out, pd.DataFrame)
             if key_info is not None:
@@ -414,7 +414,7 @@ class SeriesToDfTransformer(cdnb.Transformer):
         leaf_cols = self._leaf_cols
         leaf_cols = cast(List[str], leaf_cols)
         for col in leaf_cols:
-            df_out, col_info = _apply_func_to_data(
+            df_out, col_info = _apply_func_to_series(
                 df[col],
                 self._nan_mode,
                 self._transformer_func,
@@ -527,7 +527,7 @@ class SeriesToSeriesTransformer(cdnb.Transformer):
         leaf_cols = self._leaf_cols
         leaf_cols = cast(List[str], leaf_cols)
         for col in leaf_cols:
-            srs, col_info = _apply_func_to_data(
+            srs, col_info = _apply_func_to_series(
                 df[col],
                 self._nan_mode,
                 self._transformer_func,
@@ -551,6 +551,36 @@ class SeriesToSeriesTransformer(cdnb.Transformer):
 
 
 def _apply_func_to_data(
+    data: Union[pd.Series, pd.DataFrame],
+    func: Callable,
+    func_kwargs: Dict[str, Any],
+    drop_nans: bool = False,
+    reindex_like_input: bool = True,
+) -> Tuple[Union[pd.Series, pd.DataFrame], Optional[collections.OrderedDict]]:
+    idx = data.index
+    if drop_nans:
+        data = data.dropna()
+    info: Optional[collections.OrderedDict] = collections.OrderedDict()
+    # Perform the column transformation operations.
+    # Introspect to see whether `_transformer_func` contains an `info`
+    # parameter. If so, inject an empty dict to be populated when
+    # `_transformer_func` is executed.
+    func_sig = inspect.signature(func)
+    if "info" in func_sig.parameters:
+        result = func(
+            data,
+            info=info,
+            **func_kwargs,
+        )
+    else:
+        result = func(data, **func_kwargs)
+        info = None
+    if reindex_like_input:
+        result = result.reindex(idx)
+    return result, info
+
+
+def _apply_func_to_series(
     data: Union[pd.Series, pd.DataFrame],
     nan_mode: str,
     func: Callable,

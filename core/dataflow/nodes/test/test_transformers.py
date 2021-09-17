@@ -78,6 +78,7 @@ class TestGroupedColDfToDfTransformer2(hut.TestCase):
                 "transformer_kwargs": {
                     "rule": "5T",
                 },
+                "reindex_like_input": False,
                 "join_output_with_input": False,
             },
         )
@@ -180,6 +181,60 @@ datetime,MN0,MN1,MN0,MN1
 2016-01-04 09:30:00,100.00,100.00,101.00,99.00
 2016-01-04 09:31:00,105.00,98.00,106.05,97.02
 2016-01-04 09:32:00,52.50,49.00,53.025,48.51
+"""
+        df = pd.read_csv(
+            io.StringIO(txt), index_col=0, parse_dates=True, header=[0, 1]
+        )
+        return df
+
+
+class TestGroupedColDfToDfTransformer4(hut.TestCase):
+    def test_drop_nans(self) -> None:
+        data = self._get_data()
+
+        config = cconfig.get_config_from_nested_dict(
+            {
+                "in_col_groups": [("close",), ("mid",)],
+                "out_col_group": (),
+                "transformer_func": lambda x: x.diff(),
+                "col_mapping": {
+                    "close": "close_diff",
+                    "mid": "mid_diff",
+                },
+                "drop_nans": True,
+                "join_output_with_input": False,
+            },
+        )
+        node = cdnt.GroupedColDfToDfTransformer("diff", **config.to_dict())
+        actual = node.fit(data)["df_out"]
+        expected_txt = """
+,close_diff,close_diff,mid_diff,mid_diff
+,MN0,MN1,MN0,MN1
+2016-01-04 16:00:00,NaN,NaN,NaN,NaN
+2016-01-04 16:01:00,NaN,NaN,NaN,NaN
+2016-01-05 09:29:00,NaN,NaN,NaN,NaN
+2016-01-05 09:30:00,5.0,,0.0,
+2016-01-05 09:31:00,5.0,2.0,6.049999999999997,-0.980000000000004
+2016-01-05 09:32:00,-52.5,-49.0,-53.025,-48.51
+"""
+        expected = pd.read_csv(
+            io.StringIO(expected_txt),
+            index_col=0,
+            parse_dates=True,
+            header=[0, 1],
+        )
+        np.testing.assert_allclose(actual, expected)
+
+    def _get_data(self) -> pd.DataFrame:
+        txt = """
+,close,close,mid,mid
+datetime,MN0,MN1,MN0,MN1
+2016-01-04 16:00:00,95.00,96.00,100,98.00
+2016-01-04 16:01:00,NaN,NaN,NaN,NaN
+2016-01-05 09:29:00,NaN,NaN,NaN,NaN
+2016-01-05 09:30:00,100.00,NaN,100,NaN
+2016-01-05 09:31:00,105.00,98.00,106.05,97.02
+2016-01-05 09:32:00,52.50,49.00,53.025,48.51
 """
         df = pd.read_csv(
             io.StringIO(txt), index_col=0, parse_dates=True, header=[0, 1]
