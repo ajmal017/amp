@@ -111,6 +111,82 @@ datetime,MN0,MN1,MN0,MN1
         return df
 
 
+class TestGroupedColDfToDfTransformer3(hut.TestCase):
+    def test_multicolumn_processing1(self) -> None:
+        data = self._get_data()
+        config = cconfig.get_config_from_nested_dict(
+            {
+                "in_col_groups": [("close",), ("mid",),],
+                "out_col_group": (),
+                "transformer_func": lambda x: x.pct_change(),
+                "col_mapping": {
+                    "close": "close_ret_0",
+                    "mid": "mid_ret_0",
+                },
+            }
+        )
+        node = cdnt.GroupedColDfToDfTransformer("compute_ret_0", **config.to_dict())
+        actual = node.fit(data)["df_out"]
+        expected_txt = """
+,close_ret_0,close_ret_0,mid_ret_0,mid_ret_0,close,close,mid,mid
+,MN0,MN1,MN0,MN1,MN0,MN1,MN0,MN1
+2016-01-04 09:30:00,,,,,100.0,100.0,101.00,99.00
+2016-01-04 09:31:00,0.05,-0.02,0.05,-0.02,105.0,98.0,106.05,97.02
+2016-01-04 09:32:00,-0.5,-0.5,-0.5,-0.5,52.5,49.0,53.025,48.51
+"""
+        expected = pd.read_csv(
+            io.StringIO(expected_txt),
+            index_col=0,
+            parse_dates=True,
+            header=[0, 1],
+        )
+        np.testing.assert_allclose(actual, expected)
+
+    def test_multicolumn_processing2(self) -> None:
+        data = self._get_data()
+        config = cconfig.get_config_from_nested_dict(
+            {
+                "in_col_groups": [("close",), ("mid",),],
+                "out_col_group": (),
+                "transformer_func": lambda x: x.pct_change(),
+                "col_mapping": {
+                    "close": "close_ret_0",
+                    "mid": "mid_ret_0",
+                },
+                "join_output_with_input": False,
+            }
+        )
+        node = cdnt.GroupedColDfToDfTransformer("compute_ret_0", **config.to_dict())
+        actual = node.fit(data)["df_out"]
+        expected_txt = """
+,close_ret_0,close_ret_0,mid_ret_0,mid_ret_0
+,MN0,MN1,MN0,MN1
+2016-01-04 09:30:00,NaN,NaN,NaN,NaN
+2016-01-04 09:31:00,0.05,-0.02,0.05,-0.02
+2016-01-04 09:32:00,-0.5,-0.5,-0.5,-0.5
+"""
+        expected = pd.read_csv(
+            io.StringIO(expected_txt),
+            index_col=0,
+            parse_dates=True,
+            header=[0, 1],
+        )
+        np.testing.assert_allclose(actual, expected)
+
+    def _get_data(self) -> pd.DataFrame:
+        txt = """
+,close,close,mid,mid
+datetime,MN0,MN1,MN0,MN1
+2016-01-04 09:30:00,100.00,100.00,101.00,99.00
+2016-01-04 09:31:00,105.00,98.00,106.05,97.02
+2016-01-04 09:32:00,52.50,49.00,53.025,48.51
+"""
+        df = pd.read_csv(
+            io.StringIO(txt), index_col=0, parse_dates=True, header=[0, 1]
+        )
+        return df
+
+
 class TestSeriesToDfTransformer(hut.TestCase):
     def test1(self) -> None:
         def add_lags(srs: pd.Series, num_lags: int) -> pd.DataFrame:
