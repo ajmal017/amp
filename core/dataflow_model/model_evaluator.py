@@ -131,7 +131,7 @@ class StrategyEvaluator:
                 df_tmp = df[
                     [position_intent_col, returns_col, spread_col]
                 ]
-                df_tmp = _trim_df_trading_hours(df_tmp)
+                #df_tmp = _trim_df_trading_hours(df_tmp)
                 data_dict[key] = df_tmp
             except Exception as e:
                 _LOG.error(
@@ -226,10 +226,10 @@ class StrategyEvaluator:
             df["spread_cost_0"] = spread_cost
             #df["ex_cost_pnl_0"] = pnl - spread_cost
             pnl_dict[key] = df
-            _LOG.info(
-                "StrategyEvaluator.compute_pnl: memory_usage=%s",
-                dbg.get_memory_usage_as_str(None),
-            )
+            #_LOG.info(
+            #    "StrategyEvaluator.compute_pnl: memory_usage=%s",
+            #    dbg.get_memory_usage_as_str(None),
+            #)
             #print(df)
             #mem = df.memory_usage().sum()
             #print(mem)

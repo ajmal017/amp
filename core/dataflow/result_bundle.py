@@ -22,6 +22,14 @@ import helpers.timer as htimer
 
 _LOG = logging.getLogger(__name__)
 
+import datetime
+
+def _trim_df_trading_hours(df) -> pd.DataFrame:
+    df_time = df.index.time
+    mask = (df_time >= datetime.time(9, 25)) & (df_time <= datetime.time(16, 0))
+    _LOG.debug(mask.sum() / len(mask))
+    dbg.dassert_eq(len(df[~mask].dropna()), 0)
+    return df[mask]
 
 # #############################################################################
 # ResultBundle
@@ -292,7 +300,8 @@ class ResultBundle(abc.ABC):
             file_name_pq = io_.change_filename_extension(file_name, "pkl", "pq")
             if columns is None:
                 _LOG.warning(
-                    "Loading the entire `result_df` without filtering by columns: this is slow and requires a lot of memory"
+                    "Loading the entire `result_df` without filtering by columns: "
+                    "this is slow and requires a lot of memory"
                 )
             with htimer.TimedScope(logging.DEBUG, "Load parquet"):
                 obj.result_df = hparquet.from_parquet(
@@ -308,6 +317,7 @@ class ResultBundle(abc.ABC):
             #     "index.freq": result_df.index.freq
             # }
             obj.result_df.index.freq = metadata_df.pop("index.freq")
+            obj.result_df = _trim_df_trading_hours(obj.result_df)
             dbg.dassert(
                 not metadata_df, "metadata_df='%s' is not empty", str(metadata_df)
             )
