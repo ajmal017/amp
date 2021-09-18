@@ -52,9 +52,6 @@ class StrategyEvaluator:
         # start: Optional[pd.Timestamp] = None,
         # end: Optional[pd.Timestamp] = None,
     ) -> None:
-        """
-        
-        """
         self._data = data
         dbg.dassert(data, msg="Data set must be nonempty.")
         # This is required by the current implementation otherwise when we extract
