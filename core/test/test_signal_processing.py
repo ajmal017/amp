@@ -1,4 +1,5 @@
 import collections
+import datetime
 import logging
 import os
 import pprint
@@ -646,6 +647,9 @@ class Test_compute_smooth_moving_average1(hut.TestCase):
 
 class Test_extract_smooth_moving_average_weights(hut.TestCase):
     def test1(self) -> None:
+        """
+        Perform a typical application.
+        """
         df = pd.DataFrame(index=range(0, 20))
         weights = csigna.extract_smooth_moving_average_weights(
             df,
@@ -658,6 +662,9 @@ class Test_extract_smooth_moving_average_weights(hut.TestCase):
         self.check_string(actual)
 
     def test2(self) -> None:
+        """
+         Like `test1()`, but with `tau` varied.
+        """
         df = pd.DataFrame(index=range(0, 20))
         weights = csigna.extract_smooth_moving_average_weights(
             df,
@@ -670,6 +677,9 @@ class Test_extract_smooth_moving_average_weights(hut.TestCase):
         self.check_string(actual)
 
     def test3(self) -> None:
+        """
+        Like `test2()`, but with `min_depth` and `max_depth` increased.
+        """
         df = pd.DataFrame(index=range(0, 20))
         weights = csigna.extract_smooth_moving_average_weights(
             df,
@@ -684,13 +694,16 @@ class Test_extract_smooth_moving_average_weights(hut.TestCase):
         self.check_string(actual)
 
     def test4(self) -> None:
+        """
+        Use a datatime index instead of a range index.
+        """
         df = pd.DataFrame(
             index=pd.date_range(start="2001-01-04", end="2001-01-31", freq="B")
         )
         weights = csigna.extract_smooth_moving_average_weights(
             df,
             tau=16,
-            index_location="2001-01-24",
+            index_location=datetime.datetime(2001, 1, 24),
         )
         actual = hut.convert_df_to_string(
             weights.round(5), index=True, decimals=5
@@ -698,13 +711,16 @@ class Test_extract_smooth_moving_average_weights(hut.TestCase):
         self.check_string(actual)
 
     def test5(self) -> None:
+        """
+        Like `test4()`, but with `tau` varied.
+        """
         df = pd.DataFrame(
             index=pd.date_range(start="2001-01-04", end="2001-01-31", freq="B")
         )
         weights = csigna.extract_smooth_moving_average_weights(
             df,
             tau=252,
-            index_location="2001-01-24",
+            index_location=datetime.datetime(2001, 1, 24),
         )
         actual = hut.convert_df_to_string(
             weights.round(5), index=True, decimals=5
@@ -712,12 +728,32 @@ class Test_extract_smooth_moving_average_weights(hut.TestCase):
         self.check_string(actual)
 
     def test6(self) -> None:
+        """
+        Let `index_location` equal its default of `None`.
+        """
         df = pd.DataFrame(
             index=pd.date_range(start="2001-01-04", end="2001-01-31", freq="B")
         )
         weights = csigna.extract_smooth_moving_average_weights(
             df,
             tau=252,
+        )
+        actual = hut.convert_df_to_string(
+            weights.round(5), index=True, decimals=5
+        )
+        self.check_string(actual)
+
+    def test7(self) -> None:
+        """
+        Set `index_location` past `end`.
+        """
+        df = pd.DataFrame(
+            index=pd.date_range(start="2001-01-04", end="2001-01-31", freq="B")
+        )
+        weights = csigna.extract_smooth_moving_average_weights(
+            df,
+            tau=252,
+            index_location=datetime.datetime(2001, 2, 1),
         )
         actual = hut.convert_df_to_string(
             weights.round(5), index=True, decimals=5

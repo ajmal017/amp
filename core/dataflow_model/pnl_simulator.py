@@ -649,9 +649,6 @@ def _compute_pnl_level2(
         _LOG.debug("%s=%s -> %s", key, prev_value, value)
         accounting[key].append(value)
 
-    # def _update(key: str, value: float) -> None:
-    #     pass
-
     orders: List[Order] = []
     # Initial balance.
     holdings = 0.0

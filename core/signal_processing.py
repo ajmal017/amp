@@ -635,6 +635,10 @@ def extract_smooth_moving_average_weights(
     dbg.dassert_isinstance(idx, pd.Index)
     dbg.dassert(not idx.empty, msg="`signal.index` must be nonempty.")
     index_location = index_location or idx[-1]
+    if index_location > idx[-1]:
+        _LOG.warning("Requested `index_location` is out-of-range. "
+                     "Proceeding with last `signal.index` location instead.")
+        index_location = idx[-1]
     dbg.dassert_in(
         index_location,
         idx,
@@ -683,7 +687,7 @@ def extract_smooth_moving_average_weights(
     # Index and align the weights so that they terminate at `index_location`.
     weights.index = signal.loc[:index_location].index
     # Extend `weights` with NaNs if necessary.
-    return weights.reindex(signal.index)
+    return weights.reindex(idx)
 
 
 # #############################################################################
