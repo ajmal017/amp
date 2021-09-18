@@ -545,7 +545,7 @@ class SeriesToSeriesTransformer(cdnb.Transformer):
                 self._transformer_func,
                 self._transformer_kwargs,
                 self._drop_nans,
-                self._reindex_like_input
+                self._reindex_like_input,
             )
             dbg.dassert_isinstance(srs, pd.Series)
             srs.name = col
