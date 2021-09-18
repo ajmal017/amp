@@ -46,15 +46,12 @@ class StrategyEvaluator:
         position_intent_col: str,
         returns_col: str,
         spread_col: str,
-        # TODO: Allow specification of start and end times for stats.
+        # TODO(Paul): Allow specification of start and end times for stats.
         # This is useful for interactive analysis and/or zooming in on a
         # specific time period.
         # start: Optional[pd.Timestamp] = None,
         # end: Optional[pd.Timestamp] = None,
     ) -> None:
-        """
-        
-        """
         self._data = data
         dbg.dassert(data, msg="Data set must be nonempty.")
         # This is required by the current implementation otherwise when we extract
@@ -72,7 +69,7 @@ class StrategyEvaluator:
         self.valid_keys = list(self._data.keys())
         self._stats_computer = cstats.StatsComputer()
 
-    # TODO(*): This looks like the corresponding method for `ModelEvaluator`
+    # TODO(Paul): This looks like the corresponding method for `ModelEvaluator`
     # except for the columns needed. Factor out the common part.
     @classmethod
     def from_result_bundle_dict(
@@ -141,6 +138,7 @@ class StrategyEvaluator:
         key_type: str = "instrument",
     ) -> Dict[Any, pd.DataFrame]:
         """
+
         Compute pnl from position intents, ret_0, and spread.
         """
         keys = keys or self.valid_keys
@@ -182,6 +180,7 @@ class StrategyEvaluator:
                 )
                 .squeeze()
                 .rename("spread_cost_0")
+            )
             )
             df["spread_cost_0"] = spread_cost
             df["ex_cost_pnl_0"] = pnl - spread_cost
@@ -310,7 +309,8 @@ class ModelEvaluator:
         abort_on_error: bool = True,
     ) -> ModelEvaluator:
         """
-        Initialize a `ModelEvaluator` from a dictionary `key` -> `ResultBundle`.
+        Initialize a `ModelEvaluator` from a dictionary `key` ->
+        `ResultBundle`.
 
         :param result_bundle_dict: mapping from key to `ResultBundle`
         :param *: as in `ModelEvaluator` constructor
