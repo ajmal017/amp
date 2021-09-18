@@ -44,37 +44,19 @@ _LOG = logging.getLogger(__name__)
 
 hprint.config_notebook()
 
-# %%
-# file_name = "/app/oos_experiment.RH2Eg.v2_0-top10.5T.run1_test/result_1/result_bundle.v2_0.pkl"
-
-# import helpers.pickle_ as hpickle
-
-# obj = hpickle.from_pickle(file_name)
-
-# %%
-# obj.keys()
-
-# %%
-# import helpers.introspection as hintro
-
-# for k in obj.keys():
-#     print(k, hintro.get_size_in_bytes(obj[k]))
-
-# %%
-# obj["payload"]["fit_result_bundle"]["result_df"]
-
 # %% [markdown]
 # # Notebook config
 
 # %%
-# config = cconfig.Config.from_env_var("AM_CONFIG_CODE")
-config = None
+eval_config = cconfig.Config.from_env_var("AM_CONFIG_CODE")
+#eval_config = None
 
-if config is None:
+if eval_config is None:
     # exp_dir = "s3://eglp-spm-sasm/experiments/experiment.RH2Ef.v1_9-all.5T.20210831-004747.run1.tgz"
     # exp_dir = "/app/oos_experiment.RH2Eg.v2_0-top10.5T.run1_test"
     exp_dir = "/app/oos_experiment.RH2Eg.v2_0-top100.5T.run1_test"
     aws_profile = None
+    selected_idxs = None
 
     eval_config = cconfig.get_config_from_nested_dict(
         {
@@ -82,7 +64,7 @@ if config is None:
                 "src_dir": exp_dir,
                 "file_name": "result_bundle.v2_0.pkl",
                 "experiment_type": "ins_oos",
-                "selected_idxs": None,
+                "selected_idxs": selected_idxs,
                 "aws_profile": aws_profile,
             },
             "model_evaluator_kwargs": {

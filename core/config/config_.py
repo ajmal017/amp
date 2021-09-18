@@ -274,6 +274,15 @@ class Config:
             dbg.dassert_eq(str(self), str(config_tmp))
         return config_as_str
 
+    @classmethod
+    def from_env_var(cls, env_var: str) -> Optional["Config"]:
+        if env_var in os.environ:
+            python_code = os.environ[env_var]
+            config = cls.from_python_code(python_code)
+        else:
+            config = None
+        return config
+
     def to_dict(self) -> Dict[str, Any]:
         """
         Convert the Config to nested ordered dicts.
@@ -315,12 +324,6 @@ class Config:
             )
             _LOG.error(msg)
             raise ValueError(msg)
-
-    @classmethod
-    def from_env_var(cls, env_var: str) -> "Config":
-        dbg.dassert_in(env_var, os.environ.keys())
-        python_code = os.environ[env_var]
-        return cls.from_python(python_code)
 
     # TODO(*): Standardize/allow to be configurable what to return if a value is
     #     missing.
