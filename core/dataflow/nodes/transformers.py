@@ -311,7 +311,7 @@ class GroupedColDfToDfTransformer(cdnb.Transformer):
         self._transformer_kwargs = transformer_kwargs or {}
         self._col_mapping = col_mapping or {}
         self._drop_nans = drop_nans
-        self._reindex_like_data = reindex_like_input
+        self._reindex_like_input = reindex_like_input
         self._join_output_with_input = join_output_with_input
         # The leaf col names are determined from the dataframe at runtime.
         self._leaf_cols = None
@@ -337,7 +337,7 @@ class GroupedColDfToDfTransformer(cdnb.Transformer):
                 self._transformer_func,
                 self._transformer_kwargs,
                 self._drop_nans,
-                self._reindex_like_data,
+                self._reindex_like_input,
             )
             dbg.dassert_isinstance(df_out, pd.DataFrame)
             if key_info is not None:
