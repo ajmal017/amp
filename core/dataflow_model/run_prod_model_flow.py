@@ -5,6 +5,7 @@ import core.dataflow_model.run_prod_model_flow as rpmf
 """
 
 import logging
+import os
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -20,70 +21,87 @@ import core.signal_processing as sigp
 import core.statistics as stats
 import helpers.dbg as dbg
 import helpers.introspection as hintro
+import core.config as cconfig
+import core.dataflow as cdataf
+import core.dataflow_model.model_evaluator as modeval
+import helpers.dbg as dbg
+import helpers.git as git
+import helpers.jupyter as hjupyter
+import helpers.printing as prnt
+import helpers.system_interaction as hsinte
+import helpers.unit_test as hut
+#import research.RH1E.RH1E_pipeline as RH1Ep
+import dataflow_lemonade.RH1E.RH1E_pipeline as RH1Ep
 
 _LOG = logging.getLogger(__name__)
 
 
-def run_prod_model_flow(bm_config: str,
-                   config_builder: str,
+def run_prod_model_flow(config_builder: str,
                    experiment_builder: str,
                     run_model_opts: str,
+                    run_model_dir: str,
                    model_eval_config: Optional[cconfig.Config],
                    strategy_eval_config: Optional[cconfig.Config],
-                    dst_dir: str):
+                    run_notebook_dir: str) -> str:
+    """
+    Run end-to-end flow for a model:
+    - run model
+    - run the analysis flow to make sure that it works
+
+    :param config_builder: config builder to run the model
+    :param experiment_builder: experiment builder to run the model
+    :param run_model_dir: dir to run the model
+    :param model_eval_config: config for the model evaluator notebook. `None` to skip
+    :param strategy_eval_config: config for the strategy evaluator notebook. `None` to skip
+    :param run_notebook_dir: dir to run the notebook
+    :return: string with the signature of the experiment
+    """
+    actual_outcome = []
     # 1) Run the model.
     _LOG.debug("\n%s", prnt.frame("Run model", char1="<"))
-    #bm_config = "v2_0-top1.5T"
-    #bm_config = "kibot_v1-top1.5T"
-    run_model_dst_dir = os.path.join(dst_dir, "run_model")
-    # We abort on error since we don't expect failures.
-    #extra_opts = ""
-    run_model_dir = self._run_model(bm_config, config_builder, experiment_builder, run_model_opts, run_model_dst_dir)
-    # 2) Run the ModelEvaluator notebook.
+    _run_model(config_builder, experiment_builder, run_model_opts, run_model_dir)
+    # 2) Run the `ModelEvaluator` notebook.
     if model_eval_config is not None:
         _LOG.debug("\n%s", prnt.frame("Run model analyzer notebook", char1="<"))
         amp_dir = git.get_amp_abs_path()
         # TODO(gp): Rename -> Master_model_evaluator
         file_name = os.path.join(amp_dir, "core/dataflow_model/notebooks/Master_model_analyzer.ipynb")
         #
-        run_notebook_dir = os.path.join(dst_dir, "run_model_analyzer")
+        run_notebook_dir_tmp = os.path.join(run_notebook_dir, "run_model_analyzer")
         #
-        eval_config = self._get_eval_config(run_model_dir)
-        python_code = eval_config.to_python(check=True)
+        python_code = model_eval_config.to_python(check=True)
         env_var = "AM_CONFIG_CODE"
         pre_cmd = f'export {env_var}="{python_code}"'
         #
-        hjupyter.run_notebook(file_name, run_notebook_dir, pre_cmd=pre_cmd)
-    # 3) Run the StrategyEvaluator notebook.
+        hjupyter.run_notebook(file_name, run_notebook_dir_tmp, pre_cmd=pre_cmd)
+    # 3) Freeze statistics from the `ModelEvaluator` flow.
+    evaluator = modeval.ModelEvaluator.from_eval_config(model_eval_config)
+    pnl_stats = evaluator.calculate_stats(
+        mode=eval_config["mode"], target_volatility=eval_config["target_volatility"]
+    )
+    actual_outcome.append(p)
+    actual_outcome.append(hut.convert_df_to_string(pnl_stats, index=True))
+    # 4) Run the StrategyEvaluator notebook.
     if strategy_eval_config is not None:
         _LOG.debug("\n%s", prnt.frame("Run strategy analyzer notebook", char1="<"))
         amp_dir = git.get_amp_abs_path()
         # TODO(gp): Rename -> Master_strategy_evaluator
         file_name = os.path.join(amp_dir, "core/dataflow_model/notebooks/Master_strategy_analyzer.ipynb")
         #
-        run_notebook_dir = os.path.join(dst_dir, "run_strategy_analyzer")
+        run_notebook_dir_tmp = os.path.join(run_notebook_dir, "run_strategy_analyzer")
         #
-        eval_config = self._get_eval_config(run_model_dir)
-        python_code = eval_config.to_python(check=True)
+        python_code = strategy_eval_config.to_python(check=True)
         env_var = "AM_CONFIG_CODE"
         pre_cmd = f'export {env_var}="{python_code}"'
         #
-        hjupyter.run_notebook(file_name, run_notebook_dir, pre_cmd=pre_cmd)
-    # 4) Freeze PnL.
-    actual_outcome = []
-    # Build the ModelEvaluator from the eval config.
-    evaluator = modeval.ModelEvaluator.from_eval_config(eval_config)
-    pnl_stats = evaluator.calculate_stats(
-        mode=eval_config["mode"], target_volatility=eval_config["target_volatility"]
-    )
-    actual_outcome.append(p)
-    actual_outcome.append(hut.convert_df_to_string(pnl_stats, index=True))
-    # TODO(gp): Add the corresponding info for Strategy PnL.
+        hjupyter.run_notebook(file_name, run_notebook_dir_tmp, pre_cmd=pre_cmd)
+    # 5) Freeze statistics from the `StrategyEvaluator` flow.
+    # TODO(gp): Add some info from Strategy PnL.
     actual_outcome = "\n".join(actual_outcome)
-    self.check_string(act)
+    return actual_outcome
 
 
-def _run_model(bm_config: str, config_builder: str, experiment_builder: str, extra_opts: str, dst_dir: str) -> None:
+def _run_model(config_builder: str, experiment_builder: str, extra_opts: str, dst_dir: str) -> None:
     # Execute a command line like:
     #   /app/amp/core/dataflow_model/run_experiment.py \
     #       --experiment_builder \
@@ -94,8 +112,6 @@ def _run_model(bm_config: str, config_builder: str, experiment_builder: str, ext
     #       --clean_dst_dir \
     #       --no_confirm \
     #       --num_threads serial
-    tag = "RH1E"
-    dst_dir = f"{dst_dir}/oos_experiment.{tag}.{bm_config}"
     if os.path.exists(dst_dir):
         _LOG.warning("Dir with experiment already exists: skipping...")
         return dst_dir
@@ -126,4 +142,3 @@ def _run_model(bm_config: str, config_builder: str, experiment_builder: str, ext
     cmd.append(opts)
     cmd = " ".join(cmd)
     hsinte.system(cmd)
-    return dst_dir
