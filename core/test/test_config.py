@@ -691,7 +691,69 @@ class Test_subtract_config1(hut.TestCase):
         self.assert_equal(act, exp, fuzzy_match=True)
 
 
-# TODO(gp): Unit tests all the functions.
+# #############################################################################
+
+
+class Test_dassert_is_serializable1(hut.TestCase):
+
+    def test1(self) -> None:
+        """
+        Test a config that can be serialized correctly.
+        """
+        src_dir = "."
+        eval_config = cconfig.get_config_from_nested_dict(
+            {
+                "load_experiment_kwargs": {
+                    "src_dir": src_dir,
+                    "file_name": "result_bundle.v2_0.pkl",
+                    "experiment_type": "ins_oos",
+                    "selected_idxs": None,
+                    "aws_profile": None,
+                },
+                "model_evaluator_kwargs": {
+                    "predictions_col": "mid_ret_0_vol_adj_clipped_2_hat",
+                    "target_col": "mid_ret_0_vol_adj_clipped_2",
+                    # "oos_start": "2017-01-01",
+                },
+                "bh_adj_threshold": 0.1,
+                "resample_rule": "W",
+                "mode": "ins",
+                "target_volatility": 0.1,
+            }
+        )
+        # Make sure that it can be serialized.
+        actual = eval_config.is_serializable()
+        self.assertTrue(actual)
+
+    def test2(self) -> None:
+        """
+        Test a config that can't be serialized since there is a function pointer.
+        """
+        src_dir = "."
+        func = lambda x: x + 1
+        eval_config = cconfig.get_config_from_nested_dict(
+            {
+                "load_experiment_kwargs": {
+                    "src_dir": src_dir,
+                    "experiment_type": "ins_oos",
+                    "selected_idxs": None,
+                    "aws_profile": None,
+                },
+                "model_evaluator_kwargs": {
+                    "predictions_col": "mid_ret_0_vol_adj_clipped_2_hat",
+                    "target_col": "mid_ret_0_vol_adj_clipped_2",
+                    # "oos_start": "2017-01-01",
+                },
+                "bh_adj_threshold": 0.1,
+                "resample_rule": "W",
+                "mode": "ins",
+                "target_volatility": 0.1,
+                "func": func,
+            }
+        )
+        # Make sure that it can be serialized.
+        actual = eval_config.is_serializable()
+        self.assertFalse(actual)
 
 
 # #############################################################################
@@ -880,3 +942,6 @@ def _get_nested_config5() -> cconfig.Config:
     #
     _LOG.debug("config=\n%s", config)
     return config
+
+
+# TODO(gp): Unit tests all the functions.

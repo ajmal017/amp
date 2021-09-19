@@ -14,8 +14,10 @@ import numpy as np
 import pandas as pd
 from tqdm.auto import tqdm
 
+import core.config as cconfig
 import core.dataflow as cdataf
 import core.dataflow_model.stats_computer as cstats
+import core.dataflow_model.utils as cdmu
 import core.finance as fin
 import core.signal_processing as sigp
 import core.statistics as stats
@@ -180,7 +182,6 @@ class StrategyEvaluator:
                 )
                 .squeeze()
                 .rename("spread_cost_0")
-            )
             )
             df["spread_cost_0"] = spread_cost
             df["ex_cost_pnl_0"] = pnl - spread_cost
@@ -359,6 +360,32 @@ class ModelEvaluator:
         _LOG.info(
             "After building ModelEvaluator: memory_usage=%s",
             dbg.get_memory_usage_as_str(None),
+        )
+        return evaluator
+
+    @classmethod
+    def from_eval_config(
+        cls,
+        eval_config: cconfig.Config,
+    ) -> ModelEvaluator:
+        """
+        Initialize a `ModelEvaluator` from an eval config.
+        """
+        load_config = eval_config["load_experiment_kwargs"].to_dict()
+        # Load only the columns needed by the ModelEvaluator.
+        load_config["load_rb_kwargs"] = {
+            "columns": [
+                eval_config["model_evaluator_kwargs"]["target_col"],
+                eval_config["model_evaluator_kwargs"]["predictions_col"],
+            ]
+        }
+        result_bundle_dict = cdmu.load_experiment_artifacts(**load_config)
+        # Build the ModelEvaluator.
+        evaluator = modeval.ModelEvaluator.from_result_bundle_dict(
+            result_bundle_dict,
+            # abort_on_error=False,
+            abort_on_error=True,
+            **eval_config["model_evaluator_kwargs"].to_dict(),
         )
         return evaluator
 

@@ -4,12 +4,17 @@ Import as:
 import helpers.jupyter as hjupyter
 """
 
+import os
+
+import helpers.dbg as dbg
+import helpers.io_ as hio
+import helpers.system_interaction as hsinte
 
 def run_notebook(
     file_name: str,
     scratch_dir: str,
-    *
-    pre_cmd: Optional[str],
+    *,
+    pre_cmd: str = "",
 ) -> None:
     """
     Run jupyter notebook.
@@ -23,17 +28,17 @@ def run_notebook(
     """
     file_name = os.path.abspath(file_name)
     dbg.dassert_exists(file_name)
-    dbg.dassert_exists(scratch_dir)
+    hio.create_dir(scratch_dir, incremental=True)
     # Build command line.
     cmd = []
-    if pre_cmd is not None:
-        cmd.append(pre_cmd)
+    if pre_cmd:
+        cmd.append(f"{pre_cmd} &&")
     # Convert .py file into .ipynb if needed.
     root, ext = os.path.splitext(file_name)
     if ext == ".ipynb":
         notebook_name = file_name
     elif ext == ".py":
-        cmd.append(f"jupytext --update --to notebook {file_name}; ")
+        cmd.append(f"jupytext --update --to notebook {file_name};")
         notebook_name = f"{root}.ipynb"
     else:
         raise ValueError(f"Unsupported file format for `file_name`='{file_name}'")
@@ -47,4 +52,4 @@ def run_notebook(
     cmd.append("--ExecutePreprocessor.timeout=-1")
     # Execute.
     cmd_as_str = " ".join(cmd)
-    hsinte.system(cmd_as_str, abort_on_error=True)
+    hsinte.system(cmd_as_str, abort_on_error=True, suppressed_error=False)

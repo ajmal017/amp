@@ -250,19 +250,25 @@ class Config:
         return copy.deepcopy(self)
 
     @classmethod
-    def from_python(cls, code: str) -> "Config":
+    def from_python(cls, code: str) -> Optional["Config"]:
         """
         Create an object from the code returned by `to_python()`.
         """
         dbg.dassert_isinstance(code, str)
-        # eval function need unknown globals to be set.
-        val = eval(code, {"nan": np.nan, "Config": Config})
-        dbg.dassert_isinstance(val, Config)
+        try:
+            # eval function need unknown globals to be set.
+            val = eval(code, {"nan": np.nan, "Config": Config})
+            dbg.dassert_isinstance(val, Config)
+        except SyntaxError as e:
+            _LOG.error("Error deserializing: %s", str(e))
+            return None
         return val  # type: ignore
 
     def to_python(self, check: bool = True) -> str:
         """
         Return python code that builds, when executed, the current object.
+
+        :param check: check that the Config can be serialized/deserialized correctly.
         """
         config_as_str = str(self.to_dict())
         # We don't need `cconfig.` since we are inside the config module.
@@ -298,6 +304,15 @@ class Config:
             else:
                 dict_[k] = v
         return dict_
+
+    def is_serializable(self) -> None:
+        """
+        Make sure the config can be serialized and deserialized correctly.
+        """
+        code = self.to_python(check=False)
+        config = self.from_python(code)
+        ret = str(config) == str(self)
+        return ret
 
     def flatten(self) -> Dict[Tuple[str], Any]:
         """
@@ -348,15 +363,6 @@ class Config:
             "Invalid %s='%s' in config=\n%s"
             % (key, self._config[key], pri.indent(str(self)))
         )
-
-    def dassert_is_serializable(self) -> None:
-        """
-        Make sure the config can be serialized and deserialized correctly.
-        """
-        code = self.to_python()
-        config = self.from_python(code)
-        dbg.dassert_eq(str(config), str(self))
-        dbg.dassert_eq(config, self)
 
     @staticmethod
     def _parse_compound_key(key: Key) -> Tuple[str, Iterable[str]]:

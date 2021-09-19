@@ -86,24 +86,25 @@ print(str(eval_config))
 # # Initialize ModelEvaluator and ModelPlotter
 
 # %%
-load_config = eval_config["load_experiment_kwargs"].to_dict()
+evaluator = modeval.ModelEvaluator.from_eval_config(eval_config)
+# load_config = eval_config["load_experiment_kwargs"].to_dict()
 
-# Load only the columns needed by the ModelEvaluator.
-load_config["load_rb_kwargs"] = {
-    "columns": [
-        eval_config["model_evaluator_kwargs"]["target_col"],
-        eval_config["model_evaluator_kwargs"]["predictions_col"],
-    ]
-}
-result_bundle_dict = cdmu.load_experiment_artifacts(**load_config)
+# # Load only the columns needed by the ModelEvaluator.
+# load_config["load_rb_kwargs"] = {
+#     "columns": [
+#         eval_config["model_evaluator_kwargs"]["target_col"],
+#         eval_config["model_evaluator_kwargs"]["predictions_col"],
+#     ]
+# }
+# result_bundle_dict = cdmu.load_experiment_artifacts(**load_config)
 
-# Build the ModelEvaluator.
-evaluator = modeval.ModelEvaluator.from_result_bundle_dict(
-    result_bundle_dict,
-    # abort_on_error=False,
-    abort_on_error=True,
-    **eval_config["model_evaluator_kwargs"].to_dict(),
-)
+# # Build the ModelEvaluator.
+# evaluator = modeval.ModelEvaluator.from_result_bundle_dict(
+#     result_bundle_dict,
+#     # abort_on_error=False,
+#     abort_on_error=True,
+#     **eval_config["model_evaluator_kwargs"].to_dict(),
+# )
 # Build the ModelPlotter.
 plotter = modplot.ModelPlotter(evaluator)
 
