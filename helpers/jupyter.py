@@ -52,4 +52,4 @@ def run_notebook(
     cmd.append("--ExecutePreprocessor.timeout=-1")
     # Execute.
     cmd_as_str = " ".join(cmd)
-    hsinte.system(cmd_as_str, abort_on_error=True, suppressed_error=False)
+    hsinte.system(cmd_as_str, abort_on_error=True, suppress_output=False)

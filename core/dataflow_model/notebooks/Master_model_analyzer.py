@@ -51,7 +51,11 @@ hprint.config_notebook()
 eval_config = cconfig.Config.from_env_var("AM_CONFIG_CODE")
 #eval_config = None
 
-if eval_config is None:
+eval_config = "Config([('load_experiment_kwargs', Config([('src_dir', '/app/dataflow_lemonade/RH1E/test/Test_RH1E_ProdModels.test_end_to_end_slow1/tmp.scratch/run_model/oos_experiment.RH1E.kibot_v1-top1.5T'), ('file_name', 'result_bundle.v2_0.pkl'), ('experiment_type', 'ins_oos'), ('selected_idxs', None), ('aws_profile', None)])), ('model_evaluator_kwargs', Config([('predictions_col', 'mid_ret_0_vol_adj_clipped_2_hat'), ('target_col', 'mid_ret_0_vol_adj_clipped_2')])), ('bh_adj_threshold', 0.1), ('resample_rule', 'W'),     ('mode', 'ins'), ('target_volatility', 0.1)])"
+eval_config = cconfig.Config.from_python(eval_config)
+
+
+if False and eval_config is None:
     # exp_dir = "s3://eglp-spm-sasm/experiments/experiment.RH2Ef.v1_9-all.5T.20210831-004747.run1.tgz"
     # exp_dir = "/app/oos_experiment.RH2Eg.v2_0-top10.5T.run1_test"
     exp_dir = "/app/oos_experiment.RH2Eg.v2_0-top100.5T.run1_test"

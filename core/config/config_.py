@@ -284,8 +284,10 @@ class Config:
     def from_env_var(cls, env_var: str) -> Optional["Config"]:
         if env_var in os.environ:
             python_code = os.environ[env_var]
-            config = cls.from_python_code(python_code)
+            config = cls.from_python(python_code)
         else:
+            _LOG.warning("Environment variable '%s' not defined: no config retrieved",
+                         env_var)
             config = None
         return config
 

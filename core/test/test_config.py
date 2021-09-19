@@ -7,6 +7,7 @@ import pytest
 
 import core.config as cconfig
 import helpers.printing as hprint
+import helpers.system_interaction as hsinte
 import helpers.unit_test as hut
 
 _LOG = logging.getLogger(__name__)
@@ -754,6 +755,35 @@ class Test_dassert_is_serializable1(hut.TestCase):
         # Make sure that it can be serialized.
         actual = eval_config.is_serializable()
         self.assertFalse(actual)
+
+
+# #############################################################################
+
+
+class Test_from_env_var1(hut.TestCase):
+
+    def test1(self) -> None:
+        eval_config = cconfig.get_config_from_nested_dict(
+            {
+                "load_experiment_kwargs": {
+                    "file_name": "result_bundle.v2_0.pkl",
+                    "experiment_type": "ins_oos",
+                    "selected_idxs": None,
+                    "aws_profile": None,
+                }
+            }
+        )
+        # Make sure that it can be serialized.
+        self.assertTrue(eval_config.is_serializable())
+        #
+        python_code = eval_config.to_python(check=True)
+        env_var = "AM_CONFIG_CODE"
+        pre_cmd = f'export {env_var}="{python_code}"'
+        python_code = ("import core.config as cconfig; "
+            f"print(cconfig.Config.from_env_var(\"{env_var}\"))")
+        cmd = f"{pre_cmd}; python -c '{python_code}'"
+        _LOG.debug("cmd=%s", cmd)
+        hsinte.system(cmd, suppress_output=False)
 
 
 # #############################################################################
