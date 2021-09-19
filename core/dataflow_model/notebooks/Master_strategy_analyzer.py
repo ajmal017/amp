@@ -18,6 +18,8 @@
 # %% [markdown]
 # - Initialize with returns, alpha, and spread
 # - Evaluate portfolios generated from the alpha
+#
+# - TODO(gp): This should be called `Master_strategy_evaluator` like the class
 
 # %% [markdown]
 # # Imports
@@ -48,12 +50,13 @@ hprint.config_notebook()
 # # Notebook config
 
 # %%
-# config = cconfig.Config.from_env_var("AM_CONFIG_CODE")
-config = None
+# Read from env var.
+eval_config = cconfig.Config.from_env_var("AM_CONFIG_CODE")
 
 if config is None:
     experiment_dir = ""
     aws_profile = None
+    selected_idxs = None
 
     eval_config = cconfig.get_config_from_nested_dict(
         {
@@ -61,13 +64,14 @@ if config is None:
                 "src_dir": experiment_dir,
                 "file_name": "result_bundle.v2_0.pkl",
                 "experiment_type": "ins_oos",
-                "selected_idxs": None,
+                "selected_idxs": selected_idxs,
                 "aws_profile": aws_profile,
             },
             "strategy_evaluator_kwargs": {
                 "returns_col": "mid_ret_0",
                 "position_intent_col": "position_intent_1",
                 "spread_col": "spread",
+                "abort_on_error": True,
             },
             "bh_adj_threshold": 0.1,
             "resample_rule": "W",
@@ -77,24 +81,10 @@ if config is None:
 print(str(eval_config))
 
 # %%
-load_config = eval_config["load_experiment_kwargs"].to_dict()
-
-# Load only the columns needed by the StrategyEvaluator.
-load_config["load_rb_kwargs"] = {
-    "columns": [
-        eval_config["strategy_evaluator_kwargs"]["returns_col"],
-        eval_config["strategy_evaluator_kwargs"]["position_intent_col"],
-        eval_config["strategy_evaluator_kwargs"]["spread_col"],
-    ]
-}
-result_bundle_dict = cdmu.load_experiment_artifacts(**load_config)
-
-# Build the StrategyEvaluator.
-evaluator = modeval.StrategyEvaluator.from_result_bundle_dict(
-    result_bundle_dict,
-    # abort_on_error=False,
-    abort_on_error=True,
-    **eval_config["strategy_evaluator_kwargs"].to_dict(),
-)
+# Build the ModelEvaluator from the eval config.
+evaluator = modeval.StrategyEvaluator.from_eval_config(eval_config)
 
 # %%
+# TODO(gp): Finish this.
+keys = None
+evaluator.compute_stats()

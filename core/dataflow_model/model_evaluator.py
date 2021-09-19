@@ -133,6 +133,26 @@ class StrategyEvaluator:
         )
         return evaluator
 
+
+    @classmethod
+    def from_eval_config(cls, eval_config: cconfig.Config) -> "StrategyEvaluator":
+        load_config = eval_config["load_experiment_kwargs"].to_dict()
+        # Load only the columns needed by the StrategyEvaluator.
+        load_config["load_rb_kwargs"] = {
+            "columns": [
+                eval_config["strategy_evaluator_kwargs"]["returns_col"],
+                eval_config["strategy_evaluator_kwargs"]["position_intent_col"],
+                eval_config["strategy_evaluator_kwargs"]["spread_col"],
+            ]
+        }
+        result_bundle_dict = cdmu.load_experiment_artifacts(**load_config)
+        # Build the StrategyEvaluator.
+        evaluator = modeval.StrategyEvaluator.from_result_bundle_dict(
+            result_bundle_dict,
+            **eval_config["strategy_evaluator_kwargs"].to_dict(),
+        )
+        return evaluator
+
     def compute_pnl(
         self,
         keys: Optional[List[Key]] = None,

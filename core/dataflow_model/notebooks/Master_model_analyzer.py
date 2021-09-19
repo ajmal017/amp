@@ -17,6 +17,8 @@
 #
 # - Initialize with returns, predictions, target volatility, and oos start date
 # - Evaluate portfolios generated from the predictions
+#
+# - TODO(gp): This should be called `Master_model_evaluator` like the class
 
 # %% [markdown]
 # # Imports
@@ -51,23 +53,17 @@ hprint.config_notebook()
 # Read from env var.
 eval_config = cconfig.Config.from_env_var("AM_CONFIG_CODE")
 
-# Set a config manually.
-if False:
-    eval_config = "Config([('load_experiment_kwargs', Config([('src_dir', '/app/dataflow_lemonade/RH1E/test/Test_RH1E_ProdModels.test_end_to_end_slow1/tmp.scratch/run_model/oos_experiment.RH1E.kibot_v1-top1.5T'), ('file_name', 'result_bundle.v2_0.pkl'), ('experiment_type', 'ins_oos'), ('selected_idxs', None), ('aws_profile', None)])), ('model_evaluator_kwargs', Config([('predictions_col', 'ret_0_vol_adj_2'), ('target_col', 'ret_0_vol_adj_2_hat'), ('oos_start', None), ('abort_on_error', True)])), ('bh_adj_threshold', 0.1), ('resample_rule', 'W'), ('mode', 'ins'), ('target_volatility', 0.1)])"
-    eval_config = cconfig.Config.from_python(eval_config)
-
 # Override config.
 if eval_config is None:
-    # exp_dir = "s3://eglp-spm-sasm/experiments/experiment.RH2Ef.v1_9-all.5T.20210831-004747.run1.tgz"
-    # exp_dir = "/app/oos_experiment.RH2Eg.v2_0-top10.5T.run1_test"
-    exp_dir = "/app/oos_experiment.RH2Eg.v2_0-top100.5T.run1_test"
+    # experiment_dir = "s3://eglp-spm-sasm/experiments/experiment.RH2Ef.v1_9-all.5T.20210831-004747.run1.tgz"
+    experiment_dir = "/app/oos_experiment.RH2Eg.v2_0-top100.5T.run1_test"
     aws_profile = None
     selected_idxs = None
 
     eval_config = cconfig.get_config_from_nested_dict(
         {
             "load_experiment_kwargs": {
-                "src_dir": exp_dir,
+                "src_dir": experiment_dir,
                 "file_name": "result_bundle.v2_0.pkl",
                 "experiment_type": "ins_oos",
                 "selected_idxs": selected_idxs,
@@ -132,6 +128,7 @@ print("model not selected=%s" % not_selected)
 # Use `selected = None` to show all the models.
 
 # %%
+#selected = None
 plotter.plot_multiple_pnls(
     keys=selected,
     resample_rule=eval_config["resample_rule"],
