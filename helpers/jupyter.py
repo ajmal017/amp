@@ -43,7 +43,7 @@ def run_notebook(
     else:
         raise ValueError(f"Unsupported file format for `file_name`='{file_name}'")
     # Execute notebook.
-    cmd.append("cd %s && " % scratch_dir)
+    cmd.append("cd %s &&" % scratch_dir)
     cmd.append("jupyter nbconvert %s" % notebook_name)
     cmd.append("--execute")
     cmd.append("--to html")

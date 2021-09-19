@@ -48,14 +48,16 @@ hprint.config_notebook()
 # # Notebook config
 
 # %%
+# Read from env var.
 eval_config = cconfig.Config.from_env_var("AM_CONFIG_CODE")
-#eval_config = None
 
-eval_config = "Config([('load_experiment_kwargs', Config([('src_dir', '/app/dataflow_lemonade/RH1E/test/Test_RH1E_ProdModels.test_end_to_end_slow1/tmp.scratch/run_model/oos_experiment.RH1E.kibot_v1-top1.5T'), ('file_name', 'result_bundle.v2_0.pkl'), ('experiment_type', 'ins_oos'), ('selected_idxs', None), ('aws_profile', None)])), ('model_evaluator_kwargs', Config([('predictions_col', 'mid_ret_0_vol_adj_clipped_2_hat'), ('target_col', 'mid_ret_0_vol_adj_clipped_2')])), ('bh_adj_threshold', 0.1), ('resample_rule', 'W'),     ('mode', 'ins'), ('target_volatility', 0.1)])"
-eval_config = cconfig.Config.from_python(eval_config)
+# Set a config manually.
+if False:
+    eval_config = "Config([('load_experiment_kwargs', Config([('src_dir', '/app/dataflow_lemonade/RH1E/test/Test_RH1E_ProdModels.test_end_to_end_slow1/tmp.scratch/run_model/oos_experiment.RH1E.kibot_v1-top1.5T'), ('file_name', 'result_bundle.v2_0.pkl'), ('experiment_type', 'ins_oos'), ('selected_idxs', None), ('aws_profile', None)])), ('model_evaluator_kwargs', Config([('predictions_col', 'ret_0_vol_adj_2'), ('target_col', 'ret_0_vol_adj_2_hat'), ('oos_start', None), ('abort_on_error', True)])), ('bh_adj_threshold', 0.1), ('resample_rule', 'W'), ('mode', 'ins'), ('target_volatility', 0.1)])"
+    eval_config = cconfig.Config.from_python(eval_config)
 
-
-if False and eval_config is None:
+# Override config.
+if eval_config is None:
     # exp_dir = "s3://eglp-spm-sasm/experiments/experiment.RH2Ef.v1_9-all.5T.20210831-004747.run1.tgz"
     # exp_dir = "/app/oos_experiment.RH2Eg.v2_0-top10.5T.run1_test"
     exp_dir = "/app/oos_experiment.RH2Eg.v2_0-top100.5T.run1_test"
@@ -76,6 +78,7 @@ if False and eval_config is None:
                 "target_col": "mid_ret_0_vol_adj_clipped_2",
                 # "oos_start": "2017-01-01",
                 "oos_start": None,
+                "abort_on_error": True,
             },
             "bh_adj_threshold": 0.1,
             "resample_rule": "W",
@@ -90,25 +93,9 @@ print(str(eval_config))
 # # Initialize ModelEvaluator and ModelPlotter
 
 # %%
+# Build the ModelEvaluator from the eval config.
 evaluator = modeval.ModelEvaluator.from_eval_config(eval_config)
-# load_config = eval_config["load_experiment_kwargs"].to_dict()
 
-# # Load only the columns needed by the ModelEvaluator.
-# load_config["load_rb_kwargs"] = {
-#     "columns": [
-#         eval_config["model_evaluator_kwargs"]["target_col"],
-#         eval_config["model_evaluator_kwargs"]["predictions_col"],
-#     ]
-# }
-# result_bundle_dict = cdmu.load_experiment_artifacts(**load_config)
-
-# # Build the ModelEvaluator.
-# evaluator = modeval.ModelEvaluator.from_result_bundle_dict(
-#     result_bundle_dict,
-#     # abort_on_error=False,
-#     abort_on_error=True,
-#     **eval_config["model_evaluator_kwargs"].to_dict(),
-# )
 # Build the ModelPlotter.
 plotter = modplot.ModelPlotter(evaluator)
 
@@ -224,20 +211,19 @@ plotter.plot_rets_and_vol(
 )
 
 # %%
-assert 0
+if False:
+    plotter.plot_positions(
+        keys=selected,
+        mode=eval_config["mode"],
+        target_volatility=eval_config["target_volatility"],
+    )
 
 # %%
-plotter.plot_positions(
-    keys=selected,
-    mode=eval_config["mode"],
-    target_volatility=eval_config["target_volatility"],
-)
-
-# %%
-# Plot the returns and prediction for one or more models.
-model_key = selected[:1]
-plotter.plot_returns_and_predictions(
-    keys=model_key,
-    resample_rule=eval_config["resample_rule"],
-    mode=eval_config["mode"],
-)
+if False:
+    # Plot the returns and prediction for one or more models.
+    model_key = selected[:1]
+    plotter.plot_returns_and_predictions(
+        keys=model_key,
+        resample_rule=eval_config["resample_rule"],
+        mode=eval_config["mode"],
+    )
