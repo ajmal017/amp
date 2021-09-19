@@ -87,4 +87,4 @@ evaluator = modeval.StrategyEvaluator.from_eval_config(eval_config)
 # %%
 # TODO(gp): Finish this.
 keys = None
-evaluator.compute_stats()
+evaluator.compute_stats(keys)

@@ -75,9 +75,11 @@ def run_prod_model_flow(config_builder: str,
         #
         hjupyter.run_notebook(file_name, run_notebook_dir_tmp, pre_cmd=pre_cmd)
     # 3) Freeze statistics from the `ModelEvaluator` flow.
+    # TODO(gp): We might want to store the aggregate PnL since it's more stable
+    #  and more meaningful.
     evaluator = modeval.ModelEvaluator.from_eval_config(model_eval_config)
     pnl_stats = evaluator.calculate_stats(
-        mode=eval_config["mode"], target_volatility=eval_config["target_volatility"]
+        mode=model_eval_config["mode"], target_volatility=model_eval_config["target_volatility"]
     )
     actual_outcome.append(p)
     actual_outcome.append(hut.convert_df_to_string(pnl_stats, index=True))
