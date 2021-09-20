@@ -1179,6 +1179,17 @@ class TestCase(unittest.TestCase):
         )
         return is_equal
 
+    def assert_dfs_close(self, actual: pd.DataFrame, expected: pd.DataFrame) -> None:
+        """
+        Assert dfs have same indexes and columns and that all values are close.
+
+        This is a more robust alternative to `compare_df()`. In particular, it is
+        less sensitive to floating point round-off errors.
+        """
+        self.assertEqual(actual.index.to_list(), expected.index.to_list())
+        self.assertEqual(actual.columns.to_list(), expected.columns.to_list())
+        np.testing.assert_allclose(actual, expected)
+
     # TODO(gp): There is a lot of similarity between `check_string()` and
     #  `check_df_string()` that can be factored out if we extract the code that
     #  reads and saves the golden file.
