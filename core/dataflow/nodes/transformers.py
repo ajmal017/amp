@@ -298,8 +298,13 @@ class GroupedColDfToDfTransformer(cdnb.Transformer):
             same.
         :param transformer_func: df -> {df, srs}
         :param transformer_kwargs: transformer_func kwargs
-        :param drop_nans:
-        :param reindex_like_input:
+        :param drop_nans: apply `dropna()` after grouping and extracting
+            `in_col_groups` columns
+        :param reindex_like_input: reindex result of `transformer_func` like
+            the input dataframe
+        join_output_with_input: whether to join the output with the input. A
+            common case where this should typically be set to `False` is in
+            resampling.
         join_output_with_input: whether to join the output with the input. A
             common case where this should typically be set to `False` is in
             resampling.
@@ -389,8 +394,13 @@ class SeriesToDfTransformer(cdnb.Transformer):
             same.
         :param transformer_func: srs -> srs
         :param transformer_kwargs: transformer_func kwargs
-        :param nan_mode: `leave_unchanged` or `drop`. If `drop`, applies to
-            columns individually.
+        :param drop_nans: apply `dropna()` after grouping and extracting
+            `in_col_groups` columns
+        :param reindex_like_input: reindex result of `transformer_func` like
+            the input dataframe
+        join_output_with_input: whether to join the output with the input. A
+            common case where this should typically be set to `False` is in
+            resampling.
         """
         super().__init__(nid)
         dbg.dassert_isinstance(in_col_group, tuple)
@@ -504,6 +514,11 @@ class SeriesToSeriesTransformer(cdnb.Transformer):
             same.
         :param transformer_func: srs -> srs
         :param transformer_kwargs: transformer_func kwargs
+        :param drop_nans: apply `dropna()` after grouping and extracting
+            `in_col_groups` columns
+        :param reindex_like_input: reindex result of `transformer_func` like
+            the input series
+        join_output_with_input: whether to join the output with the input
         """
         super().__init__(nid)
         dbg.dassert_isinstance(in_col_group, tuple)
@@ -595,8 +610,9 @@ def _apply_func_to_data(
     return result, info
 
 
+# TODO(Paul): Consider deprecating.
 def _apply_func_to_series(
-    data: Union[pd.Series, pd.DataFrame],
+    srs: pd.Series,
     nan_mode: str,
     func: Callable,
     func_kwargs: Dict[str, Any],
@@ -610,27 +626,16 @@ def _apply_func_to_series(
     TODO(*): We should consider only having `nan_mode` as one of the
     `func_kwargs`, since now many functions support it directly.
     """
+    drop_nans = False
+    reindex_like_input = True
     if nan_mode == "leave_unchanged":
         pass
     elif nan_mode == "drop":
-        data = data.dropna()
+        drop_nans = True
     else:
         raise ValueError(f"Unrecognized `nan_mode` {nan_mode}")
-    info: Optional[collections.OrderedDict] = collections.OrderedDict()
-    # Perform the column transformation operations.
-    # Introspect to see whether `_transformer_func` contains an `info`
-    # parameter. If so, inject an empty dict to be populated when
-    # `_transformer_func` is executed.
-    func_sig = inspect.signature(func)
-    if "info" in func_sig.parameters:
-        result = func(
-            data,
-            info=info,
-            **func_kwargs,
-        )
-    else:
-        result = func(data, **func_kwargs)
-        info = None
+    dbg.dassert_isinstance(srs, pd.Series)
+    result, info = _apply_func_to_data(srs, func, func_kwargs, drop_nans, reindex_like_input)
     return result, info
 
 
