@@ -181,7 +181,6 @@ class StrategyEvaluator:
                 .squeeze()
                 .rename("spread_cost_0")
             )
-            )
             df["spread_cost_0"] = spread_cost
             df["ex_cost_pnl_0"] = pnl - spread_cost
             pnl_dict[key] = df
