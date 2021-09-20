@@ -1,7 +1,6 @@
 import abc
 import collections
 import copy
-import datetime
 import functools
 import logging
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
@@ -83,7 +82,9 @@ class FitPredictNode(cdtfc.Node, abc.ABC):
         return None
 
     # TODO(gp): values -> info
-    def _set_info(self, method: cdtfc.Method, values: collections.OrderedDict) -> None:
+    def _set_info(
+        self, method: cdtfc.Method, values: collections.OrderedDict
+    ) -> None:
         """
         The passed `info` is copied internally.
         """
@@ -821,6 +822,7 @@ class DfStacker:
 
     A use case for this transformation is learning a pooled model.
     """
+
     @staticmethod
     def preprocess(
         dfs: Dict[cdtfu.NodeColumn, pd.DataFrame],
@@ -868,9 +870,7 @@ class DfStacker:
         return out_dfs
 
     @staticmethod
-    def _validate_dfs(
-        dfs: Dict[cdtfu.NodeColumn, pd.DataFrame]
-    ) -> None:
+    def _validate_dfs(dfs: Dict[cdtfu.NodeColumn, pd.DataFrame]) -> None:
         """
         Perform sanity checks on `dfs`.
         """
