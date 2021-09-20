@@ -14,8 +14,10 @@ import numpy as np
 import pandas as pd
 from tqdm.auto import tqdm
 
+import core.config as cconfig
 import core.dataflow as cdataf
 import core.dataflow_model.stats_computer as cstats
+import core.dataflow_model.utils as cdmu
 import core.finance as fin
 import core.signal_processing as sigp
 import core.statistics as stats
@@ -155,6 +157,25 @@ class StrategyEvaluator:
         )
         return evaluator
 
+    @classmethod
+    def from_eval_config(cls, eval_config: cconfig.Config) -> "StrategyEvaluator":
+        load_config = eval_config["load_experiment_kwargs"].to_dict()
+        # Load only the columns needed by the StrategyEvaluator.
+        load_config["load_rb_kwargs"] = {
+            "columns": [
+                eval_config["strategy_evaluator_kwargs"]["returns_col"],
+                eval_config["strategy_evaluator_kwargs"]["position_intent_col"],
+                eval_config["strategy_evaluator_kwargs"]["spread_col"],
+            ]
+        }
+        result_bundle_dict = cdmu.load_experiment_artifacts(**load_config)
+        # Build the StrategyEvaluator.
+        evaluator = StrategyEvaluator.from_result_bundle_dict(
+            result_bundle_dict,
+            **eval_config["strategy_evaluator_kwargs"].to_dict(),
+        )
+        return evaluator
+
     # TODO(gp): Maybe we should separate the pivoting logic in a different function
     #  to avoid to complicate the types.
     def compute_pnl(
@@ -239,8 +260,14 @@ class StrategyEvaluator:
             pass
         elif key_type == "attribute":
             pnl_dict_pivoted = {}
-            for attribute in ["ret_0", "position_intent_1", "spread_0",
-                              "spread_cost_0", "pnl_0", "ex_cost_pnl_0"]:
+            for attribute in [
+                "ret_0",
+                "position_intent_1",
+                "spread_0",
+                "spread_cost_0",
+                "pnl_0",
+                "ex_cost_pnl_0",
+            ]:
                 data = []
                 for key in pnl_dict.keys():
                     data.append(pnl_dict[key][attribute].rename(key))
@@ -369,7 +396,8 @@ class ModelEvaluator:
         abort_on_error: bool = True,
     ) -> ModelEvaluator:
         """
-        Initialize a `ModelEvaluator` from a dictionary `key` -> `ResultBundle`.
+        Initialize a `ModelEvaluator` from a dictionary `key` ->
+        `ResultBundle`.
 
         :param result_bundle_dict: mapping from key to `ResultBundle`
         :param *: as in `ModelEvaluator` constructor
@@ -418,6 +446,30 @@ class ModelEvaluator:
         _LOG.info(
             "After building ModelEvaluator: memory_usage=%s",
             dbg.get_memory_usage_as_str(None),
+        )
+        return evaluator
+
+    @classmethod
+    def from_eval_config(
+        cls,
+        eval_config: cconfig.Config,
+    ) -> ModelEvaluator:
+        """
+        Initialize a `ModelEvaluator` from an eval config.
+        """
+        load_config = eval_config["load_experiment_kwargs"].to_dict()
+        # Load only the columns needed by the ModelEvaluator.
+        load_config["load_rb_kwargs"] = {
+            "columns": [
+                eval_config["model_evaluator_kwargs"]["target_col"],
+                eval_config["model_evaluator_kwargs"]["predictions_col"],
+            ]
+        }
+        result_bundle_dict = cdmu.load_experiment_artifacts(**load_config)
+        # Build the ModelEvaluator.
+        evaluator = ModelEvaluator.from_result_bundle_dict(
+            result_bundle_dict,
+            **eval_config["model_evaluator_kwargs"].to_dict(),
         )
         return evaluator
 

@@ -48,13 +48,12 @@ hprint.config_notebook()
 # # Notebook config
 
 # %%
-# config = cconfig.Config.from_env_var("AM_CONFIG_CODE")
-config = None
+# Read from env var.
+eval_config = cconfig.Config.from_env_var("AM_CONFIG_CODE")
 
-if config is None:
-    experiment_dir = "/cache/experiments/oos_experiment.RH2Eg.v2_0-all.5T.run2.hacked"
+if eval_config is None:
+    experiment_dir = ""
     aws_profile = None
-    #selected_idxs = range(200)
     selected_idxs = None
 
     eval_config = cconfig.get_config_from_nested_dict(
@@ -70,6 +69,7 @@ if config is None:
                 "returns_col": "mid_ret_0",
                 "position_intent_col": "position_intent_1",
                 "spread_col": "spread",
+                "abort_on_error": True,
             },
             "bh_adj_threshold": 0.1,
             "resample_rule": "W",
@@ -82,25 +82,8 @@ print(str(eval_config))
 result_bundle_dict[0]
 
 # %%
-load_config = eval_config["load_experiment_kwargs"].to_dict()
-
-# Load only the columns needed by the StrategyEvaluator.
-load_config["load_rb_kwargs"] = {
-    "columns": [
-        eval_config["strategy_evaluator_kwargs"]["returns_col"],
-        eval_config["strategy_evaluator_kwargs"]["position_intent_col"],
-        eval_config["strategy_evaluator_kwargs"]["spread_col"],
-    ]
-}
-result_bundle_dict = cdmu.load_experiment_artifacts(**load_config)
-
-# Build the StrategyEvaluator.
-evaluator = modeval.StrategyEvaluator.from_result_bundle_dict(
-    result_bundle_dict,
-    # abort_on_error=False,
-    abort_on_error=True,
-    **eval_config["strategy_evaluator_kwargs"].to_dict(),
-)
+# Build the ModelEvaluator from the eval config.
+evaluator = modeval.StrategyEvaluator.from_eval_config(eval_config)
 
 # %%
 if False:
@@ -154,8 +137,8 @@ def _compute_pnl_dict(spread_fraction_paid):
     #result = evaluator.compute_pnl(key_type="attribute", keys=keys)
     pnl_dict = evaluator.compute_pnl(spread_fraction_paid, keys=keys, key_type="instrument")
     return pnl_dict
-    
-    
+
+
 def _get_pnl_df(pnl_dict):
     dfs = []
     for key in list(pnl_dict.keys()):
@@ -185,7 +168,7 @@ for sfp in [-0.05, -0.03, -0.01, 0.0, 0.01, 0.02, 0.03]:
     #aggr_df.plot()
     aggr_df.name = sfp
     final_df.append(aggr_df)
-    
+
     print(dbg.get_memory_usage_as_str(None))
 
 # %%
@@ -197,7 +180,7 @@ final_df2.plot()
 # %%
 def sr(srs):
     return srs.mean() / srs.std() * np.sqrt(252)
-    
+
 print("ins", sr(final_df2[:"2017-01-01"].diff()))
 print("oos", sr(final_df2["2017-01-01":].diff()))
 
@@ -218,7 +201,7 @@ for sfp in sfp_paul:
     key = keys[0]
     srs = pnl_dict[key]["pnl_0"] - pnl_dict[key]["spread_cost_0"]
     srs.name = sfp
-    
+
     final_df.append(srs)
 
 final_df = pd.concat(final_df, axis=1)
@@ -263,7 +246,7 @@ import numpy as np
 
 def sr(srs):
     return srs.mean() / srs.std() * np.sqrt(252)
-    
+
 print("ins", sr(aggr_pnl[:"2017-01-01"].diff()))
 print("oos", sr(aggr_pnl["2017-01-01":].diff()))
 

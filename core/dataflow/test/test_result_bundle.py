@@ -64,11 +64,11 @@ class TestResultBundle(hut.TestCase):
         # Check.
         expected = """
         # Dir structure
-        /app/amp/core/dataflow/test/TestResultBundle.test_pickle1/tmp.scratch
-        /app/amp/core/dataflow/test/TestResultBundle.test_pickle1/tmp.scratch/result_bundle.v1_0.pkl
+        $GIT_ROOT/core/dataflow/test/TestResultBundle.test_pickle1/tmp.scratch
+        $GIT_ROOT/core/dataflow/test/TestResultBundle.test_pickle1/tmp.scratch/result_bundle.v1_0.pkl
         """
         expected = hprint.dedent(expected)
-        self.assert_equal(str(actual), str(expected))
+        self.assert_equal(str(actual), str(expected), purify_text=True)
 
     def test_get_tags_for_column1(self) -> None:
         rb = self._get_result_bundle()
