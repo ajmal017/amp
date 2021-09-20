@@ -1,9 +1,9 @@
 import io
 import logging
-import pytest
 
 import numpy as np
 import pandas as pd
+import pytest
 
 import core.artificial_signal_generators as casgen
 import core.config as cconfig
