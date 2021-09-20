@@ -17,8 +17,6 @@ import helpers.printing as prnt
 import helpers.system_interaction as hsinte
 import helpers.unit_test as hut
 
-# import research.RH1E.RH1E_pipeline as RH1Ep
-
 _LOG = logging.getLogger(__name__)
 
 
@@ -136,12 +134,11 @@ def _run_model(
     cmd = []
     cmd.append(exec_filename)
     # Experiment builder.
-    # experiment_builder = "amp.core.dataflow_model.master_experiment.run_experiment"
+    # E.g., "amp.core.dataflow_model.master_experiment.run_experiment"
     cmd.append(f"--experiment_builder {experiment_builder}")
     # Config builder.
-    # builder = f'build_oos_model_configs("{bm_config}")'
+    # E.g.,
     # builder = f'build_model_configs("{bm_config}", 1)'
-    # config_builder = f'research.RH1E.RH1E_configs.{builder}'
     # config_builder = f'dataflow_lemonade.RH1E.RH1E_configs.{builder}'
     cmd.append(f"--config_builder '{config_builder}'")
     #
