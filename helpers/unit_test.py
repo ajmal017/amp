@@ -1185,8 +1185,8 @@ class TestCase(unittest.TestCase):
         """
         Assert dfs have same indexes and columns and that all values are close.
 
-        This is a more robust alternative to `compare_df()`. In particular, it is
-        less sensitive to floating point round-off errors.
+        This is a more robust alternative to `compare_df()`. In particular, it
+        is less sensitive to floating point round-off errors.
         """
         self.assertEqual(actual.index.to_list(), expected.index.to_list())
         self.assertEqual(actual.columns.to_list(), expected.columns.to_list())
