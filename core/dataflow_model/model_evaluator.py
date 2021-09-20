@@ -36,16 +36,6 @@ _LOG = logging.getLogger(__name__)
 Key = int
 
 
-import datetime
-
-def _trim_df_trading_hours(df) -> pd.DataFrame:
-    df_time = df.index.time
-    mask = (df_time >= datetime.time(9, 25)) & (df_time <= datetime.time(16, 0))
-    _LOG.debug(mask.sum() / len(mask))
-    dbg.dassert_eq(len(df[~mask].dropna()), 0)
-    return df[mask]
-
-
 class StrategyEvaluator:
     """
     Evaluate the performance of a strategy driven by an alpha.
@@ -66,9 +56,8 @@ class StrategyEvaluator:
         """
         Constructor.
 
-        We assume that the passed time series are aligned, in the sense that they
-        are shifted so that the `pnl = position_intent * returns_col`. In our
-        nomenclature they correspond to `position_intent_1` and `ret_0`.
+        The passed time series need to have a proper alignment.
+        TODO(gp): Check with Paul and specify this clearly.
 
         :param data: same meaning as in `ModelEvaluator`
         :param position_intent_col: column storing the position intent for the
@@ -133,7 +122,6 @@ class StrategyEvaluator:
                 df_tmp = df[
                     [position_intent_col, returns_col, spread_col]
                 ]
-                #df_tmp = _trim_df_trading_hours(df_tmp)
                 data_dict[key] = df_tmp
             except Exception as e:
                 _LOG.error(
@@ -192,14 +180,14 @@ class StrategyEvaluator:
         :param key_type: how to index the output data structure (e.g., by instrument
             or by attribute)
         """
-        # TODO(gp): Avoid to recompute
+        # TODO(gp): Add some logic to cache this data and not recompute.
         _LOG.info(
             "Before StrategyEvaluator.compute_pnl: memory_usage=%s",
             dbg.get_memory_usage_as_str(None),
         )
         keys = keys or self.valid_keys
         dbg.dassert_is_subset(keys, self.valid_keys)
-        # Build the
+        # Build the dict from experiment key to dataframe.
         pnl_dict: Dict[Union[Key, str], pd.DataFrame] = {}
         for key in tqdm(keys):
             _LOG.debug("Process key=%s", key)
@@ -245,16 +233,10 @@ class StrategyEvaluator:
             )
             # Add the info.
             df["spread_cost_0"] = spread_cost
-            #df["ex_cost_pnl_0"] = pnl - spread_cost
+            # TODO(gp): This is simple enough that we should recompute it from
+            # the columns, to avoid using memory.
+            df["ex_cost_pnl_0"] = pnl - spread_cost
             pnl_dict[key] = df
-            #_LOG.info(
-            #    "StrategyEvaluator.compute_pnl: memory_usage=%s",
-            #    dbg.get_memory_usage_as_str(None),
-            #)
-            #print(df)
-            #mem = df.memory_usage().sum()
-            #print(mem)
-            #assert 0
         # Organize the resulting output.
         if key_type == "instrument":
             pass

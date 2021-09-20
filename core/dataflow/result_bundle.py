@@ -6,6 +6,7 @@ import core.dataflow.result_bundle as cdtfrb
 import abc
 import collections
 import copy
+import datetime
 import logging
 from typing import Any, Dict, List, Optional, Set, Tuple, cast
 
@@ -22,14 +23,6 @@ import helpers.timer as htimer
 
 _LOG = logging.getLogger(__name__)
 
-import datetime
-
-def _trim_df_trading_hours(df) -> pd.DataFrame:
-    df_time = df.index.time
-    mask = (df_time >= datetime.time(9, 25)) & (df_time <= datetime.time(16, 0))
-    _LOG.debug(mask.sum() / len(mask))
-    dbg.dassert_eq(len(df[~mask].dropna()), 0)
-    return df[mask]
 
 # #############################################################################
 # ResultBundle
@@ -485,3 +478,20 @@ class PredictionResultBundle(ResultBundle):
             tag,
         )
         return selected_cols_for_tag[0]
+
+
+# #############################################################################
+
+
+# TODO(gp): This is probably more general than here. Probably we want to trim
+#  the data also inside the pipeline.
+def _trim_df_trading_hours(df) -> pd.DataFrame:
+    """
+    Remove data outside trading hours.
+    """
+    df_time = df.index.time
+    # TODO(gp): We should extend this to handle the overnight return.
+    mask = (df_time >= datetime.time(9, 30)) & (df_time <= datetime.time(16, 0))
+    _LOG.debug(mask.sum() / len(mask))
+    dbg.dassert_eq(len(df[~mask].dropna()), 0)
+    return df[mask]
