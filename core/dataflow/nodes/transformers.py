@@ -358,7 +358,6 @@ class GroupedColDfToDfTransformer(cdnb.Transformer):
             out_dfs, self._out_col_group
         )
         if self._join_output_with_input:
-            df = df.reindex(df_in.index)
             df = cdtfu.merge_dataframes(df_in, df)
         info["df_transformed_info"] = cdtfu.get_df_info_as_string(df)
         return df, info
@@ -448,7 +447,6 @@ class SeriesToDfTransformer(cdnb.Transformer):
         # single dataframe.
         df = cdnb.SeriesToDfColProcessor.postprocess(dfs, self._out_col_group)
         if self._join_output_with_input:
-            df = df.reindex(df_in.index)
             df = cdtfu.merge_dataframes(df_in, df)
         info["df_transformed_info"] = cdtfu.get_df_info_as_string(df)
         return df, info
@@ -564,7 +562,6 @@ class SeriesToSeriesTransformer(cdnb.Transformer):
             )
             dbg.dassert_isinstance(srs, pd.Series)
             srs.name = col
-            srs = srs.reindex(index=df.index)
             if col_info is not None:
                 func_info[col] = col_info
             srs_list.append(srs)
