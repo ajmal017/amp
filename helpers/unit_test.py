@@ -1179,7 +1179,9 @@ class TestCase(unittest.TestCase):
         )
         return is_equal
 
-    def assert_dfs_close(self, actual: pd.DataFrame, expected: pd.DataFrame) -> None:
+    def assert_dfs_close(
+        self, actual: pd.DataFrame, expected: pd.DataFrame
+    ) -> None:
         """
         Assert dfs have same indexes and columns and that all values are close.
 
