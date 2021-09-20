@@ -310,7 +310,8 @@ class ResultBundle(abc.ABC):
             #     "index.freq": result_df.index.freq
             # }
             obj.result_df.index.freq = metadata_df.pop("index.freq")
-            obj.result_df = _trim_df_trading_hours(obj.result_df)
+            # TODO(gp): See AmpTask1732 about disabling this.
+            #obj.result_df = _trim_df_trading_hours(obj.result_df)
             dbg.dassert(
                 not metadata_df, "metadata_df='%s' is not empty", str(metadata_df)
             )
