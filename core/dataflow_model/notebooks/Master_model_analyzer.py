@@ -32,7 +32,6 @@ import logging
 import core.config as cconfig
 import core.dataflow_model.model_evaluator as modeval
 import core.dataflow_model.model_plotter as modplot
-import core.dataflow_model.utils as cdmu
 import helpers.dbg as dbg
 import helpers.printing as hprint
 
@@ -128,7 +127,7 @@ print("model not selected=%s" % not_selected)
 # Use `selected = None` to show all the models.
 
 # %%
-#selected = None
+# selected = None
 plotter.plot_multiple_pnls(
     keys=selected,
     resample_rule=eval_config["resample_rule"],

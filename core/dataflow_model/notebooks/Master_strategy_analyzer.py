@@ -53,7 +53,7 @@ hprint.config_notebook()
 # Read from env var.
 eval_config = cconfig.Config.from_env_var("AM_CONFIG_CODE")
 
-if config is None:
+if eval_config is None:
     experiment_dir = ""
     aws_profile = None
     selected_idxs = None

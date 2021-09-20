@@ -75,7 +75,7 @@ def run_prod_model_flow(
         mode=model_eval_config["mode"],
         target_volatility=model_eval_config["target_volatility"],
     )
-    actual_outcome.append(prnt.frame("ModelEvaluator stats")
+    actual_outcome.append(prnt.frame("ModelEvaluator stats"))
     actual_outcome.append(hut.convert_df_to_string(pnl_stats, index=True))
     # 4) Run the StrategyEvaluator notebook.
     if strategy_eval_config is not None:
@@ -127,12 +127,14 @@ def _run_model(
     opts.append(extra_opts)
     opts = " ".join(opts)
     #
-    exec = git.get_client_root(super_module=False)
-    exec = os.path.join(exec, "amp/core/dataflow_model/run_experiment.py")
-    dbg.dassert_exists(exec)
+    exec_filename = git.get_client_root(super_module=False)
+    exec_filename = os.path.join(
+        exec_filename, "amp/core/dataflow_model/run_experiment.py"
+    )
+    dbg.dassert_exists(exec_filename)
     #
     cmd = []
-    cmd.append(exec)
+    cmd.append(exec_filename)
     # Experiment builder.
     # experiment_builder = "amp.core.dataflow_model.master_experiment.run_experiment"
     cmd.append(f"--experiment_builder {experiment_builder}")
