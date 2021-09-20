@@ -12,6 +12,7 @@ import pytest
 import core.artificial_signal_generators as cartif
 import core.signal_processing as csigna
 import helpers.git as git
+import helpers.jupyter as hjupyter
 import helpers.printing as hprint
 import helpers.unit_test as hut
 
@@ -663,7 +664,7 @@ class Test_extract_smooth_moving_average_weights(hut.TestCase):
 
     def test2(self) -> None:
         """
-         Like `test1()`, but with `tau` varied.
+        Like `test1()`, but with `tau` varied.
         """
         df = pd.DataFrame(index=range(0, 20))
         weights = csigna.extract_smooth_moving_average_weights(
@@ -1207,7 +1208,7 @@ class Test_gallery_signal_processing1(hut.TestCase):
             "core/notebooks/gallery_signal_processing.ipynb",
         )
         scratch_dir = self.get_scratch_space()
-        hut.run_notebook(file_name, scratch_dir)
+        hjupyter.run_notebook(file_name, scratch_dir)
 
 
 class TestProcessNonfinite1(hut.TestCase):
