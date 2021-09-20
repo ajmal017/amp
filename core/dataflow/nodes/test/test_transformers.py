@@ -300,7 +300,7 @@ datetime,MN0,MN1,MN0,MN1
         return df
 
 
-class TestSeriesToDfTransformer(hut.TestCase):
+class TestSeriesToDfTransformer1(hut.TestCase):
     def test1(self) -> None:
         def add_lags(srs: pd.Series, num_lags: int) -> pd.DataFrame:
             lags = []
@@ -346,6 +346,157 @@ datetime,MN0,MN1,MN0,MN1
 2016-01-04 09:30:00,94.70,100.20,30000,40000
 2016-01-04 09:31:00,94.90,100.25,35000,44000
 2016-01-04 09:32:00,95.35,100.23,40000,45000
+"""
+        df = pd.read_csv(
+            io.StringIO(txt), index_col=0, parse_dates=True, header=[0, 1]
+        )
+        return df
+
+
+class TestSeriesToDfTransformer2(hut.TestCase):
+    def test_drop_nans(self) -> None:
+        data = self._get_data()
+        config = cconfig.get_config_from_nested_dict(
+            {
+                "in_col_group": ("close",),
+                "out_col_group": (),
+                "transformer_func": self._add_lags,
+                "transformer_kwargs": {
+                    "num_lags": 2,
+                },
+                "drop_nans": True,
+                "join_output_with_input": False,
+            }
+        )
+        node = cdnt.SeriesToDfTransformer("add_lags", **config.to_dict())
+        actual = node.fit(data)["df_out"]
+        expected_txt = """
+,lag_0,lag_0,lag_1,lag_1
+,MN0,MN1,MN0,MN1
+2016-01-04 16:00:00,95.00,96.00,NaN,NaN
+2016-01-04 16:01:00,NaN,NaN,NaN,NaN
+2016-01-05 09:29:00,NaN,NaN,NaN,NaN
+2016-01-05 09:30:00,100.00,NaN,95.00,NaN
+2016-01-05 09:31:00,105.00,98.00,100.00,96.00
+2016-01-05 09:32:00,52.50,49.00,105.00,98.00
+"""
+        expected = pd.read_csv(
+            io.StringIO(expected_txt),
+            index_col=0,
+            parse_dates=True,
+            header=[0, 1],
+        )
+        assert actual.index.to_list() == expected.index.to_list()
+        assert actual.columns.to_list() == expected.columns.to_list()
+        np.testing.assert_allclose(actual, expected)
+
+    def test_drop_nans_then_join(self) -> None:
+        data = self._get_data()
+        config = cconfig.get_config_from_nested_dict(
+            {
+                "in_col_group": ("close",),
+                "out_col_group": (),
+                "transformer_func": self._add_lags,
+                "transformer_kwargs": {
+                    "num_lags": 2,
+                },
+                "drop_nans": True,
+            }
+        )
+        node = cdnt.SeriesToDfTransformer("add_lags", **config.to_dict())
+        actual = node.fit(data)["df_out"]
+        expected_txt = """
+,lag_0,lag_0,lag_1,lag_1,close,close,mid,mid
+,MN0,MN1,MN0,MN1,MN0,MN1,MN0,MN1
+2016-01-04 16:00:00,95.00,96.00,NaN,NaN,95.00,96.00,100.00,98.00
+2016-01-04 16:01:00,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN
+2016-01-05 09:29:00,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN
+2016-01-05 09:30:00,100.00,NaN,95.00,NaN,100.00,NaN,100.00,NaN
+2016-01-05 09:31:00,105.00,98.00,100.00,96.00,105.00,98.00,106.05,97.02
+2016-01-05 09:32:00,52.50,49.00,105.00,98.00,52.50,49.00,53.025,48.51
+"""
+        expected = pd.read_csv(
+            io.StringIO(expected_txt),
+            index_col=0,
+            parse_dates=True,
+            header=[0, 1],
+        )
+        assert actual.index.to_list() == expected.index.to_list()
+        assert actual.columns.to_list() == expected.columns.to_list()
+        np.testing.assert_allclose(actual, expected)
+
+    def test_drop_nans_without_reindexing(self) -> None:
+        data = self._get_data()
+        config = cconfig.get_config_from_nested_dict(
+            {
+                "in_col_group": ("close",),
+                "out_col_group": (),
+                "transformer_func": self._add_lags,
+                "transformer_kwargs": {
+                    "num_lags": 2,
+                },
+                "drop_nans": True,
+                "reindex_like_input": False,
+                "join_output_with_input": False,
+            }
+        )
+        node = cdnt.SeriesToDfTransformer("add_lags", **config.to_dict())
+        actual = node.fit(data)["df_out"]
+        expected_txt = """
+,lag_0,lag_0,lag_1,lag_1
+,MN0,MN1,MN0,MN1
+2016-01-04 16:00:00,95.00,96.00,NaN,NaN
+2016-01-05 09:30:00,100.00,NaN,95.00,NaN
+2016-01-05 09:31:00,105.00,98.00,100.00,96.00
+2016-01-05 09:32:00,52.50,49.00,105.00,98.00
+"""
+        expected = pd.read_csv(
+            io.StringIO(expected_txt),
+            index_col=0,
+            parse_dates=True,
+            header=[0, 1],
+        )
+        assert actual.index.to_list() == expected.index.to_list()
+        assert actual.columns.to_list() == expected.columns.to_list()
+        np.testing.assert_allclose(actual, expected)
+
+    def test_drop_nans_without_reindexing_then_attempt_join(self) -> None:
+        data = self._get_data()
+        config = cconfig.get_config_from_nested_dict(
+            {
+                "in_col_group": ("close",),
+                "out_col_group": (),
+                "transformer_func": self._add_lags,
+                "transformer_kwargs": {
+                    "num_lags": 2,
+                },
+                "drop_nans": True,
+                "reindex_like_input": False,
+                "join_output_with_input": True,
+            }
+        )
+        node = cdnt.SeriesToDfTransformer("add_lags", **config.to_dict())
+        with pytest.raises(AssertionError):
+            node.fit(data)["df_out"]
+
+    @staticmethod
+    def _add_lags(srs: pd.Series, num_lags: int) -> pd.DataFrame:
+        lags = []
+        for lag in range(0, num_lags):
+            lags.append(srs.shift(lag).rename("lag_" + str(lag)))
+        out_df = pd.concat(lags, axis=1)
+        return out_df
+
+    def _get_data(self) -> pd.DataFrame:
+        txt = """
+,close,close,mid,mid
+datetime,MN0,MN1,MN0,MN1
+2016-01-04 16:00:00,95.00,96.00,100,98.00
+2016-01-04 16:01:00,NaN,NaN,NaN,NaN
+2016-01-05 09:29:00,NaN,NaN,NaN,NaN
+2016-01-05 09:30:00,100.00,NaN,100,NaN
+2016-01-05 09:31:00,105.00,98.00,106.05,97.02
+2016-01-05 09:32:00,52.50,49.00,53.025,48.51
 """
         df = pd.read_csv(
             io.StringIO(txt), index_col=0, parse_dates=True, header=[0, 1]
