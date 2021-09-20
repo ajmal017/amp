@@ -133,7 +133,6 @@ class StrategyEvaluator:
         )
         return evaluator
 
-
     @classmethod
     def from_eval_config(cls, eval_config: cconfig.Config) -> "StrategyEvaluator":
         load_config = eval_config["load_experiment_kwargs"].to_dict()
@@ -147,7 +146,7 @@ class StrategyEvaluator:
         }
         result_bundle_dict = cdmu.load_experiment_artifacts(**load_config)
         # Build the StrategyEvaluator.
-        evaluator = modeval.StrategyEvaluator.from_result_bundle_dict(
+        evaluator = StrategyEvaluator.from_result_bundle_dict(
             result_bundle_dict,
             **eval_config["strategy_evaluator_kwargs"].to_dict(),
         )
@@ -160,7 +159,6 @@ class StrategyEvaluator:
         key_type: str = "instrument",
     ) -> Dict[Any, pd.DataFrame]:
         """
-
         Compute pnl from position intents, ret_0, and spread.
         """
         keys = keys or self.valid_keys
@@ -210,8 +208,14 @@ class StrategyEvaluator:
             pass
         if key_type == "attribute":
             pnl_dict_pivoted = {}
-            for attribute in ["ret_0", "position_intent_1", "spread_0",
-                              "spread_cost_0", "pnl_0", "ex_cost_pnl_0"]:
+            for attribute in [
+                "ret_0",
+                "position_intent_1",
+                "spread_0",
+                "spread_cost_0",
+                "pnl_0",
+                "ex_cost_pnl_0",
+            ]:
                 data = []
                 for key in pnl_dict.keys():
                     data.append(pnl_dict[key][attribute].rename(key))

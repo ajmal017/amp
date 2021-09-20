@@ -6,23 +6,9 @@ import core.dataflow_model.run_prod_model_flow as rpmf
 
 import logging
 import os
-from typing import Any, Dict, List, Optional, Tuple, Union
-
-import numpy as np
-import pandas as pd
-from tqdm.auto import tqdm
+from typing import Optional
 
 import core.config as cconfig
-import core.dataflow as cdataf
-import core.dataflow_model.stats_computer as cstats
-import core.dataflow_model.utils as cdmu
-import core.finance as fin
-import core.signal_processing as sigp
-import core.statistics as stats
-import helpers.dbg as dbg
-import helpers.introspection as hintro
-import core.config as cconfig
-import core.dataflow as cdataf
 import core.dataflow_model.model_evaluator as modeval
 import helpers.dbg as dbg
 import helpers.git as git
@@ -30,21 +16,24 @@ import helpers.jupyter as hjupyter
 import helpers.printing as prnt
 import helpers.system_interaction as hsinte
 import helpers.unit_test as hut
-#import research.RH1E.RH1E_pipeline as RH1Ep
-import dataflow_lemonade.RH1E.RH1E_pipeline as RH1Ep
+
+# import research.RH1E.RH1E_pipeline as RH1Ep
 
 _LOG = logging.getLogger(__name__)
 
 
-def run_prod_model_flow(config_builder: str,
-                   experiment_builder: str,
-                    run_model_opts: str,
-                    run_model_dir: str,
-                   model_eval_config: Optional[cconfig.Config],
-                   strategy_eval_config: Optional[cconfig.Config],
-                    run_notebook_dir: str) -> str:
+def run_prod_model_flow(
+    config_builder: str,
+    experiment_builder: str,
+    run_model_opts: str,
+    run_model_dir: str,
+    model_eval_config: Optional[cconfig.Config],
+    strategy_eval_config: Optional[cconfig.Config],
+    run_notebook_dir: str,
+) -> str:
     """
     Run end-to-end flow for a model:
+
     - run model
     - run the analysis flow to make sure that it works
 
@@ -65,9 +54,13 @@ def run_prod_model_flow(config_builder: str,
         _LOG.debug("\n%s", prnt.frame("Run model analyzer notebook", char1="<"))
         amp_dir = git.get_amp_abs_path()
         # TODO(gp): Rename -> Master_model_evaluator
-        file_name = os.path.join(amp_dir, "core/dataflow_model/notebooks/Master_model_analyzer.ipynb")
+        file_name = os.path.join(
+            amp_dir, "core/dataflow_model/notebooks/Master_model_analyzer.ipynb"
+        )
         #
-        run_notebook_dir_tmp = os.path.join(run_notebook_dir, "run_model_analyzer")
+        run_notebook_dir_tmp = os.path.join(
+            run_notebook_dir, "run_model_analyzer"
+        )
         #
         python_code = model_eval_config.to_python(check=True)
         env_var = "AM_CONFIG_CODE"
@@ -79,18 +72,26 @@ def run_prod_model_flow(config_builder: str,
     #  and more meaningful.
     evaluator = modeval.ModelEvaluator.from_eval_config(model_eval_config)
     pnl_stats = evaluator.calculate_stats(
-        mode=model_eval_config["mode"], target_volatility=model_eval_config["target_volatility"]
+        mode=model_eval_config["mode"],
+        target_volatility=model_eval_config["target_volatility"],
     )
-    actual_outcome.append(p)
+    actual_outcome.append(prnt.frame("ModelEvaluator stats")
     actual_outcome.append(hut.convert_df_to_string(pnl_stats, index=True))
     # 4) Run the StrategyEvaluator notebook.
     if strategy_eval_config is not None:
-        _LOG.debug("\n%s", prnt.frame("Run strategy analyzer notebook", char1="<"))
+        _LOG.debug(
+            "\n%s", prnt.frame("Run strategy analyzer notebook", char1="<")
+        )
         amp_dir = git.get_amp_abs_path()
         # TODO(gp): Rename -> Master_strategy_evaluator
-        file_name = os.path.join(amp_dir, "core/dataflow_model/notebooks/Master_strategy_analyzer.ipynb")
+        file_name = os.path.join(
+            amp_dir,
+            "core/dataflow_model/notebooks/Master_strategy_analyzer.ipynb",
+        )
         #
-        run_notebook_dir_tmp = os.path.join(run_notebook_dir, "run_strategy_analyzer")
+        run_notebook_dir_tmp = os.path.join(
+            run_notebook_dir, "run_strategy_analyzer"
+        )
         #
         python_code = strategy_eval_config.to_python(check=True)
         env_var = "AM_CONFIG_CODE"
@@ -103,7 +104,9 @@ def run_prod_model_flow(config_builder: str,
     return actual_outcome
 
 
-def _run_model(config_builder: str, experiment_builder: str, extra_opts: str, dst_dir: str) -> None:
+def _run_model(
+    config_builder: str, experiment_builder: str, extra_opts: str, dst_dir: str
+) -> None:
     # Execute a command line like:
     #   /app/amp/core/dataflow_model/run_experiment.py \
     #       --experiment_builder \
@@ -116,7 +119,7 @@ def _run_model(config_builder: str, experiment_builder: str, extra_opts: str, ds
     #       --num_threads serial
     if os.path.exists(dst_dir):
         _LOG.warning("Dir with experiment already exists: skipping...")
-        return dst_dir
+        return
     #
     opts = []
     opts.append("--clean_dst_dir --no_confirm")
@@ -131,13 +134,13 @@ def _run_model(config_builder: str, experiment_builder: str, extra_opts: str, ds
     cmd = []
     cmd.append(exec)
     # Experiment builder.
-    #experiment_builder = "amp.core.dataflow_model.master_experiment.run_experiment"
+    # experiment_builder = "amp.core.dataflow_model.master_experiment.run_experiment"
     cmd.append(f"--experiment_builder {experiment_builder}")
     # Config builder.
-    #builder = f'build_oos_model_configs("{bm_config}")'
-    #builder = f'build_model_configs("{bm_config}", 1)'
-    #config_builder = f'research.RH1E.RH1E_configs.{builder}'
-    #config_builder = f'dataflow_lemonade.RH1E.RH1E_configs.{builder}'
+    # builder = f'build_oos_model_configs("{bm_config}")'
+    # builder = f'build_model_configs("{bm_config}", 1)'
+    # config_builder = f'research.RH1E.RH1E_configs.{builder}'
+    # config_builder = f'dataflow_lemonade.RH1E.RH1E_configs.{builder}'
     cmd.append(f"--config_builder '{config_builder}'")
     #
     cmd.append(f"--dst_dir {dst_dir}")

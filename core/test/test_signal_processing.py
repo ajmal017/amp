@@ -664,7 +664,7 @@ class Test_extract_smooth_moving_average_weights(hut.TestCase):
 
     def test2(self) -> None:
         """
-         Like `test1()`, but with `tau` varied.
+        Like `test1()`, but with `tau` varied.
         """
         df = pd.DataFrame(index=range(0, 20))
         weights = csigna.extract_smooth_moving_average_weights(

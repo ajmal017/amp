@@ -10,6 +10,7 @@ import helpers.dbg as dbg
 import helpers.io_ as hio
 import helpers.system_interaction as hsinte
 
+
 def run_notebook(
     file_name: str,
     scratch_dir: str,
@@ -24,7 +25,7 @@ def run_notebook(
     :param file_name: path to the notebook to run. If this is a .py file,
         convert to .ipynb first
     :param scratch_dir: temporary dir storing the output
-    :param pre_cmd: 
+    :param pre_cmd:
     """
     file_name = os.path.abspath(file_name)
     dbg.dassert_exists(file_name)

@@ -696,7 +696,6 @@ class Test_subtract_config1(hut.TestCase):
 
 
 class Test_dassert_is_serializable1(hut.TestCase):
-
     def test1(self) -> None:
         """
         Test a config that can be serialized correctly.
@@ -728,7 +727,8 @@ class Test_dassert_is_serializable1(hut.TestCase):
 
     def test2(self) -> None:
         """
-        Test a config that can't be serialized since there is a function pointer.
+        Test a config that can't be serialized since there is a function
+        pointer.
         """
         src_dir = "."
         func = lambda x: x + 1
@@ -761,7 +761,6 @@ class Test_dassert_is_serializable1(hut.TestCase):
 
 
 class Test_from_env_var1(hut.TestCase):
-
     def test1(self) -> None:
         eval_config = cconfig.get_config_from_nested_dict(
             {
@@ -779,8 +778,10 @@ class Test_from_env_var1(hut.TestCase):
         python_code = eval_config.to_python(check=True)
         env_var = "AM_CONFIG_CODE"
         pre_cmd = f'export {env_var}="{python_code}"'
-        python_code = ("import core.config as cconfig; "
-            f"print(cconfig.Config.from_env_var(\"{env_var}\"))")
+        python_code = (
+            "import core.config as cconfig; "
+            f'print(cconfig.Config.from_env_var("{env_var}"))'
+        )
         cmd = f"{pre_cmd}; python -c '{python_code}'"
         _LOG.debug("cmd=%s", cmd)
         hsinte.system(cmd, suppress_output=False)

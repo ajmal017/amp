@@ -286,8 +286,10 @@ class Config:
             python_code = os.environ[env_var]
             config = cls.from_python(python_code)
         else:
-            _LOG.warning("Environment variable '%s' not defined: no config retrieved",
-                         env_var)
+            _LOG.warning(
+                "Environment variable '%s' not defined: no config retrieved",
+                env_var,
+            )
             config = None
         return config
 
@@ -307,7 +309,7 @@ class Config:
                 dict_[k] = v
         return dict_
 
-    def is_serializable(self) -> None:
+    def is_serializable(self) -> bool:
         """
         Make sure the config can be serialized and deserialized correctly.
         """
