@@ -286,7 +286,8 @@ class GroupedColDfToDfTransformer(cdnb.Transformer):
         join_output_with_input: bool = True,
     ) -> None:
         """
-        For reference, let
+        For reference, let.
+
           - N = df.columns.nlevels
           - leaf_cols = df[in_col_group].columns
 
@@ -382,7 +383,8 @@ class SeriesToDfTransformer(cdnb.Transformer):
         join_output_with_input: bool = True,
     ) -> None:
         """
-        For reference, let
+        For reference, let.
+
           - N = df.columns.nlevels
           - leaf_cols = df[in_col_group].columns
 
@@ -502,7 +504,8 @@ class SeriesToSeriesTransformer(cdnb.Transformer):
         join_output_with_input: bool = True,
     ) -> None:
         """
-        For reference, let
+        For reference, let.
+
           - N = df.columns.nlevels
           - leaf_cols = df[in_col_group].columns
 
@@ -635,7 +638,9 @@ def _apply_func_to_series(
     else:
         raise ValueError(f"Unrecognized `nan_mode` {nan_mode}")
     dbg.dassert_isinstance(srs, pd.Series)
-    result, info = _apply_func_to_data(srs, func, func_kwargs, drop_nans, reindex_like_input)
+    result, info = _apply_func_to_data(
+        srs, func, func_kwargs, drop_nans, reindex_like_input
+    )
     return result, info
 
 
