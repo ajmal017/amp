@@ -287,7 +287,7 @@ class MultiindexPooledSkLearnModel(cdnb.FitPredictNode):
                 dfs[key] = cdtfu.get_x_and_forward_y_fit_df(
                     value, self._x_vars, self._y_vars, self._steps_ahead
                 )
-            stacked_df = self._stack_dfs(dfs)
+            stacked_df = cdnb.DfStacker.preprocess(dfs)
             forward_y_fit_cols = stacked_df.drop(
                 columns=self._x_vars
             ).columns.to_list()
@@ -300,7 +300,7 @@ class MultiindexPooledSkLearnModel(cdnb.FitPredictNode):
                 col_mode="merge_all",
             )
             df_out = sklm.fit(stacked_df)["df_out"].drop(columns=self._x_vars)
-            results = self._unstack_df(dfs, df_out)
+            results = cdnb.DfStacker.postprocess(dfs, df_out)
             info = sklm.get_info("fit")
             self._fit_state = sklm.get_fit_state()
         else:
