@@ -55,7 +55,8 @@ eval_config = cconfig.Config.from_env_var("AM_CONFIG_CODE")
 # Override config.
 if eval_config is None:
     # experiment_dir = "s3://eglp-spm-sasm/experiments/experiment.RH2Ef.v1_9-all.5T.20210831-004747.run1.tgz"
-    experiment_dir = "/app/oos_experiment.RH2Eg.v2_0-top100.5T.run1_test"
+    #experiment_dir = "/cache/experiments/oos_experiment.RH1E.v2_0-top100.5T"
+    experiment_dir = "/cache/experiments/experiment.RH4E.v2_0-top10.5T"
     aws_profile = None
     selected_idxs = None
 
