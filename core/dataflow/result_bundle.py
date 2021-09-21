@@ -6,6 +6,7 @@ import core.dataflow.result_bundle as cdtfrb
 import abc
 import collections
 import copy
+import datetime
 import logging
 from typing import Any, Dict, List, Optional, Set, Tuple, cast
 
@@ -18,6 +19,7 @@ import helpers.git as git
 import helpers.hparquet as hparquet
 import helpers.io_ as io_
 import helpers.pickle_ as hpickle
+import helpers.timer as htimer
 
 _LOG = logging.getLogger(__name__)
 
@@ -281,20 +283,23 @@ class ResultBundle(abc.ABC):
                 "Invalid file_name='%s'",
                 file_name,
             )
-            obj = hpickle.from_pickle(file_name, log_level=logging.DEBUG)
-            # TODO(gp): This is a workaround waiting for LimeTask164.
-            #  We load 200MB of data and then discard 198MB.
-            obj.payload = None
-            dbg.dassert_isinstance(obj, ResultBundle)
+            with htimer.TimedScope(logging.DEBUG, "Load pickle"):
+                obj = hpickle.from_pickle(file_name, log_level=logging.DEBUG)
+                # TODO(gp): This is a workaround waiting for LimeTask164.
+                #  We load 200MB of data and then discard 198MB.
+                obj.payload = None
+                dbg.dassert_isinstance(obj, ResultBundle)
             # Load the `result_df` as parquet.
             file_name_pq = io_.change_filename_extension(file_name, "pkl", "pq")
             if columns is None:
                 _LOG.warning(
-                    "Loading the entire `result_df` without filtering by columns: this is slow and requires a lot of memory"
+                    "Loading the entire `result_df` without filtering by columns: "
+                    "this is slow and requires a lot of memory"
                 )
-            obj.result_df = hparquet.from_parquet(
-                file_name_pq, columns=columns, log_level=logging.DEBUG
-            )
+            with htimer.TimedScope(logging.DEBUG, "Load parquet"):
+                obj.result_df = hparquet.from_parquet(
+                    file_name_pq, columns=columns, log_level=logging.DEBUG
+                )
             file_name_metadata_df = io_.change_filename_extension(
                 file_name, "pkl", "metadata_df.pkl"
             )
@@ -305,6 +310,8 @@ class ResultBundle(abc.ABC):
             #     "index.freq": result_df.index.freq
             # }
             obj.result_df.index.freq = metadata_df.pop("index.freq")
+            # TODO(gp): See AmpTask1732 about disabling this.
+            #obj.result_df = _trim_df_trading_hours(obj.result_df)
             dbg.dassert(
                 not metadata_df, "metadata_df='%s' is not empty", str(metadata_df)
             )
@@ -472,3 +479,20 @@ class PredictionResultBundle(ResultBundle):
             tag,
         )
         return selected_cols_for_tag[0]
+
+
+# #############################################################################
+
+
+# TODO(gp): This is probably more general than here. Probably we want to trim
+#  the data also inside the pipeline.
+def _trim_df_trading_hours(df) -> pd.DataFrame:
+    """
+    Remove data outside trading hours.
+    """
+    df_time = df.index.time
+    # TODO(gp): We should extend this to handle the overnight return.
+    mask = (df_time >= datetime.time(9, 30)) & (df_time <= datetime.time(16, 0))
+    _LOG.debug(mask.sum() / len(mask))
+    dbg.dassert_eq(len(df[~mask].dropna()), 0)
+    return df[mask]

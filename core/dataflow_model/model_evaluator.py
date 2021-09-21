@@ -29,10 +29,10 @@ _LOG = logging.getLogger(__name__)
 # _LOG.debug = _LOG.info
 
 # #############################################################################
-# ModelEvaluator
+# StrategyEvaluator
 # #############################################################################
 
-# A model / experiment is represented by a key, encoded as an int.
+# Each model / experiment is represented by a key, encoded as an int.
 Key = int
 
 
@@ -44,7 +44,6 @@ class StrategyEvaluator:
     def __init__(
         self,
         data: Dict[Key, pd.DataFrame],
-        *,
         position_intent_col: str,
         returns_col: str,
         spread_col: str,
@@ -54,8 +53,21 @@ class StrategyEvaluator:
         # start: Optional[pd.Timestamp] = None,
         # end: Optional[pd.Timestamp] = None,
     ) -> None:
+        """
+        Constructor.
+
+        The passed time series need to have a proper alignment.
+        TODO(gp): Check with Paul and specify this clearly.
+
+        :param data: same meaning as in `ModelEvaluator`
+        :param position_intent_col: column storing the position intent for the
+            corresponding returns. This is derived from the alpha of the model
+        :param returns_col: column with the return that we are predicting
+        :param spread_col: column with the spread associated to the corresponding
+            `returns_col`
+        """
         self._data = data
-        dbg.dassert(data, msg="Data set must be nonempty.")
+        dbg.dassert(data, msg="Data set must be nonempty")
         # This is required by the current implementation otherwise when we extract
         # columns from dataframes we get dataframes and not series.
         dbg.dassert_ne(
@@ -72,7 +84,7 @@ class StrategyEvaluator:
         self._stats_computer = cstats.StatsComputer()
 
     # TODO(Paul): This looks like the corresponding method for `ModelEvaluator`
-    # except for the columns needed. Factor out the common part.
+    #  except for the columns needed. Factor out the common part.
     @classmethod
     def from_result_bundle_dict(
         cls,
@@ -104,13 +116,13 @@ class StrategyEvaluator:
                     ),
                 )
                 # Extract the needed columns.
-                dbg.dassert_in(position_intent_col, df.columns)
-                dbg.dassert_in(returns_col, df.columns)
-                dbg.dassert_in(spread_col, df.columns)
+                for col in (position_intent_col, returns_col, spread_col):
+                    dbg.dassert_in(col, df.columns)
                 dbg.dassert_not_in(key, data_dict.keys())
-                data_dict[key] = df[
+                df_tmp = df[
                     [position_intent_col, returns_col, spread_col]
                 ]
+                data_dict[key] = df_tmp
             except Exception as e:
                 _LOG.error(
                     "Error while loading ResultBundle for config %s with exception:\n%s"
@@ -152,27 +164,43 @@ class StrategyEvaluator:
         )
         return evaluator
 
+    # TODO(gp): Maybe we should separate the pivoting logic in a different function
+    #  to avoid to complicate the types.
     def compute_pnl(
         self,
+        spread_fraction_paid: float,
         keys: Optional[List[Key]] = None,
-        spread_fraction_paid: float = 0,
         key_type: str = "instrument",
-    ) -> Dict[Any, pd.DataFrame]:
+    ) -> Dict[Union[Key, str], pd.DataFrame]:
         """
-        Compute pnl from position intents, ret_0, and spread.
+        Compute PnL from position intents, ret_0, and spread.
+
+        :param keys: use all available keys if `None`
+        :param spread_fraction_paid: same interpretation as in `compute_spread_cost()`
+        :param key_type: how to index the output data structure (e.g., by instrument
+            or by attribute)
         """
+        # TODO(gp): Add some logic to cache this data and not recompute.
+        _LOG.info(
+            "Before StrategyEvaluator.compute_pnl: memory_usage=%s",
+            dbg.get_memory_usage_as_str(None),
+        )
         keys = keys or self.valid_keys
         dbg.dassert_is_subset(keys, self.valid_keys)
-        pnl_dict = {}
+        # Build the dict from experiment key to dataframe.
+        pnl_dict: Dict[Union[Key, str], pd.DataFrame] = {}
         for key in tqdm(keys):
             _LOG.debug("Process key=%s", key)
-            # Extract the returns and alpha columns.
-            dbg.dassert_in(self.returns_col, self._data[key].columns)
-            dbg.dassert_in(self.position_intent_col, self._data[key].columns)
-            dbg.dassert_in(self.spread_col, self._data[key].columns)
+            # Extract the needed data from the current dataframe.
+            for col in (self.returns_col, self.position_intent_col, self.spread_col):
+                dbg.dassert_in(col, self._data[key].columns)
             df = self._data[key][
                 [self.returns_col, self.position_intent_col, self.spread_col]
             ]
+            # TODO(gp): Not sure about renaming the columns, since it might prevent
+            #  re-running on the same data. It might be simpler to leave the data
+            #  as it is and use meaningful vars for the cols, e.g.,
+            #  `ret_0 = self.returns_col`.
             df.rename(
                 columns={
                     self.returns_col: "ret_0",
@@ -181,6 +209,7 @@ class StrategyEvaluator:
                 },
                 inplace=True,
             )
+            # Compute PnL.
             pnl = (
                 fin.compute_pnl(
                     df,
@@ -191,6 +220,7 @@ class StrategyEvaluator:
                 .rename("pnl_0")
             )
             df["pnl_0"] = pnl
+            # Compute spread cost.
             spread_cost = (
                 fin.compute_spread_cost(
                     df,
@@ -201,12 +231,16 @@ class StrategyEvaluator:
                 .squeeze()
                 .rename("spread_cost_0")
             )
+            # Add the info.
             df["spread_cost_0"] = spread_cost
+            # TODO(gp): This is simple enough that we should recompute it from
+            # the columns, to avoid using memory.
             df["ex_cost_pnl_0"] = pnl - spread_cost
             pnl_dict[key] = df
+        # Organize the resulting output.
         if key_type == "instrument":
             pass
-        if key_type == "attribute":
+        elif key_type == "attribute":
             pnl_dict_pivoted = {}
             for attribute in [
                 "ret_0",
@@ -223,7 +257,7 @@ class StrategyEvaluator:
                 pnl_dict_pivoted[attribute] = df
             pnl_dict = pnl_dict_pivoted
         else:
-            raise ValueError()
+            raise ValueError("Invalid key_type='%s'" % key_type)
         return pnl_dict
 
     def calculate_stats(
@@ -234,27 +268,32 @@ class StrategyEvaluator:
         """
         Calculate performance characteristics of selected models.
 
-        :param keys: Use all available if `None`
-        :return: Dataframe of statistics with `keys` as columns
+        :param keys: use all available if `None`
+        :return: dataframe of statistics with `keys` as columns
         """
-        #
         pnl_dict = self.compute_pnl(
-            keys,
-            spread_fraction_paid=spread_fraction_paid,
+            spread_fraction_paid,
+            keys=keys,
         )
+        #
         stats_dict = {}
         for key in tqdm(pnl_dict.keys(), desc="Calculating stats"):
             _LOG.debug("key=%s", key)
-            if pnl_dict[key].empty:
-                _LOG.warning("PnL series for key=%i is empty.", key)
+            pnl_df = pnl_dict[key]
+            if pnl_df.empty:
+                _LOG.warning("PnL series for key=%i is empty", key)
                 continue
-            if pnl_dict[key].dropna().empty:
-                _LOG.warning("PnL series for key=%i is all-NaN.", key)
+            if pnl_df.dropna().empty:
+                _LOG.warning("PnL series for key=%i is all-NaN", key)
                 continue
+            # Compute PnL without spread cost.
+            ex_cost_pnl_0 = pnl_df["pnl_0"] - pnl_df["spread_cost_0"]
+            ex_cost_pnl_0 = ex_cost_pnl_0.to_frame().rename("ex_cost_pnl_0")
             stats_dict[key] = self._stats_computer.compute_finance_stats(
-                pnl_dict[key],
+                ex_cost_pnl_0,
                 pnl_col="ex_cost_pnl_0",
             )
+        # TODO(gp): Factor out this piece since it's common to `ModelEvaluator`.
         stats_df = pd.concat(stats_dict, axis=1)
         # Calculate BH adjustment of pvals.
         adj_pvals = stats.multipletests(
@@ -265,6 +304,11 @@ class StrategyEvaluator:
         )
         stats_df = pd.concat([stats_df, adj_pvals], axis=0)
         return stats_df
+
+
+# #############################################################################
+# ModelEvaluator
+# #############################################################################
 
 
 class ModelEvaluator:
@@ -302,14 +346,12 @@ class ModelEvaluator:
              2009-01-02 09:15:00-05:00                              NaN ...
             ```
 
-        :param prediction_col: column of `ResultBundle.result_df` to use as
-            predictions
-        :param target_col: column of `ResultBundle.result_df` to use as targets
-            (e.g., returns)
+        :param prediction_col: column of to use as predictions
+        :param target_col: column of to use as targets (e.g., returns)
         :param oos_start: start of the OOS period, or None for nothing
         """
         self._data = data
-        dbg.dassert(data, msg="Data set must be nonempty.")
+        dbg.dassert(data, msg="Data set must be nonempty")
         # This is required by the current implementation otherwise when we extract
         # columns from dataframes we get dataframes and not series.
         dbg.dassert_ne(
@@ -322,6 +364,8 @@ class ModelEvaluator:
         self.oos_start = oos_start
         # The valid keys are the keys in the data dict.
         self.valid_keys = list(self._data.keys())
+        # TODO(gp): This is used only in `calculate_stats`, so it doesn't have to be
+        #  part of the state.
         self._stats_computer = cstats.StatsComputer()
 
     @classmethod
@@ -530,10 +574,10 @@ class ModelEvaluator:
         for key in tqdm(pnl_dict.keys(), desc="Calculating stats"):
             _LOG.debug("key=%s", key)
             if pnl_dict[key].empty:
-                _LOG.warning("PnL series for key=%i is empty.", key)
+                _LOG.warning("PnL series for key=%i is empty", key)
                 continue
             if pnl_dict[key].dropna().empty:
-                _LOG.warning("PnL series for key=%i is all-NaN.", key)
+                _LOG.warning("PnL series for key=%i is all-NaN", key)
                 continue
             stats_dict[key] = self._stats_computer.compute_finance_stats(
                 pnl_dict[key],
