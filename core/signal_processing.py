@@ -623,9 +623,9 @@ def extract_smooth_moving_average_weights(
     :param tau: as in `compute_smooth_moving_average()`
     :param min_depth: as in `compute_smooth_moving_average()`
     :param max_depth: as in `compute_smooth_moving_average()`
-    :index_location: current and latest value to be considered operated upon by
-        the smooth moving average (e.g., the last in-sample index). If `None`,
-        then use the last index location of `signal`.
+    :param index_location: current and latest value to be considered operated
+        upon by the smooth moving average (e.g., the last in-sample index). If
+        `None`, then use the last index location of `signal`.
     :return: dataframe with two columns of weights:
         1. absolute weights (e.g., weights sum to 1)
         2. relative weights (weight at `index_location` is equal to `1`, and
@@ -635,6 +635,10 @@ def extract_smooth_moving_average_weights(
     dbg.dassert_isinstance(idx, pd.Index)
     dbg.dassert(not idx.empty, msg="`signal.index` must be nonempty.")
     index_location = index_location or idx[-1]
+    if index_location > idx[-1]:
+        _LOG.warning("Requested `index_location` is out-of-range. "
+                     "Proceeding with last `signal.index` location instead.")
+        index_location = idx[-1]
     dbg.dassert_in(
         index_location,
         idx,
@@ -683,7 +687,7 @@ def extract_smooth_moving_average_weights(
     # Index and align the weights so that they terminate at `index_location`.
     weights.index = signal.loc[:index_location].index
     # Extend `weights` with NaNs if necessary.
-    return weights.reindex(signal.index)
+    return weights.reindex(idx)
 
 
 # #############################################################################
