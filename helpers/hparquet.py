@@ -38,18 +38,17 @@ def to_parquet(
     mem = df.memory_usage().sum()
     _LOG.debug("df.memory_usage=%s", hintro.format_size(mem))
     # Save data.
-    dtmr = htimer.dtimer_start(logging.DEBUG, "To parquet '%s'" % file_name)
-    table = pa.Table.from_pandas(df)
-    pq.write_table(table, file_name)
+    with htimer.TimedScope(logging.DEBUG, "To parquet '%s'" % file_name) as ts:
+        table = pa.Table.from_pandas(df)
+        pq.write_table(table, file_name)
     # Report stats.
-    _, elapsed_time = htimer.dtimer_stop(dtmr)
     file_size = hintro.format_size(os.path.getsize(file_name))
     _LOG.log(
         log_level,
         "Saved '%s' (size=%s, time=%.1fs)",
         file_name,
         file_size,
-        elapsed_time,
+        ts.elapsed_time,
     )
 
 
@@ -66,27 +65,26 @@ def from_parquet(
     dbg.dassert_isinstance(file_name, str)
     dbg.dassert_file_extension(file_name, "pq")
     # Load data.
-    dtmr = htimer.dtimer_start(logging.DEBUG, "From parquet '%s'" % file_name)
-    filesystem = None
-    dataset = pq.ParquetDataset(
-        file_name,
-        filesystem=filesystem,
-        filters=filters,
-        use_legacy_dataset=False,
-    )
-    # To read also the index we need to use `read_pandas()`, instead of `read_table()`.
-    # See https://arrow.apache.org/docs/python/parquet.html#reading-and-writing-single-files.
-    table = dataset.read_pandas(columns=columns)
-    df = table.to_pandas()
+    with htimer.TimedScope(logging.DEBUG, "From parquet '%s'" % file_name) as ts:
+        filesystem = None
+        dataset = pq.ParquetDataset(
+            file_name,
+            filesystem=filesystem,
+            filters=filters,
+            use_legacy_dataset=False,
+        )
+        # To read also the index we need to use `read_pandas()`, instead of `read_table()`.
+        # See https://arrow.apache.org/docs/python/parquet.html#reading-and-writing-single-files.
+        table = dataset.read_pandas(columns=columns)
+        df = table.to_pandas()
     # Report stats.
-    _, elapsed_time = htimer.dtimer_stop(dtmr)
     file_size = hintro.format_size(os.path.getsize(file_name))
     _LOG.log(
         log_level,
         "Loaded '%s' (size=%s, time=%.1fs)",
         file_name,
         file_size,
-        elapsed_time,
+        ts.elapsed_time,
     )
     # Report stats about the df.
     _LOG.debug("df.shape=%s", str(df.shape))

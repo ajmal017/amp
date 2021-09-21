@@ -44,43 +44,42 @@ def to_pickle(
     """
     dbg.dassert_type_is(file_name, str)
     hio.create_enclosing_dir(file_name, incremental=True)
-    dtmr = htimer.dtimer_start(logging.DEBUG, "Pickling to '%s'" % file_name)
-    # We assume that the user always specifies a .pkl extension and then we
-    # change the extension based on the backend.
-    if backend in ("pickle", "dill"):
-        dbg.dassert_file_extension(file_name, "pkl")
-        if backend == "pickle":
-            with open(file_name, "wb") as fd:
-                pickler = pickle.Pickler(fd, pickle.HIGHEST_PROTOCOL)
+    with htimer.TimedScope(logging.DEBUG, "Pickling to '%s'" % file_name) as ts:
+        # We assume that the user always specifies a .pkl extension and then we
+        # change the extension based on the backend.
+        if backend in ("pickle", "dill"):
+            dbg.dassert_file_extension(file_name, "pkl")
+            if backend == "pickle":
+                with open(file_name, "wb") as fd:
+                    pickler = pickle.Pickler(fd, pickle.HIGHEST_PROTOCOL)
+                    pickler.fast = True
+                    pickler.dump(obj)
+            elif backend == "dill":
+                import dill
+
+                with open(file_name, "wb") as fd:
+                    dill.dump(obj, fd)
+            else:
+                raise ValueError("Invalid backend='%s'" % backend)
+        elif backend == "pickle_gzip":
+            # TODO(gp): Use `dassert_file_extension` if possible.
+            dbg.dassert(
+                file_name.endswith(".pkl.gz"), msg="Invalid file_name=%s" % file_name
+            )
+            with gzip.open(file_name, "wb") as zfd:
+                pickler = pickle.Pickler(zfd, pickle.HIGHEST_PROTOCOL)
                 pickler.fast = True
                 pickler.dump(obj)
-        elif backend == "dill":
-            import dill
-
-            with open(file_name, "wb") as fd:
-                dill.dump(obj, fd)
         else:
             raise ValueError("Invalid backend='%s'" % backend)
-    elif backend == "pickle_gzip":
-        # TODO(gp): Use `dassert_file_extension` if possible.
-        dbg.dassert(
-            file_name.endswith(".pkl.gz"), msg="Invalid file_name=%s" % file_name
-        )
-        with gzip.open(file_name, "wb") as zfd:
-            pickler = pickle.Pickler(zfd, pickle.HIGHEST_PROTOCOL)
-            pickler.fast = True
-            pickler.dump(obj)
-    else:
-        raise ValueError("Invalid backend='%s'" % backend)
     # Report time and size.
-    _, elapsed_time = htimer.dtimer_stop(dtmr)
     file_size = hintro.format_size(os.path.getsize(file_name))
     _LOG.log(
         log_level,
         "Saved '%s' (size=%s, time=%.1fs)",
         file_name,
         file_size,
-        elapsed_time,
+        ts.elapsed_time,
     )
 
 
@@ -93,41 +92,40 @@ def from_pickle(
     Unpickle and return object stored in `file_name`.
     """
     dbg.dassert_isinstance(file_name, str)
-    dtmr = htimer.dtimer_start(logging.DEBUG, "Unpickling from '%s'" % file_name)
-    # We assume that the user always specifies a .pkl extension and then we
-    # change the extension based on the backend.
-    if backend in ("pickle", "dill"):
-        dbg.dassert_file_extension(file_name, "pkl")
-        if backend == "pickle":
-            with open(file_name, "rb") as fd:
-                unpickler = pickle.Unpickler(fd)
-                obj = unpickler.load()
-        elif backend == "dill":
-            import dill
+    with htimer.TimedScope(logging.DEBUG, "Unpickling from '%s'" % file_name) as ts:
+        # We assume that the user always specifies a .pkl extension and then we
+        # change the extension based on the backend.
+        if backend in ("pickle", "dill"):
+            dbg.dassert_file_extension(file_name, "pkl")
+            if backend == "pickle":
+                with open(file_name, "rb") as fd:
+                    unpickler = pickle.Unpickler(fd)
+                    obj = unpickler.load()
+            elif backend == "dill":
+                import dill
 
-            with open(file_name, "rb") as fd:
-                obj = dill.load(fd)
+                with open(file_name, "rb") as fd:
+                    obj = dill.load(fd)
+            else:
+                raise ValueError("Invalid backend='%s'" % backend)
+        elif backend == "pickle_gzip":
+            # TODO(gp): Use `dassert_file_extension` if possible.
+            dbg.dassert(
+                file_name.endswith(".pkl.gz"), msg="Invalid file_name=%s" % file_name
+            )
+            with gzip.open(file_name, "rb") as zfd:
+                unpickler = pickle.Unpickler(zfd)
+                obj = unpickler.load()
         else:
             raise ValueError("Invalid backend='%s'" % backend)
-    elif backend == "pickle_gzip":
-        # TODO(gp): Use `dassert_file_extension` if possible.
-        dbg.dassert(
-            file_name.endswith(".pkl.gz"), msg="Invalid file_name=%s" % file_name
-        )
-        with gzip.open(file_name, "rb") as zfd:
-            unpickler = pickle.Unpickler(zfd)
-            obj = unpickler.load()
-    else:
-        raise ValueError("Invalid backend='%s'" % backend)
     # Report time and size.
-    _, elapsed_time = htimer.dtimer_stop(dtmr)
     file_size = hintro.format_size(os.path.getsize(file_name))
     _LOG.log(
         log_level,
         "Read '%s' (size=%s, time=%.1fs)",
         file_name,
         file_size,
-        elapsed_time,
+        ts.elapsed_time,
     )
     return obj
 
