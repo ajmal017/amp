@@ -48,9 +48,7 @@ class TestGroupedColDfToDfTransformer1(hut.TestCase):
             parse_dates=True,
             header=[0, 1],
         )
-        assert actual.index.to_list() == expected.index.to_list()
-        assert actual.columns.to_list() == expected.columns.to_list()
-        np.testing.assert_allclose(actual, expected)
+        self.assert_dfs_close(actual, expected)
 
     def _get_data(self) -> pd.DataFrame:
         txt = """
@@ -99,9 +97,7 @@ class TestGroupedColDfToDfTransformer2(hut.TestCase):
             parse_dates=True,
             header=[0, 1],
         )
-        assert actual.index.to_list() == expected.index.to_list()
-        assert actual.columns.to_list() == expected.columns.to_list()
-        np.testing.assert_allclose(actual, expected)
+        self.assert_dfs_close(actual, expected)
 
     def _get_data(self) -> pd.DataFrame:
         txt = """
@@ -151,9 +147,7 @@ class TestGroupedColDfToDfTransformer3(hut.TestCase):
             parse_dates=True,
             header=[0, 1],
         )
-        assert actual.index.to_list() == expected.index.to_list()
-        assert actual.columns.to_list() == expected.columns.to_list()
-        np.testing.assert_allclose(actual, expected)
+        self.assert_dfs_close(actual, expected)
 
     def test_multicolumn_processing2(self) -> None:
         data = self._get_data()
@@ -189,9 +183,7 @@ class TestGroupedColDfToDfTransformer3(hut.TestCase):
             parse_dates=True,
             header=[0, 1],
         )
-        assert actual.index.to_list() == expected.index.to_list()
-        assert actual.columns.to_list() == expected.columns.to_list()
-        np.testing.assert_allclose(actual, expected)
+        self.assert_dfs_close(actual, expected)
 
     def _get_data(self) -> pd.DataFrame:
         txt = """
@@ -242,9 +234,7 @@ class TestGroupedColDfToDfTransformer4(hut.TestCase):
             parse_dates=True,
             header=[0, 1],
         )
-        assert actual.index.to_list() == expected.index.to_list()
-        assert actual.columns.to_list() == expected.columns.to_list()
-        np.testing.assert_allclose(actual, expected)
+        self.assert_dfs_close(actual, expected)
 
     def test_drop_nans_without_reindexing(self) -> None:
         data = self._get_data()
@@ -279,9 +269,7 @@ class TestGroupedColDfToDfTransformer4(hut.TestCase):
             parse_dates=True,
             header=[0, 1],
         )
-        assert actual.index.to_list() == expected.index.to_list()
-        assert actual.columns.to_list() == expected.columns.to_list()
-        np.testing.assert_allclose(actual, expected)
+        self.assert_dfs_close(actual, expected)
 
     def _get_data(self) -> pd.DataFrame:
         txt = """
@@ -335,9 +323,7 @@ class TestSeriesToDfTransformer1(hut.TestCase):
             parse_dates=True,
             header=[0, 1],
         )
-        assert actual.index.to_list() == expected.index.to_list()
-        assert actual.columns.to_list() == expected.columns.to_list()
-        hut.compare_df(actual, expected)
+        self.assert_dfs_close(actual, expected)
 
     def _get_data(self) -> pd.DataFrame:
         txt = """
@@ -386,9 +372,7 @@ class TestSeriesToDfTransformer2(hut.TestCase):
             parse_dates=True,
             header=[0, 1],
         )
-        assert actual.index.to_list() == expected.index.to_list()
-        assert actual.columns.to_list() == expected.columns.to_list()
-        np.testing.assert_allclose(actual, expected)
+        self.assert_dfs_close(actual, expected)
 
     def test_drop_nans_then_join(self) -> None:
         data = self._get_data()
@@ -421,9 +405,7 @@ class TestSeriesToDfTransformer2(hut.TestCase):
             parse_dates=True,
             header=[0, 1],
         )
-        assert actual.index.to_list() == expected.index.to_list()
-        assert actual.columns.to_list() == expected.columns.to_list()
-        np.testing.assert_allclose(actual, expected)
+        self.assert_dfs_close(actual, expected)
 
     def test_drop_nans_without_reindexing(self) -> None:
         data = self._get_data()
@@ -456,9 +438,7 @@ class TestSeriesToDfTransformer2(hut.TestCase):
             parse_dates=True,
             header=[0, 1],
         )
-        assert actual.index.to_list() == expected.index.to_list()
-        assert actual.columns.to_list() == expected.columns.to_list()
-        np.testing.assert_allclose(actual, expected)
+        self.assert_dfs_close(actual, expected)
 
     def test_drop_nans_without_reindexing_then_attempt_join(self) -> None:
         data = self._get_data()
@@ -529,9 +509,7 @@ class TestSeriesToSeriesTransformer1(hut.TestCase):
             parse_dates=True,
             header=[0, 1],
         )
-        assert actual.index.to_list() == expected.index.to_list()
-        assert actual.columns.to_list() == expected.columns.to_list()
-        np.testing.assert_allclose(actual, expected)
+        self.assert_dfs_close(actual, expected)
 
     def _get_data(self) -> pd.DataFrame:
         txt = """
@@ -629,9 +607,7 @@ class TestSeriesToSeriesTransformer3(hut.TestCase):
             parse_dates=True,
             header=[0, 1],
         )
-        assert actual.index.to_list() == expected.index.to_list()
-        assert actual.columns.to_list() == expected.columns.to_list()
-        np.testing.assert_allclose(actual, expected)
+        self.assert_dfs_close(actual, expected)
 
     def test_drop_nans_then_join(self) -> None:
         data = self._get_data()
@@ -661,9 +637,7 @@ class TestSeriesToSeriesTransformer3(hut.TestCase):
             parse_dates=True,
             header=[0, 1],
         )
-        assert actual.index.to_list() == expected.index.to_list()
-        assert actual.columns.to_list() == expected.columns.to_list()
-        np.testing.assert_allclose(actual, expected)
+        self.assert_dfs_close(actual, expected)
 
     def test_drop_nans_without_reindexing(self) -> None:
         data = self._get_data()
@@ -693,9 +667,7 @@ class TestSeriesToSeriesTransformer3(hut.TestCase):
             parse_dates=True,
             header=[0, 1],
         )
-        assert actual.index.to_list() == expected.index.to_list()
-        assert actual.columns.to_list() == expected.columns.to_list()
-        np.testing.assert_allclose(actual, expected)
+        self.assert_dfs_close(actual, expected)
 
     def test_drop_nans_without_reindexing_then_attempt_join(self) -> None:
         data = self._get_data()
