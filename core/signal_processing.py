@@ -623,9 +623,9 @@ def extract_smooth_moving_average_weights(
     :param tau: as in `compute_smooth_moving_average()`
     :param min_depth: as in `compute_smooth_moving_average()`
     :param max_depth: as in `compute_smooth_moving_average()`
-    :index_location: current and latest value to be considered operated upon by
-        the smooth moving average (e.g., the last in-sample index). If `None`,
-        then use the last index location of `signal`.
+    :param index_location: current and latest value to be considered operated
+        upon by the smooth moving average (e.g., the last in-sample index). If
+        `None`, then use the last index location of `signal`.
     :return: dataframe with two columns of weights:
         1. absolute weights (e.g., weights sum to 1)
         2. relative weights (weight at `index_location` is equal to `1`, and
