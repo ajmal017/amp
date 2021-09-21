@@ -186,7 +186,8 @@ class TimedScope:
 
     def __exit__(self, *args: Any) -> None:
         if self._idx is not None:
-            self.elapsed_time = dtimer_stop(self._idx)
+            msg, self.elapsed_time = dtimer_stop(self._idx)
+            _ = msg
 
 
 # #############################################################################
