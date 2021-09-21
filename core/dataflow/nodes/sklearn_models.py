@@ -331,30 +331,6 @@ class MultiindexPooledSkLearnModel(cdnb.FitPredictNode):
         self._set_info(method, info)
         return {"df_out": df_out}
 
-    def _stack_dfs(
-        self, dfs: Dict[cdtfu.NodeColumn, pd.DataFrame]
-    ) -> pd.DataFrame:
-        df = pd.concat(dfs.values()).reset_index(drop=True)
-        return df
-
-    def _unstack_df(
-        self, dfs: Dict[cdtfu.NodeColumn, pd.DataFrame], df: pd.DataFrame
-    ) -> Dict[cdtfu.NodeColumn, pd.DataFrame]:
-        counter = 0
-        out_dfs = {}
-        for key, value in dfs.items():
-            length = value.shape[0]
-            out_df = df.iloc[counter : counter + length].copy()
-            dbg.dassert_eq(
-                out_df.shape[0],
-                value.shape[0],
-                msg="Dimension mismatch for key=%s" % key,
-            )
-            out_df.index = value.index
-            out_dfs[key] = out_df
-            counter += length
-        return out_dfs
-
 
 class MultiindexSkLearnModel(cdnb.FitPredictNode):
     """
