@@ -13,7 +13,6 @@ import numpy as np
 import pandas as pd
 import pywt
 
-import helpers.dataframe as hdataf
 import helpers.dbg as dbg
 
 _LOG = logging.getLogger(__name__)
@@ -1291,7 +1290,6 @@ def compute_ipca(
     df: pd.DataFrame,
     num_pc: int,
     tau: float,
-    nan_mode: Optional[str] = None,
 ) -> Tuple[pd.DataFrame, List[pd.DataFrame]]:
     """
     Incremental PCA.
@@ -1305,7 +1303,6 @@ def compute_ipca(
     :param tau: parameter used in (continuous) compute_ema and compute_ema-derived kernels. For
         typical ranges it is approximately but not exactly equal to the
         center-of-mass (com) associated with an compute_ema kernel.
-    :param nan_mode: argument for hdataf.apply_nan_mode()
     :return:
       - df of eigenvalue series (col 0 correspond to max eigenvalue, etc.).
       - list of dfs of unit eigenvectors (0 indexes df eigenvectors
@@ -1329,8 +1326,9 @@ def compute_ipca(
     alpha = 1.0 / (com + 1.0)
     _LOG.debug("com = %0.2f", com)
     _LOG.debug("alpha = %0.2f", alpha)
-    nan_mode = nan_mode or "fill_with_zero"
-    df = df.apply(hdataf.apply_nan_mode, mode=nan_mode)
+    # TODO(Paul): Consider requiring that the caller do this instead.
+    # Fill NaNs with zero.
+    df.fillna(0, inplace=True)
     lambdas: Dict[int, list] = {k: [] for k in range(num_pc)}
     # V's are eigenvectors with norm equal to corresponding eigenvalue.
     vs: Dict[int, list] = {k: [] for k in range(num_pc)}
