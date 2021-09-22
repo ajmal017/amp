@@ -122,7 +122,7 @@ class TestRealTimeDagRunner1(hut.TestCase):
         }
         # Run.
         dag_runner = cdtfr.RealTimeDagRunner(**kwargs)
-        result_bundles = hasyncio.run(dag_runner.predict(), event_loop)
+        result_bundles = hasyncio.run(dag_runner.predict(), event_loop=event_loop)
         events = dag_runner.events
         #
         _LOG.debug("events=\n%s", events)

@@ -38,20 +38,23 @@ import helpers.dbg as dbg  # noqa: E402 # pylint: disable=wrong-import-position
 
 _LOG = logging.getLogger(__name__)
 
-# We use this type to allow flexibility in the interface exposed to client.
-# Typically as soon as we enter functions exposed to users, we call `to_datetime()`
-# to convert the user-provided datetime into a `datetime.datetime` and use only
-# this type in private interfaces.
-# In general it's worth to import this file even for just the type `Datetime`,
+# We use the type `Datetime` to allow flexibility in the interface exposed to client.
+# The typical pattern is:
+# - we call `to_datetime()`, as soon as we enter functions exposed to users,
+#   to convert the user-provided datetime into a `datetime.datetime`
+# - we use only `datetime.datetime` in the private interfaces
+#
+# It's often worth to import this file even for just the type `Datetime`,
 # since typically as soon as the caller uses this type, they also want to use
 # `to_datetime()` and `dassert_*()` functions.
-# TODO(gp): It would be better to call this `UserFriendlyDateTime` or
-#  `GeneralDateTime` and rename `StrictDateTime` -> `DateTime`.
+# TODO(gp): It would be better to call this `GeneralDateTime`, `FlexibleDateTime`,
+#  and rename `StrictDateTime` -> `DateTime`.
 Datetime = Union[str, pd.Timestamp, datetime.datetime]
 
-# This type is for stricter interfaces, although it is a bit of a compromise.
-# Either one wants to be flexible and allow everything that can be interpreted as
-# a datetime, or strict and then only the Python type `datetime.datetime` is used.
+# The type `StrictDateTime` is for stricter interfaces, although it is a bit of a
+# compromise.
+# Either one wants to allow everything that can be interpreted as a datetime (and
+# then use `Datetime`), or strict (and then use only `datetime.datetime`).
 StrictDatetime = Union[pd.Timestamp, datetime.datetime]
 
 
@@ -226,7 +229,7 @@ def get_current_time(tz: str, event_loop: Optional[asyncio.AbstractEventLoop]=No
     time through async-
     """
     if event_loop is not None:
-        # We accept only hasyncio.EventLoop here. If we are using asyncio
+        # We accept only `hasyncio.EventLoop` here. If we are using asyncio
         # EventLoop we rely on wall-clock time instead of `loop.time()`.
         dbg.dassert_isinstance(event_loop, asyncio.AbstractEventLoop)
         timestamp = event_loop.get_current_time()
