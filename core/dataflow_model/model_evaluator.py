@@ -258,6 +258,7 @@ class StrategyEvaluator:
             pnl_dict = pnl_dict_pivoted
         else:
             raise ValueError("Invalid key_type='%s'" % key_type)
+        _LOG.info("memory_usage=%s", dbg.get_memory_usage_as_str(None))
         return pnl_dict
 
     def calculate_stats(
@@ -303,6 +304,7 @@ class StrategyEvaluator:
             [adj_pvals.to_frame().transpose()], keys=["signal_quality"]
         )
         stats_df = pd.concat([stats_df, adj_pvals], axis=0)
+        _LOG.info("memory_usage=%s", dbg.get_memory_usage_as_str(None))
         return stats_df
 
 
@@ -538,6 +540,7 @@ class ModelEvaluator:
             positions_col="positions",
             pnl_col="pnl",
         )
+        _LOG.info("memory_usage=%s", dbg.get_memory_usage_as_str(None))
         return pnl_srs, pos_srs, aggregate_stats
 
     # TODO(gp): This is second.
@@ -595,6 +598,7 @@ class ModelEvaluator:
             [adj_pvals.to_frame().transpose()], keys=["signal_quality"]
         )
         stats_df = pd.concat([stats_df, adj_pvals], axis=0)
+        _LOG.info("memory_usage=%s", dbg.get_memory_usage_as_str(None))
         return stats_df
 
     # TODO(gp): This is first.
@@ -678,6 +682,7 @@ class ModelEvaluator:
             )
         _LOG.debug("Trim pnl_dict")
         pnl_dict = self._trim_time_range(pnl_dict, mode=mode)
+        _LOG.info("memory_usage=%s", dbg.get_memory_usage_as_str(None))
         return pnl_dict
 
     # TODO(gp): Maybe trim when they are generated so we can discard.
