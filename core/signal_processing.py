@@ -901,6 +901,7 @@ def compute_centered_gaussian_log_likelihood(
 def compute_rolling_annualized_sharpe_ratio(
     signal: Union[pd.DataFrame, pd.Series],
     tau: float,
+    points_per_year: float,
     min_periods: int = 2,
     min_depth: int = 1,
     max_depth: int = 1,
@@ -913,14 +914,13 @@ def compute_rolling_annualized_sharpe_ratio(
     average kernel as an estimate of the "number of data points" used in
     the calculation of the Sharpe ratio.
     """
-    ppy = hdataf.infer_sampling_points_per_year(signal)
     sr = compute_rolling_sharpe_ratio(
         signal, tau, min_periods, min_depth, max_depth, p_moment
     )
     # TODO(*): May need to rescale denominator by a constant.
     se_sr = np.sqrt((1 + (sr ** 2) / 2) / (tau * max_depth))
-    rescaled_sr = np.sqrt(ppy) * sr
-    rescaled_se_sr = np.sqrt(ppy) * se_sr
+    rescaled_sr = np.sqrt(points_per_year) * sr
+    rescaled_se_sr = np.sqrt(points_per_year) * se_sr
     df = pd.DataFrame(index=signal.index)
     df["annualized_SR"] = rescaled_sr
     df["annualized_SE(SR)"] = rescaled_se_sr
@@ -941,10 +941,10 @@ def compute_rolling_sharpe_ratio(
     signal_ma = compute_smooth_moving_average(
         signal, tau, min_periods, min_depth, max_depth
     )
+    # Use `zero` as the mean in the standard deviation calculation.
     signal_std = compute_rolling_norm(
-        signal - signal_ma, tau, min_periods, min_depth, max_depth, p_moment
+        signal, tau, min_periods, min_depth, max_depth, p_moment
     )
-    # TODO(Paul): Annualize appropriately.
     return signal_ma / signal_std
 
 

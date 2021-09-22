@@ -1179,7 +1179,7 @@ class Test_compute_rolling_annualized_sharpe_ratio(hut.TestCase):
             burnin=5,
         )
         rolling_sr = csigna.compute_rolling_annualized_sharpe_ratio(
-            realization, tau=16
+            realization, tau=16, points_per_year=260.875
         )
         self.check_string(hut.convert_df_to_string(rolling_sr, index=True))
 
