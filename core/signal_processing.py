@@ -55,7 +55,6 @@ def correlate_with_lagged_cumsum(
     lag: int,
     y_vars: List[str],
     x_vars: Optional[List[str]] = None,
-    nan_mode: Optional[str] = None,
 ) -> pd.DataFrame:
     """
     Compute correlation matrix of `df` cols and lagged cumulative sums.
@@ -75,7 +74,6 @@ def correlate_with_lagged_cumsum(
     :param y_vars: names of columns for which to compute cumulative sum
     :param x_vars: names of columns to correlate the `y_vars` with. If `None`,
         defaults to all columns except `y_vars`
-    :param nan_mode: argument for hdataf.apply_nan_mode()
     :return: correlation matrix of `(len(x_vars), len(y_vars))` shape
     """
     dbg.dassert_isinstance(df, pd.DataFrame)
@@ -89,7 +87,7 @@ def correlate_with_lagged_cumsum(
         "returns with. ",
     )
     df = df[x_vars + y_vars].copy()
-    cumsum_df = _compute_lagged_cumsum(df, lag, y_vars=y_vars, nan_mode=nan_mode)
+    cumsum_df = _compute_lagged_cumsum(df, lag, y_vars=y_vars)
     corr_df = cumsum_df.corr()
     y_cumsum_vars = cumsum_df.columns.difference(x_vars)
     return corr_df.loc[x_vars, y_cumsum_vars]
@@ -99,7 +97,6 @@ def _compute_lagged_cumsum(
     df: pd.DataFrame,
     lag: int,
     y_vars: Optional[List[str]] = None,
-    nan_mode: Optional[str] = None,
 ) -> pd.DataFrame:
     """
     Compute lagged cumulative sum for selected columns.
@@ -111,7 +108,6 @@ def _compute_lagged_cumsum(
         compute rolling sum is `lag`
     :param y_vars: names of columns for which to compute cumulative sum. If
         `None`, compute for all columns
-    :param nan_mode: argument for hdataf.apply_nan_mode()
     :return: dataframe with lagged cumulative sum columns
     """
     dbg.dassert_isinstance(df, pd.DataFrame)
@@ -121,7 +117,7 @@ def _compute_lagged_cumsum(
     y = df[y_vars].copy()
     x = df[x_vars].copy()
     # Compute cumulative sum.
-    y_cumsum = y.apply(accumulate, num_steps=lag, nan_mode=nan_mode)
+    y_cumsum = y.rolling(window=lag).sum()
     y_cumsum.rename(columns=lambda x: f"{x}_cumsum_{lag}", inplace=True)
     # Let's lag `y` so that `x_t` aligns with `y_{t+1} + ... + y{t+lag}`.
     y_cumsum_lagged = y_cumsum.shift(-lag)
@@ -208,43 +204,6 @@ def squash(
     """
     dbg.dassert_lt(0, scale)
     return scale * np.tanh(signal / scale)
-
-
-def accumulate(
-    signal: Union[pd.DataFrame, pd.Series],
-    num_steps: int,
-    nan_mode: Optional[str] = None,
-) -> Union[pd.DataFrame, pd.Series]:
-    """
-    Accumulate series for step.
-
-    :param signal: time series or dataframe
-    :param num_steps: number of steps to compute rolling sum for
-    :param nan_mode: argument for hdataf.apply_nan_mode()
-    :return: time series or dataframe accumulated
-    """
-    dbg.dassert_isinstance(num_steps, int)
-    dbg.dassert_lte(
-        1,
-        num_steps,
-        "`num_steps=0` returns all-zero dataframe. Passed in `num_steps`='%s'",
-        num_steps,
-    )
-    nan_mode = nan_mode or "leave_unchanged"
-
-    if isinstance(signal, pd.Series):
-        signal_cleaned = hdataf.apply_nan_mode(signal, mode=nan_mode)
-        signal_cumulative = signal_cleaned.rolling(window=num_steps).sum()
-    elif isinstance(signal, pd.DataFrame):
-        signal_cleaned = signal.apply(
-            (lambda x: hdataf.apply_nan_mode(x, mode=nan_mode)), axis=0
-        )
-        signal_cumulative = signal_cleaned.apply(
-            (lambda x: x.rolling(window=num_steps).sum()), axis=0
-        )
-    else:
-        raise ValueError(f"Invalid input type `{type(signal)}`")
-    return signal_cumulative
 
 
 def get_symmetric_equisized_bins(
