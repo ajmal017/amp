@@ -13,7 +13,6 @@ import numpy as np
 import pandas as pd
 import pywt
 
-import helpers.dataframe as hdataf
 import helpers.dbg as dbg
 
 _LOG = logging.getLogger(__name__)
@@ -55,7 +54,6 @@ def correlate_with_lagged_cumsum(
     lag: int,
     y_vars: List[str],
     x_vars: Optional[List[str]] = None,
-    nan_mode: Optional[str] = None,
 ) -> pd.DataFrame:
     """
     Compute correlation matrix of `df` cols and lagged cumulative sums.
@@ -75,7 +73,6 @@ def correlate_with_lagged_cumsum(
     :param y_vars: names of columns for which to compute cumulative sum
     :param x_vars: names of columns to correlate the `y_vars` with. If `None`,
         defaults to all columns except `y_vars`
-    :param nan_mode: argument for hdataf.apply_nan_mode()
     :return: correlation matrix of `(len(x_vars), len(y_vars))` shape
     """
     dbg.dassert_isinstance(df, pd.DataFrame)
@@ -89,7 +86,7 @@ def correlate_with_lagged_cumsum(
         "returns with. ",
     )
     df = df[x_vars + y_vars].copy()
-    cumsum_df = _compute_lagged_cumsum(df, lag, y_vars=y_vars, nan_mode=nan_mode)
+    cumsum_df = _compute_lagged_cumsum(df, lag, y_vars=y_vars)
     corr_df = cumsum_df.corr()
     y_cumsum_vars = cumsum_df.columns.difference(x_vars)
     return corr_df.loc[x_vars, y_cumsum_vars]
@@ -99,7 +96,6 @@ def _compute_lagged_cumsum(
     df: pd.DataFrame,
     lag: int,
     y_vars: Optional[List[str]] = None,
-    nan_mode: Optional[str] = None,
 ) -> pd.DataFrame:
     """
     Compute lagged cumulative sum for selected columns.
@@ -111,7 +107,6 @@ def _compute_lagged_cumsum(
         compute rolling sum is `lag`
     :param y_vars: names of columns for which to compute cumulative sum. If
         `None`, compute for all columns
-    :param nan_mode: argument for hdataf.apply_nan_mode()
     :return: dataframe with lagged cumulative sum columns
     """
     dbg.dassert_isinstance(df, pd.DataFrame)
@@ -121,7 +116,7 @@ def _compute_lagged_cumsum(
     y = df[y_vars].copy()
     x = df[x_vars].copy()
     # Compute cumulative sum.
-    y_cumsum = y.apply(accumulate, num_steps=lag, nan_mode=nan_mode)
+    y_cumsum = y.rolling(window=lag).sum()
     y_cumsum.rename(columns=lambda x: f"{x}_cumsum_{lag}", inplace=True)
     # Let's lag `y` so that `x_t` aligns with `y_{t+1} + ... + y{t+lag}`.
     y_cumsum_lagged = y_cumsum.shift(-lag)
@@ -208,43 +203,6 @@ def squash(
     """
     dbg.dassert_lt(0, scale)
     return scale * np.tanh(signal / scale)
-
-
-def accumulate(
-    signal: Union[pd.DataFrame, pd.Series],
-    num_steps: int,
-    nan_mode: Optional[str] = None,
-) -> Union[pd.DataFrame, pd.Series]:
-    """
-    Accumulate series for step.
-
-    :param signal: time series or dataframe
-    :param num_steps: number of steps to compute rolling sum for
-    :param nan_mode: argument for hdataf.apply_nan_mode()
-    :return: time series or dataframe accumulated
-    """
-    dbg.dassert_isinstance(num_steps, int)
-    dbg.dassert_lte(
-        1,
-        num_steps,
-        "`num_steps=0` returns all-zero dataframe. Passed in `num_steps`='%s'",
-        num_steps,
-    )
-    nan_mode = nan_mode or "leave_unchanged"
-
-    if isinstance(signal, pd.Series):
-        signal_cleaned = hdataf.apply_nan_mode(signal, mode=nan_mode)
-        signal_cumulative = signal_cleaned.rolling(window=num_steps).sum()
-    elif isinstance(signal, pd.DataFrame):
-        signal_cleaned = signal.apply(
-            (lambda x: hdataf.apply_nan_mode(x, mode=nan_mode)), axis=0
-        )
-        signal_cumulative = signal_cleaned.apply(
-            (lambda x: x.rolling(window=num_steps).sum()), axis=0
-        )
-    else:
-        raise ValueError(f"Invalid input type `{type(signal)}`")
-    return signal_cumulative
 
 
 def get_symmetric_equisized_bins(
@@ -942,6 +900,7 @@ def compute_centered_gaussian_log_likelihood(
 def compute_rolling_annualized_sharpe_ratio(
     signal: Union[pd.DataFrame, pd.Series],
     tau: float,
+    points_per_year: float,
     min_periods: int = 2,
     min_depth: int = 1,
     max_depth: int = 1,
@@ -954,14 +913,13 @@ def compute_rolling_annualized_sharpe_ratio(
     average kernel as an estimate of the "number of data points" used in
     the calculation of the Sharpe ratio.
     """
-    ppy = hdataf.infer_sampling_points_per_year(signal)
     sr = compute_rolling_sharpe_ratio(
         signal, tau, min_periods, min_depth, max_depth, p_moment
     )
     # TODO(*): May need to rescale denominator by a constant.
     se_sr = np.sqrt((1 + (sr ** 2) / 2) / (tau * max_depth))
-    rescaled_sr = np.sqrt(ppy) * sr
-    rescaled_se_sr = np.sqrt(ppy) * se_sr
+    rescaled_sr = np.sqrt(points_per_year) * sr
+    rescaled_se_sr = np.sqrt(points_per_year) * se_sr
     df = pd.DataFrame(index=signal.index)
     df["annualized_SR"] = rescaled_sr
     df["annualized_SE(SR)"] = rescaled_se_sr
@@ -982,10 +940,10 @@ def compute_rolling_sharpe_ratio(
     signal_ma = compute_smooth_moving_average(
         signal, tau, min_periods, min_depth, max_depth
     )
+    # Use `zero` as the mean in the standard deviation calculation.
     signal_std = compute_rolling_norm(
-        signal - signal_ma, tau, min_periods, min_depth, max_depth, p_moment
+        signal, tau, min_periods, min_depth, max_depth, p_moment
     )
-    # TODO(Paul): Annualize appropriately.
     return signal_ma / signal_std
 
 
@@ -1332,7 +1290,6 @@ def compute_ipca(
     df: pd.DataFrame,
     num_pc: int,
     tau: float,
-    nan_mode: Optional[str] = None,
 ) -> Tuple[pd.DataFrame, List[pd.DataFrame]]:
     """
     Incremental PCA.
@@ -1346,7 +1303,6 @@ def compute_ipca(
     :param tau: parameter used in (continuous) compute_ema and compute_ema-derived kernels. For
         typical ranges it is approximately but not exactly equal to the
         center-of-mass (com) associated with an compute_ema kernel.
-    :param nan_mode: argument for hdataf.apply_nan_mode()
     :return:
       - df of eigenvalue series (col 0 correspond to max eigenvalue, etc.).
       - list of dfs of unit eigenvectors (0 indexes df eigenvectors
@@ -1370,8 +1326,9 @@ def compute_ipca(
     alpha = 1.0 / (com + 1.0)
     _LOG.debug("com = %0.2f", com)
     _LOG.debug("alpha = %0.2f", alpha)
-    nan_mode = nan_mode or "fill_with_zero"
-    df = df.apply(hdataf.apply_nan_mode, mode=nan_mode)
+    # TODO(Paul): Consider requiring that the caller do this instead.
+    # Fill NaNs with zero.
+    df.fillna(0, inplace=True)
     lambdas: Dict[int, list] = {k: [] for k in range(num_pc)}
     # V's are eigenvectors with norm equal to corresponding eigenvalue.
     vs: Dict[int, list] = {k: [] for k in range(num_pc)}

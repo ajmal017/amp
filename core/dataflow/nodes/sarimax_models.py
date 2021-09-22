@@ -365,7 +365,7 @@ class MultihorizonReturnsPredictionProcessor(cdnb.FitPredictNode):
         # Accumulate target for each step.
         cum_rets = []
         for i in range(1, self._max_steps_ahead + 1):
-            cum_ret_curr = csigna.accumulate(target, i).rename(f"cumret_{i}")
+            cum_ret_curr = target.rolling(window=i).sum().rename(f"cumret_{i}")
             cum_rets.append(cum_ret_curr)
         cum_rets = pd.concat(cum_rets, axis=1)
         fwd_cum_ret = cum_rets.shift(-self._max_steps_ahead)
