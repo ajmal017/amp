@@ -409,7 +409,7 @@ def _load_experiment_artifact(
     return res
 
 
-def _yield_experiment_artifacts(
+def yield_experiment_artifacts(
     src_dir: str,
     file_name: str,
     load_rb_kwargs: Dict[str, Any],
@@ -485,6 +485,7 @@ def _yield_rolling_experiment_out_of_sample_df(
             dbg.dassert_strictly_increasing_index(df)
             df = csigna.resample(df, rule=dfs[0].index.freq).sum(min_count=1)
             yield key, df
+
 
 
 def load_experiment_artifacts(
