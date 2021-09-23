@@ -119,9 +119,7 @@ class StrategyEvaluator:
                 for col in (position_intent_col, returns_col, spread_col):
                     dbg.dassert_in(col, df.columns)
                 dbg.dassert_not_in(key, data_dict.keys())
-                df_tmp = df[
-                    [position_intent_col, returns_col, spread_col]
-                ]
+                df_tmp = df[[position_intent_col, returns_col, spread_col]]
                 data_dict[key] = df_tmp
             except Exception as e:
                 _LOG.error(
@@ -192,7 +190,11 @@ class StrategyEvaluator:
         for key in tqdm(keys):
             _LOG.debug("Process key=%s", key)
             # Extract the needed data from the current dataframe.
-            for col in (self.returns_col, self.position_intent_col, self.spread_col):
+            for col in (
+                self.returns_col,
+                self.position_intent_col,
+                self.spread_col,
+            ):
                 dbg.dassert_in(col, self._data[key].columns)
             df = self._data[key][
                 [self.returns_col, self.position_intent_col, self.spread_col]
@@ -955,15 +957,17 @@ def process_result_df(
     research_pnl_2 = df["prediction_col"] * df["target_col"]
     df["research_pnl_2"] = research_pnl_2
     # Compute PnL in original returns space.
-    pnl_0 = fin.compute_pnl(position_intent_col=position_intent_1_col,
-                            return_col=ret_0_col)
+    pnl_0 = fin.compute_pnl(
+        position_intent_col=position_intent_1_col, return_col=ret_0_col
+    )
     df["pnl_0"] = pnl_0
     # Use predictions/targets for stats. Alignment is important.
-    stats = cstats.StatsComputer.compute_finance_stats(df,
-                                               returns_col=prediction_col,
-                                               positions_col=prediction_col,
-                                               pnl_col=research_pnl_2
-                                               )
+    stats = cstats.StatsComputer.compute_finance_stats(
+        df,
+        returns_col=prediction_col,
+        positions_col=prediction_col,
+        pnl_col=research_pnl_2,
+    )
     # Resample to business daily frequency.
     # Note that we do not directly use `spread_0_col`, but pass it through.
     # Due to linearity, we can still estimate transaction costs at the daily
