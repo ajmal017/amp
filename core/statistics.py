@@ -1243,6 +1243,7 @@ def compute_annualized_sharpe_ratio(
     :param log_rets: time series of log returns
     :return: annualized Sharpe ratio
     """
+    log_rets = cfinan.maybe_resample(log_rets)
     points_per_year = hdataf.infer_sampling_points_per_year(log_rets)
     if isinstance(log_rets, pd.Series):
         log_rets = hdataf.apply_nan_mode(log_rets, mode="fill_with_zero")
@@ -1265,6 +1266,7 @@ def compute_annualized_sharpe_ratio_standard_error(
     :param log_rets: time series of log returns
     :return: standard error estimate of annualized Sharpe ratio
     """
+    log_rets = cfinan.maybe_resample(log_rets)
     points_per_year = hdataf.infer_sampling_points_per_year(log_rets)
     log_rets = hdataf.apply_nan_mode(log_rets, mode="fill_with_zero")
     se_sr = compute_sharpe_ratio_standard_error(log_rets, points_per_year)
@@ -1721,8 +1723,11 @@ def compute_bet_stats(
     stats["num_positions"] = int(bet_lengths.abs().sum())
     stats["num_bets"] = bet_lengths.size
     stats["long_bets_(%)"] = 100 * (bet_lengths > 0).sum() / bet_lengths.size
-    n_years = positions.size / hdataf.infer_sampling_points_per_year(positions)
-    stats["avg_num_bets_per_year"] = bet_lengths.size / n_years
+    if positions.index.freq is not None:
+        n_years = positions.size / hdataf.infer_sampling_points_per_year(
+            positions
+        )
+        stats["avg_num_bets_per_year"] = bet_lengths.size / n_years
     # Format index.freq outcome to the word that represents its frequency.
     #    E.g. if `srs.index.freq` is equal to `<MonthEnd>` then
     #    this line will convert it to the string "Month".

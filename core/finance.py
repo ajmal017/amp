@@ -634,7 +634,7 @@ def compute_spread_cost(
     dbg.dassert_isinstance(df, pd.DataFrame)
     dbg.dassert_in(target_position_col, df.columns)
     dbg.dassert_in(spread_col, df.columns)
-    #if spread_fraction_paid < 0:
+    # if spread_fraction_paid < 0:
     #    _LOG.warning("spread_fraction_paid=%f", spread_fraction_paid)
     # dbg.dassert_lte(0, spread_fraction_paid)
     dbg.dassert_lte(spread_fraction_paid, 1)
@@ -853,6 +853,7 @@ def compute_volatility_normalization_factor(
     :return: scale factor
     """
     dbg.dassert_isinstance(srs, pd.Series)
+    # TODO(Paul): Determine how to deal with no `freq`.
     ppy = hdataf.infer_sampling_points_per_year(srs)
     srs = hdataf.apply_nan_mode(srs, mode="fill_with_zero")
     scale_factor: float = target_volatility / (np.sqrt(ppy) * srs.std())
@@ -874,7 +875,7 @@ def compute_kratio(log_rets: pd.Series) -> float:
     :return: K-Ratio
     """
     dbg.dassert_isinstance(log_rets, pd.Series)
-    dbg.dassert(log_rets.index.freq)
+    log_rets = maybe_resample(log_rets)
     log_rets = hdataf.apply_nan_mode(log_rets, mode="fill_with_zero")
     cum_rets = log_rets.cumsum()
     # Fit the best line to the daily rets.
@@ -960,7 +961,6 @@ def compute_turnover(
     :return: turnover
     """
     dbg.dassert_isinstance(pos, pd.Series)
-    dbg.dassert(pos.index.freq)
     nan_mode = nan_mode or "drop"
     pos = hdataf.apply_nan_mode(pos, mode=nan_mode)
     numerator = pos.diff().abs()
@@ -988,6 +988,7 @@ def compute_average_holding_period(
     """
     unit = unit or "B"
     dbg.dassert_isinstance(pos, pd.Series)
+    # TODO(Paul): Determine how to deal with no `freq`.
     dbg.dassert(pos.index.freq)
     pos_freq_in_year = hdataf.infer_sampling_points_per_year(pos)
     unit_freq_in_year = hdataf.infer_sampling_points_per_year(
@@ -1129,6 +1130,7 @@ def compute_annualized_return(srs: pd.Series) -> float:
     :return: annualized return; pct rets if `srs` consists of pct rets,
         log rets if `srs` consists of log rets.
     """
+    srs = maybe_resample(srs)
     srs = hdataf.apply_nan_mode(srs, mode="fill_with_zero")
     ppy = hdataf.infer_sampling_points_per_year(srs)
     mean_rets = srs.mean()
@@ -1144,9 +1146,23 @@ def compute_annualized_volatility(srs: pd.Series) -> float:
     :param srs: series with datetimeindex with `freq`
     :return: annualized volatility (stdev)
     """
+    srs = maybe_resample(srs)
     srs = hdataf.apply_nan_mode(srs, mode="fill_with_zero")
     ppy = hdataf.infer_sampling_points_per_year(srs)
     std = srs.std()
     annualized_volatility = np.sqrt(ppy) * std
     annualized_volatility = cast(float, annualized_volatility)
     return annualized_volatility
+
+
+def maybe_resample(srs: pd.Series) -> pd.Series:
+    """
+    Return `srs` resampled to "B" `srs.index.freq` if is `None`.
+
+    This is a no-op if `srs.index.freq` is not `None`.
+    """
+    dbg.dassert_isinstance(srs.index, pd.DatetimeIndex)
+    if srs.index.freq is None:
+        _LOG.debug("No `freq` detected; resampling to 'B'.")
+        srs = srs.resample("B").sum(min_count=1)
+    return srs
