@@ -853,6 +853,7 @@ def compute_volatility_normalization_factor(
     :return: scale factor
     """
     dbg.dassert_isinstance(srs, pd.Series)
+    # TODO(Paul): Determine how to deal with no `freq`.
     ppy = hdataf.infer_sampling_points_per_year(srs)
     srs = hdataf.apply_nan_mode(srs, mode="fill_with_zero")
     scale_factor: float = target_volatility / (np.sqrt(ppy) * srs.std())
@@ -960,7 +961,6 @@ def compute_turnover(
     :return: turnover
     """
     dbg.dassert_isinstance(pos, pd.Series)
-    dbg.dassert(pos.index.freq)
     nan_mode = nan_mode or "drop"
     pos = hdataf.apply_nan_mode(pos, mode=nan_mode)
     numerator = pos.diff().abs()
@@ -988,6 +988,7 @@ def compute_average_holding_period(
     """
     unit = unit or "B"
     dbg.dassert_isinstance(pos, pd.Series)
+    # TODO(Paul): Determine how to deal with no `freq`.
     dbg.dassert(pos.index.freq)
     pos_freq_in_year = hdataf.infer_sampling_points_per_year(pos)
     unit_freq_in_year = hdataf.infer_sampling_points_per_year(
