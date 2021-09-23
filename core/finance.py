@@ -874,7 +874,7 @@ def compute_kratio(log_rets: pd.Series) -> float:
     :return: K-Ratio
     """
     dbg.dassert_isinstance(log_rets, pd.Series)
-    dbg.dassert(log_rets.index.freq)
+    log_rets = maybe_resample(log_rets)
     log_rets = hdataf.apply_nan_mode(log_rets, mode="fill_with_zero")
     cum_rets = log_rets.cumsum()
     # Fit the best line to the daily rets.
@@ -1129,6 +1129,7 @@ def compute_annualized_return(srs: pd.Series) -> float:
     :return: annualized return; pct rets if `srs` consists of pct rets,
         log rets if `srs` consists of log rets.
     """
+    srs = maybe_resample(srs)
     srs = hdataf.apply_nan_mode(srs, mode="fill_with_zero")
     ppy = hdataf.infer_sampling_points_per_year(srs)
     mean_rets = srs.mean()
@@ -1144,9 +1145,23 @@ def compute_annualized_volatility(srs: pd.Series) -> float:
     :param srs: series with datetimeindex with `freq`
     :return: annualized volatility (stdev)
     """
+    srs = maybe_resample(srs)
     srs = hdataf.apply_nan_mode(srs, mode="fill_with_zero")
     ppy = hdataf.infer_sampling_points_per_year(srs)
     std = srs.std()
     annualized_volatility = np.sqrt(ppy) * std
     annualized_volatility = cast(float, annualized_volatility)
     return annualized_volatility
+
+
+def maybe_resample(srs: pd.Series) -> pd.Series:
+    """
+    Return `srs` resampled to "B" `srs.index.freq` if is `None`.
+
+    This is a no-op if `srs.index.freq` is not `None`.
+    """
+    dbg.dassert_isinstance(srs.index, pd.DatetimeIndex)
+    if srs.index.freq is None:
+        _LOG.debug("No `freq` detected; resampling to 'B'.")
+        srs = srs.resample("B").sum(min_count=1)
+    return srs
