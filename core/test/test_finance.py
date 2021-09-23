@@ -75,14 +75,18 @@ datetime,open,high,low,close,vol
 2016-01-05 15:59:00,95.28,95.36,95.22,95.32,729315
 2016-01-05 16:00:00,95.32,95.4,95.32,95.4,3255752
         """
-        expected = pd.read_csv(io.StringIO(expected_txt), index_col=0, parse_dates=True)
+        expected = pd.read_csv(
+            io.StringIO(expected_txt), index_col=0, parse_dates=True
+        )
         self.assert_dfs_close(actual, expected)
 
     def test_bypass(self) -> None:
         df = self._get_df()
         start_time = datetime.time(9, 29)
         end_time = datetime.time(16, 0)
-        actual = fin.remove_times_outside_window(df, start_time, end_time, bypass=True)
+        actual = fin.remove_times_outside_window(
+            df, start_time, end_time, bypass=True
+        )
         self.assert_dfs_close(actual, df)
 
     @staticmethod
@@ -148,7 +152,9 @@ datetime,close,volume
 2016-01-11,100.00,100000
 2016-01-12,100.00,100000
 """
-        expected = pd.read_csv(io.StringIO(expected_txt), index_col=0, parse_dates=True)
+        expected = pd.read_csv(
+            io.StringIO(expected_txt), index_col=0, parse_dates=True
+        )
         self.assert_dfs_close(actual, expected)
 
     def test_bypass(self) -> None:
