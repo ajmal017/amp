@@ -109,6 +109,29 @@ def set_non_ath_to_nan(
     return df
 
 
+def remove_times_outside_window(
+    df: pd.DataFrame,
+    start_time: datetime.time,
+    end_time: datetime.time,
+    bypass: bool = False,
+) -> pd.DataFrame:
+    """
+    Remove times outside of (start_time, end_time].
+    """
+    # Perform sanity checks.
+    dbg.dassert_isinstance(df.index, pd.DatetimeIndex)
+    hpandas.dassert_strictly_increasing_index(df)
+    dbg.dassert_isinstance(start_time, datetime.time)
+    dbg.dassert_isinstance(end_time, datetime.time)
+    dbg.dassert_lte(start_time, end_time)
+    if bypass:
+        return df
+    # Compute the indices to remove.
+    times = df.index.time
+    to_remove_mask = (times <= start_time) | (end_time < times)
+    return df[~to_remove_mask]
+
+
 def set_weekends_to_nan(df: pd.DataFrame) -> pd.DataFrame:
     """
     Filter out weekends setting the corresponding values to `np.nan`.
@@ -119,6 +142,18 @@ def set_weekends_to_nan(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df[to_remove_mask] = np.nan
     return df
+
+
+def remove_weekends(df: pd.DataFrame, bypass: bool = False) -> pd.DataFrame:
+    """
+    Remove weekends from `df`.
+    """
+    dbg.dassert_isinstance(df.index, pd.DatetimeIndex)
+    # 5 = Saturday, 6 = Sunday.
+    if bypass:
+        return df
+    to_remove_mask = df.index.dayofweek.isin([5, 6])
+    return df[~to_remove_mask]
 
 
 # #############################################################################

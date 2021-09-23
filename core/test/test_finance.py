@@ -60,6 +60,51 @@ datetime,open,high,low,close,vol
         return df
 
 
+class Test_remove_times_outside_window(hut.TestCase):
+    def test_remove(self) -> None:
+        df = self._get_df()
+        start_time = datetime.time(9, 29)
+        end_time = datetime.time(16, 0)
+        actual = fin.remove_times_outside_window(df, start_time, end_time)
+        expected_txt = """
+datetime,open,high,low,close,vol
+2016-01-05 09:30:00,98.14,98.24,97.79,98.01,751857
+2016-01-05 09:31:00,98.01,98.19,98.0,98.0,172584
+2016-01-05 09:32:00,97.99,98.04,97.77,97.77,189058
+2016-01-05 15:58:00,95.31,95.32,95.22,95.27,456235
+2016-01-05 15:59:00,95.28,95.36,95.22,95.32,729315
+2016-01-05 16:00:00,95.32,95.4,95.32,95.4,3255752
+        """
+        expected = pd.read_csv(io.StringIO(expected_txt), index_col=0, parse_dates=True)
+        self.assert_dfs_close(actual, expected)
+
+    def test_bypass(self) -> None:
+        df = self._get_df()
+        start_time = datetime.time(9, 29)
+        end_time = datetime.time(16, 0)
+        actual = fin.remove_times_outside_window(df, start_time, end_time, bypass=True)
+        self.assert_dfs_close(actual, df)
+
+    @staticmethod
+    def _get_df() -> pd.DataFrame:
+        # From `s3://*****-data/data/kibot/all_stocks_1min/AAPL.csv.gz`.
+        txt = """
+datetime,open,high,low,close,vol
+2016-01-05 09:28:00,98.0,98.05,97.99,98.05,2241
+2016-01-05 09:29:00,98.04,98.13,97.97,98.13,14174
+2016-01-05 09:30:00,98.14,98.24,97.79,98.01,751857
+2016-01-05 09:31:00,98.01,98.19,98.0,98.0,172584
+2016-01-05 09:32:00,97.99,98.04,97.77,97.77,189058
+2016-01-05 15:58:00,95.31,95.32,95.22,95.27,456235
+2016-01-05 15:59:00,95.28,95.36,95.22,95.32,729315
+2016-01-05 16:00:00,95.32,95.4,95.32,95.4,3255752
+2016-01-05 16:01:00,95.4,95.42,95.4,95.42,4635
+2016-01-05 16:02:00,95.41,95.41,95.37,95.4,3926
+"""
+        df = pd.read_csv(io.StringIO(txt), index_col=0, parse_dates=True)
+        return df
+
+
 class Test_set_weekends_to_nan(hut.TestCase):
     def test1(self) -> None:
         """
@@ -86,6 +131,50 @@ class Test_set_weekends_to_nan(hut.TestCase):
         actual = fin.set_weekends_to_nan(df)
         actual_string = hut.convert_df_to_string(actual, index=True)
         self.check_string(actual_string)
+
+
+class Test_remove_weekends(hut.TestCase):
+    def test_remove(self) -> None:
+        df = self._get_df()
+        actual = fin.remove_weekends(df)
+        expected_txt = """
+datetime,close,volume
+2016-01-01,NaN,NaN
+2016-01-04,100.00,100000
+2016-01-05,100.00,100000
+2016-01-06,100.00,100000
+2016-01-07,100.00,100000
+2016-01-08,100.00,100000
+2016-01-11,100.00,100000
+2016-01-12,100.00,100000
+"""
+        expected = pd.read_csv(io.StringIO(expected_txt), index_col=0, parse_dates=True)
+        self.assert_dfs_close(actual, expected)
+
+    def test_bypass(self) -> None:
+        df = self._get_df()
+        actual = fin.remove_weekends(df, bypass=True)
+        self.assert_dfs_close(actual, df)
+
+    @staticmethod
+    def _get_df() -> pd.DataFrame:
+        txt = """
+datetime,close,volume
+2016-01-01,NaN,NaN
+2016-01-02,NaN,NaN
+2016-01-03,NaN,NaN
+2016-01-04,100.00,100000
+2016-01-05,100.00,100000
+2016-01-06,100.00,100000
+2016-01-07,100.00,100000
+2016-01-08,100.00,100000
+2016-01-09,100.00,100000
+2016-01-10,100.00,100000
+2016-01-11,100.00,100000
+2016-01-12,100.00,100000
+"""
+        df = pd.read_csv(io.StringIO(txt), index_col=0, parse_dates=True)
+        return df
 
 
 class Test_resample_time_bars1(hut.TestCase):
