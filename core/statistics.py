@@ -1724,7 +1724,9 @@ def compute_bet_stats(
     stats["num_bets"] = bet_lengths.size
     stats["long_bets_(%)"] = 100 * (bet_lengths > 0).sum() / bet_lengths.size
     if positions.index.freq is not None:
-        n_years = positions.size / hdataf.infer_sampling_points_per_year(positions)
+        n_years = positions.size / hdataf.infer_sampling_points_per_year(
+            positions
+        )
         stats["avg_num_bets_per_year"] = bet_lengths.size / n_years
     # Format index.freq outcome to the word that represents its frequency.
     #    E.g. if `srs.index.freq` is equal to `<MonthEnd>` then
