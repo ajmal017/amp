@@ -1,7 +1,7 @@
 """
 Import as:
 
-import core.signal_processing as csigna
+import core.signal_processing as csipro
 """
 
 import collections
@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import pywt
 
-import helpers.dbg as dbg
+import helpers.dbg as hdbg
 
 _LOG = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ def correlate_with_lag(
     :param lag: number of lags to apply or list of number of lags
     :return: correlation matrix with `(1 + len(lag)) * df.columns` columns
     """
-    dbg.dassert_isinstance(df, pd.DataFrame)
+    hdbg.dassert_isinstance(df, pd.DataFrame)
     if isinstance(lag, int):
         lag = [lag]
     elif isinstance(lag, list):
@@ -75,11 +75,11 @@ def correlate_with_lagged_cumsum(
         defaults to all columns except `y_vars`
     :return: correlation matrix of `(len(x_vars), len(y_vars))` shape
     """
-    dbg.dassert_isinstance(df, pd.DataFrame)
-    dbg.dassert_isinstance(y_vars, list)
+    hdbg.dassert_isinstance(df, pd.DataFrame)
+    hdbg.dassert_isinstance(y_vars, list)
     x_vars = x_vars or df.columns.difference(y_vars).tolist()
-    dbg.dassert_isinstance(x_vars, list)
-    dbg.dassert_lte(
+    hdbg.dassert_isinstance(x_vars, list)
+    hdbg.dassert_lte(
         1,
         len(x_vars),
         "There are no columns to compute the correlation of cumulative "
@@ -109,9 +109,9 @@ def _compute_lagged_cumsum(
         `None`, compute for all columns
     :return: dataframe with lagged cumulative sum columns
     """
-    dbg.dassert_isinstance(df, pd.DataFrame)
+    hdbg.dassert_isinstance(df, pd.DataFrame)
     y_vars = y_vars or df.columns.tolist()
-    dbg.dassert_isinstance(y_vars, list)
+    hdbg.dassert_isinstance(y_vars, list)
     x_vars = df.columns.difference(y_vars)
     y = df[y_vars].copy()
     x = df[x_vars].copy()
@@ -138,17 +138,17 @@ def calculate_inverse(
     :param p_moment: order of the matrix norm as in `np.linalg.cond`
     :param info: dict with info to add the condition number to
     """
-    dbg.dassert_isinstance(df, pd.DataFrame)
-    dbg.dassert_eq(
+    hdbg.dassert_isinstance(df, pd.DataFrame)
+    hdbg.dassert_eq(
         df.shape[0], df.shape[1], "Only square matrices are invertible."
     )
-    dbg.dassert(
+    hdbg.dassert(
         df.apply(lambda s: pd.to_numeric(s, errors="coerce").notnull()).all(
             axis=None
         ),
         "The matrix is not numeric.",
     )
-    dbg.dassert_ne(np.linalg.det(df), 0, "The matrix is non-invertible.")
+    hdbg.dassert_ne(np.linalg.det(df), 0, "The matrix is non-invertible.")
     if info is not None:
         info["condition_number"] = np.linalg.cond(df, p_moment)
     return pd.DataFrame(np.linalg.inv(df), df.columns, df.index)
@@ -170,8 +170,8 @@ def calculate_pseudoinverse(
     :param p_moment: order of the matrix norm as in `np.linalg.cond`
     :param info: dict with info to add the condition number to
     """
-    dbg.dassert_isinstance(df, pd.DataFrame)
-    dbg.dassert(
+    hdbg.dassert_isinstance(df, pd.DataFrame)
+    hdbg.dassert(
         df.apply(lambda s: pd.to_numeric(s, errors="coerce").notnull()).all(
             axis=None
         ),
@@ -201,7 +201,7 @@ def squash(
         origin where the squashing function is approximately linear.
     :return: squashed data
     """
-    dbg.dassert_lt(0, scale)
+    hdbg.dassert_lt(0, scale)
     return scale * np.tanh(signal / scale)
 
 
@@ -276,8 +276,8 @@ def _wrap(signal: pd.Series, num_cols: int) -> pd.DataFrame:
 
     :param num_cols: number of columns to use for wrapping
     """
-    dbg.dassert_isinstance(signal, pd.Series)
-    dbg.dassert_lte(1, num_cols)
+    hdbg.dassert_isinstance(signal, pd.Series)
+    hdbg.dassert_lte(1, num_cols)
     values = signal.values
     _LOG.debug("num values=%d", values.size)
     # Calculate number of rows that wrapped pd.DataFrame should have.
@@ -356,7 +356,7 @@ def sign_normalize(
     if isinstance(signal, pd.DataFrame):
         signal = signal.squeeze()
         convert_to_frame = True
-    dbg.dassert_isinstance(
+    hdbg.dassert_isinstance(
         signal,
         pd.Series,
         msg="Only series and 1-dimensional dataframes are admissible",
@@ -381,8 +381,8 @@ def normalize(
     """
     Normalize `signal` by dividing it by its l2 norm.
     """
-    dbg.dassert_isinstance(signal, pd.Series)
-    dbg.dassert(
+    hdbg.dassert_isinstance(signal, pd.Series)
+    hdbg.dassert(
         not signal.isna().any(),
         msg="NaNs detected at %s" % signal[signal.isna()].index,
     )
@@ -398,7 +398,7 @@ def split_positive_and_negative_parts(
     """
     Split `signal` into max(signal, 0) and max(-signal, 0).
     """
-    dbg.dassert_isinstance(signal, pd.Series)
+    hdbg.dassert_isinstance(signal, pd.Series)
     positive = ((signal + signal.abs()) / 2).rename("positive")
     negative = ((signal.abs() - signal) / 2).rename("negative")
     df = pd.concat([positive, negative], axis=1)
@@ -416,7 +416,7 @@ def calculate_tau_from_com(com: float) -> Union[float, np.float]:
 
     This is the function inverse of `calculate_com_from_tau`.
     """
-    dbg.dassert_lt(0, com)
+    hdbg.dassert_lt(0, com)
     return 1.0 / np.log(1 + 1.0 / com)
 
 
@@ -435,7 +435,7 @@ def calculate_com_from_tau(tau: float) -> Union[float, np.float]:
         center-of-mass (com) associated with an compute_ema kernel.
     :return: com
     """
-    dbg.dassert_lt(0, tau)
+    hdbg.dassert_lt(0, tau)
     return 1.0 / (np.exp(1.0 / tau) - 1)
 
 
@@ -470,9 +470,9 @@ def compute_ema(
       - width = \sqrt{n} \tau
       - aspect ratio = \sqrt{1 + 1 / n}
     """
-    dbg.dassert_isinstance(depth, int)
-    dbg.dassert_lte(1, depth)
-    dbg.dassert_lt(0, tau)
+    hdbg.dassert_isinstance(depth, int)
+    hdbg.dassert_lte(1, depth)
+    hdbg.dassert_lt(0, tau)
     _LOG.debug("Calculating iterated ema of depth %i", depth)
     _LOG.debug("range = %0.2f", depth * tau)
     _LOG.debug("<t^2>^{1/2} = %0.2f", np.sqrt(depth * (depth + 1)) * tau)
@@ -515,8 +515,8 @@ def compute_smooth_derivative(
     The `order` parameter refers to the number of times the
     compute_smooth_derivative operator is applied to the original signal.
     """
-    dbg.dassert_isinstance(order, int)
-    dbg.dassert_lte(0, order)
+    hdbg.dassert_isinstance(order, int)
+    hdbg.dassert_lte(0, order)
     gamma = 1.22208
     beta = 0.65
     alpha = 1.0 / (gamma * (8 * beta - 3))
@@ -561,10 +561,10 @@ def compute_smooth_moving_average(
     constant for t << 2 * range_. In particular, when max_depth >= 5,
     the kernels are more rectangular than compute_ema-like.
     """
-    dbg.dassert_isinstance(min_depth, int)
-    dbg.dassert_isinstance(max_depth, int)
-    dbg.dassert_lte(1, min_depth)
-    dbg.dassert_lte(min_depth, max_depth)
+    hdbg.dassert_isinstance(min_depth, int)
+    hdbg.dassert_isinstance(max_depth, int)
+    hdbg.dassert_lte(1, min_depth)
+    hdbg.dassert_lte(min_depth, max_depth)
     range_ = tau * (min_depth + max_depth) / 2.0
     _LOG.debug("Range = %0.2f", range_)
     ema_eval = functools.partial(compute_ema, signal, tau, min_periods)
@@ -603,19 +603,21 @@ def extract_smooth_moving_average_weights(
            prior weights are expressed relative to this value
     """
     idx = signal.index
-    dbg.dassert_isinstance(idx, pd.Index)
-    dbg.dassert(not idx.empty, msg="`signal.index` must be nonempty.")
+    hdbg.dassert_isinstance(idx, pd.Index)
+    hdbg.dassert(not idx.empty, msg="`signal.index` must be nonempty.")
     index_location = index_location or idx[-1]
     if index_location > idx[-1]:
-        _LOG.warning("Requested `index_location` is out-of-range. "
-                     "Proceeding with last `signal.index` location instead.")
+        _LOG.warning(
+            "Requested `index_location` is out-of-range. "
+            "Proceeding with last `signal.index` location instead."
+        )
         index_location = idx[-1]
-    dbg.dassert_in(
+    hdbg.dassert_in(
         index_location,
         idx,
         msg="`index_location` must be a member of `signal.index`",
     )
-    dbg.dassert_lt(0, tau)
+    hdbg.dassert_lt(0, tau)
     # Build a step series.
     # - This is a sequence of ones followed by a sequence of zeros
     # - The length of the ones series is determined by `tau` and is used for
@@ -693,7 +695,7 @@ def compute_rolling_norm(
 
     Moving average corresponds to compute_ema when min_depth = max_depth = 1.
     """
-    dbg.dassert_lte(0, delay, "Requested delay=%i is non-causal.", delay)
+    hdbg.dassert_lte(0, delay, "Requested delay=%i is non-causal.", delay)
     signal = signal.shift(delay)
     signal_p = compute_rolling_moment(
         signal, tau, min_periods, min_depth, max_depth, p_moment
@@ -873,11 +875,11 @@ def compute_centered_gaussian_log_likelihood(
     :return: dataframe of log-likelihoods and adjusted observations
     """
     prefix = prefix or ""
-    dbg.dassert_isinstance(df, pd.DataFrame)
+    hdbg.dassert_isinstance(df, pd.DataFrame)
     # Extract observations and variance, with optional shift applied.
     obs = df[observation_col]
     var = df[variance_col].shift(variance_shifts)
-    dbg.dassert(not (var <= 0).any(), msg="Variance values must be positive.")
+    hdbg.dassert(not (var <= 0).any(), msg="Variance values must be positive.")
     if square_variance_col:
         var = np.square(var)
     # Restrict to relevant data and drop any rows with NaNs.
@@ -887,7 +889,7 @@ def compute_centered_gaussian_log_likelihood(
     # Ensure that there is at least one observation.
     n_obs = idx.size
     _LOG.debug("Number of non-NaN observations=%i", n_obs)
-    dbg.dassert_lt(0, n_obs)
+    hdbg.dassert_lt(0, n_obs)
     # Perform log-likelihood calculation.
     # This term only depends upon the presence of an observation. We preserve
     # it here to facilitate comparisons across series with different numbers of
@@ -1122,12 +1124,12 @@ def process_outliers(
         series. The operation is not in place.
     """
     # Check parameters.
-    dbg.dassert_isinstance(srs, pd.Series)
-    dbg.dassert_lte(0.0, lower_quantile)
+    hdbg.dassert_isinstance(srs, pd.Series)
+    hdbg.dassert_lte(0.0, lower_quantile)
     if upper_quantile is None:
         upper_quantile = 1.0 - lower_quantile
-    dbg.dassert_lte(lower_quantile, upper_quantile)
-    dbg.dassert_lte(upper_quantile, 1.0)
+    hdbg.dassert_lte(lower_quantile, upper_quantile)
+    hdbg.dassert_lte(upper_quantile, 1.0)
     # Process default `min_periods` and `window` parameters.
     if min_periods is None:
         if window is None:
@@ -1155,9 +1157,9 @@ def process_outliers(
     )
     # Compute stats.
     if info is not None:
-        dbg.dassert_isinstance(info, dict)
+        hdbg.dassert_isinstance(info, dict)
         # Dictionary should be empty.
-        dbg.dassert(not info)
+        hdbg.dassert(not info)
         info["series_name"] = srs.name
         info["num_elems_before"] = len(srs)
         info["num_nans_before"] = np.isnan(srs).sum()
@@ -1182,7 +1184,7 @@ def process_outliers(
         elif mode == "set_to_zero":
             srs[mask] = 0.0
         else:
-            dbg.dfatal("Invalid mode='%s'" % mode)
+            hdbg.dfatal("Invalid mode='%s'" % mode)
     # Append more the stats.
     if info is not None:
         info["bounds"] = pd.DataFrame({"l_bound": l_bound, "u_bound": u_bound})
@@ -1215,9 +1217,9 @@ def process_outlier_df(
     https://github.com/.../.../issues/568
     """
     if info is not None:
-        dbg.dassert_isinstance(info, dict)
+        hdbg.dassert_isinstance(info, dict)
         # Dictionary should be empty.
-        dbg.dassert(not info)
+        hdbg.dassert(not info)
     cols = {}
     for col in df.columns:
         if info is not None:
@@ -1239,7 +1241,7 @@ def process_outlier_df(
     ret = pd.DataFrame.from_dict(cols)
     # Check that the columns are the same. We don't use dassert_eq because of
     # #665.
-    dbg.dassert(
+    hdbg.dassert(
         all(df.columns == ret.columns),
         "Columns are different:\ndf.columns=%s\nret.columns=%s",
         str(df.columns),
@@ -1264,7 +1266,7 @@ def process_nonfinite(
         statistics about how many items were removed
     :return: transformed copy of the input series
     """
-    dbg.dassert_isinstance(srs, pd.Series)
+    hdbg.dassert_isinstance(srs, pd.Series)
     nan_mask = np.isnan(srs)
     inf_mask = np.isinf(srs)
     nan_inf_mask = nan_mask | inf_mask
@@ -1278,9 +1280,9 @@ def process_nonfinite(
     else:
         res = srs.copy()
     if info is not None:
-        dbg.dassert_isinstance(info, dict)
+        hdbg.dassert_isinstance(info, dict)
         # Dictionary should be empty.
-        dbg.dassert(not info)
+        hdbg.dassert(not info)
         info["series_name"] = srs.name
         info["num_elems_before"] = len(srs)
         info["num_nans_before"] = np.isnan(srs).sum()
@@ -1321,20 +1323,20 @@ def compute_ipca(
       - list of dfs of unit eigenvectors (0 indexes df eigenvectors
         corresponding to max eigenvalue, etc.).
     """
-    dbg.dassert_isinstance(
+    hdbg.dassert_isinstance(
         num_pc, int, msg="Specify an integral number of principal components."
     )
-    dbg.dassert_lt(
+    hdbg.dassert_lt(
         num_pc,
         df.shape[0],
         msg="Number of time steps should exceed number of principal components.",
     )
-    dbg.dassert_lte(
+    hdbg.dassert_lte(
         num_pc,
         df.shape[1],
         msg="Dimension should be greater than or equal to the number of principal components.",
     )
-    dbg.dassert_lt(0, tau)
+    hdbg.dassert_lt(0, tau)
     com = calculate_com_from_tau(tau)
     alpha = 1.0 / (com + 1.0)
     _LOG.debug("com = %0.2f", com)
@@ -1539,7 +1541,7 @@ def get_swt(
     wavelet = wavelet or "haar"
     _LOG.debug("wavelet=`%s`", wavelet)
     if isinstance(sig, pd.DataFrame):
-        dbg.dassert_eq(
+        hdbg.dassert_eq(
             sig.shape[1], 1, "Input dataframe must have a single column."
         )
         sig = sig.squeeze()
@@ -1558,7 +1560,7 @@ def get_swt(
     # Ensure we have at least one level.
     levels = len(decomp)
     _LOG.debug("levels=%d", levels)
-    dbg.dassert_lt(0, levels)
+    hdbg.dassert_lt(0, levels)
     # Reorganize wavelet coefficients. `pywt.swt` output is of the form
     #     [(cAn, cDn), ..., (cA2, cD2), (cA1, cD1)]
     smooth, detail = zip(*reversed(decomp))
@@ -1633,7 +1635,7 @@ def get_swt_level(
         - "detail": return detail_df for `level`
     :return: see `output_mode`
     """
-    dbg.dassert_in(output_mode, ["smooth", "detail"])
+    hdbg.dassert_in(output_mode, ["smooth", "detail"])
     swt = get_swt(
         sig,
         wavelet=wavelet,
@@ -1641,7 +1643,7 @@ def get_swt_level(
         timing_mode=timing_mode,
         output_mode=output_mode,
     )
-    dbg.dassert_in(level, swt.columns)
+    hdbg.dassert_in(level, swt.columns)
     return swt[level]
 
 
@@ -1697,7 +1699,7 @@ def compute_swt_var(
     """
     if isinstance(sig, pd.Series):
         sig = sig.to_frame()
-    dbg.dassert_eq(len(sig.columns), 1)
+    hdbg.dassert_eq(len(sig.columns), 1)
     col = sig.columns[0]
     df = compute_swt_covar(
         sig,
@@ -1708,7 +1710,7 @@ def compute_swt_var(
         timing_mode=timing_mode,
         axis=axis,
     )
-    dbg.dassert_in("swt_var", df.columns)
+    hdbg.dassert_in("swt_var", df.columns)
     return df
 
 
@@ -1829,7 +1831,7 @@ def resample(
     :resample_kwargs: arguments for pd.DataFrame.resample
     :return: DatetimeIndexResampler object
     """
-    dbg.dassert_in("rule", resample_kwargs, "Argument 'rule' must be specified")
+    hdbg.dassert_in("rule", resample_kwargs, "Argument 'rule' must be specified")
     # Unless specified by the user, the resampling intervals are intended as
     # (a, b] with label on the right.
     if "closed" not in resample_kwargs:
@@ -1887,8 +1889,8 @@ def c_infinity_bump_function(x: float, a: float, b: float) -> float:
     :param a: function is 1 between -a and a
     :param b: function is zero for abs(x) >= b
     """
-    dbg.dassert_lt(0, a)
-    dbg.dassert_lt(a, b)
+    hdbg.dassert_lt(0, a)
+    hdbg.dassert_lt(a, b)
     y = (x ** 2 - a ** 2) / (b ** 2 - a ** 2)
     inverse_bump = c_infinity_step_function(y)
     return 1 - inverse_bump
