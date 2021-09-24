@@ -101,7 +101,7 @@ def aggregate_single_name_models(
         ret_0_col,
         spread_0_col,
         prediction_col,
-        target_col
+        target_col,
     ]
     load_rb_kwargs = {"columns": expected_columns}
     iter = cdtfmouti.yield_experiment_artifacts(
@@ -208,5 +208,3 @@ def _process_single_name_result_df(
     )
     df["half_spread_cost"] = half_spread_cost
     return df
-
-
