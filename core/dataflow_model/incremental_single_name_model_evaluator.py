@@ -194,7 +194,7 @@ def _process_single_name_result_df(
         inplace=True,
     )
     long_and_short_intents = csigna.split_positive_and_negative_parts(
-        df["positiion_intent_1"]
+        df["position_intent_1"]
     )
     df["position_intent_1_long"] = long_and_short_intents["positive"]
     df["position_intent_1_short"] = long_and_short_intents["negative"]
