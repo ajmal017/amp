@@ -400,7 +400,7 @@ def split_positive_and_negative_parts(
     """
     dbg.dassert_isinstance(signal, pd.Series)
     positive = ((signal + signal.abs()) / 2).rename("positive")
-    negative = ((signal - signal.abs()) / 2).rename("negative")
+    negative = ((signal.abs() - signal) / 2).rename("negative")
     df = pd.concat([positive, negative], axis=1)
     return df
 
