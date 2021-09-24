@@ -1,7 +1,7 @@
 """
 Import as:
 
-import core.incremental_single_name_model_evaluator.py as
+import core.dataflow_model.incremental_single_name_model_evaluator as cdtfmoinsinamodeva
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ import pandas as pd
 import core.dataflow_model.stats_computer as cdtfmostcom
 import core.dataflow_model.utils as cdtfmouti
 import core.finance as cfin
-import core.signal_processing as csigna
+import core.signal_processing as csipro
 import core.statistics as csta
 import helpers.datetime_ as hdatetim
 import helpers.dbg as hdbg
@@ -193,7 +193,7 @@ def _process_single_name_result_df(
         },
         inplace=True,
     )
-    long_and_short_intents = csigna.split_positive_and_negative_parts(
+    long_and_short_intents = csipro.split_positive_and_negative_parts(
         df["position_intent_1"]
     )
     df["position_intent_1_long"] = long_and_short_intents["positive"]
