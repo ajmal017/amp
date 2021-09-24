@@ -25,7 +25,7 @@ import core.config as cconfig
 import core.dataflow_model.incremental_single_name_model_evaluator as ime
 import core.dataflow_model.model_evaluator as modeval
 import core.dataflow_model.model_plotter as modplot
-import core.dataflow_mode.stats_computer as csc
+import core.dataflow_model.stats_computer as csc
 import core.plotting as cplot
 import helpers.dbg as dbg
 import helpers.printing as hprint
@@ -59,7 +59,7 @@ if eval_config is None:
         {
             "compute_stats_kwargs": {
                 "src_dir": src_dir,
-                "file_name": file_name
+                "file_name": file_name,
                 "prediction_col": prediction_col,
                 "target_col": target_col,
                 "start": None,
@@ -69,7 +69,7 @@ if eval_config is None:
             },
             "aggregate_single_name_models": {
                 "src_dir": src_dir,
-                "file_name": file_name
+                "file_name": file_name,
                 "position_intent_1_col": "",
                 "ret_0_col": "",
                 "spread_0_col": "",
@@ -90,7 +90,7 @@ print(str(eval_config))
 # # Compute stats
 
 # %%
-stats = ime.compute_stats_for_single_name_artifacts(**eval_config["compute_stats_kwargs"])
+stats = ime.compute_stats_for_single_name_artifacts(**eval_config["compute_stats_kwargs"].to_dict())
 
 # %%
 # TODO(gp): Move this chunk of code into a function.
@@ -113,7 +113,7 @@ print("model not selected=%s" % not_selected)
 # # Build portfolio
 
 # %%
-portfolio, daily_dfs = ime.aggregate_single_name_models(**eval_config["aggregate_single_name_models"])
+portfolio, daily_dfs = ime.aggregate_single_name_models(**eval_config["aggregate_single_name_models"].to_dict())
 
 # %%
 portfolio.dropna().head()
