@@ -1,7 +1,7 @@
 """
 Import as:
 
-import core.dataflow_model.model_evaluator as modeval
+import core.dataflow_model.model_evaluator as cdtfmomoeva
 """
 
 from __future__ import annotations
@@ -16,13 +16,13 @@ from tqdm.auto import tqdm
 
 import core.config as cconfig
 import core.dataflow as cdataf
-import core.dataflow_model.stats_computer as cstats
-import core.dataflow_model.utils as cdmu
-import core.finance as fin
-import core.signal_processing as sigp
-import core.statistics as stats
-import helpers.dbg as dbg
-import helpers.introspection as hintro
+import core.dataflow_model.stats_computer as cdtfmostcom
+import core.dataflow_model.utils as cdtfmouti
+import core.finance as cfin
+import core.signal_processing as csipro
+import core.statistics as csta
+import helpers.dbg as hdbg
+import helpers.introspection as hintrosp
 
 _LOG = logging.getLogger(__name__)
 
@@ -36,6 +36,7 @@ _LOG = logging.getLogger(__name__)
 Key = int
 
 
+# TODO(Paul): Deprecate.
 class StrategyEvaluator:
     """
     Evaluate the performance of a strategy driven by an alpha.
@@ -67,10 +68,10 @@ class StrategyEvaluator:
             `returns_col`
         """
         self._data = data
-        dbg.dassert(data, msg="Data set must be nonempty")
+        hdbg.dassert(data, msg="Data set must be nonempty")
         # This is required by the current implementation otherwise when we extract
         # columns from dataframes we get dataframes and not series.
-        dbg.dassert_ne(
+        hdbg.dassert_ne(
             returns_col,
             spread_col,
         )
@@ -81,7 +82,7 @@ class StrategyEvaluator:
         # self.end = end
         # The valid keys are the keys in the data dict.
         self.valid_keys = list(self._data.keys())
-        self._stats_computer = cstats.StatsComputer()
+        self._stats_computer = cdtfmostcom.StatsComputer()
 
     # TODO(Paul): This looks like the corresponding method for `ModelEvaluator`
     #  except for the columns needed. Factor out the common part.
@@ -99,29 +100,27 @@ class StrategyEvaluator:
         """
         _LOG.info(
             "Before building StrategyEvaluator: memory_usage=%s",
-            dbg.get_memory_usage_as_str(None),
+            hdbg.get_memory_usage_as_str(None),
         )
         data_dict: Dict[Key, pd.DataFrame] = {}
         # Convert each `ResultBundle` dict into a `ResultBundle` class object.
         for key, result_bundle in result_bundle_dict.items():
             _LOG.debug("Loading key=%s", key)
             try:
-                _LOG.debug("memory_usage=%s", dbg.get_memory_usage_as_str(None))
+                _LOG.debug("memory_usage=%s", hdbg.get_memory_usage_as_str(None))
                 df = result_bundle.result_df
-                dbg.dassert_is_not(df, None)
+                hdbg.dassert_is_not(df, None)
                 _LOG.debug(
                     "result_df.memory_usage=%s",
-                    hintro.format_size(
+                    hintrosp.format_size(
                         df.memory_usage(index=True, deep=True).sum()
                     ),
                 )
                 # Extract the needed columns.
                 for col in (position_intent_col, returns_col, spread_col):
-                    dbg.dassert_in(col, df.columns)
-                dbg.dassert_not_in(key, data_dict.keys())
-                df_tmp = df[
-                    [position_intent_col, returns_col, spread_col]
-                ]
+                    hdbg.dassert_in(col, df.columns)
+                hdbg.dassert_not_in(key, data_dict.keys())
+                df_tmp = df[[position_intent_col, returns_col, spread_col]]
                 data_dict[key] = df_tmp
             except Exception as e:
                 _LOG.error(
@@ -141,7 +140,7 @@ class StrategyEvaluator:
         )
         _LOG.info(
             "After building StrategyEvaluator: memory_usage=%s",
-            dbg.get_memory_usage_as_str(None),
+            hdbg.get_memory_usage_as_str(None),
         )
         return evaluator
 
@@ -156,7 +155,7 @@ class StrategyEvaluator:
                 eval_config["strategy_evaluator_kwargs"]["spread_col"],
             ]
         }
-        result_bundle_dict = cdmu.load_experiment_artifacts(**load_config)
+        result_bundle_dict = cdtfmouti.load_experiment_artifacts(**load_config)
         # Build the StrategyEvaluator.
         evaluator = StrategyEvaluator.from_result_bundle_dict(
             result_bundle_dict,
@@ -183,17 +182,21 @@ class StrategyEvaluator:
         # TODO(gp): Add some logic to cache this data and not recompute.
         _LOG.info(
             "Before StrategyEvaluator.compute_pnl: memory_usage=%s",
-            dbg.get_memory_usage_as_str(None),
+            hdbg.get_memory_usage_as_str(None),
         )
         keys = keys or self.valid_keys
-        dbg.dassert_is_subset(keys, self.valid_keys)
+        hdbg.dassert_is_subset(keys, self.valid_keys)
         # Build the dict from experiment key to dataframe.
         pnl_dict: Dict[Union[Key, str], pd.DataFrame] = {}
         for key in tqdm(keys):
             _LOG.debug("Process key=%s", key)
             # Extract the needed data from the current dataframe.
-            for col in (self.returns_col, self.position_intent_col, self.spread_col):
-                dbg.dassert_in(col, self._data[key].columns)
+            for col in (
+                self.returns_col,
+                self.position_intent_col,
+                self.spread_col,
+            ):
+                hdbg.dassert_in(col, self._data[key].columns)
             df = self._data[key][
                 [self.returns_col, self.position_intent_col, self.spread_col]
             ]
@@ -211,7 +214,7 @@ class StrategyEvaluator:
             )
             # Compute PnL.
             pnl = (
-                fin.compute_pnl(
+                cfin.compute_pnl(
                     df,
                     position_intent_col="position_intent_1",
                     return_col="ret_0",
@@ -222,7 +225,7 @@ class StrategyEvaluator:
             df["pnl_0"] = pnl
             # Compute spread cost.
             spread_cost = (
-                fin.compute_spread_cost(
+                cfin.compute_spread_cost(
                     df,
                     target_position_col="position_intent_1",
                     spread_col="spread_0",
@@ -258,7 +261,7 @@ class StrategyEvaluator:
             pnl_dict = pnl_dict_pivoted
         else:
             raise ValueError("Invalid key_type='%s'" % key_type)
-        _LOG.info("memory_usage=%s", dbg.get_memory_usage_as_str(None))
+        _LOG.info("memory_usage=%s", hdbg.get_memory_usage_as_str(None))
         return pnl_dict
 
     def calculate_stats(
@@ -297,14 +300,14 @@ class StrategyEvaluator:
         # TODO(gp): Factor out this piece since it's common to `ModelEvaluator`.
         stats_df = pd.concat(stats_dict, axis=1)
         # Calculate BH adjustment of pvals.
-        adj_pvals = stats.multipletests(
+        adj_pvals = csta.multipletests(
             stats_df.loc["signal_quality"].loc["sr.pval"], nan_mode="drop"
         ).rename("sr.adj_pval")
         adj_pvals = pd.concat(
             [adj_pvals.to_frame().transpose()], keys=["signal_quality"]
         )
         stats_df = pd.concat([stats_df, adj_pvals], axis=0)
-        _LOG.info("memory_usage=%s", dbg.get_memory_usage_as_str(None))
+        _LOG.info("memory_usage=%s", hdbg.get_memory_usage_as_str(None))
         return stats_df
 
 
@@ -313,6 +316,7 @@ class StrategyEvaluator:
 # #############################################################################
 
 
+# TODO(Paul): Deprecate.
 class ModelEvaluator:
     """
     Evaluate returns predictions.
@@ -353,10 +357,10 @@ class ModelEvaluator:
         :param oos_start: start of the OOS period, or None for nothing
         """
         self._data = data
-        dbg.dassert(data, msg="Data set must be nonempty")
+        hdbg.dassert(data, msg="Data set must be nonempty")
         # This is required by the current implementation otherwise when we extract
         # columns from dataframes we get dataframes and not series.
-        dbg.dassert_ne(
+        hdbg.dassert_ne(
             prediction_col,
             target_col,
             "Prediction and target columns need to be different",
@@ -368,7 +372,7 @@ class ModelEvaluator:
         self.valid_keys = list(self._data.keys())
         # TODO(gp): This is used only in `calculate_stats`, so it doesn't have to be
         #  part of the state.
-        self._stats_computer = cstats.StatsComputer()
+        self._stats_computer = cdtfmostcom.StatsComputer()
 
     @classmethod
     def from_result_bundle_dict(
@@ -390,26 +394,26 @@ class ModelEvaluator:
         """
         _LOG.info(
             "Before building ModelEvaluator: memory_usage=%s",
-            dbg.get_memory_usage_as_str(None),
+            hdbg.get_memory_usage_as_str(None),
         )
         data_dict: Dict[Key, pd.DataFrame] = {}
         # Convert each `ResultBundle` dict into a `ResultBundle` class object.
         for key, result_bundle in result_bundle_dict.items():
             _LOG.debug("Loading key=%s", key)
             try:
-                _LOG.debug("memory_usage=%s", dbg.get_memory_usage_as_str(None))
+                _LOG.debug("memory_usage=%s", hdbg.get_memory_usage_as_str(None))
                 df = result_bundle.result_df
-                dbg.dassert_is_not(df, None)
+                hdbg.dassert_is_not(df, None)
                 _LOG.debug(
                     "result_df.memory_usage=%s",
-                    hintro.format_size(
+                    hintrosp.format_size(
                         df.memory_usage(index=True, deep=True).sum()
                     ),
                 )
                 # Extract the needed columns.
-                dbg.dassert_in(target_col, df.columns)
-                dbg.dassert_in(predictions_col, df.columns)
-                dbg.dassert_not_in(key, data_dict.keys())
+                hdbg.dassert_in(target_col, df.columns)
+                hdbg.dassert_in(predictions_col, df.columns)
+                hdbg.dassert_not_in(key, data_dict.keys())
                 data_dict[key] = df[[target_col, predictions_col]]
             except Exception as e:
                 _LOG.error(
@@ -429,7 +433,7 @@ class ModelEvaluator:
         )
         _LOG.info(
             "After building ModelEvaluator: memory_usage=%s",
-            dbg.get_memory_usage_as_str(None),
+            hdbg.get_memory_usage_as_str(None),
         )
         return evaluator
 
@@ -449,7 +453,7 @@ class ModelEvaluator:
                 eval_config["model_evaluator_kwargs"]["predictions_col"],
             ]
         }
-        result_bundle_dict = cdmu.load_experiment_artifacts(**load_config)
+        result_bundle_dict = cdtfmouti.load_experiment_artifacts(**load_config)
         # Build the ModelEvaluator.
         evaluator = ModelEvaluator.from_result_bundle_dict(
             result_bundle_dict,
@@ -464,7 +468,7 @@ class ModelEvaluator:
         `keys=None`.
         """
         keys = keys or self.valid_keys
-        dbg.dassert_is_subset(keys, self.valid_keys)
+        hdbg.dassert_is_subset(keys, self.valid_keys)
         return keys
 
     def aggregate_models(
@@ -501,7 +505,7 @@ class ModelEvaluator:
         pnl_df = pd.concat({k: v["pnl"] for k, v in pnl_dict.items()}, axis=1)
         # Get the weights.
         weights = weights or [1 / len(keys)] * len(keys)
-        dbg.dassert_eq(len(keys), len(weights))
+        hdbg.dassert_eq(len(keys), len(weights))
         col_map = {keys[idx]: weights[idx] for idx in range(len(keys))}
         # Calculate PnL series.
         pnl_df = pnl_df.apply(lambda x: x * col_map[x.name]).sum(
@@ -529,7 +533,7 @@ class ModelEvaluator:
                 )
             else:
                 ins_pnl_srs = pnl_srs
-            scale_factor = fin.compute_volatility_normalization_factor(
+            scale_factor = cfin.compute_volatility_normalization_factor(
                 srs=ins_pnl_srs, target_volatility=target_volatility
             )
             pnl_srs *= scale_factor
@@ -540,7 +544,7 @@ class ModelEvaluator:
             positions_col="positions",
             pnl_col="pnl",
         )
-        _LOG.info("memory_usage=%s", dbg.get_memory_usage_as_str(None))
+        _LOG.info("memory_usage=%s", hdbg.get_memory_usage_as_str(None))
         return pnl_srs, pos_srs, aggregate_stats
 
     # TODO(gp): This is second.
@@ -591,14 +595,14 @@ class ModelEvaluator:
             )
         stats_df = pd.concat(stats_dict, axis=1)
         # Calculate BH adjustment of pvals.
-        adj_pvals = stats.multipletests(
+        adj_pvals = csta.multipletests(
             stats_df.loc["signal_quality"].loc["sr.pval"], nan_mode="drop"
         ).rename("sr.adj_pval")
         adj_pvals = pd.concat(
             [adj_pvals.to_frame().transpose()], keys=["signal_quality"]
         )
         stats_df = pd.concat([stats_df, adj_pvals], axis=0)
-        _LOG.info("memory_usage=%s", dbg.get_memory_usage_as_str(None))
+        _LOG.info("memory_usage=%s", hdbg.get_memory_usage_as_str(None))
         return stats_df
 
     # TODO(gp): This is first.
@@ -629,10 +633,10 @@ class ModelEvaluator:
         _LOG.debug("Process returns")
         returns = {}
         for key in keys:
-            dbg.dassert_in(self.target_col, self._data[key].columns)
+            hdbg.dassert_in(self.target_col, self._data[key].columns)
             srs = self._data[key][self.target_col]
             _validate_series(srs)
-            dbg.dassert_lte(0, returns_shift)
+            hdbg.dassert_lte(0, returns_shift)
             srs = srs.shift(returns_shift)
             srs.name = "returns"
             _validate_series(srs)
@@ -641,10 +645,10 @@ class ModelEvaluator:
         _LOG.debug("Process predictions")
         predictions = {}
         for key in keys:
-            dbg.dassert_in(self.prediction_col, self._data[key].columns)
+            hdbg.dassert_in(self.prediction_col, self._data[key].columns)
             srs = self._data[key][self.prediction_col]
             _validate_series(srs)
-            dbg.dassert_lte(0, predictions_shift)
+            hdbg.dassert_lte(0, predictions_shift)
             srs = srs.shift(predictions_shift)
             srs.name = "predictions"
             _validate_series(srs)
@@ -682,7 +686,7 @@ class ModelEvaluator:
             )
         _LOG.debug("Trim pnl_dict")
         pnl_dict = self._trim_time_range(pnl_dict, mode=mode)
-        _LOG.info("memory_usage=%s", dbg.get_memory_usage_as_str(None))
+        _LOG.info("memory_usage=%s", hdbg.get_memory_usage_as_str(None))
         return pnl_dict
 
     # TODO(gp): Maybe trim when they are generated so we can discard.
@@ -700,7 +704,7 @@ class ModelEvaluator:
         elif mode == "ins":
             trimmed = {k: v.loc[: self.oos_start] for k, v in data_dict.items()}
         elif mode == "oos":
-            dbg.dassert(self.oos_start, msg="No `oos_start` set!")
+            hdbg.dassert(self.oos_start, msg="No `oos_start` set!")
             trimmed = {k: v.loc[self.oos_start :] for k, v in data_dict.items()}
         else:
             raise ValueError(f"Unrecognized mode `{mode}`.")
@@ -713,19 +717,19 @@ class ModelEvaluator:
 
 
 def _validate_series(srs: pd.Series, oos_start: Optional[float] = None) -> None:
-    dbg.dassert_isinstance(srs, pd.Series)
-    dbg.dassert(not srs.empty, "Empty series")
-    dbg.dassert(not srs.dropna().empty, "Series with only nans")
+    hdbg.dassert_isinstance(srs, pd.Series)
+    hdbg.dassert(not srs.empty, "Empty series")
+    hdbg.dassert(not srs.dropna().empty, "Series with only nans")
     if oos_start is not None:
-        dbg.dassert(
+        hdbg.dassert(
             not srs[:oos_start].dropna().empty,  # type: ignore[misc]
             "Empty in-sample series",
         )
-        dbg.dassert(
+        hdbg.dassert(
             not srs[oos_start:].dropna().empty,  # type: ignore[misc]
             "Empty OOS series",
         )
-    dbg.dassert(srs.index.freq)
+    hdbg.dassert(srs.index.freq)
 
 
 # TODO(gp): This goes first.
@@ -856,12 +860,12 @@ class PositionComputer:
         z_saturation_point: float,
     ) -> pd.Series:
         # z-score.
-        zscored_preds = sigp.compute_rolling_zscore(
+        zscored_preds = csipro.compute_rolling_zscore(
             predictions, tau=tau, delay=delay
         )
         # Multiple by a kernel.
         bump_function = functools.partial(
-            sigp.c_infinity_bump_function, a=z_mute_point, b=z_saturation_point
+            csipro.c_infinity_bump_function, a=z_mute_point, b=z_saturation_point
         )
         scale_factors = 1 - zscored_preds.apply(bump_function)
         adjusted_preds = zscored_preds.multiply(scale_factors)
@@ -874,10 +878,10 @@ class PositionComputer:
         delay: int,
         scale: float,
     ) -> pd.Series:
-        zscored_preds = sigp.compute_rolling_zscore(
+        zscored_preds = csipro.compute_rolling_zscore(
             predictions, tau=tau, delay=delay
         )
-        return sigp.squash(zscored_preds, scale=scale)
+        return csipro.squash(zscored_preds, scale=scale)
 
     def _adjust_for_volatility(
         self,
@@ -896,7 +900,7 @@ class PositionComputer:
         # Rescale in-sample.
         ins_pnl = pnl[: self.oos_start]  # type: ignore[misc]
         if volatility_strategy == "rescale":
-            scale_factor = fin.compute_volatility_normalization_factor(
+            scale_factor = cfin.compute_volatility_normalization_factor(
                 srs=ins_pnl, target_volatility=target_volatility
             )
             positions = scale_factor * predictions
@@ -919,7 +923,7 @@ class PositionComputer:
         if mode == "ins":
             ret = srs[: self.oos_start]  # type: ignore[misc]
         elif mode == "oos":
-            dbg.dassert(
+            hdbg.dassert(
                 self.oos_start,
                 msg="Must set `oos_start` to run `oos`",
             )
