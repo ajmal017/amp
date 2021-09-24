@@ -4,7 +4,7 @@ experiments.
 
 Import as:
 
-import core.dataflow_model.utils as cdtfut
+import core.dataflow_model.utils as cdtfmouti
 """
 
 # TODO(gp): -> experiment_utils.py
@@ -32,12 +32,12 @@ from tqdm.autonotebook import tqdm
 
 import core.config as cconfig
 import core.dataflow as dtf
-import core.signal_processing as csigna
-import helpers.dbg as dbg
+import core.signal_processing as csipro
+import helpers.dbg as hdbg
 import helpers.io_ as hio
-import helpers.parser as prsr
+import helpers.parser as hparser
 import helpers.pickle_ as hpickle
-import helpers.printing as hprint
+import helpers.printing as hprintin
 import helpers.s3 as hs3
 
 _LOG = logging.getLogger(__name__)
@@ -55,10 +55,10 @@ def add_experiment_arg(
         or not. If not, a default value should be passed through `dst_dir_default`
     :param dst_dir_default: a default destination dir
     """
-    parser = prsr.add_dst_dir_arg(
+    parser = hparser.add_dst_dir_arg(
         parser, dst_dir_required=dst_dir_required, dst_dir_default=dst_dir_default
     )
-    parser = prsr.add_parallel_processing_arg(parser)
+    parser = hparser.add_parallel_processing_arg(parser)
     parser.add_argument(
         "--index",
         action="store",
@@ -123,7 +123,7 @@ def setup_experiment_dir(config: cconfig.Config) -> None:
 
     :return: whether we need to run this config or not
     """
-    dbg.dassert_isinstance(config, cconfig.Config)
+    hdbg.dassert_isinstance(config, cconfig.Config)
     # Create subdirectory structure for experiment results.
     experiment_result_dir = config[("meta", "experiment_result_dir")]
     _LOG.info("Creating experiment dir '%s'", experiment_result_dir)
@@ -151,13 +151,13 @@ def select_config(
     :param start_from_index: index of a config to start execution from, if not `None`
     :return: list of configs to execute
     """
-    dbg.dassert_container_type(configs, List, cconfig.Config)
-    dbg.dassert_lte(1, len(configs))
+    hdbg.dassert_container_type(configs, List, cconfig.Config)
+    hdbg.dassert_lte(1, len(configs))
     if index is not None:
         index = int(index)
         _LOG.warning("Only config %d will be executed because of --index", index)
-        dbg.dassert_lte(0, index)
-        dbg.dassert_lt(index, len(configs))
+        hdbg.dassert_lte(0, index)
+        hdbg.dassert_lt(index, len(configs))
         configs = [configs[index]]
     elif start_from_index is not None:
         start_from_index = int(start_from_index)
@@ -165,11 +165,11 @@ def select_config(
             "Only configs >= %d will be executed because of --start_from_index",
             start_from_index,
         )
-        dbg.dassert_lte(0, start_from_index)
-        dbg.dassert_lt(start_from_index, len(configs))
+        hdbg.dassert_lte(0, start_from_index)
+        hdbg.dassert_lt(start_from_index, len(configs))
         configs = [c for idx, c in enumerate(configs) if idx >= start_from_index]
     _LOG.info("Selected %s configs", len(configs))
-    dbg.dassert_container_type(configs, List, cconfig.Config)
+    hdbg.dassert_container_type(configs, List, cconfig.Config)
     return configs
 
 
@@ -211,7 +211,7 @@ def get_configs_from_command_line(
             "The following configs will not be executed due to passing --dry_run:"
         )
         for i, config in enumerate(configs):
-            print(hprint.frame("Config %d/%s" % (i + 1, len(configs))))
+            print(hprintin.frame("Config %d/%s" % (i + 1, len(configs))))
             print(str(config))
         sys.exit(0)
     return configs
@@ -287,7 +287,7 @@ def _retrieve_archived_experiment_artifacts_from_S3(
         _LOG.warning(
             "The file name '%s' is not under `experiments` dir", s3_file_name
         )
-    dbg.dassert_file_extension(s3_file_name, "tgz")
+    hdbg.dassert_file_extension(s3_file_name, "tgz")
     tgz_dst_dir = hs3.retrieve_archived_data_from_s3(
         s3_file_name, dst_dir, aws_profile
     )
@@ -315,7 +315,7 @@ def _get_experiment_subdirs(
     if src_dir.endswith(".tgz"):
         scratch_dir = "."
         if hs3.is_s3_path(src_dir):
-            dbg.dassert_is_not(aws_profile, None)
+            hdbg.dassert_is_not(aws_profile, None)
             aws_profile = cast(str, aws_profile)
             tgz_file = _retrieve_archived_experiment_artifacts_from_S3(
                 src_dir, scratch_dir, aws_profile
@@ -326,7 +326,7 @@ def _get_experiment_subdirs(
         src_dir = hs3.expand_archived_data(tgz_file, scratch_dir)
         _LOG.debug("src_dir=%s", src_dir)
     # Retrieve all the subdirectories in `src_dir` that store results.
-    dbg.dassert_dir_exists(src_dir)
+    hdbg.dassert_dir_exists(src_dir)
     subdirs = [d for d in glob.glob(f"{src_dir}/result_*") if os.path.isdir(d)]
     _LOG.info("Found %d experiment subdirs in '%s'", len(subdirs), src_dir)
     # Build a mapping from `config_idx` to `experiment_dir`.
@@ -335,10 +335,10 @@ def _get_experiment_subdirs(
         _LOG.debug("subdir='%s'", subdir)
         # E.g., `result_123"
         m = re.match(r"^result_(\d+)$", os.path.basename(subdir))
-        dbg.dassert(m)
+        hdbg.dassert(m)
         m = cast(Match[str], m)
         key = int(m.group(1))
-        dbg.dassert_not_in(key, config_idx_to_dir)
+        hdbg.dassert_not_in(key, config_idx_to_dir)
         config_idx_to_dir[key] = subdir
     # Select the indices of files to load.
     config_idxs = config_idx_to_dir.keys()
@@ -347,11 +347,11 @@ def _get_experiment_subdirs(
         selected_keys = sorted(config_idxs)
     else:
         idxs_l = set(selected_idxs)
-        dbg.dassert_is_subset(idxs_l, set(config_idxs))
+        hdbg.dassert_is_subset(idxs_l, set(config_idxs))
         selected_keys = [key for key in sorted(config_idxs) if key in idxs_l]
     # Subset the experiment subdirs based on the selected keys.
     experiment_subdirs = {key: config_idx_to_dir[key] for key in selected_keys}
-    dbg.dassert_lte(
+    hdbg.dassert_lte(
         1,
         len(experiment_subdirs),
         "Can't find subdirs in '%s'",
@@ -429,7 +429,7 @@ def yield_experiment_artifacts(
     # Iterate over experiment directories.
     for key, subdir in tqdm(experiment_subdirs.items(), desc="Loading artifacts"):
         # Build the name of the file.
-        dbg.dassert_dir_exists(subdir)
+        hdbg.dassert_dir_exists(subdir)
         file_name_tmp = os.path.join(subdir, file_name)
         _LOG.debug("Loading '%s'", file_name_tmp)
         if not os.path.exists(file_name_tmp):
@@ -455,7 +455,7 @@ def _yield_rolling_experiment_out_of_sample_df(
     Same inputs as `load_experiment_artifacts()`.
     """
     # TODO(gp): Not sure what are the acceptable prefixes.
-    dbg.dassert_in(
+    hdbg.dassert_in(
         file_name_prefix, ("result_bundle.v1_0.pkl", "result_bundle.v2_0.pkl")
     )
     # TODO(Paul): Generalize to loading fit `ResultBundle`s.
@@ -466,7 +466,7 @@ def _yield_rolling_experiment_out_of_sample_df(
     )
     # Iterate over experiment directories.
     for key, subdir in tqdm(experiment_subdirs.items(), desc="Loading artifacts"):
-        dbg.dassert_dir_exists(subdir)
+        hdbg.dassert_dir_exists(subdir)
         # TODO(Paul): Sort these explicitly. Currently we rely on an implicit
         #  order.
         files = glob.glob(os.path.join(subdir, file_name_prefix) + "*")
@@ -477,13 +477,13 @@ def _yield_rolling_experiment_out_of_sample_df(
             if not os.path.exists(file_name_tmp):
                 _LOG.warning("Can't find '%s': skipping", file_name_tmp)
                 continue
-            dbg.dassert(os.path.basename(file_name_tmp))
+            hdbg.dassert(os.path.basename(file_name_tmp))
             rb = _load_experiment_artifact(file_name_tmp, load_rb_kwargs)
             dfs.append(rb["result_df"])
         if dfs:
             df = pd.concat(dfs, axis=0)
-            dbg.dassert_strictly_increasing_index(df)
-            df = csigna.resample(df, rule=dfs[0].index.freq).sum(min_count=1)
+            hdbg.dassert_strictly_increasing_index(df)
+            df = csipro.resample(df, rule=dfs[0].index.freq).sum(min_count=1)
             yield key, df
 
 
@@ -520,10 +520,10 @@ def load_experiment_artifacts(
     """
     _LOG.info(
         "Before load_experiment_artifacts: memory_usage=%s",
-        dbg.get_memory_usage_as_str(None),
+        hdbg.get_memory_usage_as_str(None),
     )
     if experiment_type == "ins_oos":
-        iterator = _yield_experiment_artifacts
+        iterator = yield_experiment_artifacts
     elif experiment_type == "rolling_oos":
         iterator = _yield_rolling_experiment_out_of_sample_df
     else:
@@ -540,12 +540,12 @@ def load_experiment_artifacts(
     for key, artifact in iter:
         _LOG.info(
             "load_experiment_artifacts: memory_usage=%s",
-            dbg.get_memory_usage_as_str(None),
+            hdbg.get_memory_usage_as_str(None),
         )
         artifacts[key] = artifact
-    dbg.dassert(artifacts, "No data read from '%s'", src_dir)
+    hdbg.dassert(artifacts, "No data read from '%s'", src_dir)
     _LOG.info(
         "After load_experiment_artifacts: memory_usage=%s",
-        dbg.get_memory_usage_as_str(None),
+        hdbg.get_memory_usage_as_str(None),
     )
     return artifacts
