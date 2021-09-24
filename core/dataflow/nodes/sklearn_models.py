@@ -102,7 +102,7 @@ class ContinuousSkLearnModel(cdnb.FitPredictNode, cdnb.ColModeMixin):
         # Materialize names of x and y vars.
         x_vars = cdtfu.convert_to_list(self._x_vars)
         y_vars = cdtfu.convert_to_list(self._y_vars)
-        if self._sample_weight_col is not None:
+        if fit and self._sample_weight_col is not None:
             sample_weight_col = cdtfu.convert_to_list(self._sample_weight_col)
             dbg.dassert_eq(len(sample_weight_col), 1)
         else:
