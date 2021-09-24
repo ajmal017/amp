@@ -15,6 +15,7 @@ import pandas as pd
 import core.dataflow_model.stats_computer as cdtfmostcom
 import core.dataflow_model.utils as cdtfmouti
 import core.finance as cfin
+import core.signal_processing as csigna
 import core.statistics as csta
 import helpers.datetime_ as hdatetim
 import helpers.dbg as hdbg
@@ -104,7 +105,7 @@ def aggregate_single_name_models(
         target_col,
     ]
     load_rb_kwargs = {"columns": expected_columns}
-    iter = cdtfmouti.yield_experiment_artifacts(
+    iterator = cdtfmouti.yield_experiment_artifacts(
         src_dir,
         file_name,
         load_rb_kwargs=load_rb_kwargs,
@@ -113,7 +114,7 @@ def aggregate_single_name_models(
     )
     portfolio = pd.DataFrame()
     dfs = collections.OrderedDict()
-    for key, artifact in iter:
+    for key, artifact in iterator:
         _LOG.info(
             "load_experiment_artifacts: memory_usage=%s",
             hdbg.get_memory_usage_as_str(None),
@@ -192,6 +193,11 @@ def _process_single_name_result_df(
         },
         inplace=True,
     )
+    long_and_short_intents = csigna.split_positive_and_negative_parts(
+        df["positiion_intent_1"]
+    )
+    df["position_intent_1_long"] = long_and_short_intents["positive"]
+    df["position_intent_1_short"] = long_and_short_intents["negative"]
     # Compute PnL from predictions (e.g., in z-score space).
     research_pnl_2 = df["prediction"] * df["target"]
     df["research_pnl_2"] = research_pnl_2
