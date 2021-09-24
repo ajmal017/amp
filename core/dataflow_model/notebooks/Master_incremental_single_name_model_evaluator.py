@@ -95,13 +95,13 @@ stats = ime.compute_stats_for_single_name_artifacts(**eval_config["compute_stats
 # %%
 # TODO(gp): Move this chunk of code into a function.
 col_mask = (
-    pnl_stats.loc["signal_quality"].loc["sr.adj_pval"]
+    stats.loc["signal_quality"].loc["sr.adj_pval"]
     < eval_config["bh_adj_threshold"]
 )
-selected = pnl_stats.loc[:, col_mask].columns.to_list()
-not_selected = pnl_stats.loc[:, ~col_mask].columns.to_list()
+selected = stats.loc[:, col_mask].columns.to_list()
+not_selected = stats.loc[:, ~col_mask].columns.to_list()
 
-print("num model selected=%s" % hprint.perc(len(selected), pnl_stats.shape[1]))
+print("num model selected=%s" % hprint.perc(len(selected), stats.shape[1]))
 print("model selected=%s" % selected)
 print("model not selected=%s" % not_selected)
 
