@@ -105,25 +105,27 @@ class ContinuousSkLearnModel(cdnb.FitPredictNode, cdnb.ColModeMixin):
         if fit and self._sample_weight_col is not None:
             sample_weight_col = cdtfu.convert_to_list(self._sample_weight_col)
             dbg.dassert_eq(len(sample_weight_col), 1)
+            x_vars_and_maybe_weight = x_vars + sample_weight_col
         else:
-            sample_weight_col = []
+            x_vars_and_maybe_weight = x_vars
+            sample_weight_col = None
         # Get x and forward y df.
         if fit:
             # This df has no NaNs.
             df = cdtfu.get_x_and_forward_y_fit_df(
-                df_in, x_vars + sample_weight_col, y_vars, self._steps_ahead
+                df_in, x_vars_and_maybe_weight, y_vars, self._steps_ahead
             )
         else:
             # This df has no `x_vars` NaNs.
             df = cdtfu.get_x_and_forward_y_predict_df(
-                df_in, x_vars + sample_weight_col, y_vars, self._steps_ahead
+                df_in, x_vars_and_maybe_weight, y_vars, self._steps_ahead
             )
         # Handle presence of NaNs according to `nan_mode`.
         idx = df_in.index[: -self._steps_ahead] if fit else df_in.index
         self._handle_nans(idx, df.index)
         # Isolate the forward y piece of `df`.
         forward_y_cols = df.drop(
-            x_vars + sample_weight_col, axis=1
+            x_vars_and_maybe_weight, axis=1
         ).columns.to_list()
         forward_y_df = df[forward_y_cols]
         # Prepare x_vars in sklearn format.
