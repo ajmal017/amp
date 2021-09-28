@@ -260,7 +260,11 @@ class ArmaGenerator(cdnb.DataSource):
         df = prices.to_frame()
         self.df = df.loc[self._start_date : self._end_date]
         # Use constant volume (for now).
-        self.df["vol"] = 100  # type: ignore[index]
+        self.df["volume"] = 10000  # type: ignore[index]
+        self.df["bid"] = self.df["close"] - 0.01
+        self.df["ask"] = self.df["close"] + 0.01
+        self.df["bid_size"] = 100
+        self.df["ask_size"] = 100
 
 
 # #############################################################################
