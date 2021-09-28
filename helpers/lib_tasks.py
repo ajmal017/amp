@@ -1617,6 +1617,19 @@ def docker_build_prod_image(ctx, cache=True, base_image=""):  # type: ignore
 
 
 @task
+def docker_push_prod_image(ctx, base_image=""):  # type: ignore
+    """
+    (ONLY CI/CD) Push the "prod" image to ECR.
+    """
+    _report_task()
+    docker_login(ctx)
+    #
+    image_prod = get_image("prod", base_image)
+    cmd = f"docker push {image_prod}"
+    _run(ctx, cmd, pty=True)
+
+
+@task
 def docker_release_prod_image(  # type: ignore
     ctx,
     cache=True,
@@ -1648,9 +1661,7 @@ def docker_release_prod_image(  # type: ignore
         run_superslow_tests(ctx, stage=stage)
     # 3) Push prod image.
     if push_to_repo:
-        image_prod = get_image("prod", base_image)
-        cmd = f"docker push {image_prod}"
-        _run(ctx, cmd, pty=True)
+        docker_push_prod_image(ctx)
     else:
         _LOG.warning("Skipping pushing image to repo_short_name as requested")
     _LOG.info("==> SUCCESS <==")
