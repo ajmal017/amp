@@ -229,6 +229,9 @@ class ArmaGenerator(cdnb.DataSource):
         self._arma_process = cartif.ArmaProcess(
             ar_coeffs=self._ar_coeffs, ma_coeffs=self._ma_coeffs
         )
+        self._poisson_process = cartif.PoissonProcess(
+            mu=100
+        )
 
     def fit(self) -> Optional[Dict[str, pd.DataFrame]]:
         self._lazy_load()
@@ -251,6 +254,22 @@ class ArmaGenerator(cdnb.DataSource):
             burnin=self._burnin,
             seed=self._seed,
         )
+        bid_volume = self._poisson_process.generate_sample(
+            date_range_kwargs={
+                "start": self._start_date,
+                "end": self._end_date,
+                "freq": self._frequency,
+            },
+            seed=self._seed,
+        )
+        ask_volume = self._poisson_process.generate_sample(
+            date_range_kwargs={
+                "start": self._start_date,
+                "end": self._end_date,
+                "freq": self._frequency,
+            },
+            seed=self._seed + 1,
+        )
         # Cumulatively sum to generate a price series (implicitly assumes the
         # returns are log returns; at small enough scales and short enough
         # times this is practically interchangeable with percentage returns).
@@ -260,7 +279,11 @@ class ArmaGenerator(cdnb.DataSource):
         df = prices.to_frame()
         self.df = df.loc[self._start_date : self._end_date]
         # Use constant volume (for now).
-        self.df["vol"] = 100  # type: ignore[index]
+        self.df["volume"] = 10000  # type: ignore[index]
+        self.df["bid"] = self.df["close"] - 0.01
+        self.df["ask"] = self.df["close"] + 0.01
+        self.df["bid_size"] = bid_volume
+        self.df["ask_size"] = ask_volume
 
 
 # #############################################################################
