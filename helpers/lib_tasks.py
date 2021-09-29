@@ -1281,8 +1281,9 @@ def _get_docker_cmd(
     # - Handle the user.
     user_name = hsinte.get_user_name()
     docker_cmd_.append(
+        #--user $(id -u):$(id -g)"""
         rf"""
-        --user $(id -u):$(id -g)"""
+        -l user={user_name}"""
     )
     # - Handle the extra docker options.
     if extra_docker_run_opts:
