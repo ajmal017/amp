@@ -14,7 +14,8 @@ set -o vi
 echo "UID="$(id -u)
 echo "GID="$(id -g)
 
-# We use ~/.aws to pass the credentials.
+# We use ~/.aws and the env vars to pass the AWS credentials.
+# TODO(gp): Remove this script.
 # TODO(gp): -> set_aws_env_vars.sh
 #source devops/docker_build/entrypoint/aws_credentials.sh
 
