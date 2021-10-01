@@ -11,17 +11,18 @@ source /${ENV_NAME}/bin/activate
 # TODO(gp): Since we execute bash in eval we lose this config.
 set -o vi
 
-# We use ~/.aws to pass the credentials.
+echo "UID="$(id -u)
+echo "GID="$(id -g)
+
+# We use ~/.aws and the env vars to pass the AWS credentials.
+# TODO(gp): Remove this script.
 # TODO(gp): -> set_aws_env_vars.sh
 #source devops/docker_build/entrypoint/aws_credentials.sh
 
 # TODO(gp): -> set_env_vars.sh
 source devops/docker_build/entrypoint/patch_environment_variables.sh
 
-mount -a || true
-
-echo "UID="$(id -u)
-echo "GID="$(id -g)
+#mount -a || true
 
 # Allow working with files outside a container.
 #umask 000
