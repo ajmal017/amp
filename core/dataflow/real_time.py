@@ -165,7 +165,8 @@ def get_data_as_of_datetime(
     returned.
     """
     dbg.dassert_lte(0, delay_in_secs)
-    hdatetime.dassert_tz_compatible_timestamp_with_df(datetime_, df)
+    hdatetime.dassert_tz_compatible_timestamp_with_df(datetime_, df,
+            col_name=None)
     # TODO(gp): We could also use the `timestamp_db` field if available.
     datetime_eff = datetime_ - datetime.timedelta(seconds=delay_in_secs)
     mask = df.index <= datetime_eff
