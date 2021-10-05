@@ -150,12 +150,19 @@ def parse_traceback(
             file_name, line_num, text = cfile_row
             # Leave the files relative to the current dir.
             root_dir = hgit.get_client_root(super_module=False)
-            mode = "assert_unless_one_result"
+            mode = "return_all_results"
             file_names = hgit.find_docker_file(
                 file_name, root_dir=root_dir, mode=mode
             )
-            file_name = file_names[0]
-            cfile_tmp.append((file_name, line_num, text))
+            if len(file_names) == 0:
+                _LOG.warning("Can't find file corresponding to '%s'", file_name)
+            elif len(file_names) > 1:
+                _LOG.warning(
+                    "Found multiple potential files corresponding to '%s'", file_name
+                )
+            else:
+                file_name = file_names[0]
+                cfile_tmp.append((file_name, line_num, text))
         cfile = cfile_tmp
         _LOG.debug("# After purifying from client")
         _LOG.debug("cfile=\n%s", cfile_to_str(cfile))

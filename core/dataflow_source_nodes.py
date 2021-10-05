@@ -58,10 +58,6 @@ def data_source_node_factory(
         ret = cdataf.DataLoader(nid, **source_node_kwargs)
     elif source_node_name == "multivariate_normal":
         ret = cdataf.MultivariateNormalGenerator(nid, **source_node_kwargs)
-    elif source_node_name == "SimulatedTimeDataSource":
-        ret = cdataf.SimulatedTimeDataSource(nid, **source_node_kwargs)
-    elif source_node_name == "ReplayedTimeDataSource":
-        ret = cdataf.ReplayedTimeDataSource(nid, **source_node_kwargs)
     elif source_node_name == "RealTimeDataSource":
         ret = cdataf.RealTimeDataSource(nid, **source_node_kwargs)
     else:

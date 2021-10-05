@@ -712,12 +712,6 @@ def find_docker_file(
     )
     # Purify.
     _LOG.debug("Purifying file_names=%s", file_names)
-    if len(file_names) == 0:
-        _LOG.warning("Can't find file corresponding to '%s'", file_name)
-    elif len(file_names) > 1:
-        _LOG.warning(
-            "Found multiple potential files corresponding to '%s'", file_name
-        )
     file_names = [
         os.path.relpath(file_name, root_dir) for file_name in file_names
     ]
