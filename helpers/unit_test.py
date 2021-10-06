@@ -59,7 +59,7 @@ except ImportError as e:
 
 _LOG = logging.getLogger(__name__)
 # Mute this module unless we want to debug it.
-#_LOG.setLevel(logging.INFO)
+# _LOG.setLevel(logging.INFO)
 _LOG.setLevel(logging.DEBUG)
 
 # #############################################################################
@@ -1183,7 +1183,10 @@ class TestCase(unittest.TestCase):
         return is_equal
 
     def assert_dfs_close(
-        self, actual: pd.DataFrame, expected: pd.DataFrame
+        self,
+        actual: pd.DataFrame,
+        expected: pd.DataFrame,
+        **kwargs,
     ) -> None:
         """
         Assert dfs have same indexes and columns and that all values are close.
@@ -1194,7 +1197,7 @@ class TestCase(unittest.TestCase):
         """
         self.assertEqual(actual.index.to_list(), expected.index.to_list())
         self.assertEqual(actual.columns.to_list(), expected.columns.to_list())
-        np.testing.assert_allclose(actual, expected)
+        np.testing.assert_allclose(actual, expected, **kwargs)
 
     # TODO(gp): There is a lot of similarity between `check_string()` and
     #  `check_df_string()` that can be factored out if we extract the code that
