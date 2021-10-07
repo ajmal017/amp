@@ -189,17 +189,17 @@ def calculate_pseudoinverse(
 # #############################################################################
 
 
-def squash(
+def compress_tails(
     signal: Union[pd.DataFrame, pd.Series], scale: int = 1
 ) -> Union[pd.DataFrame, pd.Series]:
     """
-    Apply squashing function to data.
+    Apply compression to data.
 
     :param signal: data
-    :param scale: Divide data by scale and multiply squashed output by scale.
+    :param scale: Divide data by scale and multiply compressed output by scale.
         Rescaling approximately preserves behavior in a neighborhood of the
-        origin where the squashing function is approximately linear.
-    :return: squashed data
+        origin where the compression function is approximately linear.
+    :return: compressed data
     """
     hdbg.dassert_lt(0, scale)
     return scale * np.tanh(signal / scale)

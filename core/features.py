@@ -11,9 +11,11 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 
+import core.signal_processing as csipro
 import helpers.dbg as hdbg
 
 _LOG = logging.getLogger(__name__)
+COL = Union[str, int]
 
 
 def get_lagged_feature_names(
@@ -145,11 +147,80 @@ def combine_columns(
     return result.to_frame()
 
 
+def perform_col_arithmetic(
+    df: pd.DataFrame,
+    col_groups: List[Tuple[COL, COL, str, COL]],
+    join_output_with_input: bool = False,
+) -> pd.DataFrame:
+    """
+    Perform simple arithmetic operations on pairs of columns.
+
+    :param df: dataframe with at least two columns (not necessarily
+        unique)
+    :param col_groups: a tuple of the following form:
+        `(col1_name, col1_name, operation, out_col_name)`.
+    :param join_output_with_input: whether to only return the requested columns
+        or to join the requested columns to the input dataframe
+    """
+    results = []
+    for col1, col2, operation, out_col_name in col_groups:
+        hdbg.dassert_in(
+            operation,
+            ["multiply", "divide", "add", "subtract"],
+            "Operation not supported.",
+        )
+        hdbg.dassert_in(col1, df.columns.to_list())
+        hdbg.dassert_in(col2, df.columns.to_list())
+        term1 = df[col1]
+        term2 = df[col2]
+        result = getattr(term1, operation)(term2)
+        result = result.rename(out_col_name)
+        results.append(result)
+    out_df = pd.concat(results, axis=1)
+    if join_output_with_input:
+        out_df = out_df.merge(df, left_index=True, right_index=True, how="outer")
+        hdbg.dassert(not out_df.columns.has_duplicates)
+    hdbg.dassert(not out_df.columns.has_duplicates)
+    return out_df
+
+
+def cross_feature_pairs(
+    df: pd.DataFrame,
+    feature_groups: List[Tuple[COL, COL, List[COL], str]],
+    join_output_with_input: bool = False,
+) -> pd.DataFrame:
+    """
+    Perform feature crosses of multiple pairs of columns.
+
+    This function wraps `cross_feature_pair()`.
+
+    :param df: dataframe with at least two feature columns (not necessarily
+        unique)
+    :param feature_groups: a tuple of the following form:
+        `(feature1_col, feature2_col, requested_cols, prefix)`.
+        The string `prefix` is prepended to the column names of
+        `requested_cols` in the output.
+    :param join_output_with_input: whether to only return the requested columns
+        or to join the requested columns to the input dataframe
+    """
+    results = []
+    for ftr1, ftr2, requested_cols, prefix in feature_groups:
+        ftr_df = cross_feature_pair(df, ftr1, ftr2, requested_cols)
+        ftr_df = ftr_df.rename(columns=lambda x: prefix + "." + str(x))
+        results.append(ftr_df)
+    out_df = pd.concat(results, axis=1)
+    if join_output_with_input:
+        out_df = out_df.merge(df, left_index=True, right_index=True, how="outer")
+        hdbg.dassert(not out_df.columns.has_duplicates)
+    hdbg.dassert(not out_df.columns.has_duplicates)
+    return out_df
+
+
 def cross_feature_pair(
     df: pd.DataFrame,
-    feature1_col: Union[str, int],
-    feature2_col: Union[str, int],
-    requested_cols: Optional[List[str]] = None,
+    feature1_col: COL,
+    feature2_col: COL,
+    requested_cols: Optional[List[COL]] = None,
     join_output_with_input: bool = False,
 ) -> pd.DataFrame:
     """
@@ -159,9 +230,8 @@ def cross_feature_pair(
     - Most feature crosses available in this function are neither linear nor
       bilinear
     - Some features are invariant with respect to uniform rescalings (e.g.,
-      "normalized_difference"), and others are not (e.g., "tanh_difference")
-    - The compression-type features (including `tanh` features) may benefit
-      from pre-scaling
+      "normalized_difference"), and others are not
+    - The compression-type features may benefit from pre-scaling
     - Some features require non-negative or strictly positive values
 
     :param df: dataframe with at least two feature columns (not necessarily
@@ -176,17 +246,21 @@ def cross_feature_pair(
     hdbg.dassert_in(feature1_col, df.columns.to_list())
     hdbg.dassert_in(feature2_col, df.columns.to_list())
     supported_cols = [
+        #
         "difference",
+        "compressed_difference",
         "normalized_difference",
-        "log_difference",
-        "tanh_difference",
+        "difference_of_logs",
+        #
         "mean",
+        "compressed_mean",
+        #
+        "product",
+        "compressed_product",
+        #
         "geometric_mean",
         "harmonic_mean",
-        "product",
-        "log_mean",
-        "compressed_mean",
-        "tanh_mean",
+        "mean_of_logs",
     ]
     requested_cols = requested_cols or supported_cols
     hdbg.dassert_is_subset(
@@ -203,49 +277,76 @@ def cross_feature_pair(
     ftr2 = df[feature2_col]
     # Calculate feature crosses.
     crosses = []
+    # These crosses are good for Poisson-like features, rescaled to have
+    # variance 1.
     if "difference" in requested_cols:
-        cross = (ftr1 - ftr2).rename("difference")
+        # Optimized for variance-1 features.
+        cross = ((ftr1 - ftr2) / np.sqrt(2)).rename("difference")
         crosses.append(cross)
+    if "compressed_difference" in requested_cols:
+        # Optimized for variance-1 features.
+        cross = csipro.compress_tails((ftr1 - ftr2) / np.sqrt(2), scale=4)
+        cross = cross.rename("compressed_difference")
+        crosses.append(cross)
+    # These crosses are good for Poisson-like features and are invariant
+    # to uniform rescalings of the features.
     if "normalized_difference" in requested_cols:
+        # A scale invariant cross.
+        product = ftr1 * ftr2
+        if (product < 0).any():
+            _LOG.warning("Features have opposite signs.")
         cross = ((ftr1 - ftr2) / (np.abs(ftr1) + np.abs(ftr2))).rename(
             "normalized_difference"
         )
         crosses.append(cross)
-    if "log_difference" in requested_cols:
-        cross = (np.log(ftr1) - np.log(ftr2)).rename("log_difference")
+    if "difference_of_logs" in requested_cols:
+        # A scale invariant cross.
+        quotient = ftr1 / ftr2
+        if (quotient < 0).any():
+            _LOG.warning("Features have opposite signs.")
+        cross = np.log(ftr1.abs()) - np.log(ftr2.abs())
+        cross = cross.rename("difference_of_logs")
         crosses.append(cross)
-    if "tanh_difference" in requested_cols:
-        # The normalization is chosen so that
-        # `np.tanh(0.5 * (np.log(ftr1) - np.log(ftr2)))` is equal to
-        # `normalized_difference` applied to `ftr1` and `ftr2` (without the
-        # log transformation).
-        cross = np.tanh(0.5 * (ftr1 - ftr2)).rename("tanh_difference")
-        crosses.append(cross)
+    # These crosses are good for Gaussian-like features, renormalized to have
+    # variance 1.
     if "mean" in requested_cols:
-        cross = ((ftr1 + ftr2) / 2).rename("mean")
+        # Optimized for variance-1 features.
+        cross = ((ftr1 + ftr2) / np.sqrt(2)).rename("mean")
         crosses.append(cross)
-    if "geometric_mean" in requested_cols:
-        cross = np.sqrt(ftr1 * ftr2).rename("geometric_mean")
-        crosses.append(cross)
-    if "harmonic_mean" in requested_cols:
-        cross = ((2 * ftr1 * ftr2) / (ftr1 + ftr2)).rename("harmonic_mean")
+    if "compressed_mean" in requested_cols:
+        # Optimized for variance-1 features.
+        cross = csipro.compress_tails((ftr1 + ftr2) / np.sqrt(2), scale=4)
+        cross = cross.rename("compressed_mean")
         crosses.append(cross)
     if "product" in requested_cols:
         cross = (ftr1 * ftr2).rename("product")
         crosses.append(cross)
-    if "log_mean" in requested_cols:
-        cross = ((np.log(ftr1) + np.log(ftr2)) / 2).rename("log_mean")
+    if "compressed_product" in requested_cols:
+        # Optimized for variance-1 features.
+        cross = csipro.compress_tails(ftr1 * ftr2, scale=4)
+        cross = cross.rename("compressed_product")
         crosses.append(cross)
-    if "compressed_mean" in requested_cols:
-        cross = (np.sqrt(ftr1 * ftr2) - 1) / (np.sqrt(ftr1 * ftr2) + 1)
-        cross = cross.rename("compressed_mean")
+    if "geometric_mean" in requested_cols:
+        if (ftr1 < 0).any() or (ftr2 < 0).any():
+            _LOG.warning("Negative values detected in features.")
+        product = ftr1 * ftr2
+        signs = csipro.sign_normalize(product)
+        cross = np.sqrt(product.abs()) * signs
+        cross = cross.rename("geometric_mean")
         crosses.append(cross)
-    if "tanh_mean" in requested_cols:
-        # The normalization is chosen so that
-        # `np.tanh(0.25 * (np.log(ftr1) + np.log(ftr2)))` is equal to
-        # `compressed_mean` applied to `ftr1` and `ftr2` (without the
-        # log transformation).
-        cross = np.tanh(0.25 * (ftr1 + ftr2)).rename("tanh_mean")
+    if "harmonic_mean" in requested_cols:
+        if (ftr1 < 0).any() or (ftr2 < 0).any():
+            _LOG.warning("Negative values detected in features.")
+        cross = ((2 * ftr1 * ftr2) / (ftr1 + ftr2)).rename("harmonic_mean")
+        crosses.append(cross)
+    if "mean_of_logs" in requested_cols:
+        # Equivalent to the log of the geometric mean.
+        product = ftr1 * ftr2
+        if (product < 0).any():
+            _LOG.warning("Features have opposite signs.")
+        cross = ((np.log(ftr1.abs()) + np.log(ftr2.abs())) / 2).rename(
+            "mean_of_logs"
+        )
         crosses.append(cross)
     out_df = pd.concat(crosses, axis=1)
     if join_output_with_input:
