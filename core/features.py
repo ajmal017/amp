@@ -162,6 +162,9 @@ def perform_col_arithmetic(
     :param join_output_with_input: whether to only return the requested columns
         or to join the requested columns to the input dataframe
     """
+    if not col_groups:
+        _LOG.debug("No operations requested.")
+        return df
     results = []
     for col1, col2, operation, out_col_name in col_groups:
         hdbg.dassert_in(
@@ -277,8 +280,6 @@ def cross_feature_pair(
     ftr2 = df[feature2_col]
     # Calculate feature crosses.
     crosses = []
-    # These crosses are good for Poisson-like features, rescaled to have
-    # variance 1.
     if "difference" in requested_cols:
         # Optimized for variance-1 features.
         cross = ((ftr1 - ftr2) / np.sqrt(2)).rename("difference")
@@ -288,13 +289,13 @@ def cross_feature_pair(
         cross = csipro.compress_tails((ftr1 - ftr2) / np.sqrt(2), scale=4)
         cross = cross.rename("compressed_difference")
         crosses.append(cross)
-    # These crosses are good for Poisson-like features and are invariant
-    # to uniform rescalings of the features.
     if "normalized_difference" in requested_cols:
         # A scale invariant cross.
         product = ftr1 * ftr2
         if (product < 0).any():
-            _LOG.warning("Features have opposite signs.")
+            _log_opposite_sign_warning(
+                feature1_col, feature2_col, "normalized_difference"
+            )
         cross = ((ftr1 - ftr2) / (np.abs(ftr1) + np.abs(ftr2))).rename(
             "normalized_difference"
         )
@@ -303,12 +304,12 @@ def cross_feature_pair(
         # A scale invariant cross.
         quotient = ftr1 / ftr2
         if (quotient < 0).any():
-            _LOG.warning("Features have opposite signs.")
+            _log_opposite_sign_warning(
+                feature1_col, feature2_col, "difference_of_logs"
+            )
         cross = np.log(ftr1.abs()) - np.log(ftr2.abs())
         cross = cross.rename("difference_of_logs")
         crosses.append(cross)
-    # These crosses are good for Gaussian-like features, renormalized to have
-    # variance 1.
     if "mean" in requested_cols:
         # Optimized for variance-1 features.
         cross = ((ftr1 + ftr2) / np.sqrt(2)).rename("mean")
@@ -328,7 +329,9 @@ def cross_feature_pair(
         crosses.append(cross)
     if "geometric_mean" in requested_cols:
         if (ftr1 < 0).any() or (ftr2 < 0).any():
-            _LOG.warning("Negative values detected in features.")
+            _log_negative_value_warning(
+                feature1_col, feature2_col, "geometric_mean"
+            )
         product = ftr1 * ftr2
         signs = csipro.sign_normalize(product)
         cross = np.sqrt(product.abs()) * signs
@@ -336,14 +339,16 @@ def cross_feature_pair(
         crosses.append(cross)
     if "harmonic_mean" in requested_cols:
         if (ftr1 < 0).any() or (ftr2 < 0).any():
-            _LOG.warning("Negative values detected in features.")
+            _log_negative_value_warning(
+                feature1_col, feature2_col, "harmonic_mean"
+            )
         cross = ((2 * ftr1 * ftr2) / (ftr1 + ftr2)).rename("harmonic_mean")
         crosses.append(cross)
     if "mean_of_logs" in requested_cols:
         # Equivalent to the log of the geometric mean.
         product = ftr1 * ftr2
         if (product < 0).any():
-            _LOG.warning("Features have opposite signs.")
+            _log_opposite_sign_warning(feature1_col, feature2_col, "mean_of_logs")
         cross = ((np.log(ftr1.abs()) + np.log(ftr2.abs())) / 2).rename(
             "mean_of_logs"
         )
@@ -353,3 +358,21 @@ def cross_feature_pair(
         out_df = out_df.merge(df, left_index=True, right_index=True, how="outer")
         hdbg.dassert(not out_df.columns.has_duplicates)
     return out_df
+
+
+def _log_opposite_sign_warning(
+    feature1_col,
+    feature2_col,
+    feature_cross,
+) -> None:
+    msg = "Calculating feature cross `%s`: features `%s` and `%s` have entries with opposite signs."
+    _LOG.warning(msg, feature_cross, feature1_col, feature2_col)
+
+
+def _log_negative_value_warning(
+    feature1_col,
+    feature2_col,
+    feature_cross,
+) -> None:
+    msg = "Calculating feature cross `%s`: negative values detected in at least one of feature `%s` and `%s`."
+    _LOG.warning(msg, feature_cross, feature1_col, feature2_col)
