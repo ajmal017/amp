@@ -51,7 +51,7 @@ if [[ $AWS_DEFAULT_REGION == "" ]]; then
 else
     echo "AWS_DEFAULT_REGION='$AWS_DEFAULT_REGION'"
 fi;
-aws configure --profile am list
+aws configure --profile am list || true
 
 echo "CONTAINER_VERSION='$CONTAINER_VERSION'"
 echo "BUILD_TAG='$BUILD_TAG'"
