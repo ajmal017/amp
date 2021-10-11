@@ -32,9 +32,26 @@ source devops/docker_build/entrypoint/patch_environment_variables.sh
 ./devops/docker_build/test/test_mount_s3.sh
 ./devops/docker_build/test/test_volumes.sh
 
-echo "AWS_ACCESS_KEY_ID='$AWS_ACCESS_KEY_ID'"
-echo "AWS_SECRET_ACCESS_KEY='***'"
-echo "AWS_DEFAULT_REGION='$AWS_DEFAULT_REGION'"
+# AWS.
+echo "# Check AWS authentication setup"
+if [[ $AWS_ACCESS_KEY_ID == "" ]]; then
+    unset AWS_ACCESS_KEY_ID
+else
+    echo "AWS_ACCESS_KEY_ID='$AWS_ACCESS_KEY_ID'"
+fi;
+
+if [[ $AWS_SECRET_ACCESS_KEY == "" ]]; then
+    unset AWS_SECRET_ACCESS_KEY
+else
+    echo "AWS_SECRET_ACCESS_KEY='***'"
+fi;
+
+if [[ $AWS_DEFAULT_REGION == "" ]]; then
+    unset AWS_DEFAULT_REGION
+else
+    echo "AWS_DEFAULT_REGION='$AWS_DEFAULT_REGION'"
+fi;
+aws configure --profile am list
 
 echo "CONTAINER_VERSION='$CONTAINER_VERSION'"
 echo "BUILD_TAG='$BUILD_TAG'"
