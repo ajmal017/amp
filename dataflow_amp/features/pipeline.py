@@ -105,7 +105,6 @@ class FeaturePipeline(dtf.DagBuilder):
         node = dtf.SeriesTransformer(
             nid,
             transformer_func=csipro.compute_fir_zscore,
-            col_rename_func=lambda x: x + ".z",
             **config[nid].to_dict(),
         )
         tail_nid = self._append(dag, tail_nid, node)
@@ -115,7 +114,6 @@ class FeaturePipeline(dtf.DagBuilder):
         node = dtf.SeriesTransformer(
             nid,
             transformer_func=csipro.compress_tails,
-            col_rename_func=lambda x: x + ".cmprs",
             **config[nid].to_dict(),
         )
         tail_nid = self._append(dag, tail_nid, node)
