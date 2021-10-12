@@ -185,6 +185,31 @@ class TestLinearRegression(hut.TestCase):
         df_str = hut.convert_df_to_string(df_out.round(3), index=True, decimals=3)
         self.check_string(df_str)
 
+    def test6(self) -> None:
+        """
+        Test `fit()` with `p_val_threshold`.
+        """
+        # Load test data.
+        data = self._get_frozen_input()
+        # Generate node config.
+        config = cconfig.get_config_from_nested_dict(
+            {
+                "x_vars": ["x1", "x2", "x3", "x4"],
+                "y_vars": ["y"],
+                "steps_ahead": 1,
+                "p_val_threshold": 0.2,
+                "col_mode": "merge_all",
+            }
+        )
+        node = cdnrm.LinearRegression(
+            "linear_regression",
+            **config.to_dict(),
+        )
+        #
+        df_out = node.fit(data)["df_out"]
+        df_str = hut.convert_df_to_string(df_out.round(3), index=True, decimals=3)
+        self.check_string(df_str)
+
     def _get_test_data_file_name(self) -> str:
         """
         Return the name of the file containing the data for testing this class.

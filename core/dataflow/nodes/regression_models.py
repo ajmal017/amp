@@ -27,6 +27,7 @@ class LinearRegression(cdnb.FitPredictNode, cdnb.ColModeMixin):
         y_vars: cdtfu.NodeColumnList,
         steps_ahead: int,
         smoothing: float = 0,
+        p_val_threshold: float = 1,
         col_mode: Optional[str] = None,
         nan_mode: Optional[str] = None,
         sample_weight_col: Optional[cdtfu.NodeColumnList] = None,
@@ -37,6 +38,10 @@ class LinearRegression(cdnb.FitPredictNode, cdnb.ColModeMixin):
         self._fit_coefficients = None
         self._steps_ahead = steps_ahead
         self._smoothing = smoothing
+        dbg.dassert_lte(0, self._smoothing)
+        self._p_val_threshold = p_val_threshold
+        dbg.dassert_lte(0, self._p_val_threshold)
+        dbg.dassert_lte(self._p_val_threshold, 1.0)
         dbg.dassert_lte(
             0, self._steps_ahead, "Non-causal prediction attempted! Aborting..."
         )
@@ -69,6 +74,9 @@ class LinearRegression(cdnb.FitPredictNode, cdnb.ColModeMixin):
         x_vars = cdtfu.convert_to_list(self._x_vars)
         y_vars = cdtfu.convert_to_list(self._y_vars)
         sample_weight_col = self._sample_weight_col
+        # Package the sample weight column together with the x variables iff
+        # `fit()` is called and a `sample_weight_col` that is not `None` is
+        # provided.
         if fit and self._sample_weight_col is not None:
             x_vars_and_maybe_weight = x_vars + [self._sample_weight_col]
         else:
@@ -76,15 +84,16 @@ class LinearRegression(cdnb.FitPredictNode, cdnb.ColModeMixin):
             sample_weight_col = None
         # Get x and forward y df.
         if fit:
-            # This df has no NaNs.
+            # NOTE: This df has no NaNs.
             df = cdtfu.get_x_and_forward_y_fit_df(
                 df_in, x_vars_and_maybe_weight, y_vars, self._steps_ahead
             )
         else:
-            # This df has no `x_vars` NaNs.
+            # NOTE: This df has no `x_vars` NaNs.
             df = cdtfu.get_x_and_forward_y_predict_df(
                 df_in, x_vars_and_maybe_weight, y_vars, self._steps_ahead
             )
+        #
         # Handle presence of NaNs according to `nan_mode`.
         idx = df_in.index[: -self._steps_ahead] if fit else df_in.index
         self._handle_nans(idx, df.index)
@@ -94,20 +103,26 @@ class LinearRegression(cdnb.FitPredictNode, cdnb.ColModeMixin):
         ).columns.to_list()
         dbg.dassert_eq(1, len(forward_y_cols))
         forward_y_col = forward_y_cols[0]
+        # Regress `forward_y_col` on `x_vars` using `sample_weight_col` weights.
+        # This performs one 1-variable regression per x variable.
         coefficients = cstati.compute_regression_coefficients(
             df, x_vars, forward_y_col, sample_weight_col
         )
         if fit:
             self._fit_coefficients = coefficients.copy()
-            # Generate x_var weights.
+            # Initialize weights with `beta` values from regression.
+            weights = self._fit_coefficients["beta"]
+            # Apply p-value thresholding.
+            p_vals = self._fit_coefficients["p_val_2s"]
+            weights[p_vals > self._p_val_threshold] = 0
+            # Apply smoothing.
             smoothing = 1 / self._fit_coefficients["turn"] ** self._smoothing
-            beta_norm = np.linalg.norm(self._fit_coefficients["beta"])
-            self._fit_coefficients["weight"] = beta_norm * csigna.normalize(
-                self._fit_coefficients["beta"] * smoothing
-            )
-            self._fit_coefficients["norm_weight"] = csigna.normalize(
-                self._fit_coefficients["weight"]
-            )
+            beta_norm = np.linalg.norm(weights)
+            weights = beta_norm * csigna.normalize(weights * smoothing)
+            #
+            self._fit_coefficients["weight"] = weights
+            self._fit_coefficients["norm_weight"] = csigna.normalize(weights)
+            #
             dbg.dassert(
                 self._fit_coefficients is not None,
                 "Model not found! Check if `fit()` has been run.",
