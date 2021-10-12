@@ -224,6 +224,7 @@ def cross_feature_pair(
     feature1_col: COL,
     feature2_col: COL,
     requested_cols: Optional[List[COL]] = None,
+    compression_scale: float = 4,
     join_output_with_input: bool = False,
 ) -> pd.DataFrame:
     """
@@ -243,6 +244,10 @@ def cross_feature_pair(
     :param feature2_col: second feature column
     :param requested_cols: the requested output columns; `None` returns all
         available
+    :param compression_scale: rescaling factor to use in "compression"
+        features. A larger number means less compression. The maximum of the
+        absolute value of the compressed feature cross is less than or equal to
+         `compression_scale`.
     :param join_output_with_input: whether to only return the requested columns
         or to join the requested columns to the input dataframe
     """
@@ -254,6 +259,7 @@ def cross_feature_pair(
         "compressed_difference",
         "normalized_difference",
         "difference_of_logs",
+        "compressed_difference_of_logs",
         #
         "mean",
         "compressed_mean",
@@ -280,78 +286,103 @@ def cross_feature_pair(
     ftr2 = df[feature2_col]
     # Calculate feature crosses.
     crosses = []
-    if "difference" in requested_cols:
+    #
+    name = "difference"
+    if name in requested_cols:
         # Optimized for variance-1 features.
-        cross = ((ftr1 - ftr2) / np.sqrt(2)).rename("difference")
+        cross = ((ftr1 - ftr2) / np.sqrt(2)).rename(name)
         crosses.append(cross)
-    if "compressed_difference" in requested_cols:
+    #
+    name = "compressed_difference"
+    if name in requested_cols:
         # Optimized for variance-1 features.
-        cross = csipro.compress_tails((ftr1 - ftr2) / np.sqrt(2), scale=4)
-        cross = cross.rename("compressed_difference")
+        cross = csipro.compress_tails(
+            (ftr1 - ftr2) / np.sqrt(2), scale=compression_scale
+        )
+        cross = cross.rename(name)
         crosses.append(cross)
-    if "normalized_difference" in requested_cols:
+    #
+    name = "normalized_difference"
+    if name in requested_cols:
         # A scale invariant cross.
         product = ftr1 * ftr2
         if (product < 0).any():
-            _log_opposite_sign_warning(
-                feature1_col, feature2_col, "normalized_difference"
-            )
-        cross = ((ftr1 - ftr2) / (np.abs(ftr1) + np.abs(ftr2))).rename(
-            "normalized_difference"
-        )
+            _log_opposite_sign_warning(feature1_col, feature2_col, name)
+        cross = ((ftr1 - ftr2) / (np.abs(ftr1) + np.abs(ftr2))).rename(name)
         crosses.append(cross)
-    if "difference_of_logs" in requested_cols:
+    #
+    name = "difference_of_logs"
+    if name in requested_cols:
         # A scale invariant cross.
         quotient = ftr1 / ftr2
         if (quotient < 0).any():
-            _log_opposite_sign_warning(
-                feature1_col, feature2_col, "difference_of_logs"
-            )
+            _log_opposite_sign_warning(feature1_col, feature2_col, name)
         cross = np.log(ftr1.abs()) - np.log(ftr2.abs())
-        cross = cross.rename("difference_of_logs")
+        cross = cross.rename(name)
         crosses.append(cross)
-    if "mean" in requested_cols:
+    #
+    name = "compressed_difference_of_logs"
+    if name in requested_cols:
+        # Optimized for variance-1 difference of logs.
+        quotient = ftr1 / ftr2
+        if (quotient < 0).any():
+            _log_opposite_sign_warning(feature1_col, feature2_col, name)
+        cross = np.log(ftr1.abs()) - np.log(ftr2.abs())
+        cross = csipro.compress_tails(cross, scale=compression_scale)
+        cross = cross.rename(name)
+        crosses.append(cross)
+    #
+    name = "mean"
+    if name in requested_cols:
         # Optimized for variance-1 features.
-        cross = ((ftr1 + ftr2) / np.sqrt(2)).rename("mean")
+        cross = ((ftr1 + ftr2) / np.sqrt(2)).rename(name)
         crosses.append(cross)
-    if "compressed_mean" in requested_cols:
+    #
+    name = "compressed_mean"
+    if name in requested_cols:
         # Optimized for variance-1 features.
-        cross = csipro.compress_tails((ftr1 + ftr2) / np.sqrt(2), scale=4)
-        cross = cross.rename("compressed_mean")
+        cross = csipro.compress_tails(
+            (ftr1 + ftr2) / np.sqrt(2), scale=compression_scale
+        )
+        cross = cross.rename(name)
         crosses.append(cross)
-    if "product" in requested_cols:
-        cross = (ftr1 * ftr2).rename("product")
+    #
+    name = "product"
+    if name in requested_cols:
+        cross = (ftr1 * ftr2).rename(name)
         crosses.append(cross)
-    if "compressed_product" in requested_cols:
+    #
+    name = "compressed_product"
+    if name in requested_cols:
         # Optimized for variance-1 features.
-        cross = csipro.compress_tails(ftr1 * ftr2, scale=4)
-        cross = cross.rename("compressed_product")
+        cross = csipro.compress_tails(ftr1 * ftr2, scale=compression_scale)
+        cross = cross.rename(name)
         crosses.append(cross)
-    if "geometric_mean" in requested_cols:
+    #
+    name = "geometric_mean"
+    if name in requested_cols:
         if (ftr1 < 0).any() or (ftr2 < 0).any():
-            _log_negative_value_warning(
-                feature1_col, feature2_col, "geometric_mean"
-            )
+            _log_negative_value_warning(feature1_col, feature2_col, name)
         product = ftr1 * ftr2
         signs = csipro.sign_normalize(product)
         cross = np.sqrt(product.abs()) * signs
-        cross = cross.rename("geometric_mean")
+        cross = cross.rename(name)
         crosses.append(cross)
-    if "harmonic_mean" in requested_cols:
+    #
+    name = "harmonic_mean"
+    if name in requested_cols:
         if (ftr1 < 0).any() or (ftr2 < 0).any():
-            _log_negative_value_warning(
-                feature1_col, feature2_col, "harmonic_mean"
-            )
-        cross = ((2 * ftr1 * ftr2) / (ftr1 + ftr2)).rename("harmonic_mean")
+            _log_negative_value_warning(feature1_col, feature2_col, name)
+        cross = ((2 * ftr1 * ftr2) / (ftr1 + ftr2)).rename(name)
         crosses.append(cross)
-    if "mean_of_logs" in requested_cols:
+    #
+    name = "mean_of_logs"
+    if name in requested_cols:
         # Equivalent to the log of the geometric mean.
         product = ftr1 * ftr2
         if (product < 0).any():
-            _log_opposite_sign_warning(feature1_col, feature2_col, "mean_of_logs")
-        cross = ((np.log(ftr1.abs()) + np.log(ftr2.abs())) / 2).rename(
-            "mean_of_logs"
-        )
+            _log_opposite_sign_warning(feature1_col, feature2_col, name)
+        cross = ((np.log(ftr1.abs()) + np.log(ftr2.abs())) / 2).rename(name)
         crosses.append(cross)
     out_df = pd.concat(crosses, axis=1)
     if join_output_with_input:

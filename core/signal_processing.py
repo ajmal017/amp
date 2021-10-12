@@ -190,7 +190,7 @@ def calculate_pseudoinverse(
 
 
 def compress_tails(
-    signal: Union[pd.DataFrame, pd.Series], scale: int = 1
+    signal: Union[pd.DataFrame, pd.Series], scale: float = 1
 ) -> Union[pd.DataFrame, pd.Series]:
     """
     Apply compression to data.
