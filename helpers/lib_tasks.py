@@ -433,22 +433,22 @@ def git_clean(ctx, dry_run=False):  # type: ignore
     _run(ctx, cmd)
 
 
-def _delete_branches(ctx: Any, tag: str, confirm_delete: bool) -> None:
-    if tag == "local":
+def _delete_branches(mode: str, confirm_delete: bool) -> None:
+    # Get branches that have already merged into master.
+    if mode == "local":
         # Delete local branches that are already merged into master.
         # > git branch --merged
         # * AmpTask1251_Update_GH_actions_for_amp_02
         find_cmd = r"git branch --merged master | grep -v master | grep -v \*"
-        delete_cmd = "git branch -d"
-    elif tag == "remote":
+    elif mode == "remote":
         # Get the branches to delete.
+        # TODO(gp): Leave origin.
         find_cmd = (
             "git branch -r --merged origin/master"
             + r" | grep -v master | sed 's/origin\///'"
         )
-        delete_cmd = "git push origin --delete"
     else:
-        raise ValueError(f"Invalid tag='{tag}'")
+        raise ValueError(f"Invalid mode='{mode}'")
     # TODO(gp): Use system_to_lines
     _, txt = hsyint.system_to_string(find_cmd, abort_on_error=False)
     branches = hsyint.text_to_list(txt)
@@ -456,20 +456,13 @@ def _delete_branches(ctx: Any, tag: str, confirm_delete: bool) -> None:
     _LOG.info(
         "There are %d %s branches to delete:\n%s",
         len(branches),
-        tag,
+        mode,
         "\n".join(branches),
     )
     if not branches:
         # No branch to delete, then we are done.
         return
-    # Ask whether to continue.
-    if confirm_delete:
-        hsyint.query_yes_no(
-            hdbg.WARNING + f": Delete these {tag} branches?", abort_on_no=True
-        )
-    for branch in branches:
-        cmd_tmp = f"{delete_cmd} {branch}"
-        _run(ctx, cmd_tmp)
+    hgit.delete_branches(mode, branches, confirm_delete)
 
 
 @task
@@ -487,8 +480,8 @@ def git_delete_merged_branches(ctx, confirm_delete=True):  # type: ignore
     cmd = "git fetch --all --prune"
     _run(ctx, cmd)
     # Delete local and remote branches that are already merged into master.
-    _delete_branches(ctx, "local", confirm_delete)
-    _delete_branches(ctx, "remote", confirm_delete)
+    _delete_branches("local", confirm_delete)
+    _delete_branches("remote", confirm_delete)
     #
     cmd = "git fetch --all --prune"
     _run(ctx, cmd)

@@ -10,6 +10,7 @@ import logging
 import os
 import pprint
 import re
+import sys
 from typing import Dict, List, Match, Optional, Tuple
 
 import helpers.dbg as hdbg
@@ -1023,3 +1024,59 @@ def fetch_origin_master_if_needed() -> None:
             hsyint.system(cmd)
             cmd = "git branch --track master origin/master"
             hsyint.system(cmd)
+
+
+def does_branch_exist(branch_name: str) -> bool:
+    # From https://stackoverflow.com/questions/5167957
+    # > git rev-parse --verify LimeTask197_Get_familiar_with_CF2
+    # f03bfa0b4577c2524afd6a1f24d06013f8aa9f1a
+    # > git rev-parse --verify I_dont_exist
+    # fatal: Needed a single revision
+    cmd = f"git rev-parse --verify {branch_name}"
+    rc = hsyint.system(cmd, abort_on_error=False)
+    exists = rc == 0
+    return exists
+
+
+def is_client_clean(dir_name: str, abort_if_needed: bool = True) -> bool:
+    hdbg.dassert_dir_exists(dir_name)
+    cmd = f"cd {dir_name}; git status --untracked-files=no --porcelain"
+    _, txt = hsyint.system_to_string(cmd)
+    if abort_if_needed and txt != "":
+        _LOG.error("There are uncommitted changes in tracked files\n:%s", txt)
+        sys.exit(-1)
+    return txt == ""
+
+
+def delete_branches(mode: str, branches: List[str], confirm_delete: bool) -> None:
+    """
+    Delete local or remote branches.
+
+    :param mode: local or remote
+    :param branches: list of branches to delete
+    :param confirm_delete: ask the user to confirm before deleting, or just do it
+    """
+    hdbg.dassert_isinstance(branches, list)
+    if mode == "local":
+        delete_cmd = "git branch -d"
+    elif mode == "remote":
+        delete_cmd = "git push origin --delete"
+    else:
+        raise ValueError(f"Invalid mode='{mode}'")
+    # Ask whether to continue.
+    if confirm_delete:
+        branches_as_str = " ".join(branches)
+        msg = (hdbg.WARNING + f": Delete {len(branches)} {mode} branch(es) '{branches_as_str}'?")
+        hsyint.query_yes_no(
+            msg, abort_on_no=True
+        )
+    for branch in branches:
+        if mode == "remote":
+            prefix = "origin/"
+            hdbg.dassert(branch.startswith(prefix),
+                        "Remote branch '%s' needs to start with '%s'",
+                        branch, prefix)
+            branch = branch[len(prefix):]
+        cmd = f"{delete_cmd} {branch}"
+        hsyint.system(cmd, suppress_output=False, log_level="echo")
+
