@@ -1048,7 +1048,8 @@ def is_client_clean(dir_name: str, abort_if_needed: bool = True) -> bool:
     return txt == ""
 
 
-def delete_branches(mode: str, branches: List[str], confirm_delete: bool) -> None:
+def delete_branches(mode: str, branches: List[str], confirm_delete: bool,
+                    abort_on_error: bool = True) -> None:
     """
     Delete local or remote branches.
 
@@ -1078,5 +1079,5 @@ def delete_branches(mode: str, branches: List[str], confirm_delete: bool) -> Non
                         branch, prefix)
             branch = branch[len(prefix):]
         cmd = f"{delete_cmd} {branch}"
-        hsyint.system(cmd, suppress_output=False, log_level="echo")
+        hsyint.system(cmd, suppress_output=False, log_level="echo", abort_on_error=abort_on_error)
 
