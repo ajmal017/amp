@@ -21,6 +21,8 @@
 
 import logging
 
+import pandas as pd
+
 import core.config as cconfig
 import core.dataflow_model.incremental_single_name_model_evaluator as ime
 import core.dataflow_model.model_evaluator as modeval
@@ -43,65 +45,25 @@ _LOG = logging.getLogger(__name__)
 hprint.config_notebook()
 
 # %% [markdown]
-# # Load features
+# # Load regression dataframes
 
 # %%
-feat_iter = cdmu.yield_experiment_artifacts(
+fit_iter = cdmu.yield_experiment_artifacts(
+    src_dir="",
+    file_name="result_bundle.v2_0.pkl",
+    load_rb_kwargs={},
+)
+
+pred_iter = cdmu.yield_experiment_artifacts(
     src_dir="",
     file_name="result_bundle.v2_0.pkl",
     load_rb_kwargs={},
 )
 
 # %%
-key, artifact = next(feat_iter)
-display("key=%s", key)
-features = artifact.result_df
+fit_coeffs = {k: v.info["ml"]["predict"]["fit_coefficients"] for k, v in fit_iter}
+fit_coeffs = pd.concat(fit_coeffs)
 
 # %%
-features.head()
-
-# %% [markdown]
-# # Cross-sectional feature analysis
-
-# %%
-cplot.plot_heatmap(
-    features.corr(),
-    mode="clustermap",
-    figsize=(20, 20)
-)
-
-# %%
-cplot.plot_effective_correlation_rank(features)
-
-# %%
-cplot.plot_projection(features.resample("B").sum(min_count=1))
-
-# %%
-sc = csc.StatsComputer()
-
-# %%
-features.apply(sc.compute_summary_stats).round(3)
-
-# %% [markdown]
-# # Single feature analysis
-
-# %%
-feature = ""
-
-# %%
-cplot.plot_qq(features[feature])
-
-# %%
-cplot.plot_histograms_and_lagged_scatterplot(
-    features[feature],
-    lag=1,
-    figsize=(20, 20)
-)
-
-# %%
-cplot.plot_time_series_by_period(
-    features[feature],
-    "hour",
-)
-
-# %%
+pred_coeffs = {k: v.info["ml"]["predict"]["predict_coefficients"] for k, v in pred_iter}
+pred_coeffs = pd.concat(pred_coeffs)
