@@ -111,7 +111,7 @@ class LinearRegression(cdnb.FitPredictNode, cdnb.ColModeMixin):
         if fit:
             self._fit_coefficients = coefficients.copy()
             # Initialize weights with `beta` values from regression.
-            weights = self._fit_coefficients["beta"]
+            weights = self._fit_coefficients["beta"].copy()
             # Apply p-value thresholding.
             p_vals = self._fit_coefficients["p_val_2s"]
             weights[p_vals > self._p_val_threshold] = 0

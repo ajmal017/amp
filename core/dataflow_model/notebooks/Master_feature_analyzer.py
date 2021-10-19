@@ -103,3 +103,102 @@ cplot.plot_time_series_by_period(
     features[feature],
     "hour",
 )
+
+# %%
+import numpy as np
+import pandas as pd
+
+import core.features as cfeat
+
+# %%
+
+# %%
+
+# %%
+m = [[1, 0.9, 0, -1], [-1, -1, 0, 0], [0, 0.1, 1, 0], [0, 0, -1, 1]]
+
+# %%
+mdf = pd.DataFrame(m, columns=["f1", "f2", "f3", "f4"])
+
+# %%
+mdf.std()
+
+# %%
+mdf = mdf / np.sqrt((mdf ** 2).sum())
+
+# %%
+mdf.std()
+
+# %%
+mdf["f1"].std()
+
+# %%
+cfeat.compute_correlations(mdf).round(2)
+
+# %%
+cfeat.compute_grassmann_distance(mdf, 1, ["f1", "f2"])
+
+# %%
+cfeat.compute_grassmann_distance(mdf, 1, ["f1"])
+
+# %%
+cfeat.compute_grassmann_distance(mdf, 1, ["f1", "f2", "f3"]).round(3)
+
+# %%
+np.linalg.det(m)
+
+# %%
+df = mdf
+
+# %%
+import core.artificial_signal_generators as casg
+
+# %%
+mvn = casg.MultivariateNormalProcess()
+
+# %%
+mvn.set_cov_from_inv_wishart_draw(dim=10, seed=343)
+
+# %%
+df = mvn.generate_sample(
+    date_range_kwargs={
+        "start": "2001-01-01",
+        "freq": "T",
+        "periods": 1000
+    },
+    seed=708
+)
+
+# %%
+df
+
+# %%
+cfeat.compute_normalized_statistical_leverage_scores(df, demean_cols=True, normalize_cols=True).round(3)
+
+# %%
+cfeat.compute_normalized_principal_loadings(df, normalize_cols=True).round(3)
+
+# %%
+cfeat.compute_effective_rank(df / df.std(), np.inf)
+
+# %%
+cplot.plot_effective_correlation_rank(df / df.std())
+
+# %%
+edf = cfeat.evaluate_col_selection(df, [8], normalize_cols=False)
+display(edf)
+
+# %%
+edf = cfeat.evaluate_col_selection(df, [4], normalize_cols=False)
+display(edf)
+
+# %%
+cfeat.select_cols_by_greedy_grassmann(df, 5, normalize_cols=False)
+
+# %%
+cfeat.select_cols_by_greedy_volume(df, 5, normalize_cols=False)
+
+# %%
+cfeat.compute_principal_grassmannian(df, 1)
+
+# %%
