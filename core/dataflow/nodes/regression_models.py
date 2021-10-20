@@ -1,6 +1,6 @@
 import collections
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -31,6 +31,7 @@ class LinearRegression(cdnb.FitPredictNode, cdnb.ColModeMixin):
         col_mode: Optional[str] = None,
         nan_mode: Optional[str] = None,
         sample_weight_col: Optional[cdtfu.NodeColumnList] = None,
+        feature_weights: Optional[List[float]] = None,
     ) -> None:
         super().__init__(nid)
         self._x_vars = x_vars
@@ -49,6 +50,13 @@ class LinearRegression(cdnb.FitPredictNode, cdnb.ColModeMixin):
         dbg.dassert_in(self._col_mode, ["replace_all", "merge_all"])
         self._nan_mode = nan_mode or "raise"
         self._sample_weight_col = sample_weight_col
+        if feature_weights is not None:
+            dbg.dassert_eq(len(feature_weights), len(x_vars))
+            self._feature_weights = pd.Series(
+                data=feature_weights, index=x_vars, name="feature_weights"
+            )
+        else:
+            self._feature_weights = None
 
     def fit(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
         return self._fit_predict_helper(df_in, fit=True)
@@ -128,9 +136,13 @@ class LinearRegression(cdnb.FitPredictNode, cdnb.ColModeMixin):
                 "Model not found! Check if `fit()` has been run.",
             )
         # Generate predictions.
-        forward_y_hat = (
-            df[x_vars].multiply(self._fit_coefficients["weight"]).sum(axis=1)
-        )
+        # If the caller supplied `feature_weights`, use those for prediction.
+        # Otherwise, use the learned weights.
+        if self._feature_weights is not None:
+            feature_weights = self._feature_weights
+        else:
+            feature_weights = self._fit_coefficients["weight"]
+        forward_y_hat = df[x_vars].multiply(feature_weights).sum(axis=1)
         forward_y_hat_col = f"{forward_y_col}_hat"
         forward_y_hat = forward_y_hat.rename(forward_y_hat_col)
         # Populate `info`.
