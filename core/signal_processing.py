@@ -1824,7 +1824,41 @@ def compute_swt_sum(
     return srs.to_frame()
 
 
+# TODO(*): Make this a decorator.
 def compute_fir_zscore(
+    signal: Union[pd.DataFrame, pd.Series],
+    dyadic_tau: int,
+    variance_dyadic_tau: Optional[int] = None,
+    delay: int = 0,
+    variance_delay: Optional[int] = None,
+    wavelet: Optional[str] = None,
+    variance_wavelet: Optional[str] = None,
+) -> pd.DataFrame:
+    if isinstance(signal, pd.Series):
+        return _compute_fir_zscore(
+            signal,
+            dyadic_tau,
+            variance_dyadic_tau,
+            delay,
+            variance_delay,
+            wavelet,
+            variance_wavelet,
+        )
+    df = signal.apply(
+        lambda x: _compute_fir_zscore(
+            x,
+            dyadic_tau,
+            variance_dyadic_tau,
+            delay,
+            variance_delay,
+            wavelet,
+            variance_wavelet,
+        )
+    )
+    return df
+
+
+def _compute_fir_zscore(
     signal: Union[pd.DataFrame, pd.Series],
     dyadic_tau: int,
     variance_dyadic_tau: Optional[int] = None,
