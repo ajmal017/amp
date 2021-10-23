@@ -433,22 +433,22 @@ def git_clean(ctx, dry_run=False):  # type: ignore
     _run(ctx, cmd)
 
 
-def _delete_branches(mode: str, confirm_delete: bool) -> None:
-    # Get branches that have already merged into master.
-    if mode == "local":
+def _delete_branches(ctx: Any, tag: str, confirm_delete: bool) -> None:
+    if tag == "local":
         # Delete local branches that are already merged into master.
         # > git branch --merged
         # * AmpTask1251_Update_GH_actions_for_amp_02
         find_cmd = r"git branch --merged master | grep -v master | grep -v \*"
-    elif mode == "remote":
+        delete_cmd = "git branch -d"
+    elif tag == "remote":
         # Get the branches to delete.
-        # TODO(gp): Leave origin.
         find_cmd = (
             "git branch -r --merged origin/master"
             + r" | grep -v master | sed 's/origin\///'"
         )
+        delete_cmd = "git push origin --delete"
     else:
-        raise ValueError(f"Invalid mode='{mode}'")
+        raise ValueError(f"Invalid tag='{tag}'")
     # TODO(gp): Use system_to_lines
     _, txt = hsyint.system_to_string(find_cmd, abort_on_error=False)
     branches = hsyint.text_to_list(txt)
@@ -456,13 +456,20 @@ def _delete_branches(mode: str, confirm_delete: bool) -> None:
     _LOG.info(
         "There are %d %s branches to delete:\n%s",
         len(branches),
-        mode,
+        tag,
         "\n".join(branches),
     )
     if not branches:
         # No branch to delete, then we are done.
         return
-    hgit.delete_branches(mode, branches, confirm_delete)
+    # Ask whether to continue.
+    if confirm_delete:
+        hsyint.query_yes_no(
+            hdbg.WARNING + f": Delete these {tag} branches?", abort_on_no=True
+        )
+    for branch in branches:
+        cmd_tmp = f"{delete_cmd} {branch}"
+        _run(ctx, cmd_tmp)
 
 
 @task
@@ -480,8 +487,8 @@ def git_delete_merged_branches(ctx, confirm_delete=True):  # type: ignore
     cmd = "git fetch --all --prune"
     _run(ctx, cmd)
     # Delete local and remote branches that are already merged into master.
-    _delete_branches("local", confirm_delete)
-    _delete_branches("remote", confirm_delete)
+    _delete_branches(ctx, "local", confirm_delete)
+    _delete_branches(ctx, "remote", confirm_delete)
     #
     cmd = "git fetch --all --prune"
     _run(ctx, cmd)
@@ -1272,12 +1279,12 @@ def _get_docker_cmd(
         --rm"""
     )
     # - Handle the user.
-    user_name = hsyint.get_user_name()
-    docker_cmd_.append(
-        # --user $(id -u):$(id -g)"""
-        rf"""
-        -l user={user_name}"""
-    )
+    if False:
+        user_name = hsyint.get_user_name()
+        docker_cmd_.append(
+            rf"""
+        --user $(id -u):$(id -g)"""
+        )
     # - Handle the extra docker options.
     if extra_docker_run_opts:
         hdbg.dassert_isinstance(extra_docker_run_opts, list)
@@ -1446,9 +1453,13 @@ def _get_build_tag(code_ver: str) -> str:
 
 # DEV image flow:
 # - A "local" image (which is a release candidate for the DEV image) is built
+#   ```
+#   > docker_build_local_image
+#   ```
+#   This creates the image `dev_tools:local`
 # - A qualification process (e.g., running all tests) is performed on the "local"
 #   image (e.g., through GitHub actions)
-# - If qualification is passed, it becomes "latest".
+# - If qualification is passed, it becomes `dev`.
 
 
 # For base_image, we use "" as default instead None since pyinvoke can only infer
@@ -1541,6 +1552,13 @@ def docker_release_dev_image(  # type: ignore
     This can be used to test the entire flow from scratch by building an image,
     running the tests, but not necessarily pushing.
 
+    Phases:
+    - Build local image
+    - Run the tests
+    - Mark local as dev image
+    - Push dev image to the repo
+
+    :param cache: use the cache
     :param skip_tests: skip all the tests and release the dev image
     :param push_to_repo: push the image to the repo_short_name
     :param update_poetry: update package dependencies using poetry
@@ -1584,6 +1602,12 @@ def docker_release_dev_image(  # type: ignore
 def docker_build_prod_image(ctx, cache=True, base_image=""):  # type: ignore
     """
     (ONLY CI/CD) Build a prod image.
+
+    Phases:
+    - Build the prod image on top of the dev image
+
+    :param cache: note that often the prod image is just a copy of the dev
+        image so caching makes no difference
     """
     _report_task()
     image_prod = get_image("prod", base_image)
@@ -1637,6 +1661,10 @@ def docker_release_prod_image(  # type: ignore
     (ONLY CI/CD) Build, test, and release to ECR the prod image.
 
     Same options as `docker_release_dev_image`.
+
+    - Build prod image
+    - Run the tests
+    - Push the prod image repo
     """
     _report_task()
     # 1) Build prod image.
@@ -1664,6 +1692,10 @@ def docker_release_prod_image(  # type: ignore
 def docker_release_all(ctx):  # type: ignore
     """
     (ONLY CI/CD) Release both dev and prod image to ECR.
+
+    This includes:
+    - docker_release_dev_image
+    - docker_release_prod_image
     """
     _report_task()
     docker_release_dev_image(ctx)
@@ -2446,7 +2478,7 @@ def pytest_failed(  # type: ignore
 # #############################################################################
 
 
-def _get_lint_docker_cmd(precommit_opts: str, run_bash: bool) -> str:
+def _get_lint_docker_cmd(precommit_opts: str, run_bash: bool, stage: str) -> str:
     superproject_path, submodule_path = hgit.get_path_from_supermodule()
     if superproject_path:
         # We are running in a Git submodule.
@@ -2460,7 +2492,7 @@ def _get_lint_docker_cmd(precommit_opts: str, run_bash: bool) -> str:
     # image = get_default_param("DEV_TOOLS_IMAGE_PROD")
     # image="*****.dkr.ecr.us-east-1.amazonaws.com/dev_tools:local"
     ecr_base_path = os.environ["AM_ECR_BASE_PATH"]
-    image = f"{ecr_base_path}/dev_tools:prod"
+    image = f"{ecr_base_path}/dev_tools:{stage}"
     docker_cmd_ = ["docker run", "--rm"]
     if run_bash:
         docker_cmd_.append("-it")
@@ -2531,6 +2563,7 @@ def lint(  # type: ignore
     run_bash=False,
     run_linter_step=True,
     parse_linter_output=True,
+    stage="prod",
 ):
     """
     Lint files.
@@ -2544,6 +2577,7 @@ def lint(  # type: ignore
     :param run_bash: instead of running pre-commit, run bash to debug
     :param run_linter_step: run linter step
     :param parse_linter_output: parse linter output and generate vim cfile
+    :param stage: the image stage to use
     """
     _report_task()
     lint_file_name = "linter_output.txt"
@@ -2590,7 +2624,7 @@ def lint(  # type: ignore
             ]
             precommit_opts = _to_single_line_cmd(precommit_opts)
             # Execute command line.
-            cmd = _get_lint_docker_cmd(precommit_opts, run_bash)
+            cmd = _get_lint_docker_cmd(precommit_opts, run_bash, stage)
             cmd = f"({cmd}) 2>&1 | tee -a {lint_file_name}"
             if run_bash:
                 # We don't execute this command since pty=True corrupts the terminal
