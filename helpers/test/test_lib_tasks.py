@@ -588,7 +588,6 @@ class TestLibTasksGetDockerCmd1(_LibTasksTestCase):
             --env-file devops/env/default.env \
             run \
             --rm \
-            -l user=$USER_NAME \
             --entrypoint bash \
             app
         """
