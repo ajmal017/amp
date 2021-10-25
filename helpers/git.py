@@ -1026,18 +1026,6 @@ def fetch_origin_master_if_needed() -> None:
             hsyint.system(cmd)
 
 
-def does_branch_exist(branch_name: str) -> bool:
-    # From https://stackoverflow.com/questions/5167957
-    # > git rev-parse --verify LimeTask197_Get_familiar_with_CF2
-    # f03bfa0b4577c2524afd6a1f24d06013f8aa9f1a
-    # > git rev-parse --verify I_dont_exist
-    # fatal: Needed a single revision
-    cmd = f"git rev-parse --verify {branch_name}"
-    rc = hsyint.system(cmd, abort_on_error=False)
-    exists = rc == 0
-    return exists
-
-
 def is_client_clean(dir_name: str, abort_if_needed: bool = True) -> bool:
     hdbg.dassert_dir_exists(dir_name)
     cmd = f"cd {dir_name}; git status --untracked-files=no --porcelain"
@@ -1048,7 +1036,22 @@ def is_client_clean(dir_name: str, abort_if_needed: bool = True) -> bool:
     return txt == ""
 
 
-def delete_branches(mode: str, branches: List[str], confirm_delete: bool,
+def does_branch_exist(dir_name: str, branch_name: str) -> bool:
+    # From https://stackoverflow.com/questions/35941566
+    cmd = f"cd {dir_name} && git fetch --prune"
+    hsyint.system(cmd, abort_on_error=False)
+    # From https://stackoverflow.com/questions/5167957
+    # > git rev-parse --verify LimeTask197_Get_familiar_with_CF2
+    # f03bfa0b4577c2524afd6a1f24d06013f8aa9f1a
+    # > git rev-parse --verify I_dont_exist
+    # fatal: Needed a single revision
+    cmd = f"cd {dir_name} && git rev-parse --verify {branch_name}"
+    rc = hsyint.system(cmd, abort_on_error=False)
+    exists = rc == 0
+    return exists
+
+
+def delete_branches(dir_name: str, mode: str, branches: List[str], confirm_delete: bool,
                     abort_on_error: bool = True) -> None:
     """
     Delete local or remote branches.
@@ -1058,10 +1061,11 @@ def delete_branches(mode: str, branches: List[str], confirm_delete: bool,
     :param confirm_delete: ask the user to confirm before deleting, or just do it
     """
     hdbg.dassert_isinstance(branches, list)
+    delete_cmd = f"cd {dir_name} && "
     if mode == "local":
-        delete_cmd = "git branch -d"
+        delete_cmd += "git branch -d"
     elif mode == "remote":
-        delete_cmd = "git push origin --delete"
+        delete_cmd += "git push origin --delete"
     else:
         raise ValueError(f"Invalid mode='{mode}'")
     # Ask whether to continue.

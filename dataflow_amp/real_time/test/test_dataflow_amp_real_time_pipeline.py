@@ -19,8 +19,10 @@ _LOG = logging.getLogger(__name__)
 
 class TestRealTimeReturnPipeline1(huntes.TestCase):
     """
-    This test is similar to `TestRealTimeDagRunner1` but using a real DAG
-    (`ReturnPipeline`) together with real-time data source node.
+    This test is similar to `TestRealTimeDagRunner1`.
+    It uses:
+    - a real DAG `ReturnPipeline`
+    - a replayed time data source node using synthetic data
     """
 
     def test1(self) -> None:

@@ -20,6 +20,7 @@ import core.dataflow.nodes.base as cdtfnobas
 import core.finance as cfin
 import core.pandas_helpers as cpah
 import helpers.datetime_ as hdatetim
+import helpers.printing as hprintin
 import helpers.dbg as hdbg
 import helpers.hpandas as hhpandas
 import helpers.s3 as hs3
@@ -363,7 +364,7 @@ class MultivariateNormalGenerator(cdtfnobas.DataSource):
 # #############################################################################
 
 
-class RealTimeDataSource(cdtfnobas.DataSource, abc.ABC):
+class RealTimeDataSource(cdtfnobas.DataSource):
     """
     A RealTimeDataSource is a node that:
 
@@ -371,8 +372,8 @@ class RealTimeDataSource(cdtfnobas.DataSource, abc.ABC):
     - emits different data based on the value of a clock
       - This represents the fact the state of a DB is updated over time
     - has a blocking behavior
-      - E.g., the data might not be available immediately when the data is requested
-        and thus we have to wait
+      - E.g., the data might not be available immediately when the data is
+        requested and thus we have to wait
     """
 
     def __init__(
@@ -401,8 +402,8 @@ class RealTimeDataSource(cdtfnobas.DataSource, abc.ABC):
         return ret  # type: ignore[no-any-return]
 
     def fit(self) -> Optional[Dict[str, pd.DataFrame]]:
-        # TODO(gp): This approach of communicating params through the state makes
-        #  the code difficult to understand.
+        # TODO(gp): This approach of communicating params through the state
+        # makes the code difficult to understand.
         self.df = self._rtdi.get_data(self._period)
         return super().fit()  # type: ignore[no-any-return]
 

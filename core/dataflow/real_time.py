@@ -341,6 +341,7 @@ async def execute_with_real_time_loop(
         - an execution trace representing the events in the real-time loop; and
         - a list of results returned by the workload function
     """
+    _LOG.debug(hprintin.to_str("sleep_interval_in_secs time_out_in_secs"))
     hdbg.dassert(
         callable(get_wall_clock_time),
         "get_wall_clock_time='%s' is not callable",
@@ -352,6 +353,7 @@ async def execute_with_real_time_loop(
         # TODO(gp): Consider using a real-time check instead of number of iterations.
         num_iterations = int(time_out_in_secs / sleep_interval_in_secs)
         hdbg.dassert_lt(0, num_iterations)
+    _LOG.debug(hprintin.to_str("num_iterations"))
     #
     num_it = 1
     while True:
@@ -359,16 +361,24 @@ async def execute_with_real_time_loop(
         # For the wall clock time, we always use the real one. This is used only for
         # book-keeping.
         real_wall_clock_time = hdatetim.get_current_time(tz="ET")
+        _LOG.debug("\n%s", hprintin.frame(
+            "num_it=%s / %s: wall_clock_time='%s' real_wall_clock_time='%s'" % (
+                num_it, num_iterations, wall_clock_time, real_wall_clock_time),
+            char1="<"
+        ))
         # Update the current events.
         event = Event(num_it, wall_clock_time, real_wall_clock_time)
         _LOG.debug("event='%s'", str(event))
         # Execute workload.
+        _LOG.debug("await ...")
+        # TODO(gp): Compensate for drift.
         result = await asyncio.gather(  # type: ignore[var-annotated]
             asyncio.sleep(sleep_interval_in_secs),
             # We need to use the passed `wall_clock_time` since that's what being
             # used as real, simulated, replayed time.
             workload(wall_clock_time),
         )
+        _LOG.debug("await done")
         _, workload_result = result
         yield event, workload_result
         # Exit, if needed.
