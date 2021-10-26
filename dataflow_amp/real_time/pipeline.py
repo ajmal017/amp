@@ -63,7 +63,7 @@ class RealTimeReturnPipeline(dtf.DagBuilder):
         config = self._dag_builder.get_config_template()
         return config
 
-    def get_dag(self, config: cconfig.Config, mode: str = "strict") -> dtf.DAG:
+    def _get_dag(self, config: cconfig.Config, mode: str = "strict") -> dtf.DAG:
         """
         Generate pipeline DAG.
         """

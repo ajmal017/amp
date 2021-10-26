@@ -82,7 +82,16 @@ class ReturnsPipeline(dtf.DagBuilder):
         config = cconfig.get_config_from_nested_dict(dict_)
         return config
 
-    def get_dag(self, config: cconfig.Config, mode: str = "strict") -> dtf.DAG:
+    @staticmethod
+    def validate_config(config: cconfig.Config) -> None:
+        """
+        Sanity-check config.
+
+        :param config: config object to validate
+        """
+        hdbg.dassert(cconfig.check_no_dummy_values(config))
+
+    def _get_dag(self, config: cconfig.Config, mode: str = "strict") -> dtf.DAG:
         """
         Generate pipeline DAG.
 
@@ -145,12 +154,3 @@ class ReturnsPipeline(dtf.DagBuilder):
         #
         _ = tail_nid
         return dag
-
-    @staticmethod
-    def validate_config(config: cconfig.Config) -> None:
-        """
-        Sanity-check config.
-
-        :param config: config object to validate
-        """
-        hdbg.dassert(cconfig.check_no_dummy_values(config))
