@@ -52,6 +52,7 @@ class TestRealTimeReturnPipeline1(huntes.TestCase):
             source_node_kwargs = {
                 "real_time_db_interface": rtdi,
                 "period": period,
+                "multiindex_output": False,
             }
             config["load_prices"] = cconfig.get_config_from_nested_dict(
                 {
@@ -81,6 +82,7 @@ class TestRealTimeReturnPipeline1(huntes.TestCase):
             events = dag_runner.events
             # Check.
             # TODO(gp): Factor this out.
+            # TODO(gp): 
             actual = []
             events_as_str = "\n".join(
                 [

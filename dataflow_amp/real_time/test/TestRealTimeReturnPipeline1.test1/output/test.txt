@@ -9,6 +9,7 @@ config:
     source_node_kwargs:
       real_time_db_interface: <core.dataflow.db_interface.ReplayedTimeDbInterface object>
       period: last_5mins
+      multiindex_output: False
   filter_weekends:
     col_mode: replace_all
   filter_ath:
@@ -133,6 +134,7 @@ config:
     source_node_kwargs:
       real_time_db_interface: <core.dataflow.db_interface.ReplayedTimeDbInterface object>
       period: last_5mins
+      multiindex_output: False
   filter_weekends:
     col_mode: replace_all
   filter_ath:
@@ -257,6 +259,7 @@ config:
     source_node_kwargs:
       real_time_db_interface: <core.dataflow.db_interface.ReplayedTimeDbInterface object>
       period: last_5mins
+      multiindex_output: False
   filter_weekends:
     col_mode: replace_all
   filter_ath:
