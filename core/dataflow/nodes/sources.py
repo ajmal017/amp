@@ -419,7 +419,7 @@ class RealTimeDataSource(cdtfnobas.DataSource):
 
     def _convert_to_multiindex(self) -> None:
         # From _load_multiple_instrument_data().
-        _LOGdebug("Before multiindex conversion\n:%s",
+        _LOG.debug("Before multiindex conversion\n:%s",
                 hprintin.dataframe_to_str(self.df.head()))
         dfs = {}
         for egid, df in self.df.groupby("egid"):
@@ -429,5 +429,5 @@ class RealTimeDataSource(cdtfnobas.DataSource):
         df = df.swaplevel(i=0, j=1, axis=1)
         df.sort_index(axis=1, level=0, inplace=True)
         self.df = df
-        _LOGdebug("After multiindex conversion\n:%s",
+        _LOG.debug("After multiindex conversion\n:%s",
                 hprintin.dataframe_to_str(self.df.head()))
