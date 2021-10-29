@@ -11,6 +11,7 @@ import core.dataflow.result_bundle as cdtfrebun
 import core.dataflow.runners as cdtfrun
 import core.dataflow.test.test_builders as cdtfnttd
 import core.dataflow.test.test_real_time as cdtfttrt
+import helpers.datetime_ as hdatetim
 import helpers.hasyncio as hhasynci
 import helpers.unit_test as huntes
 
@@ -105,7 +106,6 @@ class TestRealTimeDagRunner1(huntes.TestCase):
         """
         Use replayed time.
         """
-        dtf.align_on_even_second()
         event_loop = None
         events, result_bundles = self._helper(event_loop)
         # It's difficult to check the output of any real-time test, so we don't
@@ -136,6 +136,14 @@ class TestRealTimeDagRunner1(huntes.TestCase):
             "execute_rt_loop_kwargs": execute_rt_loop_kwargs,
             "dst_dir": None,
         }
+        # Align on a second boundary.
+        get_wall_clock_time = lambda: hdatetim.get_current_time(
+            tz="ET", event_loop=event_loop
+        )
+        grid_time_in_secs = 1
+        cdtfretim.align_on_time_grid(
+            get_wall_clock_time, grid_time_in_secs, event_loop=event_loop
+        )
         # Run.
         dag_runner = cdtfrun.RealTimeDagRunner(**dag_runner_kwargs)
         result_bundles = hhasynci.run(dag_runner.predict(), event_loop=event_loop)
