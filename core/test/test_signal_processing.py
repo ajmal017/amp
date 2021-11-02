@@ -1252,6 +1252,20 @@ class Test_get_swt(hut.TestCase):
         output_str = f"detail_df:\n{actual_str}\n"
         self.check_string(output_str)
 
+    def test_depth(self) -> None:
+        """
+        Test for sufficient input data length given `depth`.
+        """
+        series = self._get_series(seed=1, periods=10)
+        # The test should not raise on this call.
+        csigna.get_swt(series, depth=2, output_mode="detail")
+        with pytest.raises(ValueError):
+            # The raise comes from the `get_swt` implementation.
+            csigna.get_swt(series, depth=3, output_mode="detail")
+        with pytest.raises(ValueError):
+            # This raise comes from `pywt`.
+            csigna.get_swt(series, depth=5, output_mode="detail")
+
     @staticmethod
     def _get_series(seed: int, periods: int = 20) -> pd.Series:
         arma_process = cartif.ArmaProcess([0], [0])

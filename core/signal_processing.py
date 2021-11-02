@@ -1638,6 +1638,13 @@ def get_swt(
     # Drop columns that are all-NaNs (e.g., artifacts of padding).
     smooth_df.dropna(how="all", axis=1, inplace=True)
     detail_df.dropna(how="all", axis=1, inplace=True)
+    if depth:
+        cols = set(range(1, depth + 1))
+        msg = "Insufficient data to generate transform up to requested depth."
+        if not cols.issubset(smooth_df.columns):
+            raise ValueError(msg)
+        if not cols.issubset(detail_df.columns):
+            raise ValueError(msg)
     if output_mode == "tuple":
         return smooth_df, detail_df
     if output_mode == "smooth":
