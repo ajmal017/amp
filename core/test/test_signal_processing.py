@@ -1806,19 +1806,21 @@ class Test_resample_df(hut.TestCase):
         return txt
 
 
+# TODO(Paul): Rename test. Do not use file for golden.
 class Test_calculate_inverse(hut.TestCase):
     def test1(self) -> None:
         df = pd.DataFrame([[1, 2], [3, 4]])
         inverse_df = hut.convert_df_to_string(
-            csigna.calculate_inverse(df), index=True
+            csigna.compute_inverse(df), index=True
         )
         self.check_string(inverse_df)
 
 
+# TODO(Paul): Rename test. Do not use file for golden.
 class Test_calculate_presudoinverse(hut.TestCase):
     def test1(self) -> None:
         df = pd.DataFrame([[1, 2], [3, 4], [5, 6]])
         inverse_df = hut.convert_df_to_string(
-            csigna.calculate_pseudoinverse(df), index=True
+            csigna.compute_pseudoinverse(df), index=True
         )
         self.check_string(inverse_df)

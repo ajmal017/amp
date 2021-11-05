@@ -76,7 +76,7 @@ def read_dfs(dir_name) -> Iterable[Tuple[str, pd.DataFrame]]:
     """
     # Glob the `.pq` files.
     file_names = sorted(hio.find_files(dir_name, "*.pq"))
-    _LOG.debug("Number of parquet files found=%s", len(file_names))
+    _LOG.info("Number of parquet files found=%s", len(file_names))
     for file_name in file_names:
         # Load the dataframe.
         df = hparquet.from_parquet(file_name)
@@ -104,6 +104,7 @@ def consolidate_dfs(df_iter: Iterable[Tuple[str, pd.DataFrame]]) -> pd.DataFrame
     df_out = None
     for k2, df2 in iter2:
         k1, df1 = next(iter1)
+        _LOG.info("Processing keys `%s` and `%s`", k1, k2)
         # It is expected that `df2` will have at least one index value not in
         # `df1`.
         new_idx_vals = df2.index.difference(df1.index)

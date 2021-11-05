@@ -126,7 +126,7 @@ def _compute_lagged_cumsum(
     return merged_df
 
 
-def calculate_inverse(
+def compute_inverse(
     df: pd.DataFrame,
     p_moment: Optional[Any] = None,
     info: Optional[collections.OrderedDict] = None,
@@ -154,7 +154,7 @@ def calculate_inverse(
     return pd.DataFrame(np.linalg.inv(df), df.columns, df.index)
 
 
-def calculate_pseudoinverse(
+def compute_pseudoinverse(
     df: pd.DataFrame,
     rcond: Optional[float] = 1e-15,
     hermitian: Optional[bool] = False,
@@ -162,7 +162,7 @@ def calculate_pseudoinverse(
     info: Optional[collections.OrderedDict] = None,
 ) -> pd.DataFrame:
     """
-    Calculate a pseudoinverse matrix.
+    Calculate the Moore-Penrose generalized inverse of a matrix.
 
     :param df: matrix to pseudo-invert
     :param rcond: cutoff for small singular values as in `np.linalg.pinv`
@@ -182,6 +182,51 @@ def calculate_pseudoinverse(
     return pd.DataFrame(
         np.linalg.pinv(df, rcond=rcond, hermitian=hermitian), df.columns, df.index
     )
+
+
+def reduce_rank(
+    df: pd.DataFrame,
+    reduced_rank: int,
+    invert: bool = False,
+    conserve_shatten_norm: Optional[float] = None,
+) -> pd.DataFrame:
+    """
+    Reduce the rank of a matrix using the SVD.
+
+    :param df: numeric matrix as a dataframe
+    :param reduced_rank: desired rank
+    :param invert: invert the rank-reduced matrix (using SVD)
+    :param conserve_shatten_norm: preserve the Schatten p-norm in the rank
+        reduction
+    :return: projection of df to first `reduced_rank` principal directions
+    """
+    hdbg.dassert_isinstance(df, pd.DataFrame)
+    max_dim = min(df.shape)
+    hdbg.dassert_lte(0, reduced_rank)
+    hdbg.dassert_lte(reduced_rank, max_dim)
+    u, singular_values, v_transpose = np.linalg.svd(df, full_matrices=False)
+    leading_singular_values = singular_values[:reduced_rank]
+    if conserve_shatten_norm is not None:
+        # Use an alias for brevity.
+        ord = conserve_shatten_norm
+        hdbg.dassert_lte(1, ord)
+        p_norm = np.linalg.norm(singular_values, ord)
+        multiplier = p_norm / np.linalg.norm(leading_singular_values, ord)
+    else:
+        multiplier = 1
+    adjusted_leading_singular_values = leading_singular_values * multiplier
+    if invert:
+        adjusted_leading_singular_values = 1 / adjusted_leading_singular_values
+    adjusted_singular_values = np.concatenate(
+        (adjusted_leading_singular_values, np.zeros(max_dim - reduced_rank))
+    )
+    rank_reduced_matrix = np.matmul(
+        u, np.matmul(np.diag(adjusted_singular_values), v_transpose)
+    )
+    rank_reduced_df = pd.DataFrame(
+        rank_reduced_matrix, index=df.index, columns=df.columns
+    )
+    return rank_reduced_df
 
 
 # #############################################################################
