@@ -5,7 +5,6 @@ Import as:
 
 import core.dataflow.nodes.sources as cdtfnosou
 """
-import abc
 import logging
 import os
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -15,14 +14,14 @@ import pandas as pd
 
 import core.artificial_signal_generators as carsigen
 import core.dataflow.core as cdtfcor
-import core.dataflow.db_interface as cdtfdbint
 import core.dataflow.nodes.base as cdtfnobas
+import core.dataflow.price_interface as cdtfprint
 import core.finance as cfin
 import core.pandas_helpers as cpah
 import helpers.datetime_ as hdatetim
-import helpers.printing as hprintin
 import helpers.dbg as hdbg
 import helpers.hpandas as hhpandas
+import helpers.printing as hprintin
 import helpers.s3 as hs3
 
 _LOG = logging.getLogger(__name__)
@@ -379,7 +378,7 @@ class RealTimeDataSource(cdtfnobas.DataSource):
     def __init__(
         self,
         nid: cdtfcor.NodeId,
-        real_time_db_interface: cdtfdbint.RealTimeDbInterface,
+        real_time_price_interface: cdtfprint.RealTimePriceInterface,
         period: str,
         multiindex_output: bool,
     ) -> None:
@@ -390,9 +389,9 @@ class RealTimeDataSource(cdtfnobas.DataSource):
         """
         super().__init__(nid)
         hdbg.dassert_isinstance(
-            real_time_db_interface, cdtfdbint.RealTimeDbInterface
+            real_time_price_interface, cdtfprint.RealTimePriceInterface
         )
-        self._rtdi = real_time_db_interface
+        self._rtpi = real_time_price_interface
         self._period = period
         self._multiindex_output = multiindex_output
 
@@ -400,27 +399,29 @@ class RealTimeDataSource(cdtfnobas.DataSource):
     async def wait_for_latest_data(
         self,
     ) -> Tuple[pd.Timestamp, pd.Timestamp, int]:
-        ret = await self._rtdi.is_last_bar_available()
+        ret = await self._rtpi.is_last_bar_available()
         return ret  # type: ignore[no-any-return]
 
     def fit(self) -> Optional[Dict[str, pd.DataFrame]]:
         # TODO(gp): This approach of communicating params through the state
         #  makes the code difficult to understand.
-        self.df = self._rtdi.get_data(self._period)
+        self.df = self._rtpi.get_data(self._period)
         if self._multiindex_output:
             self._convert_to_multiindex()
         return super().fit()  # type: ignore[no-any-return]
 
     def predict(self) -> Optional[Dict[str, pd.DataFrame]]:
-        self.df = self._rtdi.get_data(self._period)
+        self.df = self._rtpi.get_data(self._period)
         if self._multiindex_output:
             self._convert_to_multiindex()
         return super().predict()  # type: ignore[no-any-return]
 
     def _convert_to_multiindex(self) -> None:
         # From _load_multiple_instrument_data().
-        _LOG.debug("Before multiindex conversion\n:%s",
-                hprintin.dataframe_to_str(self.df.head()))
+        _LOG.debug(
+            "Before multiindex conversion\n:%s",
+            hprintin.dataframe_to_str(self.df.head()),
+        )
         dfs = {}
         for egid, df in self.df.groupby("egid"):
             dfs[egid] = df
@@ -429,5 +430,7 @@ class RealTimeDataSource(cdtfnobas.DataSource):
         df = df.swaplevel(i=0, j=1, axis=1)
         df.sort_index(axis=1, level=0, inplace=True)
         self.df = df
-        _LOG.debug("After multiindex conversion\n:%s",
-                hprintin.dataframe_to_str(self.df.head()))
+        _LOG.debug(
+            "After multiindex conversion\n:%s",
+            hprintin.dataframe_to_str(self.df.head()),
+        )

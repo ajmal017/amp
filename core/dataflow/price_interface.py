@@ -1,8 +1,10 @@
 """
 Import as:
 
-import core.dataflow.db_interface as cdtfdbint
+import core.dataflow.price_interface as cdtfprint
 """
+
+# TODO(gp): -> price_interface.py
 
 import abc
 import asyncio
@@ -25,12 +27,12 @@ _LOG = logging.getLogger(__name__)
 
 
 # #############################################################################
-# RealTimeDbInterface
+# RealTimePriceInterface
 # #############################################################################
 
 
-# TODO(gp): -> Abstract...?
-class RealTimeDbInterface(abc.ABC):
+# TODO(gp): -> AbstractPriceInterface
+class RealTimePriceInterface(abc.ABC):
     """
     Implement an interface to a real-time database with 1-minute bar data.
 
@@ -175,6 +177,27 @@ class RealTimeDbInterface(abc.ABC):
         _LOG.debug("-> ret=%s", ret)
         return ret
 
+    def get_data_at_timestamp(
+        self,
+        ts: pd.Timestamp,
+        asset_ids: Optional[List[int]],
+        *,
+        normalize_data: bool = True,
+    ) -> pd.DataFrame:
+        """
+        Return price data at a specific timestamp.
+
+        :param ids: list of ids to filter on. `None` for all ids.
+        """
+        df = self._get_data_at_timestamp(
+            ts, asset_ids=asset_ids, normalize_data=normalize_data
+        )
+        # TODO(gp): Factor this out.
+        if self._column_remap:
+            hhpandas.dassert_valid_remap(df.columns.tolist(), self._column_remap)
+            df.rename(columns=self._column_remap, inplace=True)
+        return df
+
     @abc.abstractmethod
     def should_be_online(self, current_time: pd.Timestamp) -> bool:
         """
@@ -255,8 +278,8 @@ class RealTimeDbInterface(abc.ABC):
             _LOG.debug("Sleep for %s secs", self._sleep_in_secs)
             await asyncio.sleep(self._sleep_in_secs)
         _LOG.debug(
-            "-> "
-            + hprintin.to_str("start_sampling_time end_sampling_time num_iter")
+            "-> %s",
+            hprintin.to_str("start_sampling_time end_sampling_time num_iter")
         )
         return start_sampling_time, end_sampling_time, num_iter
 
@@ -264,23 +287,34 @@ class RealTimeDbInterface(abc.ABC):
     def _get_last_end_time(self) -> Optional[pd.Timestamp]:
         ...
 
+    # TODO(gp): We could make all params mandatory.
     @abc.abstractmethod
     def _get_data(
         self,
         period: str,
-        *,
         normalize_data: bool = True,
         limit: Optional[int] = None,
     ) -> pd.DataFrame:
         ...
 
+    @abc.abstractmethod
+    def _get_data_at_timestamp(
+        self,
+        ts: pd.Timestamp,
+        asset_ids: Optional[List[int]],
+        *,
+        normalize_data: bool = True,
+    ) -> pd.DataFrame:
+        ...
+
 
 # #############################################################################
-# RealTimeSqlDbInterface
+# RealTimeSqlPriceInterface
 # #############################################################################
 
 
-class RealTimeSqlDbInterface(RealTimeDbInterface):
+# TODO(gp): -> SqlPriceInterface
+class RealTimeSqlPriceInterface(RealTimePriceInterface):
     """
     Implement an interface to a real-time SQL database with 1-minute bar data.
     """
@@ -295,7 +329,7 @@ class RealTimeSqlDbInterface(RealTimeDbInterface):
         table_name: str,
         where_clause: Optional[str],
         valid_id: Any,
-        # Params from `RealTimeDbInterface`.
+        # Params from `RealTimePriceInterface`.
         *args: List[Any],
         **kwargs: Dict[str, Any],
     ):
@@ -475,12 +509,13 @@ class RealTimeSqlDbInterface(RealTimeDbInterface):
 
 
 # #############################################################################
-# ReplayedTimeDbInterface
+# ReplayedTimePriceInterface
 # #############################################################################
 
 
 # TODO(gp): This should have a delay and / or we should use timestamp_db.
-class ReplayedTimeDbInterface(RealTimeDbInterface):
+# TODO(gp): ReplayedTimePriceInterface
+class ReplayedTimePriceInterface(RealTimePriceInterface):
     """
     Implement an interface to a replayed time database with 1-minute bar data.
     """
@@ -490,7 +525,7 @@ class ReplayedTimeDbInterface(RealTimeDbInterface):
         df: pd.DataFrame,
         knowledge_datetime_col_name: str,
         delay_in_secs: int,
-        # Params from `RealTimeDbInterface`.
+        # Params from `RealTimePriceInterface`.
         *args: List[Any],
         **kwargs: Dict[str, Any],
     ):
@@ -584,6 +619,16 @@ class ReplayedTimeDbInterface(RealTimeDbInterface):
             ret = df.index.max()
         return ret
 
+    def _get_data_at_timestamp(
+        self,
+        ts: pd.Timestamp,
+        asset_ids: Optional[List[int]],
+        *,
+        normalize_data: bool = True,
+    ) -> pd.DataFrame:
+        # TODO(gp): Implement
+        raise NotImplementedError
+
 
 # #############################################################################
 # Utils.
@@ -665,7 +710,7 @@ def _process_period(
 
 
 def save_raw_data(
-    rtdbi: RealTimeDbInterface,
+    rtdbi: RealTimePriceInterface,
     file_name: str,
     period: str,
     limit: int,
@@ -719,7 +764,7 @@ def read_data_from_file(
     if aws_profile:
         s3fs_ = hs3.get_s3fs(aws_profile)
         kwargs_tmp["s3fs"] = s3fs_
-    kwargs.update(kwargs_tmp)
+    kwargs.update(kwargs_tmp)  # type: ignore[arg-type]
     df = cpah.read_csv(file_name, **kwargs)
     return df
 

@@ -8,23 +8,23 @@ import collections
 import itertools
 import logging
 import os
-from typing import Dict, Iterable, Tuple
+from typing import Any, Dict, Iterable, Tuple
 
 import pandas as pd
 
 import core.dataflow.core as cdtfcor
-import core.dataflow.nodes.base as cdtfnb
+import core.dataflow.nodes.base as cdtfnobas
 import core.dataflow.utils as cdtfuti
 import core.finance as cfin
 import helpers.dbg as hdbg
-import helpers.hpandas as hpandas
-import helpers.hparquet as hparquet
+import helpers.hpandas as hhpandas
+import helpers.hparquet as hhparque
 import helpers.io_ as hio
 
 _LOG = logging.getLogger(__name__)
 
 
-class WriteDf(cdtfnb.FitPredictNode):
+class WriteDf(cdtfnobas.FitPredictNode):
     def __init__(
         self,
         nid: cdtfcor.NodeId,
@@ -34,13 +34,15 @@ class WriteDf(cdtfnb.FitPredictNode):
         hdbg.dassert_isinstance(dir_name, str)
         self._dir_name = dir_name
 
-    def fit(self, df_in) -> Dict[str, pd.DataFrame]:
+    def fit(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
         return self._write_df(df_in, fit=True)
 
-    def predict(self, df_in) -> Dict[str, pd.DataFrame]:
+    def predict(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
         return self._write_df(df_in, fit=False)
 
-    def _write_df(self, df, fit: True) -> Dict[str, pd.DataFrame]:
+    def _write_df(
+        self, df: pd.DataFrame, fit: bool = True
+    ) -> Dict[str, pd.DataFrame]:
         if self._dir_name:
             hdbg.dassert_lt(1, df.index.size)
             # Create the directory if it does not already exist.
@@ -57,17 +59,17 @@ class WriteDf(cdtfnb.FitPredictNode):
             hdbg.dassert_not_exists(file_name)
             # Write the file.
             # TODO(Paul): Maybe allow the node to configure the log level.
-            hparquet.to_parquet(df, file_name, log_level=logging.DEBUG)
+            hhparque.to_parquet(df, file_name, log_level=logging.DEBUG)
         # Collect info.
         info = collections.OrderedDict()
         info["df_out_info"] = cdtfuti.get_df_info_as_string(df)
         mode = "fit" if fit else "predict"
         self._set_info(mode, info)
-        # Pass the dataframe though.
+        # Pass the dataframe through.
         return {"df_out": df}
 
 
-def read_dfs(dir_name) -> Iterable[Tuple[str, pd.DataFrame]]:
+def read_dfs(dir_name: str) -> Iterable[Tuple[str, pd.DataFrame]]:
     """
     Yield `(file_name, df)` from `dir_name`.
 
@@ -79,7 +81,7 @@ def read_dfs(dir_name) -> Iterable[Tuple[str, pd.DataFrame]]:
     _LOG.info("Number of parquet files found=%s", len(file_names))
     for file_name in file_names:
         # Load the dataframe.
-        df = hparquet.from_parquet(file_name)
+        df = hhparque.from_parquet(file_name)
         # Extract the file_name without the base or extension.
         tail = os.path.split(file_name)[1]
         key = os.path.splitext(tail)[0]
@@ -142,5 +144,54 @@ def consolidate_dfs(df_iter: Iterable[Tuple[str, pd.DataFrame]]) -> pd.DataFrame
             df_out = df2.combine_first(df1)
         else:
             df_out = df2.combine_first(df_out)
-    hpandas.dassert_strictly_increasing_index(df_out)
+    hhpandas.dassert_strictly_increasing_index(df_out)
     return df_out
+
+
+# #############################################################################
+
+
+class PlaceTrades(cdtfnobas.FitPredictNode):
+    """
+    Place trades from a model.
+    """
+
+    def __init__(
+        self,
+        nid: cdtfcor.NodeId,
+        execution_mode: bool,
+        config: Dict[str, Any],
+    ) -> None:
+        """
+        Parameters have the same meaning as in `place_orders()`.
+        """
+        super().__init__(nid)
+        hdbg.dassert_in(execution_mode, ("batch", "real_time"))
+        self._execution_mode = execution_mode
+        self._config = config
+
+    def fit(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+        return self._place_trades(df_in, fit=True)
+
+    def predict(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+        return self._place_trades(df_in, fit=False)
+
+    def _place_trades(self, df, fit: bool = True) -> Dict[str, pd.DataFrame]:
+        hdbg.dassert_in(self._pred_column, df.columns)
+        # TODO(gp): Make sure it's multi-index.
+        hdbg.dassert_lt(1, df.index.size)
+        hdbg.dassert_isinstance(df.index, pd.DatetimeIndex)
+        # Get the latest `df` index value.
+        if self._execution_mode == "batch":
+            place_trades(df, self._execution_mode, self._config)
+        elif self._execution_mode == "real_time":
+            place_trades(df[-1], self._execution_mode, self._config)
+        else:
+            raise "Invalid execution_mode='%s'" % self._execution_mode
+        # Compute stats.
+        info = collections.OrderedDict()
+        info["df_out_info"] = cdtfuti.get_df_info_as_string(df)
+        mode = "fit" if fit else "predict"
+        self._set_info(mode, info)
+        # Pass the dataframe through.
+        return {"df_out": df}
