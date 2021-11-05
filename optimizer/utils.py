@@ -31,11 +31,19 @@ def compute_tangency_portfolio(
     precision: Optional[pd.DataFrame] = None,
 ) -> pd.DataFrame:
     """
-    Compute the Markowitz tangency portfolio adjusted with Kelly leverage.
+    Compute the Markowitz tangency portfolio (up to a scale factor).
 
-    Note that the expected SR for each row is given by
+    The computation performed is `precision @ mu_rows`.
+
+    Notes:
+    1. The volatility may change substantially from row to row. For a fixed
+       target volatility, execute `rescale_to_target_volatility()` on the
+       result of this function.
+    2. The GMV may change from row to row. For a fixed target GMV, execute
+       `rescale_to_target_gmv()` on the result of this function.
+    3. The expected SR for each row is given by
         `compute_quadratic_form(mu_rows, precision)`
-    where `precision` is the inverse of the covariance matrix.
+        where `precision` is the inverse of the covariance matrix
 
     :param mu_rows: mean excess returns (along rows)
     :param covariance: covariance matrix
@@ -64,7 +72,7 @@ def compute_quadratic_form(
     row_vectors: pd.DataFrame, symmetric_matrix: pd.DataFrame
 ) -> pd.DataFrame:
     """
-    Given a fixed real symmetric_matrix matrix `M`, compute `v.T A v` row-wise.
+    Given a fixed real symmetric_matrix matrix `A`, compute `v.T A v` row-wise.
 
     :param row_vectors: numerical dataframe
     :param symmetric_matrix: a real symmetric matrix (aligned with columns of
@@ -74,7 +82,7 @@ def compute_quadratic_form(
     hdbg.dassert(is_symmetric(symmetric_matrix))
     # For each row `v` of `df`, compute `v.T * symmetric_matrix * v`.
     quadratic = row_vectors.multiply(row_vectors.dot(symmetric_matrix)).sum(
-        axis=1
+        min_count=1, axis=1
     )
     return quadratic
 
@@ -94,3 +102,43 @@ def neutralize(row_vectors: pd.DataFrame) -> pd.DataFrame:
     mean = row_vectors.mean(axis=1)
     projection = row_vectors.subtract(mean, axis=0)
     return projection
+
+
+def rescale_to_target_volatility(
+    weight_rows: pd.DataFrame,
+    covariance: pd.DataFrame,
+    target_volatility: float,
+) -> pd.DataFrame:
+    """
+    Rescale so that `(v.T A v)^0.5` is `target_volatility` for each element.
+
+    :param weight_rows: weights organized in rows
+    :param covariance: a covariance or correlation matrix
+    :param target_volatility: target volatilty in units compatible with units
+        of weights
+    :return: `weight_rows` adjusted row-wise
+    """
+    hdbg.dassert_lt(0, target_volatility)
+    volatility = np.sqrt(compute_quadratic_form(weight_rows, covariance))
+    adjustment_factor = target_volatility / volatility
+    rescaled_weights = weight_rows.multiply(adjustment_factor, axis=0)
+    return rescaled_weights
+
+
+def rescale_to_target_gmv(
+    weight_rows: pd.DataFrame,
+    target_gmv: float,
+) -> pd.DataFrame:
+    """
+    Rescale so that l1 norm of each row is equal to `target_gmv`.
+
+    :param weight_rows: weights organized in rows
+    :param target_gmv: total (long + short) gmv
+    :return: `weight_rows` adjusted row-wise
+    """
+    hdbg.dassert_lt(0, target_gmv)
+    # Take absolute values to count both longs and shorts toward total gmv.
+    total_gmv = weight_rows.abs().sum(min_count=1, axis=1)
+    adjustment_factor = target_gmv / total_gmv
+    rescaled_weights = weight_rows.multiply(adjustment_factor, axis=0)
+    return rescaled_weights
