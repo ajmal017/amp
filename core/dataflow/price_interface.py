@@ -4,7 +4,6 @@ Import as:
 import core.dataflow.price_interface as cdtfprint
 """
 
-# TODO(gp): -> price_interface.py
 
 import abc
 import asyncio
@@ -27,12 +26,12 @@ _LOG = logging.getLogger(__name__)
 
 
 # #############################################################################
-# RealTimePriceInterface
+# AbstractPriceInterface
 # #############################################################################
 
 
 # TODO(gp): -> AbstractPriceInterface
-class RealTimePriceInterface(abc.ABC):
+class AbstractPriceInterface(abc.ABC):
     """
     Implement an interface to a real-time database with 1-minute bar data.
 
@@ -279,7 +278,7 @@ class RealTimePriceInterface(abc.ABC):
             await asyncio.sleep(self._sleep_in_secs)
         _LOG.debug(
             "-> %s",
-            hprintin.to_str("start_sampling_time end_sampling_time num_iter")
+            hprintin.to_str("start_sampling_time end_sampling_time num_iter"),
         )
         return start_sampling_time, end_sampling_time, num_iter
 
@@ -309,12 +308,11 @@ class RealTimePriceInterface(abc.ABC):
 
 
 # #############################################################################
-# RealTimeSqlPriceInterface
+# SqlPriceInterface
 # #############################################################################
 
 
-# TODO(gp): -> SqlPriceInterface
-class RealTimeSqlPriceInterface(RealTimePriceInterface):
+class SqlPriceInterface(AbstractPriceInterface):
     """
     Implement an interface to a real-time SQL database with 1-minute bar data.
     """
@@ -329,7 +327,7 @@ class RealTimeSqlPriceInterface(RealTimePriceInterface):
         table_name: str,
         where_clause: Optional[str],
         valid_id: Any,
-        # Params from `RealTimePriceInterface`.
+        # Params from `AbstractPriceInterface`.
         *args: List[Any],
         **kwargs: Dict[str, Any],
     ):
@@ -514,8 +512,7 @@ class RealTimeSqlPriceInterface(RealTimePriceInterface):
 
 
 # TODO(gp): This should have a delay and / or we should use timestamp_db.
-# TODO(gp): ReplayedTimePriceInterface
-class ReplayedTimePriceInterface(RealTimePriceInterface):
+class ReplayedTimePriceInterface(AbstractPriceInterface):
     """
     Implement an interface to a replayed time database with 1-minute bar data.
     """
@@ -525,7 +522,7 @@ class ReplayedTimePriceInterface(RealTimePriceInterface):
         df: pd.DataFrame,
         knowledge_datetime_col_name: str,
         delay_in_secs: int,
-        # Params from `RealTimePriceInterface`.
+        # Params from `AbstractPriceInterface`.
         *args: List[Any],
         **kwargs: Dict[str, Any],
     ):
@@ -710,7 +707,7 @@ def _process_period(
 
 
 def save_raw_data(
-    rtdbi: RealTimePriceInterface,
+    rtdbi: AbstractPriceInterface,
     file_name: str,
     period: str,
     limit: int,

@@ -2921,6 +2921,12 @@ def gh_create_pr(  # type: ignore
 # chmod g=u amp/dev_scripts/git/git_hooks/test
 
 
+def _save_dir_status(dir_name: str, filename: str) -> None:
+    cmd = f'find {dir_name} -name "*" | sort | xargs ls -ld >{filename}'
+    hsyint.system(cmd)
+    _LOG.info("Saved dir status in %s", filename)
+
+
 # From https://stackoverflow.com/questions/1830618
 def _get_user_group(filename: str) -> Tuple[str, str]:
     """
@@ -2980,7 +2986,7 @@ def _compute_stats_by_user_and_group(dir_name: str) -> Tuple[Dict, Dict, Dict]:
     files = txt.split("\n")
     # Get the user of each file.
     user_to_files: Dict[str, List[str]] = {}
-    group_to_files: Dict[str, List[str]]= {}
+    group_to_files: Dict[str, List[str]] = {}
     file_to_user_group: Dict[str, Tuple[str, str]] = {}
     for file in files:
         user, group = _get_user_group(file)
@@ -3062,16 +3068,6 @@ def _print_problems(dir_name: str = ".") -> None:
     print(txt)
 
 
-# def _get_dirs(files: List[str]) -> List[str]:
-#     files_tmp = [os.path.isdir(f) for f in files]
-#     return files_tmp
-#
-#
-# def _get_files(files: List[str]) -> List[str]:
-#     files_tmp = [os.path.isfile(f) for f in files]
-#     return files_tmp
-
-
 def _change_file_ownership(file: str, abort_on_error: bool) -> None:
     """
     Change ownership of files with an invalid user (e.g., 265533) by copying
@@ -3108,7 +3104,7 @@ def _fix_invalid_owner(dir_name: str, fix: bool, abort_on_error: bool) -> None:
     Fix files that are owned by a user that is not the current user or the
     Docker one.
     """
-    _LOG.info("")
+    _LOG.info("\n%s", hprintin.frame(hintrosp.get_function_name()))
     #
     _LOG.info("Before fix")
     _, _, file_to_user_group = _compute_stats_by_user_and_group(dir_name)
@@ -3134,7 +3130,7 @@ def _fix_group(dir_name: str, fix: bool, abort_on_error: bool) -> None:
     """
     Ensure that all files are owned by the shared group.
     """
-    _LOG.info("")
+    _LOG.info("\n%s", hprintin.frame(hintrosp.get_function_name()))
     _LOG.info("Before fix")
     _, _, file_to_user_group = _compute_stats_by_user_and_group(dir_name)
     if fix:
@@ -3165,7 +3161,7 @@ def _fix_group_permissions(dir_name: str, abort_on_error: bool) -> None:
     """
     Ensure that all files are owned by the shared group.
     """
-    _LOG.info("")
+    _LOG.info("\n%s", hprintin.frame(hintrosp.get_function_name()))
     _, _, file_to_user_group = _compute_stats_by_user_and_group(dir_name)
     user = hsyint.get_user_name()
     # docker_user = get_default_param("DOCKER_USER")
@@ -3174,16 +3170,15 @@ def _fix_group_permissions(dir_name: str, abort_on_error: bool) -> None:
         st_mode = os.stat(file).st_mode
         perms = oct(st_mode & 0o777)
         # perms=0o775
+        if perms[2] != perms[3]:
+            _LOG.debug("%s -> %s, %s", file, oct(st_mode), perms)
+            cmd = f"chmod g=u {file}"
+            if curr_user != user:
+                # For files not owned by the current user, we need to `sudo`.
+                cmd = f"sudo -u {curr_user} {cmd}"
+            hsyint.system(cmd, abort_on_error=abort_on_error)
         is_dir = os.path.isdir(file)
-        if not is_dir:
-            if perms[2] != perms[3]:
-                _LOG.debug("%s -> %s, %s", file, oct(st_mode), perms)
-                cmd = f"chmod g=u {file}"
-                if curr_user != user:
-                    # For files not owned by the current user, we need to `sudo`.
-                    cmd = f"sudo -u {curr_user} {cmd}"
-                hsyint.system(cmd, abort_on_error=abort_on_error)
-        else:
+        if is_dir:
             # From https://www.gnu.org/software/coreutils/manual/html_node/Directory-Setuid-and-Setgid.html
             # If a directory’s set-group-ID bit is set, newly created subfiles
             # inherit the same group as the directory,
@@ -3196,55 +3191,31 @@ def _fix_group_permissions(dir_name: str, abort_on_error: bool) -> None:
                 hsyint.system(cmd, abort_on_error=abort_on_error)
 
 
-# def _fix_files_not_owned_by_current_user(dir_name: str, fix: bool, abort_on_error: bool) -> None:
-#     """
-#     Find the files that are not owned by the current dir.
-#     """
-#     _LOG.debug("")
-#     # Get the files not owned by the current user.
-#     user = hsyint.get_user_name()
-#     is_equal = True
-#     files = _find_files_for_user(dir_name, user, is_equal)
-#     _LOG.info("Found %s files with user equal to '%s'", len(files), user)
-#     # Get the files not owned by the current user.
-#     user = hsyint.get_user_name()
-#     is_equal = False
-#     files = _find_files_for_user(dir_name, user, is_equal)
-#     _LOG.warning("Found %s files with user different than '%s'", len(files), user)
-#     # Scan the files.
-#     owner_to_files = {}
-#     for file in files:
-#         owner = _get_user_group(file)
-#         if owner not in owner_to_files:
-#             owner_to_files[owner] = []
-#         owner_to_files[owner].append(file)
-#     # Build the output.
-#     _LOG.info("Found users different than '%s': %s", user, ", ".join(owner_to_files.keys()))
-#     txt = []
-#     for user, files in owner_to_files.items():
-#         txt.append("%s: %s" % (user, len(files)))
-#     txt = ", ".join(txt)
-#     _LOG.info("%s", txt)
-#     #
-#     shared_group = get_default_param("SHARED_GROUP")
-#     if fix:
-#         for user, files in owner_to_files.items():
-#             _LOG.debug("Fixing %s files for user=%s", len(files), user)
-#             cmd = f"sudo -u {user} chgrp {shared_group}"
-#             _exec_cmd_by_chunks(cmd, files, abort_on_error)
-
-
 @task
 def fix_perms(  # type: ignore
     ctx, dir_name=".", action="all", fix=True, abort_on_error=True
 ):
+    """
+    :param action:
+        - `all`: run all the fixes
+        - `print_stats`: print stats about file users and groups
+        - `print_problems`:
+        - `fix_invalid_owner`: fix the files with an invalid owner (e.g., mysterious
+            265533)
+        - `fix_group`: ensure that shared group owns all the files
+        - `fix_group_permissions`: ensure that the group permissions are the same
+            as the owner ones
+    """
     _ = ctx
     _report_task()
     #
     if action == "all":
-        action = ["fix_file_owners"]
+        action = ["fix_invalid_owner", "fix_group", "fix_group_permissions"]
     else:
         action = [action]
+    #
+    file_name1 = "./tmp.fix_perms.before.txt"
+    _save_dir_status(dir_name, file_name1)
     #
     if "print_stats" in action:
         _compute_stats_by_user_and_group(dir_name)
@@ -3256,6 +3227,12 @@ def fix_perms(  # type: ignore
         _fix_group(dir_name, fix, abort_on_error)
     if "fix_group_permissions" in action:
         _fix_group_permissions(dir_name, abort_on_error)
+    #
+    file_name2 = "./tmp.fix_perms.after.txt"
+    _save_dir_status(dir_name, file_name2)
+    #
+    cmd = f"To compare run:\n> vimdiff {file_name1} {file_name2}"
+    print(cmd)
 
 
 # TODO(gp): Add gh_open_pr to jump to the PR from this branch.

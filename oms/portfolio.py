@@ -61,12 +61,14 @@ class Portfolio:
         self._price_column = price_column
         # Initialize dataframe with holdings over time.
         hdbg.dassert_lt(0, initial_cash)
-        row = [Portfolio.CASH_ID, initial_wealth]
+        row = [Portfolio.CASH_ID, initial_cash]
         # TODO(gp): Check that initial_ts is pd.Timestamp.
         # Store `id` and `position`.
         self._holdings_columns = ["asset_id", "curr_num_shares"]
-        self._holdings = pd.DataFrame([row], index=[initial_ts], columns=columns)
-        # Initalize dataframe with executed orders.
+        self._holdings = pd.DataFrame(
+            [row], index=[initial_ts], columns=self._holdings_columns
+        )
+        # Initialize dataframe with executed orders.
         self._order_columns = [
             # Order corresponding to the change in position.
             "order_id",

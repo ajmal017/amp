@@ -378,7 +378,7 @@ class RealTimeDataSource(cdtfnobas.DataSource):
     def __init__(
         self,
         nid: cdtfcor.NodeId,
-        real_time_price_interface: cdtfprint.RealTimePriceInterface,
+        real_time_price_interface: cdtfprint.AbstractPriceInterface,
         period: str,
         multiindex_output: bool,
     ) -> None:
@@ -389,7 +389,7 @@ class RealTimeDataSource(cdtfnobas.DataSource):
         """
         super().__init__(nid)
         hdbg.dassert_isinstance(
-            real_time_price_interface, cdtfprint.RealTimePriceInterface
+            real_time_price_interface, cdtfprint.AbstractPriceInterface
         )
         self._rtpi = real_time_price_interface
         self._period = period

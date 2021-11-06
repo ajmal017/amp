@@ -868,8 +868,8 @@ def compute_rolling_zscore(
     TODO(Paul): determine whether signal == signal.shift(0) always.
     """
     if demean:
-        # Equivalent to invoking compute_rolling_demean and compute_rolling_std, but this way
-        # we avoid calculating signal_ma twice.
+        # Equivalent to invoking compute_rolling_demean and compute_rolling_std, but
+        # this way we avoid calculating signal_ma twice.
         signal_ma = compute_smooth_moving_average(
             signal, tau, min_periods, min_depth, max_depth
         )

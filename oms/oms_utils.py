@@ -14,8 +14,6 @@ import helpers.dbg as hdbg
 
 _LOG = logging.getLogger(__name__)
 
-# _LOG.debug = _LOG.info
-
 
 def _ts_to_str(ts: pd.Timestamp) -> str:
     """
