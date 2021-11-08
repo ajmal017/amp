@@ -503,6 +503,7 @@ class SeriesToSeriesTransformer(cdnb.Transformer):
         out_col_group: Tuple[cdtfu.NodeColumn],
         transformer_func: Callable[..., pd.Series],
         transformer_kwargs: Optional[Dict[str, Any]] = None,
+        permitted_exceptions: Tuple[Any] = (),
         *,
         drop_nans: bool = False,
         reindex_like_input: bool = True,
@@ -542,6 +543,7 @@ class SeriesToSeriesTransformer(cdnb.Transformer):
         self._drop_nans = drop_nans
         self._reindex_like_input = reindex_like_input
         self._join_output_with_input = join_output_with_input
+        self._permitted_exceptions = permitted_exceptions
         # The leaf col names are determined from the dataframe at runtime.
         self._leaf_cols = None
 
@@ -568,6 +570,7 @@ class SeriesToSeriesTransformer(cdnb.Transformer):
                 self._transformer_kwargs,
                 self._drop_nans,
                 self._reindex_like_input,
+                self._permitted_exceptions,
             )
             if srs is None:
                 _LOG.warning("No output for key=%s", key)
