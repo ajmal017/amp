@@ -18,6 +18,7 @@ from typing import (
     cast,
 )
 
+import numpy as np
 import pandas as pd
 
 import core.dataflow.core as cdtfc
@@ -351,8 +352,8 @@ class GroupedColDfToDfTransformer(cdnb.Transformer):
                 self._permitted_exceptions,
             )
             if df_out is None:
-                _LOG.warning("No output for key=%s", key)
-                continue
+                _LOG.warning("No output for key=%s, imputing empty dataframe", key)
+                df_out = pd.DataFrame()
             dbg.dassert_isinstance(df_out, pd.DataFrame)
             if key_info is not None:
                 func_info[key] = key_info
@@ -573,8 +574,8 @@ class SeriesToSeriesTransformer(cdnb.Transformer):
                 self._permitted_exceptions,
             )
             if srs is None:
-                _LOG.warning("No output for key=%s", key)
-                continue
+                _LOG.warning("No output for key=%s, imputing NaNs", col)
+                srs = pd.Series(np.nan, index=df[col].index)
             dbg.dassert_isinstance(srs, pd.Series)
             srs.name = col
             if col_info is not None:
