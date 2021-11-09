@@ -496,16 +496,18 @@ class GroupedColDfToDfColProcessor:
         out_col_names = [col_group[-1] for col_group in col_groups]
         _LOG.debug("out_col_names=%s", out_col_names)
         dbg.dassert_no_duplicates(out_col_names)
+        # Sort before accessing leaf columns.
+        df_out = df.sort_index(axis=1)
         # Determine keys (i.e., leaf column names).
-        keys = df[col_groups[0]].columns.to_list()
+        keys = df_out[col_groups[0]].columns.to_list()
         _LOG.debug("keys=%s", keys)
         # Ensure all groups have the same keys.
         for col_group in col_groups:
-            col_group_keys = df[col_group].columns.to_list()
+            col_group_keys = df_out[col_group].columns.to_list()
             dbg.dassert_set_eq(keys, col_group_keys)
         # Swap levels in `df` so that keys are top level.
-        df_out = df.swaplevel(i=-2, j=-1, axis=1)
-        # Sort by keys for faster selection.
+        df_out = df_out.swaplevel(i=-2, j=-1, axis=1)
+        # Sort by keys for faster selection (needed post `swaplevel()`).
         df_out.sort_index(axis=1, level=-2, inplace=True)
         # To generate a dataframe for each key, generate tuples that key
         # up to the last two levels.
@@ -765,8 +767,9 @@ def preprocess_multiindex_cols(
         "Dataframe multiindex column depth incompatible with config.",
     )
     # Select single-column-level dataframe and return.
-    df = df[col_group].copy()
-    return df
+    df_out = df.sort_index(axis=1)
+    df_out = df_out[col_group].copy()
+    return df_out
 
 
 def _postprocess_dataframe_dict(
