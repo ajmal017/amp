@@ -1248,6 +1248,8 @@ def stack_prediction_df(
     df = df.copy()
     # TODO(Paul): Make this more robust.
     idx_name = df.columns.names[1]
+    if idx_name is None:
+        idx_name = "level_1"
     # Reindex according to start time.
     bar_start_ts = compute_bar_start_timestamps(df).rename("start_bar_et_ts")
     df.index = bar_start_ts
