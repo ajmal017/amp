@@ -1480,7 +1480,7 @@ def docker_build_local_image(  # type: ignore
     _report_task()
     # Update poetry.
     if update_poetry:
-        cmd = "cd devops/docker_build; poetry lock"
+        cmd = "cd devops/docker_build; poetry lock -v"
         _run(ctx, cmd)
     #
     image_local = get_image("local", base_image)
