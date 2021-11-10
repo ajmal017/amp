@@ -930,25 +930,24 @@ def compute_kratio(log_rets: pd.Series) -> float:
     return kratio
 
 
-def compute_drawdown(log_rets: pd.Series) -> pd.Series:
-    r"""
-    Calculate drawdown of a time series of log returns.
+def compute_drawdown(pnl: pd.Series) -> pd.Series:
+    """
+    Calculate drawdown of a time series of per-period PnL.
 
-    Define the drawdown at index location j to be
-        d_j := max_{0 \leq i \leq j} \log(p_i / p_j)
-    where p_k is price. Though this definition is in terms of prices, we
-    calculate the drawdown series using log returns.
+    At each point in time, drawdown is either zero (a new high-water mark is
+    achieved), or positive, measuring the cumulative loss since the last
+    high-water mark.
 
-    Using this definition, drawdown is always nonnegative.
+    According to our conventions, drawdown is always nonnegative.
 
-    :param log_rets: time series of log returns
+    :param pnl: time series of per-period PnL
     :return: drawdown time series
     """
-    hdbg.dassert_isinstance(log_rets, pd.Series)
-    log_rets = hdatafra.apply_nan_mode(log_rets, mode="fill_with_zero")
-    cum_rets = log_rets.cumsum()
-    running_max = np.maximum.accumulate(cum_rets)  # pylint: disable=no-member
-    drawdown = running_max - cum_rets
+    hdbg.dassert_isinstance(pnl, pd.Series)
+    pnl = hdatafra.apply_nan_mode(pnl, mode="fill_with_zero")
+    cum_pnl = pnl.cumsum()
+    running_max = np.maximum.accumulate(cum_pnl)  # pylint: disable=no-member
+    drawdown = running_max - cum_pnl
     return drawdown
 
 
@@ -963,14 +962,14 @@ def compute_perc_loss_from_high_water_mark(log_rets: pd.Series) -> pd.Series:
     return 1 - np.exp(-dd)
 
 
-def compute_time_under_water(log_rets: pd.Series) -> pd.Series:
+def compute_time_under_water(pnl: pd.Series) -> pd.Series:
     """
     Generate time under water series.
 
-    :param log_rets: time series of log returns
+    :param pnl: time series of per-period PnL
     :return: series of number of consecutive time points under water
     """
-    drawdown = compute_drawdown(log_rets)
+    drawdown = compute_drawdown(pnl)
     underwater_mask = drawdown != 0
     # Cumulatively count number of values in True/False groups.
     # Calculate the start of each underwater series.
