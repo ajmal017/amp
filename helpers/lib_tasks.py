@@ -1109,7 +1109,8 @@ def _get_amp_docker_compose_path() -> Optional[str]:
     """
     Return the docker compose for `amp` as supermodule or as submodule.
 
-    E.g., `devops/compose/docker-compose_as_submodule.yml` and
+    E.g., 
+    `devops/compose/docker-compose_as_submodule.yml` and
     `devops/compose/docker-compose_as_supermodule.yml`
     """
     path, _ = hgit.get_path_from_supermodule()
@@ -1235,16 +1236,26 @@ def _get_docker_cmd(
         docker-compose"""
     )
     # - Handle the docker compose files.
-    docker_compose_files = []
-    docker_compose_files.append(_get_base_docker_compose_path())
-    #
     dir_name = hgit.get_repo_full_name_from_dirname(".", include_host_name=False)
     repo_short_name = hgit.get_repo_name(dir_name, in_mode="full_name")
     _LOG.debug("repo_short_name=%s", repo_short_name)
-    if repo_short_name == "amp":
-        docker_compose_file_tmp = _get_amp_docker_compose_path()
-        if docker_compose_file_tmp:
-            docker_compose_files.append(docker_compose_file_tmp)
+    #
+    docker_compose_files = []
+    if has_default_param("USE_ONLY_ONE_DOCKER_COMPOSE"):
+        # Use only one docker compose file.
+        # TODO(gp): Hacky fix for CmampTask386.
+        if repo_short_name == "amp":
+            docker_compose_file_tmp = _get_amp_docker_compose_path()
+        else:
+            docker_compose_file_tmp = _get_base_docker_compose_path()
+        docker_compose_files.append(docker_compose_file_tmp)
+    else:
+        # Use one or two docker compose files.
+        docker_compose_files.append(_get_base_docker_compose_path())
+        if repo_short_name == "amp":
+            docker_compose_file_tmp = _get_amp_docker_compose_path()
+            if docker_compose_file_tmp:
+                docker_compose_files.append(docker_compose_file_tmp)
     # Add the compose files from command line.
     if extra_docker_compose_files:
         hdbg.dassert_isinstance(extra_docker_compose_files, list)

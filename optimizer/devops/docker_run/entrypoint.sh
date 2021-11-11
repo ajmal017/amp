@@ -59,13 +59,18 @@ fi;
 echo "CONTAINER_VERSION='$CONTAINER_VERSION'"
 echo "BUILD_TAG='$BUILD_TAG'"
 
-echo "which python: "$(which python)
-echo "python -V: "$(python -V)
+# TODO(gp): Use this idiom everywhere (see CmampTask387).
+VAL=$(which python)
+echo "which python: $VAL"
+VAL=$(python -V)
+echo "python -V: $VAL"
 #echo "check pandas package: "$(python -c "import pandas; print(pandas)")
 #echo "docker -v: "$(docker -v)
 #echo "docker-compose -v: "$(docker-compose -v)
-echo "helpers: "$(python -c "import helpers; print(helpers)")
-echo "cvxpy -V: "$(python -c "import cvxpy; print(cvxpy.__version__)")
+VAL=$(python -c "import helpers; print(helpers)")
+echo "helpers: $VAL"
+VAL=$(python -c "import cvxpy; print(cvxpy.__version__)")
+echo "cvxpy -V: $VAL"
 
 echo "PATH=$PATH"
 echo "PYTHONPATH=$PYTHONPATH"
