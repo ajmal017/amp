@@ -6,12 +6,14 @@ import helpers.sql as hsql
 
 import logging
 import os
+import time
 from typing import List, Optional, Tuple, Union
 
 import pandas as pd
 import psycopg2 as psycop
 import psycopg2.sql as psql
 
+import helpers.system_interaction as hsyint
 import helpers.timer as htimer
 
 _LOG = logging.getLogger(__name__)
@@ -75,6 +77,48 @@ def get_connection_from_string(
     if autocommit:
         connection.autocommit = True
     return connection, cursor
+
+
+def check_db_connection(
+    db_name: str,
+    port: int,
+    host: str,
+) -> None:
+    """
+    Verify that the database is available.
+    """
+    _LOG.debug("db_name=%s, port=%s, host=%s", db_name, port, host)
+    while True:
+        _LOG.info("Waiting for PostgreSQL to become available...")
+        cmd = f"pg_isready -d {db_name} -p {port} -h {host}"
+        rc = hsyint.system(cmd,abort_on_error=False)
+        time.sleep(1)
+        if rc == 0:
+            _LOG.info("PostgreSQL is available")
+            break
+
+
+def db_connection_to_str(connection: DbConnection) -> str:
+    """
+    Get database connection details using connection. Connection
+    details include:
+
+        - Database name
+        - Host
+        - Port
+        - Username
+        - Password
+
+    :param connection: a database connection
+    :return: database connection details
+    """
+    info = connection.info
+    txt = (f"dbname={info.dbname}\n"
+           f"host={info.host}\n"
+           f"port={info.port}\n"
+           f"user={info.user}\n"
+           f"password={info.password}")
+    return txt
 
 
 # #############################################################################
@@ -217,12 +261,11 @@ def get_columns(connection: DbConnection, table_name: str) -> list:
 
 # #############################################################################
 
-# TODO(plyq): Add tests.
-# TODO(*): Rename force -> overwrite or not_incremental.
+
 def create_database(
     connection: DbConnection,
     db: str,
-    force: Optional[bool] = None,
+    overwrite: Optional[bool] = None,
 ) -> None:
     """
     Create empty database.
@@ -233,14 +276,15 @@ def create_database(
     """
     _LOG.debug("connection=%s", connection)
     with connection.cursor() as cursor:
-        if force:
+        if overwrite:
             cursor.execute(
                 psql.SQL("DROP DATABASE IF EXISTS {};").format(
                     psql.Identifier(db)
                 )
             )
         else:
-            raise ValueError("Database %s already exists" % db)
+            if db in get_table_names(connection):
+                raise ValueError(f"Database {db} already exists")
         cursor.execute(
             psql.SQL("CREATE DATABASE {};").format(psql.Identifier(db))
         )
