@@ -33,8 +33,9 @@ class TestRealTimeReturnPipeline1(huntes.TestCase):
             start_datetime = pd.Timestamp("2000-01-01 09:30:00-05:00")
             end_datetime = pd.Timestamp("2000-01-01 10:30:00-05:00")
             columns = ["close", "vol"]
+            asset_ids = [1000]
             df = dartttdi.generate_synthetic_db_data(
-                start_datetime, end_datetime, columns
+                start_datetime, end_datetime, columns, asset_ids
             )
             initial_replayed_delay = 5
             rtpi = dartttdi.get_replayed_time_price_interface_example1(
@@ -78,7 +79,6 @@ class TestRealTimeReturnPipeline1(huntes.TestCase):
             events = dag_runner.events
             # Check.
             # TODO(gp): Factor this out.
-            # TODO(gp):
             actual = []
             events_as_str = "\n".join(
                 [
