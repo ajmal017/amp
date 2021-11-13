@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import core.dataflow_model.pnl_simulator as cdtfmopnsim
+import oms.pnl_simulator as cdtfmopnsim
 import helpers.printing as hprintin
 import helpers.unit_test as huntes
 

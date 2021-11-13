@@ -46,7 +46,7 @@ class TestRealTimeReturnPipeline1(huntes.TestCase):
             )
             period = "last_5mins"
             source_node_kwargs = {
-                "real_time_price_interface": rtpi,
+                "price_interface": rtpi,
                 "period": period,
                 "multiindex_output": False,
             }

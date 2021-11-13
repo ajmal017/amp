@@ -1,7 +1,7 @@
 """
 Import as:
 
-import core.dataflow_model.pnl_simulator as pnlsim
+import oms.pnl_simulator as pnlsim
 """
 import collections
 import copy

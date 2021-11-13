@@ -177,15 +177,17 @@ class PlaceTrades(cdtfnobas.FitPredictNode):
         return self._place_trades(df_in, fit=False)
 
     def _place_trades(self, df, fit: bool = True) -> Dict[str, pd.DataFrame]:
+        import oms.place_orders as oplord
+
         hdbg.dassert_in(self._pred_column, df.columns)
         # TODO(gp): Make sure it's multi-index.
         hdbg.dassert_lt(1, df.index.size)
         hdbg.dassert_isinstance(df.index, pd.DatetimeIndex)
         # Get the latest `df` index value.
         if self._execution_mode == "batch":
-            place_trades(df, self._execution_mode, self._config)
+            oplord.place_trades(df, self._execution_mode, self._config)
         elif self._execution_mode == "real_time":
-            place_trades(df[-1], self._execution_mode, self._config)
+            oplord.place_trades(df[-1], self._execution_mode, self._config)
         else:
             raise "Invalid execution_mode='%s'" % self._execution_mode
         # Compute stats.
