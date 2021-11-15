@@ -10,7 +10,6 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
-import core.signal_processing as csipro
 import helpers.dbg as hdbg
 
 _LOG = logging.getLogger(__name__)
@@ -19,6 +18,7 @@ _LOG = logging.getLogger(__name__)
 
 
 def is_symmetric(matrix: pd.DataFrame, **kwargs) -> bool:
+    hdbg.dassert_isinstance(matrix, pd.DataFrame)
     m, n = matrix.shape
     hdbg.dassert_eq(m, n)
     return np.allclose(matrix, matrix.T, **kwargs)
@@ -51,13 +51,18 @@ def compute_tangency_portfolio(
         matrix
     :return: rows of weights
     """
+    hdbg.dassert_isinstance(mu_rows, pd.DataFrame)
     if covariance is not None:
         hdbg.dassert(
             precision is None,
             "Exactly one of `covariance` and `precision` must be not `None`.",
         )
         hdbg.dassert(is_symmetric(covariance))
-        precision = csipro.compute_pseudoinverse(covariance, hermitian=True)
+        pseudoinverse = np.linalg.pinv(covariance, hermitian=True)
+        # Reverse `columns` and `index` because this is a pseudoinverse.
+        precision = pd.DataFrame(
+            pseudoinverse, covariance.columns, covariance.index
+        )
     else:
         hdbg.dassert(
             precision is not None,
