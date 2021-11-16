@@ -568,6 +568,7 @@ class SqlPriceInterface(AbstractPriceInterface):
         end_ts: pd.Timestamp,
         ts_col_name: str,
         asset_ids: List[Any],
+        # TODO(gp): Move these close to start_ts.
         left_close: bool,
         right_close: bool,
         sort_time: bool,
