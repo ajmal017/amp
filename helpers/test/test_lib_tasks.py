@@ -465,6 +465,12 @@ class TestLibTasksGetDockerCmd1(_LibTasksTestCase):
     Test `_get_docker_cmd()`.
     """
 
+    def _check(self, act: str, exp: str) -> None:
+        act = huntes.purify_txt_from_client(act)
+        # This is required when different repos run Docker with user vs root / remap.
+        act = huntes.filter_text("--user", act)
+        self.assert_equal(act, exp, fuzzy_match=True)
+
     @pytest.mark.skipif(
         not hgit.is_in_amp_as_submodule(), reason="Only run in amp as submodule"
     )
@@ -486,7 +492,6 @@ class TestLibTasksGetDockerCmd1(_LibTasksTestCase):
             entrypoint=entrypoint,
             print_docker_config=print_docker_config,
         )
-        act = huntes.purify_txt_from_client(act)
         exp = r"""
         IMAGE=*****/amp_test:dev \
             docker-compose \
@@ -497,7 +502,7 @@ class TestLibTasksGetDockerCmd1(_LibTasksTestCase):
             --entrypoint bash \
             app
         """
-        self.assert_equal(act, exp, fuzzy_match=True)
+        self._check(act, exp)
 
     @pytest.mark.skipif(
         not hgit.is_in_amp_as_submodule(), reason="Only run in amp as submodule"
@@ -513,7 +518,6 @@ class TestLibTasksGetDockerCmd1(_LibTasksTestCase):
         act = hlitas._get_docker_cmd(
             stage, base_image, cmd, print_docker_config=print_docker_config
         )
-        act = huntes.purify_txt_from_client(act)
         exp = r"""
         IMAGE=*****/amp_test:local \
             docker-compose \
@@ -524,7 +528,7 @@ class TestLibTasksGetDockerCmd1(_LibTasksTestCase):
             app \
             bash
         """
-        self.assert_equal(act, exp, fuzzy_match=True)
+        self._check(act, exp)
 
     @pytest.mark.skipif(
         not hgit.is_in_amp_as_submodule(), reason="Only run in amp as submodule"
@@ -545,7 +549,6 @@ class TestLibTasksGetDockerCmd1(_LibTasksTestCase):
             extra_env_vars=extra_env_vars,
             print_docker_config=print_docker_config,
         )
-        act = huntes.purify_txt_from_client(act)
         exp = r"""
         IMAGE=*****/amp_test:local \
         PORT=9999 \
@@ -558,7 +561,7 @@ class TestLibTasksGetDockerCmd1(_LibTasksTestCase):
             app \
             bash
         """
-        self.assert_equal(act, exp, fuzzy_match=True)
+        self._check(act, exp)
 
     @pytest.mark.skipif(
         not hgit.is_in_amp_as_supermodule(),
@@ -577,7 +580,6 @@ class TestLibTasksGetDockerCmd1(_LibTasksTestCase):
             entrypoint=entrypoint,
             print_docker_config=print_docker_config,
         )
-        act = huntes.purify_txt_from_client(act)
         exp = r"""
         IMAGE=*****/amp_test:dev \
             docker-compose \
@@ -588,7 +590,7 @@ class TestLibTasksGetDockerCmd1(_LibTasksTestCase):
             --entrypoint bash \
             app
         """
-        self.assert_equal(act, exp, fuzzy_match=True)
+        self._check(act, exp)
 
     @pytest.mark.skipif(
         not hgit.is_in_amp_as_submodule(), reason="Only run in amp as submodule"
@@ -606,7 +608,6 @@ class TestLibTasksGetDockerCmd1(_LibTasksTestCase):
             self_test,
             print_docker_config=print_docker_config,
         )
-        act = huntes.purify_txt_from_client(act)
         exp = r"""
         IMAGE=*****/amp_test:dev \
         PORT=9999 \
@@ -618,7 +619,7 @@ class TestLibTasksGetDockerCmd1(_LibTasksTestCase):
             --service-ports \
             jupyter_server_test
         """
-        self.assert_equal(act, exp, fuzzy_match=True)
+        self._check(act, exp)
 
 
 # #############################################################################

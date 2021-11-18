@@ -697,8 +697,6 @@ def git_create_branch(  # type: ignore
     _run(ctx, cmd)
 
 
-
-
 def _delete_branches(ctx: Any, tag: str, confirm_delete: bool) -> None:
     if tag == "local":
         # Delete local branches that are already merged into master.
@@ -1235,9 +1233,9 @@ def _get_docker_cmd(
         --rm"""
     )
     # - Handle the user.
-    if False:
+    if True:
         docker_cmd_.append(
-            r"""
+            rf"""
         --user $(id -u):$(id -g)"""
         )
     # - Handle the extra docker options.

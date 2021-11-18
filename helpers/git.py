@@ -1051,8 +1051,13 @@ def does_branch_exist(dir_name: str, branch_name: str) -> bool:
     return exists
 
 
-def delete_branches(dir_name: str, mode: str, branches: List[str], confirm_delete: bool,
-                    abort_on_error: bool = True) -> None:
+def delete_branches(
+    dir_name: str,
+    mode: str,
+    branches: List[str],
+    confirm_delete: bool,
+    abort_on_error: bool = True,
+) -> None:
     """
     Delete local or remote branches.
 
@@ -1071,17 +1076,25 @@ def delete_branches(dir_name: str, mode: str, branches: List[str], confirm_delet
     # Ask whether to continue.
     if confirm_delete:
         branches_as_str = " ".join(branches)
-        msg = (hdbg.WARNING + f": Delete {len(branches)} {mode} branch(es) '{branches_as_str}'?")
-        hsyint.query_yes_no(
-            msg, abort_on_no=True
+        msg = (
+            hdbg.WARNING
+            + f": Delete {len(branches)} {mode} branch(es) '{branches_as_str}'?"
         )
+        hsyint.query_yes_no(msg, abort_on_no=True)
     for branch in branches:
         if mode == "remote":
             prefix = "origin/"
-            hdbg.dassert(branch.startswith(prefix),
-                        "Remote branch '%s' needs to start with '%s'",
-                        branch, prefix)
-            branch = branch[len(prefix):]
+            hdbg.dassert(
+                branch.startswith(prefix),
+                "Remote branch '%s' needs to start with '%s'",
+                branch,
+                prefix,
+            )
+            branch = branch[len(prefix) :]
         cmd = f"{delete_cmd} {branch}"
-        hsyint.system(cmd, suppress_output=False, log_level="echo", abort_on_error=abort_on_error)
-
+        hsyint.system(
+            cmd,
+            suppress_output=False,
+            log_level="echo",
+            abort_on_error=abort_on_error,
+        )
