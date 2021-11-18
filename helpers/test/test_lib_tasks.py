@@ -796,7 +796,9 @@ class TestLibTasksRunTests1(hunitest.TestCase):
         git_root = hgit.get_client_root(super_module=True)
         file_names = hlibtask._find_test_files(git_root)
         #
-        file_names = hlibtask._find_test_class("TestLibTasksRunTests1", file_names)
+        file_names = hlibtask._find_test_class(
+            "TestLibTasksRunTests1", file_names
+        )
         act = hunitest.purify_file_names(file_names)
         exp = ["helpers/test/test_lib_tasks.py::TestLibTasksRunTests1"]
         self.assert_equal(str(act), str(exp))
@@ -807,7 +809,9 @@ class TestLibTasksRunTests1(hunitest.TestCase):
         """
         file_names = [__file__]
         #
-        file_names = hlibtask._find_test_class("TestLibTasksRunTests1", file_names)
+        file_names = hlibtask._find_test_class(
+            "TestLibTasksRunTests1", file_names
+        )
         act = hunitest.purify_file_names(file_names)
         exp = ["helpers/test/test_lib_tasks.py::TestLibTasksRunTests1"]
         self.assert_equal(str(act), str(exp))

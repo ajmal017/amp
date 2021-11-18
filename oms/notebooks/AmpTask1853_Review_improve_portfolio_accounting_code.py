@@ -24,8 +24,8 @@ import pandas as pd
 import core.config as cconfig
 import core.dataflow.price_interface as cdtfprint
 import helpers.dbg as hdbg
-import helpers.printing as hprintin
-import oms.portfolio as opor
+import helpers.printing as hprint
+import oms.portfolio as omportfo
 import oms.test.test_portfolio as ottport
 
 # %%
@@ -36,7 +36,7 @@ _LOG = logging.getLogger(__name__)
 
 # _LOG.info("%s", env.get_system_signature()[0])
 
-hprintin.config_notebook()
+hprint.config_notebook()
 
 # %% [markdown]
 # # Section 1
