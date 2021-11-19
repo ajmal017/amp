@@ -54,7 +54,7 @@ AMP_DIR="${HOME_DIR}/src/${DIR_PREFIX}${IDX}"
 echo "AMP_DIR=$AMP_DIR"
 
 # #############################################################################
-# Open the tmux seesion.
+# Open the tmux session.
 # #############################################################################
 
 SETENV="dev_scripts/setenv_amp.sh"

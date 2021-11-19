@@ -27,7 +27,7 @@ def _get_docker_cmd(docker_cmd: str) -> str:
     ```
     docker-compose \
         --file devops/compose/docker-compose.yml \
-        run --rm app \
+        run --rm im_app \
         .../devops/set_schema_im_db.py
     ```
 
@@ -35,10 +35,10 @@ def _get_docker_cmd(docker_cmd: str) -> str:
     """
     cmd = ["docker-compose"]
     # Add `docker-compose` file path.
-    docker_compose_file_path = hlibtask._get_base_docker_compose_path()
+    docker_compose_file_path = hlibtask.get_base_docker_compose_path()
     cmd.append(f"--file {docker_compose_file_path}")
     # Add `run`.
-    service_name = "app"
+    service_name = "im_app"
     cmd.append(f"run --rm {service_name}")
     cmd.append(docker_cmd)
     # Convert the list to a multiline command.
@@ -79,7 +79,7 @@ def _get_docker_up_cmd(detach: bool) -> str:
     """
     cmd = ["docker-compose"]
     # Add `docker-compose` file path.
-    docker_compose_file_path = hlibtask._get_base_docker_compose_path()
+    docker_compose_file_path = hlibtask.get_base_docker_compose_path()
     cmd.append(f"--file {docker_compose_file_path}")
     # Add `down` command.
     cmd.append("up")
@@ -125,7 +125,7 @@ def _get_docker_down_cmd(volumes_remove: bool) -> str:
     """
     cmd = ["docker-compose"]
     # Add `docker-compose` file path.
-    docker_compose_file_path = hlibtask._get_base_docker_compose_path()
+    docker_compose_file_path = hlibtask.get_base_docker_compose_path()
     cmd.append(f"--file {docker_compose_file_path}")
     # Add `down` command.
     cmd.append("down")
