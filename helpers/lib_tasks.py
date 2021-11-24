@@ -1452,7 +1452,8 @@ def docker_jupyter(  # type: ignore
     #
     print_docker_config = False
     docker_cmd_ = _get_docker_jupyter_cmd(
-        base_image, stage, version, port, self_test, print_docker_config
+        base_image, stage, version, port, self_test,
+        print_docker_config=print_docker_config
     )
     _docker_cmd(ctx, docker_cmd_)
 
