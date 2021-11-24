@@ -27,10 +27,10 @@ import helpers.dbg as hdbg
 import helpers.env as henv
 import helpers.printing as hprint
 import helpers.s3 as hs3
-import im_v2.data.universe as imv2dauni
+import im_v2.common.universe.universe as imvcounun
 import research_amp.cc.statistics as rccstat
 import research_amp.cc.volume as rccvolu
-import im.ccxt.data.load.loader as imcdalolo
+import im_v2.ccxt.data.client.loader as imcdacllo
 
 import core.plotting as coplotti
 
@@ -154,7 +154,7 @@ def get_initial_df_with_volumes(coins, exchange, is_notional_volume):
     Parameters: list of coins, exchange name
     """
     result = []
-    loader = imcdalolo.CcxtLoaderFromFile(
+    loader = imcdacllo.CcxtLoaderFromFile(
         root_dir="s3://alphamatic-data/data", aws_profile="am"
     )
     for coin in coins:
@@ -197,10 +197,10 @@ def plot_ath_volumes_comparison(df_list):
 
 # %%
 # get the list of all coin paires for each exchange
-binance_coins = imv2dauni.get_trade_universe("v01")["CCXT"]["binance"]
-ftx_coins = imv2dauni.get_trade_universe("v01")["CCXT"]["ftx"]
-gateio_coins = imv2dauni.get_trade_universe("v01")["CCXT"]["gateio"]
-kucoin_coins = imv2dauni.get_trade_universe("v01")["CCXT"]["kucoin"]
+binance_coins = imvcounun.get_trade_universe("v01")["CCXT"]["binance"]
+ftx_coins = imvcounun.get_trade_universe("v01")["CCXT"]["ftx"]
+gateio_coins = imvcounun.get_trade_universe("v01")["CCXT"]["gateio"]
+kucoin_coins = imvcounun.get_trade_universe("v01")["CCXT"]["kucoin"]
 
 # load all the dataframes
 binance_1 = get_initial_df_with_volumes(

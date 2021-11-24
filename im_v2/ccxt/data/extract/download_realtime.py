@@ -38,7 +38,7 @@ import helpers.io_ as hio
 import helpers.parser as hparser
 import helpers.sql as hsql
 import im_v2.ccxt.data.extract.exchange_class as imvcdeexcl
-import im_v2.data.universe as imv2dauni
+import im_v2.common.universe.universe as imvcounun
 
 _LOG = logging.getLogger(__name__)
 
@@ -197,7 +197,7 @@ def _main(parser: argparse.ArgumentParser) -> None:
     else:
         hdbg.dfatal("Unknown db connection: %s" % args.db_connection)
     # Load universe.
-    universe = imv2dauni.get_trade_universe(args.universe)
+    universe = imvcounun.get_trade_universe(args.universe)
     exchange_ids = universe["CCXT"].keys()
     # Build mappings from exchange ids to classes and currencies.
     exchanges = []
@@ -205,6 +205,12 @@ def _main(parser: argparse.ArgumentParser) -> None:
         exchanges.append(
             _instantiate_exchange(exchange_id, universe["CCXT"], args.api_keys)
         )
+    # Generate a query to remove duplicates.
+    dup_query = hsql.get_remove_duplicates_query(
+        table_name=args.table_name,
+        id_col="id",
+        column_names=["timestamp", "exchange_id", "currency_pair"],
+    )
     # Launch an infinite loop.
     while True:
         for exchange in exchanges:
@@ -216,19 +222,10 @@ def _main(parser: argparse.ArgumentParser) -> None:
                     ccxt.ExchangeError,
                     ccxt.NetworkError,
                     ccxt.base.errors.RequestTimeout,
+                    ccxt.base.errors.RateLimitExceeded,
                 ) as e:
-                    # TODO(*): handle timeouts and network errors differently ?
                     # Continue the loop if could not connect to exchange.
                     _LOG.warning("Got an error: %s", type(e).__name__, e.args)
-                    continue
-                except ccxt.base.errors.RateLimitExceeded as e:
-                    # Sleep for extra 60 seconds if exceeded rate limit.
-                    _LOG.warning(
-                        "Got an Exceeded limit error: %s",
-                        type(e).__name__,
-                        e.args,
-                    )
-                    time.sleep(60)
                     continue
                 # Save to disk.
                 if args.dst_dir:
@@ -242,6 +239,8 @@ def _main(parser: argparse.ArgumentParser) -> None:
                         obj=pair_data,
                         table_name=args.table_name,
                     )
+                    # Drop duplicates inside the table.
+                    connection.cursor().execute(dup_query)
         time.sleep(60)
 
 

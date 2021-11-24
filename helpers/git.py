@@ -641,6 +641,7 @@ def get_amp_abs_path() -> str:
     Return the absolute path of `amp` dir.
     """
     repo_sym_name = get_repo_full_name_from_client(super_module=False)
+    _LOG.debug("repo_sym_name=%s", repo_sym_name)
     if repo_sym_name == "alphamatic/amp":
         # If we are in the amp repo, then the git client root is the amp
         # directory.
@@ -981,6 +982,63 @@ def git_stash_apply(mode: str, log_level: int = logging.DEBUG) -> None:
     else:
         raise ValueError("mode='%s'" % mode)
     hsysinte.system(cmd, suppress_output=False, log_level=log_level)
+
+
+# TODO(gp): Consider using this everywhere. Maybe it can simplify handling issues
+#  stemming from the super-module / sub-module repo.
+def _get_git_cmd(super_module: bool) -> str:
+    """
+    Build the first part of a Git command line.
+    """
+    cmd = []
+    cmd.append("git")
+    client_root = get_client_root(super_module=super_module)
+    # Set the path to the repository (".git" directory), avoiding Git to search for
+    # it (from https://git-scm.com/docs/git)
+    cmd.append(f"--git-dir='{client_root}/.git'")
+    # Set the path to the working tree.
+    cmd.append(f"--work-tree='{client_root}'")
+    cmd = " ".join(cmd)
+    return cmd
+
+
+def git_tag(
+    tag_name: str, super_module: bool = True, log_level: int = logging.DEBUG
+) -> None:
+    """
+    Tag the Git tree with `tag_name` without pushing the tag to the remote.
+    """
+    _LOG.debug("# Tagging current commit ...")
+    git_cmd = _get_git_cmd(super_module)
+    cmd = f"{git_cmd} tag -f {tag_name}"
+    _ = hsysinte.system(cmd, suppress_output=False, log_level=log_level)
+
+
+def git_push_tag(
+    tag_name: str,
+    remote: str = "origin",
+    super_module: bool = True,
+    log_level: int = logging.DEBUG,
+) -> None:
+    """
+    Push the tag `tag_name` to the given remote.
+    """
+    _LOG.debug("# Pushing current commit ...")
+    git_cmd = _get_git_cmd(super_module)
+    cmd = f"{git_cmd} push {remote} {tag_name}"
+    _ = hsysinte.system(cmd, suppress_output=False, log_level=log_level)
+
+
+def git_describe(log_level: int = logging.DEBUG) -> str:
+    """
+    Return the closest tag in the repo, e.g., 1.0.0.
+
+    If there is no tag, this will return short commit hash.
+    """
+    _LOG.debug("# Looking for version ...")
+    cmd = "git describe --tags --always --abbrev=0"
+    tag, num = hsysinte.system_to_one_line(cmd, log_level=log_level)
+    return tag
 
 
 def git_add_update(

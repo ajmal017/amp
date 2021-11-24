@@ -48,7 +48,9 @@ class _LibTasksTestCase(hunitest.TestCase):
         hlibtask.reset_default_params()
         super().tearDown()
 
+
 # #############################################################################
+
 
 def _build_mock_context_returning_ok() -> invoke.MockContext:
     """
@@ -103,14 +105,22 @@ def _gh_login() -> None:
         _LOG.warning("Using env var '%s' to log in GitHub", env_var)
         # For debugging only (see AmpTask1864).
         if False:
+
             def _cmd(cmd):
-                hsysinte.system(cmd, suppress_output=False, log_level="echo",
-                        abort_on_error=False)
-            for cmd in ["ls -l $HOME/.config",
+                hsysinte.system(
+                    cmd,
+                    suppress_output=False,
+                    log_level="echo",
+                    abort_on_error=False,
+                )
+
+            for cmd in [
+                "ls -l $HOME/.config",
                 "ls -l $HOME/.config/gh",
                 "ls -l $HOME/.config/gh/config.yml",
                 "touch $HOME/.config/gh/config.yml",
-                "ls -l $HOME/.config/gh/config.yml"]:
+                "ls -l $HOME/.config/gh/config.yml",
+            ]:
                 _cmd(cmd)
         cmd = "echo $GH_ACTION_ACCESS_TOKEN | gh auth login --with-token"
         hsysinte.system(cmd)
@@ -120,7 +130,6 @@ def _gh_login() -> None:
 
 
 class TestGhLogin1(hunitest.TestCase):
-
     def test_gh_login(self) -> None:
         _gh_login()
 
@@ -437,14 +446,8 @@ class TestDryRunTasks2(_LibTasksTestCase, _CheckDryRunTestCase):
 
 class TestLibTasks1(hunitest.TestCase):
     """
-    Test some auxiliary functions, e.g., `_get_build_tag`,
-    `_get_gh_issue_title()`.
+    Test some auxiliary functions, e.g., `_get_gh_issue_title()`.
     """
-
-    def test_get_build_tag1(self) -> None:
-        code_ver = "amp-1.0.0"
-        build_tag = hlibtask._get_build_tag(code_ver)
-        _LOG.debug("build_tag=%s", build_tag)
 
     def test_get_gh_issue_title1(self) -> None:
         _gh_login()
@@ -516,22 +519,24 @@ class TestLibTasksGetDockerCmd1(_LibTasksTestCase):
         """
         Command for docker_bash target.
         """
-        stage = "dev"
         base_image = ""
+        stage = "dev"
+        version = "1.0.0"
         cmd = "bash"
         service_name = "app"
         entrypoint = False
         print_docker_config = False
         act = hlibtask._get_docker_cmd(
-            stage,
             base_image,
+            stage,
+            version,
             cmd,
             service_name=service_name,
             entrypoint=entrypoint,
             print_docker_config=print_docker_config,
         )
         exp = r"""
-        IMAGE=*****/amp_test:dev \
+        IMAGE=*****/amp_test:dev-1.0.0 \
             docker-compose \
             --file $GIT_ROOT/devops/compose/docker-compose.yml --file $GIT_ROOT/devops/compose/docker-compose_as_submodule.yml \
             --env-file devops/env/default.env \
@@ -549,12 +554,13 @@ class TestLibTasksGetDockerCmd1(_LibTasksTestCase):
         """
         Command for docker_bash with entrypoint.
         """
-        stage = "local"
         base_image = ""
+        stage = "local"
+        version = "1.0.0"
         cmd = "bash"
         print_docker_config = False
         act = hlibtask._get_docker_cmd(
-            stage, base_image, cmd, print_docker_config=print_docker_config
+            base_image, stage, version, cmd, print_docker_config=print_docker_config
         )
         exp = r"""
         IMAGE=*****/amp_test:local \
@@ -575,20 +581,22 @@ class TestLibTasksGetDockerCmd1(_LibTasksTestCase):
         """
         Command for docker_bash with some env vars.
         """
-        stage = "local"
         base_image = ""
+        stage = "local"
+        version = "1.0.0"
         cmd = "bash"
         extra_env_vars = ["PORT=9999", "SKIP_RUN=1"]
         print_docker_config = False
         act = hlibtask._get_docker_cmd(
-            stage,
             base_image,
+            stage,
+            version,
             cmd,
             extra_env_vars=extra_env_vars,
             print_docker_config=print_docker_config,
         )
         exp = r"""
-        IMAGE=*****/amp_test:local \
+        IMAGE=*****/amp_test:local-1.0.0 \
         PORT=9999 \
         SKIP_RUN=1 \
             docker-compose \
@@ -606,20 +614,22 @@ class TestLibTasksGetDockerCmd1(_LibTasksTestCase):
         reason="Only run in amp as supermodule",
     )
     def test_docker_bash4(self) -> None:
-        stage = "dev"
         base_image = ""
+        stage = "dev"
+        version = "1.0.0"
         cmd = "bash"
         entrypoint = False
         print_docker_config = False
         act = hlibtask._get_docker_cmd(
-            stage,
             base_image,
+            stage,
+            version,
             cmd,
             entrypoint=entrypoint,
             print_docker_config=print_docker_config,
         )
         exp = r"""
-        IMAGE=*****/amp_test:dev \
+        IMAGE=*****/amp_test:dev-1.0.0 \
             docker-compose \
             --file $GIT_ROOT/devops/compose/docker-compose.yml \
             --env-file devops/env/default.env \
@@ -675,7 +685,6 @@ class Test_build_run_command_line1(hunitest.TestCase):
         Basic run fast tests.
         """
         pytest_opts = ""
-        pytest_mark = ""
         skip_submodules = False
         coverage = False
         collect_only = False
@@ -684,12 +693,10 @@ class Test_build_run_command_line1(hunitest.TestCase):
         skipped_tests = "not slow and not superslow"
         act = hlibtask._build_run_command_line(
             pytest_opts,
-            pytest_mark,
             skip_submodules,
             coverage,
             collect_only,
             tee_to_file,
-            #
             skipped_tests,
         )
         exp = 'pytest -m "not slow and not superslow" .'
@@ -701,7 +708,6 @@ class Test_build_run_command_line1(hunitest.TestCase):
         """
 
         pytest_opts = ""
-        pytest_mark = ""
         skip_submodules = False
         coverage = True
         collect_only = True
@@ -710,12 +716,10 @@ class Test_build_run_command_line1(hunitest.TestCase):
         skipped_tests = "not slow and not superslow"
         act = hlibtask._build_run_command_line(
             pytest_opts,
-            pytest_mark,
             skip_submodules,
             coverage,
             collect_only,
             tee_to_file,
-            #
             skipped_tests,
         )
         exp = (
@@ -756,7 +760,6 @@ class Test_build_run_command_line1(hunitest.TestCase):
         hunitest.create_test_dir(dir_name, incremental, file_dict)
         #
         pytest_opts = ""
-        pytest_mark = "no_container"
         dir_name = scratch_space
         skip_submodules = True
         coverage = False
@@ -766,8 +769,6 @@ class Test_build_run_command_line1(hunitest.TestCase):
         skipped_tests = ""
         act = hlibtask._build_run_command_line(
             pytest_opts,
-            pytest_mark,
-            dir_name,
             skip_submodules,
             coverage,
             collect_only,
@@ -785,7 +786,6 @@ class Test_build_run_command_line1(hunitest.TestCase):
         Basic run fast tests tee-ing to a file.
         """
         pytest_opts = ""
-        pytest_mark = ""
         skip_submodules = False
         coverage = False
         collect_only = False
@@ -794,12 +794,10 @@ class Test_build_run_command_line1(hunitest.TestCase):
         skipped_tests = "not slow and not superslow"
         act = hlibtask._build_run_command_line(
             pytest_opts,
-            pytest_mark,
             skip_submodules,
             coverage,
             collect_only,
             tee_to_file,
-            #
             skipped_tests,
         )
         exp = 'pytest -m "not slow and not superslow" . 2>&1 | tee tmp.pytest.log'

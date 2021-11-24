@@ -14,7 +14,7 @@ _LOG = logging.getLogger(__name__)
 
 
 # TODO(gp): helpers can't depend from im.
-@pytest.mark.skipif(not hgit.is_amp(), reason="Only run in amp")
+# @pytest.mark.skipif(not hgit.is_amp(), reason="Only run in amp")
 class TestSql1(hunitest.TestCase):
     def setUp(self) -> None:
         """
@@ -54,7 +54,6 @@ class TestSql1(hunitest.TestCase):
         """
         Smoke test.
         """
-        # TODO(Dan3): change to env
         hsql.wait_db_connection(self.host, self.dbname, self.port)
 
     @pytest.mark.slow()
@@ -86,7 +85,7 @@ class TestSql1(hunitest.TestCase):
         """
         Verify that db is creating.
         """
-        hsql.wait_db_connection(self.dbname, self.port, self.host)
+        hsql.wait_db_connection(self.host, self.dbname, self.port)
         self.connection = hsql.get_connection(
             self.host,
             self.dbname,
@@ -134,7 +133,7 @@ class TestSql1(hunitest.TestCase):
         """
         Test failed assertion for passing db name that does not exist.
         """
-        hsql.wait_db_connection(self.dbname, self.port, self.host)
+        hsql.wait_db_connection(self.host, self.dbname, self.port)
         self.connection = hsql.get_connection(
             self.host,
             self.dbname,
@@ -190,6 +189,58 @@ class TestSql1(hunitest.TestCase):
         actual = hunitest.convert_df_to_json_string(df, n_tail=None)
         self.check_string(actual)
 
+    @pytest.mark.slow()
+    def test_duplicate_removal1(self) -> None:
+        """
+        Verify that duplicate entries are removed correctly.
+        """
+        self._create_test_table()
+        test_data = self._get_duplicated_data()
+        # Try uploading test data.
+        self.connection = hsql.get_connection(
+            self.host,
+            self.dbname,
+            self.port,
+            self.user,
+            self.password,
+            autocommit=True,
+        )
+        hsql.execute_insert_query(self.connection, test_data, "test_table")
+        # Create a query to remove duplicates.
+        dup_query = hsql.get_remove_duplicates_query(
+            "test_table", "id", ["column_1", "column_2"]
+        )
+        self.connection.cursor().execute(dup_query)
+        df = hsql.execute_query_to_df(self.connection, "SELECT * FROM test_table")
+        actual = hunitest.convert_df_to_json_string(df, n_tail=None)
+        self.check_string(actual)
+
+    @pytest.mark.slow()
+    def test_duplicate_removal2(self) -> None:
+        """
+        Verify that no rows are removed as duplicates.
+        """
+        self._create_test_table()
+        test_data = self._get_test_data()
+        # Try uploading test data.
+        self.connection = hsql.get_connection(
+            self.host,
+            self.dbname,
+            self.port,
+            self.user,
+            self.password,
+            autocommit=True,
+        )
+        hsql.execute_insert_query(self.connection, test_data, "test_table")
+        # Create a query to remove duplicates.
+        dup_query = hsql.get_remove_duplicates_query(
+            "test_table", "id", ["column_1", "column_2"]
+        )
+        self.connection.cursor().execute(dup_query)
+        df = hsql.execute_query_to_df(self.connection, "SELECT * FROM test_table")
+        actual = hunitest.convert_df_to_json_string(df, n_tail=None)
+        self.check_string(actual)
+
     def _create_test_table(self) -> None:
         """
         Create a test table.
@@ -200,7 +251,7 @@ class TestSql1(hunitest.TestCase):
                     column_2 VARCHAR(255)
                     )
                     """
-        hsql.wait_db_connection(self.dbname, self.port, self.host)
+        hsql.wait_db_connection(self.host, self.dbname, self.port)
         connection = hsql.get_connection(
             self.host,
             self.dbname,
@@ -239,6 +290,39 @@ class TestSql1(hunitest.TestCase):
                     5,
                     1004,
                     "test_string_5",
+                ],
+            ],
+        )
+        return test_data
+
+    def _get_duplicated_data(self) -> pd.DataFrame:
+        test_data = pd.DataFrame(
+            columns=["id", "column_1", "column_2"],
+            data=[
+                [
+                    1,
+                    1000,
+                    "test_string_1",
+                ],
+                [
+                    2,
+                    1001,
+                    "test_string_2",
+                ],
+                [
+                    3,
+                    1002,
+                    "test_string_3",
+                ],
+                [
+                    4,
+                    1002,
+                    "test_string_3",
+                ],
+                [
+                    5,
+                    1001,
+                    "test_string_2",
                 ],
             ],
         )
