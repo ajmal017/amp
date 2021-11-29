@@ -46,29 +46,29 @@ class Portfolio:
         account: str,
         #
         price_interface: cdtfprint.AbstractPriceInterface,
-        # TODO(gp): -> _column -> _col_name
-        asset_id_column: str,
-        # TODO(gp): -> mark_to_market_col_name
-        price_column: str,
+        asset_id_col: str,
+        mark_to_market_col: str,
+        timestamp_col: str,
         holdings_df: pd.DataFrame,
     ):
         """
         Constructor.
 
-        :param asset_id_column: column name in the output df of `price_interface`
+        :param asset_id_col: column name in the output df of `price_interface`
             storing the asset id
-        :param price_column: column name used to mark holdings to market
+        :param mark_to_market_col: column name used to mark holdings to market
         """
         _LOG.debug(
-            hprint.to_str("strategy_id account asset_id_column price_column")
+            hprint.to_str("strategy_id account asset_id_col mark_to_market_col")
         )
         self._strategy_id = strategy_id
         self._account = account
         #
         hdbg.dassert_issubclass(price_interface, cdtfprint.AbstractPriceInterface)
         self._price_interface = price_interface
-        self._asset_id_column = asset_id_column
-        self._price_column = price_column
+        self._asset_id_col = asset_id_col
+        self._mark_to_market_col = mark_to_market_col
+        self._timestamp_col = timestamp_col
         self._validate_initial_holdings_df(holdings_df)
         self._holdings = holdings_df
         # Initialize dataframe with order fills.
@@ -110,7 +110,8 @@ class Portfolio:
         account: str,
         price_interface: cdtfprint.AbstractPriceInterface,
         asset_id_column: str,
-        price_column: str,
+        mark_to_market_col: str,
+        timestamp_col: str,
         initial_cash: float,
         initial_timestamp: pd.Timestamp,
     ) -> "Portfolio":
@@ -127,7 +128,8 @@ class Portfolio:
             account,
             price_interface,
             asset_id_column,
-            price_column,
+            mark_to_market_col,
+            timestamp_col,
             holdings_df,
         )
         return portfolio
@@ -139,7 +141,8 @@ class Portfolio:
         account: str,
         price_interface: cdtfprint.AbstractPriceInterface,
         asset_id_column: str,
-        price_column: str,
+        mark_to_market_col: str,
+        timestamp_col: str,
         holdings_dict: Dict[int, float],
         initial_timestamp: pd.Timestamp,
     ) -> "Portfolio":
@@ -157,7 +160,8 @@ class Portfolio:
             account,
             price_interface,
             asset_id_column,
-            price_column,
+            mark_to_market_col,
+            timestamp_col,
             df,
         )
         return portfolio
@@ -242,9 +246,8 @@ class Portfolio:
         non_cash_asset_ids = list(
             filter(lambda x: x != Portfolio.CASH_ID, asset_ids)
         )
-        timestamp_col_name = "end_datetime"
         price_df = self._price_interface.get_data_at_timestamp(
-            timestamp, timestamp_col_name, non_cash_asset_ids
+            timestamp, self._timestamp_col, non_cash_asset_ids
         )
         hdbg.dassert_eq(
             price_df.shape[0],
@@ -256,7 +259,7 @@ class Portfolio:
         )
         _LOG.debug("price_df=\n%s", hprint.dataframe_to_str(price_df))
         # Extract subset of price information.
-        columns = [self._asset_id_column, self._price_column]
+        columns = [self._asset_id_col, self._mark_to_market_col]
         hdbg.dassert_is_subset(columns, price_df.columns)
         price_df = price_df[columns]
         price_df.columns = Portfolio.PRICE_COLS
@@ -289,17 +292,23 @@ class Portfolio:
             hprint.frame("mark_to_market: timestamp=%s" % timestamp, char1="<"),
         )
         Portfolio._validate_mark_to_market_df(df)
+        if df.empty:
+            cols = Portfolio.HOLDINGS_COLS + ["value", "price"]
+            result_df = pd.DataFrame(columns=cols)
+            return result_df
         # Get asset ids.
         asset_ids = df["asset_id"].to_list()
+        hdbg.dassert_lt(0, len(asset_ids))
         _LOG.debug("asset_ids=%s", asset_ids)
         price_df = self.get_asset_price_at_timestamp(timestamp, asset_ids)
+        hdbg.dassert(not price_df.empty)
         # Merge the holdings with the prices.
         result_df = pd.merge(
             df,
             price_df,
             how="outer",
             left_on="asset_id",
-            right_on=self._asset_id_column,
+            right_on=self._asset_id_col,
         )
         # Compute the value.
         result_df["value"] = result_df["curr_num_shares"] * result_df["price"]
@@ -329,6 +338,12 @@ class Portfolio:
             hprint.frame(
                 "get_characteristics: timestamp=%s" % timestamp, char1="<"
             ),
+        )
+        hdbg.dassert_in(
+            timestamp,
+            self._holdings.index,
+            "No record of holdings at timestamp=`%s`",
+            timestamp,
         )
         # Mark the current holdings to market.
         holdings = self.get_holdings(timestamp, asset_id=None, exclude_cash=True)

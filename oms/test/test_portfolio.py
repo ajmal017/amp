@@ -11,6 +11,7 @@ from typing import Any, Dict
 import pandas as pd
 
 import core.dataflow.price_interface as cdtfprint
+import core.dataflow.real_time as cdtfretim
 import core.dataflow.test.test_price_interface as dartttdi
 import helpers.printing as hprint
 import helpers.unit_test as hunitest
@@ -28,7 +29,8 @@ def get_portfolio_example1(
     account = "paper"
     asset_id_column = "asset_id"
     # price_column = "midpoint"
-    price_column = "price"
+    mark_to_market_col = "price"
+    timestamp_col = "end_datetime"
     #
     initial_cash = 1e6
     portfolio = omportfo.Portfolio.from_cash(
@@ -37,7 +39,8 @@ def get_portfolio_example1(
         #
         price_interface,
         asset_id_column,
-        price_column,
+        mark_to_market_col,
+        timestamp_col,
         #
         initial_cash,
         initial_timestamp,
@@ -202,7 +205,8 @@ class TestPortfolio2(hunitest.TestCase):
             account="paper",
             price_interface=price_interface,
             asset_id_column="asset_id",
-            price_column="price",
+            mark_to_market_col="price",
+            timestamp_col="end_datetime",
             initial_cash=1e6,
             initial_timestamp=initial_timestamp,
         )
@@ -226,7 +230,8 @@ class TestPortfolio2(hunitest.TestCase):
             account="paper",
             price_interface=price_interface,
             asset_id_column="asset_id",
-            price_column="price",
+            mark_to_market_col="price",
+            timestamp_col="end_datetime",
             holdings_dict=dict_,
             initial_timestamp=initial_timestamp,
         )
@@ -251,7 +256,8 @@ class TestPortfolio2(hunitest.TestCase):
             account="paper",
             price_interface=price_interface,
             asset_id_column="asset_id",
-            price_column="price",
+            mark_to_market_col="price",
+            timestamp_col="end_datetime",
             initial_cash=1e6,
             initial_timestamp=initial_timestamp,
         )
@@ -282,7 +288,8 @@ leverage,0.0
             account="paper",
             price_interface=price_interface,
             asset_id_column="asset_id",
-            price_column="price",
+            mark_to_market_col="price",
+            timestamp_col="end_datetime",
             holdings_dict=dict_,
             initial_timestamp=initial_timestamp,
         )
@@ -293,6 +300,61 @@ cash,10000.0
 net_wealth,10551.422
 gross_exposure,551.422
 leverage,0.052
+"""
+        expected = pd.read_csv(
+            io.StringIO(txt),
+            index_col=0,
+        )
+        # The timestamp doesn't parse correctly from the csv.
+        expected.columns = [initial_timestamp]
+        actual = portfolio.get_characteristics(initial_timestamp)
+        self.assert_dfs_close(actual.to_frame(), expected, rtol=1e-2, atol=1e-2)
+
+    def test_characteristics3(self) -> None:
+        tz = "ET"
+        initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
+        event_loop = None
+        get_wall_clock_time = cdtfretim.get_replayed_wall_clock_time(
+            tz,
+            initial_timestamp,
+            event_loop=event_loop,
+        )
+        price_txt = r"""
+start_datetime,end_datetime,asset_id,price
+2000-01-01 09:30:00-05:00,2000-01-01 09:35:00-05:00,100,100.34
+"""
+        price_df = pd.read_csv(
+            io.StringIO(price_txt),
+            parse_dates=["start_datetime", "end_datetime"],
+        )
+        price_interface = cdtfprint.ReplayedTimePriceInterface(
+            price_df,
+            start_time_col_name="start_datetime",
+            end_time_col_name="end_datetime",
+            knowledge_datetime_col_name="end_datetime",
+            delay_in_secs=0,
+            id_col_name="asset_id",
+            ids=None,
+            columns=[],
+            get_wall_clock_time=get_wall_clock_time,
+        )
+        portfolio = omportfo.Portfolio.from_cash(
+            strategy_id="str1",
+            account="paper",
+            price_interface=price_interface,
+            asset_id_column="asset_id",
+            mark_to_market_col="price",
+            timestamp_col="end_datetime",
+            initial_cash=1e6,
+            initial_timestamp=initial_timestamp,
+        )
+        txt = r"""
+,2000-01-01 09:35:00-05:00
+net_asset_holdings,0
+cash,1000000.0
+net_wealth,1000000.0
+gross_exposure,0.0
+leverage,0.0
 """
         expected = pd.read_csv(
             io.StringIO(txt),

@@ -108,7 +108,8 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             account="paper",
             price_interface=price_interface,
             asset_id_column="asset_id",
-            price_column="price",
+            mark_to_market_col="price",
+            timestamp_col="end_datetime",
             initial_cash=1e6,
             initial_timestamp=initial_timestamp,
         )
@@ -179,7 +180,8 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             account="paper",
             price_interface=price_interface,
             asset_id_column="asset_id",
-            price_column="price",
+            mark_to_market_col="price",
+            timestamp_col="end_datetime",
             initial_cash=1e6,
             initial_timestamp=initial_timestamp,
         )

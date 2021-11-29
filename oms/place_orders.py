@@ -4,6 +4,7 @@ Import as:
 import oms.place_orders as oplaorde
 """
 
+import copy
 import logging
 from typing import Any, Dict, List
 
@@ -193,7 +194,7 @@ def place_orders(
     config: Dict[str, Any],
     # TODO(gp): -> initial_order_id
     order_id: int = 0,
-) -> pd.DataFrame:
+) -> omportfo.Portfolio:
     """
     Place orders corresponding to the predictions stored in the given df.
 
@@ -219,12 +220,12 @@ def place_orders(
           market
         - `portfolio`: object used to store positions
         - `locates`: object used to access short locates
-    :return: df with information about the placed orders
+    :return: updated portfolio
     """
     # Check the config.
     price_interface = config["price_interface"]
     hdbg.dassert_issubclass(price_interface, cdtfprint.AbstractPriceInterface)
-    portfolio = config["portfolio"]
+    portfolio = copy.copy(config["portfolio"])
     hdbg.dassert_issubclass(portfolio, omportfo.Portfolio)
     # Check predictions.
     hdbg.dassert_isinstance(predictions_df, pd.DataFrame)
@@ -273,3 +274,4 @@ def place_orders(
             timestamp, predictions, portfolio, order_config, order_id
         )
         order_id += num_orders_filled
+    return portfolio
