@@ -161,8 +161,9 @@ class TestPortfolio1(hunitest.TestCase):
         act = str(portfolio)
         exp = r"""# holdings=
                                    asset_id  curr_num_shares
-        2000-01-01 09:40:00-05:00       101             10.0
-        2000-01-01 09:30:00-05:00        -1        1000000.0
+        2000-01-01 09:40:00-05:00        -1     1.000001e+06
+        2000-01-01 09:40:00-05:00       101     1.000000e+01
+        2000-01-01 09:30:00-05:00        -1     1.000000e+06
         # orders=
                                   order_id               creation_timestamp asset_id       type_                  start_timestamp                    end_timestamp num_shares num_shares_filled holdings+1  execution_price        cash+1
         2000-01-01 09:35:00-05:00        0        2000-01-01 09:35:00-05:00      101  price@twap        2000-01-01 09:35:00-05:00        2000-01-01 09:40:00-05:00         10                10         10        -0.083847  1.000001e+06

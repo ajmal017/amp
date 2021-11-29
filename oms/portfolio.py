@@ -249,7 +249,10 @@ class Portfolio:
         hdbg.dassert_eq(
             price_df.shape[0],
             len(non_cash_asset_ids),
-            msg="Some assets have no price.",
+            "Some assets have no price. Attempted to access price for"
+            "`non_cash_asset_ids=%s` and found prices for `asset_ids=%s`",
+            non_cash_asset_ids,
+            price_df["asset_id"].to_list(),
         )
         _LOG.debug("price_df=\n%s", hprint.dataframe_to_str(price_df))
         # Extract subset of price information.
@@ -272,13 +275,14 @@ class Portfolio:
         """
         Mark holdings to market prices available at `timestamp`.
 
+        :param timestamp: as-of time for holdings and price
         :param df: a dataframe that
             - has columns HOLDINGS_COLS
             - does not have columns PRICE_COLS
             - does not have duplicate asset_ids
             - does not have NaN `curr_num_shares`
-        :param return: `df` merged with asset prices (valued at `timestamp`)
-            and valued according to `price` and `curr_num_shares`
+        :return: `df` merged with asset prices (valued at `timestamp`) and
+            valued according to `price` and `curr_num_shares`
         """
         _LOG.debug(
             "\n%s",
@@ -432,6 +436,12 @@ class Portfolio:
             holdings_rows.append(holdings_row)
         # Cash should not be negative after executing all the orders.
         hdbg.dassert_lte(0.0, cash, "cash=%s", cash)
+        cash_holdings_row = {
+            "timestamp": next_timestamp,
+            "asset_id": Portfolio.CASH_ID,
+            "curr_num_shares": cash,
+        }
+        holdings_rows.append(cash_holdings_row)
         # Add the information to the orders.
         orders_tmp = self._concat(orders_rows, self._order_columns)
         self._orders = pd.concat([orders_tmp, self._orders])
