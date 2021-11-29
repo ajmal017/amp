@@ -12,6 +12,7 @@ import im_v2.common.db.utils as imcodbuti
 _LOG = logging.getLogger(__name__)
 
 
+@pytest.mark.skipif(hgit.is_lime(), reason="lime doesn't have dind support")
 class TestCreateDb1(hunitest.TestCase):
     def setUp(self) -> None:
         """

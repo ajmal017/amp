@@ -164,6 +164,10 @@ def is_lem() -> bool:
     return _is_repo("lem")
 
 
+def is_lime() -> bool:
+    return _is_repo("lime")
+
+
 # TODO(gp): submodule -> sub_module
 def is_in_amp_as_submodule() -> bool:
     """

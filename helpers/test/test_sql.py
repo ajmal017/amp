@@ -15,6 +15,7 @@ _LOG = logging.getLogger(__name__)
 
 # TODO(gp): helpers can't depend from im.
 # @pytest.mark.skipif(not hgit.is_amp(), reason="Only run in amp")
+@pytest.mark.skipif(hgit.is_lime(), reason="lime doesn't have dind support")
 class TestSql1(hunitest.TestCase):
     def setUp(self) -> None:
         """
