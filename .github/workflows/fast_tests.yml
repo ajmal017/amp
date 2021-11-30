@@ -50,7 +50,7 @@ jobs:
         if: github.event.pull_request.draft == false
         env:
           AM_ECR_BASE_PATH: ${{ secrets.AM_ECR_BASE_PATH }}
-        run: invoke docker_pull --images="current"
+        run: invoke docker_pull
 
       - name: Run fast tests
         # https://github.community/t/dont-run-actions-on-draft-pull-requests/16817/19
