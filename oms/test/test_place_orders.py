@@ -1,3 +1,4 @@
+import datetime
 import io
 import logging
 
@@ -61,6 +62,10 @@ class TestPlaceOrders1(hunitest.TestCase):
             portfolio = ottport.get_portfolio_example1(rtpi, initial_timestamp)
             config["portfolio"] = portfolio
             config["order_type"] = "price@twap"
+            config["ath_start_time"] = datetime.time(9, 30)
+            config["trading_start_time"] = datetime.time(9, 30)
+            config["ath_end_time"] = datetime.time(16, 00)
+            config["trading_end_time"] = datetime.time(15, 55)
             # Run.
             execution_mode = "batch"
             oplaorde.place_orders(
@@ -107,7 +112,7 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             strategy_id="str1",
             account="paper",
             price_interface=price_interface,
-            asset_id_column="asset_id",
+            asset_id_col="asset_id",
             mark_to_market_col="price",
             timestamp_col="end_datetime",
             initial_cash=1e6,
@@ -179,7 +184,7 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             strategy_id="str1",
             account="paper",
             price_interface=price_interface,
-            asset_id_column="asset_id",
+            asset_id_col="asset_id",
             mark_to_market_col="price",
             timestamp_col="end_datetime",
             initial_cash=1e6,
@@ -221,3 +226,6 @@ leverage,0.1007
         # The timestamp doesn't parse correctly from the csv.
         expected.columns = [pd.Timestamp("2000-01-01 09:40:00-05:00")]
         self.assert_dfs_close(actual.to_frame(), expected, rtol=1e-2, atol=1e-2)
+
+
+# class SimulateOrderFills1(hunitest.TestCase):

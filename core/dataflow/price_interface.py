@@ -255,7 +255,13 @@ class AbstractPriceInterface(abc.ABC):
         # Compute the mean value.
         _LOG.debug("prices=\n%s", prices)
         price: float = prices.mean()
-        hdbg.dassert(np.isfinite(price), "price=%s", price)
+        hdbg.dassert(
+            np.isfinite(price),
+            "price=%s in interval `start_ts=%s`, `end_ts=%s`",
+            price,
+            start_ts,
+            end_ts,
+        )
         return price
 
     # TODO(gp): -> _normalize_bar_data?
