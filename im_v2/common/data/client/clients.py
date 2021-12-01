@@ -70,10 +70,6 @@ def construct_full_symbol(exchange: str, symbol: str) -> FullSymbol:
     return full_symbol
 
 
-# ##################################################################################
-
-
-# TODO(Grisha): add methods `get_start(end)_ts_available()`, `get_universe()` #543.
 class AbstractImClient(abc.ABC):
     """
     Abstract Interface for `IM` client.
@@ -84,8 +80,6 @@ class AbstractImClient(abc.ABC):
         full_symbol: FullSymbol,
         *,
         normalize: bool = True,
-        drop_duplicates: bool = True,
-        resample_to_1_min: bool = True,
         start_ts: Optional[pd.Timestamp] = None,
         end_ts: Optional[pd.Timestamp] = None,
         **kwargs: Dict[str, Any],
@@ -94,6 +88,8 @@ class AbstractImClient(abc.ABC):
         Read and process data for a single `FullSymbol` (i.e. currency pair
         from a single exchange) in [start_ts, end_ts).
 
+        None `start_ts` and `end_ts` means the entire period of time available.
+
         Data processing includes:
             - normalization specific of the vendor
             - dropping duplicates
@@ -101,13 +97,9 @@ class AbstractImClient(abc.ABC):
             - sanity check of the data
 
         :param full_symbol: `exchange::symbol`, e.g. `binance::BTC_USDT`
-        :param normalize: transform data, e.g. rename columns, convert data types
-        :param drop_duplicates: whether to drop full duplicates or not
-        :param resample_to_1_min: whether to resample to 1 min or not
+        :param normalize: whether to transform data or not
         :param start_ts: the earliest date timestamp to load data for
-            - `None` means starting from the beginning of the data
         :param end_ts: the latest date timestamp to load data for
-            - `None` means use data until the end of the data
         :return: data for a single `FullSymbol` in [start_ts, end_ts)
         """
         data = self._read_data(
@@ -115,13 +107,38 @@ class AbstractImClient(abc.ABC):
         )
         if normalize:
             data = self._normalize_data(data)
-        if drop_duplicates:
             data = hpandas.drop_duplicates(data)
-        if resample_to_1_min:
             data = hpandas.resample_df(data, "T")
-        # Verify that data is valid.
-        self._dassert_is_valid(data)
+            # Verify that data is valid.
+            self._dassert_is_valid(data)
         return data
+
+    def get_start_ts_available(self, full_symbol: FullSymbol) -> pd.Timestamp:
+        """
+        Return the earliest timestamp available for a given `FullSymbol`.
+        """
+        # TODO(Grisha): add caching.
+        data = self.read_data(full_symbol, normalize=True)
+        # It is assumed that timestamp is always stored as index.
+        start_ts = data.index.min()
+        return start_ts
+
+    def get_end_ts_available(self, full_symbol: FullSymbol) -> pd.Timestamp:
+        """
+        Return the latest timestamp available for a given `FullSymbol`.
+        """
+        # TODO(Grisha): add caching.
+        data = self.read_data(full_symbol, normalize=True)
+        # It is assumed that timestamp is always stored as index.
+        end_ts = data.index.max()
+        return end_ts
+
+    @staticmethod
+    @abc.abstractmethod
+    def get_universe() -> List[FullSymbol]:
+        """
+        Get universe as full symbols.
+        """
 
     @abc.abstractmethod
     def _read_data(
@@ -206,6 +223,7 @@ class MultipleSymbolsClient:
         full_symbols: List[FullSymbol],
         *,
         full_symbol_col_name: str = "full_symbol",
+        normalize: bool = True,
         start_ts: Optional[pd.Timestamp] = None,
         end_ts: Optional[pd.Timestamp] = None,
         **kwargs: Dict[str, Any],
@@ -218,6 +236,7 @@ class MultipleSymbolsClient:
         :param full_symbols: list of full symbols, e.g.
             `['binance::BTC_USDT', 'kucoin::ETH_USDT']`
         :param full_symbol_col_name: name of the column with full symbols
+        :param normalize: whether to transform data or not
         :param start_ts: the earliest date timestamp to load data for
         :param end_ts: the latest date timestamp to load data for
         :return: combined data for provided symbols
@@ -230,9 +249,7 @@ class MultipleSymbolsClient:
             # Read data for each given full symbol.
             df = self._class.read_data(
                 full_symbol=full_symbol,
-                normalize=True,
-                drop_duplicates=True,
-                resample_to_1_min=True,
+                normalize=normalize,
                 start_ts=start_ts,
                 end_ts=end_ts,
                 **kwargs,

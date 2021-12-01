@@ -1532,8 +1532,8 @@ def docker_build_local_image(  # type: ignore
     _dassert_is_image_name_valid(image_local)
     #
     git_tag_prefix = get_default_param("BASE_IMAGE")
-    # Tag the container with the current version of
-    # the code to keep them in sync.
+    # Tag the container with the current version of the code to keep them in
+    # sync.
     container_version = get_git_tag(version)
     #
     dockerfile = "devops/docker_build/dev.Dockerfile"
@@ -1579,7 +1579,8 @@ def docker_tag_local_image_as_dev(  # type: ignore
     cmd = f"docker tag {image_versioned_local} {image_versioned_dev}"
     _run(ctx, cmd)
     # Tag local image as dev image.
-    image_dev = get_image(base_image, "dev", None)
+    latest_version = None
+    image_dev = get_image(base_image, "dev", latest_version)
     cmd = f"docker tag {image_versioned_local} {image_dev}"
     _run(ctx, cmd)
     # Tag the Git repo with the tag corresponding to the image, e.g., `amp-1.0.0`.
@@ -1745,6 +1746,10 @@ def docker_build_prod_image(  # type: ignore
         --build-arg VERSION={version} \
         .
     """
+    _run(ctx, cmd)
+    #
+    image_versioned_prod = get_image(base_image, "prod", version)
+    cmd = f"docker tag {image_prod} {image_versioned_prod}"
     _run(ctx, cmd)
     #
     cmd = f"docker image ls {image_prod}"

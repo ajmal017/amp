@@ -34,4 +34,7 @@ else
     vimdiff $DIR1/dev_scripts/go_amp.sh $DIR2/dev_scripts/go_dev_tools.sh
     vimdiff $DIR1/dev_scripts/tmux_amp.sh $DIR2/dev_scripts/tmux_dev_tools.sh
     vimdiff $DIR1/dev_scripts/setenv_amp.sh $DIR2/dev_scripts/setenv_dev_tools.sh
+
+    vimdiff {$DIR1,$DIR2}/dev_scripts/client_setup/build.sh
+    vimdiff {$DIR1,$DIR2}/dev_scripts/client_setup/requirements.txt
 fi;

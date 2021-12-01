@@ -10,7 +10,7 @@ import im_v2.ccxt.data.client.clients as imvcdclcl
 import abc
 import logging
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
@@ -19,6 +19,7 @@ import helpers.datetime_ as hdateti
 import helpers.dbg as hdbg
 import helpers.s3 as hs3
 import helpers.sql as hsql
+import im_v2.ccxt.universe.universe as imvccunun
 import im_v2.common.data.client as imvcdcli
 
 _LOG = logging.getLogger(__name__)
@@ -41,6 +42,14 @@ class AbstractCcxtClient(imvcdcli.AbstractImClient, abc.ABC):
         date_type = data_type.lower()
         hdbg.dassert_in(date_type, _DATA_TYPES)
         self._data_type = date_type
+
+    @staticmethod
+    def get_universe() -> List[imvcdcli.FullSymbol]:
+        """
+        Return CCXT universe as full symbols.
+        """
+        universe = imvccunun.get_vendor_universe(vendor="CCXT")
+        return universe  # type: ignore[no-any-return]
 
     @staticmethod
     def _apply_common_transformation(data: pd.DataFrame) -> pd.DataFrame:
@@ -169,6 +178,7 @@ class CcxtDbClient(AbstractCcxtClient):
     def _read_data(
         self,
         full_symbol: imvcdcli.FullSymbol,
+        *,
         start_ts: Optional[pd.Timestamp] = None,
         end_ts: Optional[pd.Timestamp] = None,
         **read_sql_kwargs: Dict[str, Any],
@@ -230,6 +240,7 @@ class CcxtFileSystemClient(AbstractCcxtClient):
     def _read_data(
         self,
         full_symbol: imvcdcli.FullSymbol,
+        *,
         start_ts: Optional[pd.Timestamp] = None,
         end_ts: Optional[pd.Timestamp] = None,
         data_snapshot: Optional[str] = None,
