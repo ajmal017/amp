@@ -45,9 +45,9 @@ class TestPlaceOrders1(hunitest.TestCase):
             rtpi = ottport.get_replayed_time_price_interface(event_loop)
             # Build predictions.
             index = [
-                pd.Timestamp("2000-01-01 09:35:00-05:00"),
-                pd.Timestamp("2000-01-01 09:40:00-05:00"),
-                pd.Timestamp("2000-01-01 09:45:00-05:00"),
+                pd.Timestamp("2000-01-01 09:35:00-05:00", tz="America/New_York"),
+                pd.Timestamp("2000-01-01 09:40:00-05:00", tz="America/New_York"),
+                pd.Timestamp("2000-01-01 09:45:00-05:00", tz="America/New_York"),
             ]
             columns = [101, 202]
             data = [
@@ -58,7 +58,9 @@ class TestPlaceOrders1(hunitest.TestCase):
             predictions = pd.DataFrame(data, index=index, columns=columns)
             config["price_interface"] = rtpi
             # Build a Portfolio.
-            initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
+            initial_timestamp = pd.Timestamp(
+                "2000-01-01 09:35:00-05:00", tz="America/New_York"
+            )
             portfolio = ottport.get_portfolio_example1(rtpi, initial_timestamp)
             config["portfolio"] = portfolio
             config["order_type"] = "price@twap"
@@ -161,14 +163,27 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             io.StringIO(db_txt),
             parse_dates=["start_datetime", "end_datetime", "timestamp_db"],
         )
+        db_df["start_datetime"] = db_df["start_datetime"].dt.tz_convert(
+            "America/New_York"
+        )
+        db_df["end_datetime"] = db_df["end_datetime"].dt.tz_convert(
+            "America/New_York"
+        )
+        db_df["timestamp_db"] = db_df["timestamp_db"].dt.tz_convert(
+            "America/New_York"
+        )
         # Build a ReplayedTimePriceInterface.
         initial_replayed_delay = 5
         delay_in_secs = 0
         sleep_in_secs = 30
         time_out_in_secs = 60 * 5
-        initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
+        initial_timestamp = pd.Timestamp(
+            "2000-01-01 09:35:00-05:00", tz="America/New_York"
+        )
         start_datetime = initial_timestamp
-        end_datetime = pd.Timestamp("2000-01-01 09:35:00-05:00")
+        end_datetime = pd.Timestamp(
+            "2000-01-01 09:35:00-05:00", tz="America/New_York"
+        )
         price_interface = dartttdi.get_replayed_time_price_interface_example1(
             event_loop,
             start_datetime,
@@ -200,7 +215,9 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             "type_": "price@twap",
             "creation_timestamp": initial_timestamp,
             "start_timestamp": initial_timestamp,
-            "end_timestamp": pd.Timestamp("2000-01-01 09:40:00-05:00"),
+            "end_timestamp": pd.Timestamp(
+                "2000-01-01 09:40:00-05:00", tz="America/New_York"
+            ),
         }
         order_config = cconfig.get_config_from_nested_dict(order_dict_)
         # Mark to market.
@@ -209,7 +226,7 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
         )
         np.testing.assert_equal(num_orders, 2)
         actual = portfolio.get_characteristics(
-            pd.Timestamp("2000-01-01 09:40:00-05:00")
+            pd.Timestamp("2000-01-01 09:40:00-05:00", tz="America/New_York")
         )
         txt = r"""
 ,2000-01-01 09:40:00-05:00
@@ -224,7 +241,9 @@ leverage,0.1007
             index_col=0,
         )
         # The timestamp doesn't parse correctly from the csv.
-        expected.columns = [pd.Timestamp("2000-01-01 09:40:00-05:00")]
+        expected.columns = [
+            pd.Timestamp("2000-01-01 09:40:00-05:00", tz="America/New_York")
+        ]
         self.assert_dfs_close(actual.to_frame(), expected, rtol=1e-2, atol=1e-2)
 
 

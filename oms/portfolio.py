@@ -78,7 +78,6 @@ class Portfolio:
         self._validate_initial_holdings_df(holdings_df)
         self._holdings = holdings_df
         self._characteristics = collections.OrderedDict()
-        # We start with an empty row in `orders` to keep it aligned with `holdings`.
 
     def __str__(self) -> str:
         act = []
@@ -341,6 +340,8 @@ class Portfolio:
         # TODO(gp): Check that orders are all for different asset_ids.
         # TODO: Ensure that we are moving forward in time.
         hdbg.dassert_isinstance(timestamp, pd.Timestamp)
+        hdbg.dassert(timestamp.tz is not None)
+        hdbg.dassert_eq(timestamp.tz.zone, self._holdings.index.dtype.tz.zone)
         # Check that latest holdings are timestamped prior to `timestamp`.
         last_timestamp = self.get_last_timestamp()
         hdbg.dassert_lte(last_timestamp, timestamp)
@@ -361,6 +362,8 @@ class Portfolio:
         new_holdings_srs = last_holdings_srs.copy()
         if order_df is not None:
             Portfolio._validate_order_df(order_df)
+            hdbg.dassert_lte(last_timestamp, order_df["start_timestamp"].min())
+            hdbg.dassert_lte(order_df["end_timestamp"].max(), timestamp)
             holdings_diff = order_df.set_index("asset_id")["num_shares_filled"]
             cash_diff = (
                 -1
@@ -548,6 +551,8 @@ class Portfolio:
         """
         # The input should be a nonempty dataframe with a datetime index.
         hdbg.dassert_isinstance(holdings_df, pd.DataFrame)
+        hdbg.dassert_isinstance(holdings_df.index, pd.DatetimeIndex)
+        hdbg.dassert(hasattr(holdings_df.index.dtype, "tz"))
         hdbg.dassert(not holdings_df.empty, "The dataframe must be nonempty.")
         # The dataframe must have the correct columns.
         hdbg.dassert_eq_all(
@@ -635,24 +640,21 @@ class Portfolio:
             np.float64,
             "The column `curr_num_shares` should be a float column.",
         )
+        #
+        hdbg.dassert_eq(order_df["start_timestamp"].dtype.type, pd.Timestamp)
+        hdbg.dassert_eq(order_df["end_timestamp"].dtype.type, pd.Timestamp)
+        hdbg.dassert(hasattr(order_df["start_timestamp"].dtype, "tz"))
+        hdbg.dassert(hasattr(order_df["end_timestamp"].dtype, "tz"))
         # The dataframe must not contain a row for cash.
         hdbg.dassert_not_in(
             Portfolio.CASH_ID,
             order_df["asset_id"].to_list(),
             "Order for cash detected.",
         )
+        # There should be no more than one row per asset.
+        hdbg.dassert_no_duplicates(order_df["asset_id"].to_list())
         # All share values should be finite.
         hdbg.dassert(
             np.isfinite(order_df["num_shares_filled"]).all(),
             "All share values must be finite.",
         )
-
-    @staticmethod
-    def _concat(rows: List[Dict[str, Any]], columns: List[str]) -> pd.DataFrame:
-        df_tmp = pd.DataFrame(rows)
-        # _LOG.debug("df_tmp=\n%s", hprint.dataframe_to_str(df_tmp))
-        df_tmp.set_index("timestamp", drop=True, inplace=True)
-        df_tmp.index.name = None
-        df_tmp.sort_values("asset_id", inplace=True)
-        hdbg.dassert_set_eq(df_tmp.columns, columns)
-        return df_tmp
