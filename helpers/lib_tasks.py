@@ -326,8 +326,11 @@ def print_tasks(ctx, as_code=False):  # type: ignore
     _report_task()
     _ = ctx
     func_names = []
+    lib_tasks_file_name = os.path.join(hgit.get_amp_abs_path(),
+            "helpers/lib_tasks.py")
+    hdbg.dassert_file_exists(lib_tasks_file_name)
     # TODO(gp): Use __file__ instead of hardwiring the file.
-    cmd = r'\grep "^@task" -A 1 helpers/lib_tasks.py | grep def'
+    cmd = rf'\grep "^@task" -A 1 {lib_tasks_file_name} | grep def'
     # def print_setup(ctx):  # type: ignore
     # def git_pull(ctx):  # type: ignore
     # def git_pull_master(ctx):  # type: ignore

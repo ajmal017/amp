@@ -11,6 +11,9 @@ import helpers.unit_test as hunitest
 import im.ccxt.db.utils as imccdbuti
 
 
+@pytest.mark.skipif(
+    hgit.is_dev_tools() or hgit.is_lime(), reason="Need dind support"
+)
 class TestExtractDataFromDb1(hunitest.TestCase):
     def setUp(self) -> None:
         """
