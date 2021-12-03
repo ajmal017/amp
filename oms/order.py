@@ -201,24 +201,18 @@ class Order:
         """
         Get the price that this order executes at.
         """
-        try:
-            # This order price probably depend on future prices, so we need to allow
-            # future peeking (unfortunately).
-            old_value = self.price_interface.set_allow_future_peeking(True)
-            # TODO(gp): It should not be hardwired.
-            timestamp_col_name = "end_datetime"
-            price = self.get_price(
-                self.price_interface,
-                self.asset_id,
-                self.start_timestamp,
-                self.end_timestamp,
-                timestamp_col_name,
-                self.type_,
-                self.num_shares,
-                self.column_remap,
-            )
-        finally:
-            self.price_interface.set_allow_future_peeking(old_value)
+        # TODO(gp): It should not be hardwired.
+        timestamp_col_name = "end_datetime"
+        price = self.get_price(
+            self.price_interface,
+            self.asset_id,
+            self.start_timestamp,
+            self.end_timestamp,
+            timestamp_col_name,
+            self.type_,
+            self.num_shares,
+            self.column_remap,
+        )
         return price
 
     def is_mergeable(self, rhs: "Order") -> bool:

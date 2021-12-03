@@ -181,7 +181,6 @@ def get_data_as_of_datetime(
     datetime_: pd.Timestamp,
     *,
     delay_in_secs: int = 0,
-    allow_future_peeking: bool = False,
 ) -> pd.DataFrame:
     """
     Extract data available at `datetime_` from a df indexed with knowledge
@@ -209,20 +208,14 @@ def get_data_as_of_datetime(
     hdateti.dassert_tz_compatible_timestamp_with_df(
         datetime_, df, knowledge_datetime_col_name
     )
-    if not allow_future_peeking:
-        if knowledge_datetime_col_name is None:
-            # Filter based on the index.
-            mask = df.index <= datetime_eff
-        else:
-            # Filter based on a column.
-            hdbg.dassert_in(knowledge_datetime_col_name, df.columns)
-            mask = df[knowledge_datetime_col_name] <= datetime_eff
-        df = df[mask]
+    if knowledge_datetime_col_name is None:
+        # Filter based on the index.
+        mask = df.index <= datetime_eff
     else:
-        # Sometimes we need to allow the future peeking. E.g., to know what's the
-        # execution price of an order that will terminate in the future.
-        # raise ValueError("Future peeking")
-        pass
+        # Filter based on a column.
+        hdbg.dassert_in(knowledge_datetime_col_name, df.columns)
+        mask = df[knowledge_datetime_col_name] <= datetime_eff
+    df = df[mask]
     _LOG.debug(hprint.df_to_short_str("After get_data_as_of_datetime", df))
     return df
 

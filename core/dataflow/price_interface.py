@@ -704,7 +704,6 @@ class ReplayedTimePriceInterface(AbstractPriceInterface):
         self._knowledge_datetime_col_name = knowledge_datetime_col_name
         hdbg.dassert_lte(0, delay_in_secs)
         self._delay_in_secs = delay_in_secs
-        self._allow_future_peeking = False
         #
         hdbg.dassert_is_subset(
             [
@@ -718,11 +717,6 @@ class ReplayedTimePriceInterface(AbstractPriceInterface):
         self._df.sort_values(
             [self._end_time_col_name, self._id_col_name], inplace=True
         )
-
-    def set_allow_future_peeking(self, val: bool) -> bool:
-        old_value = val
-        self._allow_future_peeking = val
-        return old_value
 
     def should_be_online(self, current_time: pd.Timestamp) -> bool:
         return True
@@ -757,7 +751,6 @@ class ReplayedTimePriceInterface(AbstractPriceInterface):
             self._knowledge_datetime_col_name,
             current_time,
             delay_in_secs=self._delay_in_secs,
-            allow_future_peeking=self._allow_future_peeking,
         )
         # Handle `columns`.
         if self._columns is not None:

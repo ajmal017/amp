@@ -201,12 +201,13 @@ def simulate_order_fills(orders: List[omorder.Order]) -> pd.DataFrame:
 
 
 def optimize_and_update(
-    current_timestamp: pd.Timestamp,
+    timestamp: pd.Timestamp,
     predictions: pd.Series,
     portfolio: omportfo.Portfolio,
     order_config: Dict[str, Any],
-    initial_order_id: int = 0,
-) -> int:
+    orders,
+    order_id,
+) -> list:
     """
     Compute target holdings, generate orders, and update the portfolio.
 
@@ -218,28 +219,32 @@ def optimize_and_update(
     :param initial_order_id: first `order_id` to use
     :return: number of orders generated (and filled)
     """
-    if portfolio.get_last_timestamp() < current_timestamp:
-        portfolio.advance_portfolio_state(current_timestamp, None)
+    _LOG.debug("# Optimize and update portfolio")
+    # Simulate order fills here.
+    # Advance the portfolio state with orders up till "now"
+    # Edge case: we are already initialized at this timestamp.
+    # Get orders.
+    if portfolio.get_last_timestamp() < timestamp:
+        if len(orders) > 0:
+            unfilled_orders = simulate_order_fills(orders)
+        else:
+            unfilled_orders = None
+        portfolio.advance_portfolio_state(timestamp, unfilled_orders)
     if predictions.isna().sum() != 0:
         _LOG.debug(
             "Number of NaN predictions=`%i` at timestamp=`%s`",
             predictions.isna().sum(),
-            current_timestamp,
+            timestamp,
         )
-    priced_holdings = mark_to_market(current_timestamp, predictions, portfolio)
+    priced_holdings = mark_to_market(timestamp, predictions, portfolio)
     df = compute_trades(priced_holdings, portfolio.CASH_ID)
     # Round to nearest integer towards zero.
     # df["diff_num_shares"] = np.fix(df["target_trade"] / df["price"])
     df["diff_num_shares"] = df["target_trade"] / df["price"]
     orders = generate_orders(
-        df["diff_num_shares"], order_config, initial_order_id
+        df["diff_num_shares"], order_config, order_id
     )
-    order_df = simulate_order_fills(orders)
-    next_timestamp = order_config["end_timestamp"]
-    # TODO(Paul): Move this so that we advance the state before
-    # performing any pricings, etc.
-    portfolio.advance_portfolio_state(next_timestamp, order_df)
-    return len(orders)
+    return orders
 
 
 # TODO(gp): We should use a RT graph executed once step at a time. For now we just
@@ -322,6 +327,7 @@ def place_orders(
     tqdm_out = htqdm.TqdmToLogger(_LOG, level=logging.INFO)
     num_rows = len(predictions_df)
     iter_ = enumerate(predictions_df.iterrows())
+    orders = []
     for idx, (timestamp, predictions) in tqdm(
         iter_, total=num_rows, file=tqdm_out
     ):
@@ -362,9 +368,13 @@ def place_orders(
         }
         order_config = cconfig.get_config_from_nested_dict(order_dict_)
         # Optimize, generate orders, and update the portfolio.
-        _LOG.debug("# Optimize and update portfolio")
-        num_orders_filled = optimize_and_update(
-            timestamp, predictions, portfolio, order_config, order_id
+        orders = optimize_and_update(
+            timestamp,
+            predictions,
+            portfolio,
+            order_config,
+            orders,
+            order_id,
         )
-        order_id += num_orders_filled
+        order_id += len(orders)
     return portfolio
