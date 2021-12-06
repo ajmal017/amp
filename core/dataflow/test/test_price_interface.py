@@ -23,6 +23,7 @@ import helpers.unit_test as hunitest
 _LOG = logging.getLogger(__name__)
 
 
+# TODO(Paul): -> Move price_interface_example.py
 def generate_synthetic_db_data(
     start_datetime: pd.Timestamp,
     end_datetime: pd.Timestamp,
@@ -120,6 +121,7 @@ def get_replayed_time_price_interface_example1(
         speed_up_factor=speed_up_factor,
     )
     # Build object.
+    # TODO(Paul): rtpi -> price_interface
     rtpi = cdtfprint.ReplayedTimePriceInterface(
         df,
         knowledge_datetime_col_name,

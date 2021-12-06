@@ -4,6 +4,7 @@ Import as:
 import oms.place_orders as oplaorde
 """
 
+import asyncio
 import collections
 import copy
 import datetime
@@ -156,7 +157,7 @@ def generate_orders(
     :param initial_order_id: the starting point for enumerating orders
     :return: a list of nontrivial orders (i.e., no zero-share orders)
     """
-    _LOG.debug("# Place orders")
+    _LOG.debug("# Generate orders")
     orders: List[omorder.Order] = []
     order_id = initial_order_id
     for asset_id, shares in shares.iteritems():
