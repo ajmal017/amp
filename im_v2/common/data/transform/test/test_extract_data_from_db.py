@@ -11,9 +11,6 @@ import helpers.unit_test as hunitest
 import im.ccxt.db.utils as imccdbuti
 
 
-@pytest.mark.skipif(
-    hgit.is_dev_tools() or hgit.is_lime(), reason="Need dind support"
-)
 class TestExtractDataFromDb1(hunitest.TestCase):
     def setUp(self) -> None:
         """
@@ -82,7 +79,8 @@ class TestExtractDataFromDb1(hunitest.TestCase):
         os.environ.pop("POSTGRES_PASSWORD")
         super().tearDown()
 
-    @pytest.mark.slow
+    # TODO(Nikola): Revisit. It is slow test.
+    @pytest.mark.skip
     def test_extract_data_from_db(self) -> None:
 
         test_dir = self.get_scratch_space()
