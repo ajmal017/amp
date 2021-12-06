@@ -34,13 +34,16 @@ def mark_to_market(
     portfolio: omportfo.Portfolio,
 ) -> pd.DataFrame:
     """
-    Return price, value of all assets held or for which we have a prediction.
+    Return price, value of all assets in `portfolio` or for which we have a
+    prediction.
 
     :return: dataframe with columns `asset_id`, `prediction`, `price`,
-        curr_num_shares`, `value`.
+        `curr_num_shares`, `value`.
+        - The dataframe is the outer join of all the held assets in `portfolio` and
+          `predictions`
     """
     _LOG.debug("# Mark portfolio to market at timestamp=%s", current_timestamp)
-    # Get the current holdings.
+    # Get the current holdings for all the assets including cash.
     asset_id = None
     holdings = portfolio.get_holdings(
         current_timestamp, asset_id, exclude_cash=False
@@ -102,9 +105,9 @@ def generate_orders(
     initial_order_id: int = 0,
 ) -> List[omorder.Order]:
     """
-    Turns a series of shares to trade into a list of orders.
+    Turn a series of shares to trade into a list of orders.
 
-    :param shares: number of shares to trade, indexed by asset_id
+    :param shares: number of shares to trade, indexed by `asset_id`
     :param order_config: common parameters used to initialize `Order`
     :param initial_order_id: the starting point for enumerating orders
     :return: a list of nontrivial orders (i.e., no zero-share orders)
@@ -112,15 +115,15 @@ def generate_orders(
     _LOG.debug("# Generate orders")
     orders: List[omorder.Order] = []
     order_id = initial_order_id
-    for asset_id, shares in shares.iteritems():
-        if shares == 0.0:
+    for asset_id, shares_ in shares.iteritems():
+        if shares_ == 0.0:
             # No need to place trades.
             continue
         order = omorder.Order(
-            **order_config.to_dict(),
             order_id=order_id,
             asset_id=asset_id,
-            num_shares=shares,
+            num_shares=shares_,
+            **order_config.to_dict(),
         )
         order_id += 1
         _LOG.debug("order=%s", order)
@@ -254,7 +257,7 @@ async def place_orders(
     elif execution_mode == "batch":
         pass
     else:
-        raise ValueError("Unrecognized execution mode=`%s`", execution_mode)
+        raise ValueError(f"Unrecognized execution mode='{execution_mode}'")
     _LOG.debug("predictions_df=%s\n%s", str(predictions_df.shape), predictions_df)
     _LOG.debug("predictions_df.index=%s", str(predictions_df.index))
     # Cache a variable used many times.
@@ -267,6 +270,7 @@ async def place_orders(
         iter_, total=num_rows, file=tqdm_out
     ):
         _LOG.debug("\n%s", hprint.frame("# timestamp=%s" % timestamp))
+        _ = idx
         time = timestamp.time()
         if time < ath_start_time:
             _LOG.debug(

@@ -20,6 +20,7 @@ class Order:
     def __init__(
         self,
         order_id: int,
+        # TODO(gp): Remove price_interface.
         price_interface: cdtfprint.AbstractPriceInterface,
         creation_timestamp: pd.Timestamp,
         asset_id: int,
@@ -31,7 +32,7 @@ class Order:
         column_remap: Optional[Dict[str, str]] = None,
     ):
         """
-        Represent an order executed in (start_timestamp, end_timestamp].
+        Represent an order to be executed in (start_timestamp, end_timestamp].
 
         An order is characterized by:
         1) what price the order is executed at

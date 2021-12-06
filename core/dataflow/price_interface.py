@@ -181,7 +181,7 @@ class AbstractPriceInterface(abc.ABC):
             asset_ids,
             normalize_data=normalize_data,
         )
-        _LOG.debug("-> df=\n%s", hprint.dataframe_to_str(df))
+        #_LOG.debug("-> df=\n%s", hprint.dataframe_to_str(df))
         return df
 
     def get_data_for_interval(
@@ -218,7 +218,7 @@ class AbstractPriceInterface(abc.ABC):
             normalize_data,
             limit,
         )
-        _LOG.debug("-> df=\n%s", hprint.dataframe_to_str(df))
+        #_LOG.debug("-> df=\n%s", hprint.dataframe_to_str(df))
         return df
 
     def get_twap_price(
@@ -253,7 +253,7 @@ class AbstractPriceInterface(abc.ABC):
         hdbg.dassert_in(column, prices.columns)
         prices = prices[column]
         # Compute the mean value.
-        _LOG.debug("prices=\n%s", prices)
+        #_LOG.debug("prices=\n%s", prices)
         price: float = prices.mean()
         hdbg.dassert(
             np.isfinite(price),
@@ -449,6 +449,7 @@ class SqlPriceInterface(AbstractPriceInterface):
 
     def __init__(
         self,
+        # TODO(gp): Pass a connection directly.
         dbname: str,
         host: str,
         port: int,
@@ -476,6 +477,7 @@ class SqlPriceInterface(AbstractPriceInterface):
             user=user,
             password=password,
         )
+        # TODO(gp): No need to cache it.
         self.cursor = self.connection.cursor()
         self._table_name = table_name
         self._where_clause = where_clause

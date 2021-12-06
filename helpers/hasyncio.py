@@ -13,6 +13,7 @@ from typing import (
     Any,
     Callable,
     Coroutine,
+    Dict,
     Iterator,
     Optional,
     Tuple,
@@ -168,6 +169,21 @@ async def poll(
             raise TimeoutError(msg)
         _LOG.debug("sleep for %s secs", sleep_in_secs)
         await asyncio.sleep(sleep_in_secs)
+
+
+def get_poll_kwargs(
+    get_wall_clock_time: hdateti.GetWallClockTime,
+    *,
+    sleep_in_secs: float = 1.0,
+    timeout_in_secs: float = 10.0,
+) -> Dict[str, Any]:
+    # TODO(gp): Add checks.
+    poll_kwargs = {
+        "sleep_in_secs": sleep_in_secs,
+        "timeout_in_secs": timeout_in_secs,
+        "get_wall_clock_time": get_wall_clock_time,
+    }
+    return poll_kwargs
 
 
 # #############################################################################

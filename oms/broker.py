@@ -11,9 +11,9 @@ from typing import Any, Dict, List
 import pandas as pd
 
 import core.dataflow.price_interface as cdtfprint
+import helpers.datetime_ as hdateti
 import helpers.dbg as hdbg
 import oms.order as omorder
-import helpers.datetime_ as hdateti
 
 _LOG = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ class Fill:
         num_shares: float,
         price: float,
     ):
-        # TODO: decide how to id these.
+        # TODO(Paul): decide how to id these.
         self._fill_id = Fill._fill_id
         # Pointer to the order.
         self.order = order
@@ -64,7 +64,7 @@ class Fill:
 
     def __str__(self) -> str:
         txt: List[str] = []
-        txt.append(f"Fill:")
+        txt.append("Fill:")
         dict_ = self.to_dict()
         for k, v in dict_.items():
             txt.append(f"{k}={v}")
@@ -164,7 +164,7 @@ class Broker:
         fill = Fill(order, curr_timestamp, num_shares, price)
         return [fill]
 
-    def _update_last_timestamp(self, curr_timestamp: pd.Timestamp):
+    def _update_last_timestamp(self, curr_timestamp: pd.Timestamp) -> None:
         if self._last_timestamp is not None:
             hdbg.dassert_lte(self._last_timestamp, curr_timestamp)
         # Update.
