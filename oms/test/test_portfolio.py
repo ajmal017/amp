@@ -48,8 +48,8 @@ def get_portfolio_example1(
 
 
 def get_replayed_time_price_interface(event_loop):
-    start_datetime = pd.Timestamp("2000-01-01 09:30:00-05:00")
-    end_datetime = pd.Timestamp("2000-01-01 10:30:00-05:00")
+    start_datetime = pd.Timestamp("2000-01-01 09:30:00-05:00", tz="America/New_York")
+    end_datetime = pd.Timestamp("2000-01-01 10:30:00-05:00", tz="America/New_York")
     columns_ = ["price"]
     asset_ids = [101, 202]
     # asset_ids = [1000]
@@ -62,7 +62,7 @@ def get_replayed_time_price_interface(event_loop):
     delay_in_secs = 0
     sleep_in_secs = 30
     time_out_in_secs = 60 * 5
-    price_interface = dartttdi.get_replayed_time_price_interface_example1(
+    price_interface, get_wall_clock_time = dartttdi.get_replayed_time_price_interface_example1(
         event_loop,
         start_datetime,
         end_datetime,
@@ -72,7 +72,7 @@ def get_replayed_time_price_interface(event_loop):
         sleep_in_secs=sleep_in_secs,
         time_out_in_secs=time_out_in_secs,
     )
-    return price_interface
+    return price_interface, get_wall_clock_time
 
 
 _5mins = pd.DateOffset(minutes=5)
@@ -129,7 +129,7 @@ class TestPortfolio1(hunitest.TestCase):
         """
         # Build a ReplayedTimePriceInterface.
         event_loop = None
-        price_interface = get_replayed_time_price_interface(event_loop)
+        price_interface, _ = get_replayed_time_price_interface(event_loop)
         # Build a Portfolio.
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
         portfolio = get_portfolio_example1(price_interface, initial_timestamp)
@@ -148,7 +148,7 @@ class TestPortfolio1(hunitest.TestCase):
 class TestPortfolio2(hunitest.TestCase):
     def test_initialization1(self) -> None:
         event_loop = None
-        price_interface = get_replayed_time_price_interface(event_loop)
+        price_interface, _ = get_replayed_time_price_interface(event_loop)
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
         portfolio = omportfo.Portfolio.from_cash(
             strategy_id="str1",
@@ -172,7 +172,7 @@ class TestPortfolio2(hunitest.TestCase):
 
     def test_initialization2(self) -> None:
         event_loop = None
-        price_interface = get_replayed_time_price_interface(event_loop)
+        price_interface, _ = get_replayed_time_price_interface(event_loop)
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
         dict_ = {101: 727.5, 202: 1040.3, -1: 10000}
         portfolio = omportfo.Portfolio.from_dict(
@@ -199,7 +199,7 @@ class TestPortfolio2(hunitest.TestCase):
 
     def test_characteristics1(self) -> None:
         event_loop = None
-        price_interface = get_replayed_time_price_interface(event_loop)
+        price_interface, _ = get_replayed_time_price_interface(event_loop)
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
         portfolio = omportfo.Portfolio.from_cash(
             strategy_id="str1",
@@ -230,7 +230,7 @@ leverage,0.0
 
     def test_characteristics2(self) -> None:
         event_loop = None
-        price_interface = get_replayed_time_price_interface(event_loop)
+        price_interface, _ = get_replayed_time_price_interface(event_loop)
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
         dict_ = {101: 727.5, 202: 1040.3, -1: 10000}
         portfolio = omportfo.Portfolio.from_dict(
@@ -244,12 +244,12 @@ leverage,0.0
             initial_timestamp=initial_timestamp,
         )
         txt = r"""
-,2000-01-01 09:35:00-05:00
-net_asset_holdings,551.422
+,2000-01-01 09:35:00-05:00i
+net_asset_holdings,1768351.42
 cash,10000.0
-net_wealth,10551.422
-gross_exposure,551.422
-leverage,0.052
+net_wealth,1778351.42
+gross_exposure,1768351.42
+leverage,0.994
 """
         expected = pd.read_csv(
             io.StringIO(txt),

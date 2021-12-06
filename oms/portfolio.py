@@ -45,15 +45,15 @@ class Portfolio:
 
     # Columns required in a `order_df`, which represents the executed orders
     # time (e.g., what orders were executed, for how many shares, and at how much).
-    ORDER_COLS = [
+    FILLS_COLS = [
         "asset_id",
-        "start_timestamp",
-        "end_timestamp",
-        "num_shares_filled",
-        "execution_price",
+        "timestamp",
+        "num_shares",
+        "price",
     ]
 
     # Columns used in a dataframe resulting from mark to market.
+    HOLDINGS_COLS = ["asset_id", "curr_num_shares"]
     PRICE_COLS = ["asset_id", "price"]
 
     def __init__(
@@ -234,10 +234,12 @@ class Portfolio:
         hdbg.dassert_eq(
             price_df.shape[0],
             len(non_cash_asset_ids),
-            "Some assets have no price. Attempted to access price for"
-            "`non_cash_asset_ids=%s` and found prices for `asset_ids=%s`",
+            "Some assets have no price. Attempted to access price for "
+            "`non_cash_asset_ids=%s` and found prices for `asset_ids=%s` "
+            "at timestamp=`%s`",
             non_cash_asset_ids,
             price_df["asset_id"].to_list(),
+            timestamp,
         )
         _LOG.debug("price_df=\n%s", hprint.dataframe_to_str(price_df))
         # Extract subset of price information.
@@ -350,13 +352,13 @@ class Portfolio:
     def advance_portfolio_state(
         self,
         timestamp: pd.Timestamp,
-        order_df: Optional[pd.DataFrame],
+        fills_df: Optional[pd.DataFrame],
     ) -> None:
         """
         Update holdings using `order_df`.
 
         :param timestamp:
-        :param order_df:
+        :param fills_df:
         :return:
         """
         _LOG.debug(
@@ -388,17 +390,12 @@ class Portfolio:
         last_holdings.reset_index(inplace=True)
         last_holdings_srs = last_holdings.set_index("asset_id")["curr_num_shares"]
         new_holdings_srs = last_holdings_srs.copy()
-        if order_df is not None:
-            Portfolio._validate_order_df(order_df)
-            hdbg.dassert_lte(last_timestamp, order_df["start_timestamp"].min())
-            hdbg.dassert_lte(order_df["end_timestamp"].max(), timestamp)
-            holdings_diff = order_df.set_index("asset_id")["num_shares_filled"]
-            cash_diff = (
-                -1
-                * (
-                    order_df["execution_price"] * order_df["num_shares_filled"]
-                ).sum()
-            )
+        if fills_df is not None:
+            Portfolio._validate_fills_df(fills_df)
+            hdbg.dassert_lte(last_timestamp, fills_df["timestamp"].min())
+            hdbg.dassert_lte(fills_df["timestamp"].max(), timestamp)
+            holdings_diff = fills_df.set_index("asset_id")["num_shares"]
+            cash_diff = -1 * (fills_df["price"] * fills_df["num_shares"]).sum()
             hdbg.dassert(np.isfinite(cash_diff))
             new_holdings_srs = new_holdings_srs.add(holdings_diff, fill_value=0)
             new_holdings_srs.loc[Portfolio.CASH_ID] += cash_diff
@@ -559,9 +556,9 @@ class Portfolio:
             np.int64,
             "The column `asset_id` should only contain integer ids.",
         )
-        hdbg.dassert_eq(
+        hdbg.dassert_in(
             holdings_df["curr_num_shares"].dtype.type,
-            np.float64,
+            [np.float64, np.int64],
             "The column `curr_num_shares` should be a float column.",
         )
         # The dataframe must contain a row for cash.
@@ -607,47 +604,45 @@ class Portfolio:
         hdbg.dassert_lte(0, cash)
 
     @staticmethod
-    def _validate_order_df(
-        order_df: pd.DataFrame,
+    def _validate_fills_df(
+        fills_df: pd.DataFrame,
     ) -> None:
         """
-        Ensure that `order_df` passes basic sanity checks.
+        Ensure that `fills_df` passes basic sanity checks.
         """
         # The input should be a nonempty dataframe.
-        hdbg.dassert_isinstance(order_df, pd.DataFrame)
-        hdbg.dassert(not order_df.empty, "The dataframe must be nonempty.")
+        hdbg.dassert_isinstance(fills_df, pd.DataFrame)
+        hdbg.dassert(not fills_df.empty, "The dataframe must be nonempty.")
         # The dataframe must have the correct columns.
         hdbg.dassert_is_subset(
-            Portfolio.ORDER_COLS,
-            order_df.columns.to_list(),
+            Portfolio.FILLS_COLS,
+            fills_df.columns.to_list(),
             "Columns do not conform to requirements.",
         )
         # The columns should be of the correct types.
         hdbg.dassert_eq(
-            order_df["asset_id"].dtype.type,
+            fills_df["asset_id"].dtype.type,
             np.int64,
             "The column `asset_id` should only contain integer ids.",
         )
         hdbg.dassert_eq(
-            order_df["num_shares_filled"].dtype.type,
+            fills_df["num_shares"].dtype.type,
             np.float64,
             "The column `curr_num_shares` should be a float column.",
         )
-        # TODO(gp): Create a dassert in hpandas.
-        hdbg.dassert_eq(order_df["start_timestamp"].dtype.type, pd.Timestamp)
-        hdbg.dassert(hasattr(order_df["start_timestamp"].dtype, "tz"))
-        hdbg.dassert_eq(order_df["end_timestamp"].dtype.type, pd.Timestamp)
-        hdbg.dassert(hasattr(order_df["end_timestamp"].dtype, "tz"))
+        #
+        hdbg.dassert_eq(fills_df["timestamp"].dtype.type, pd.Timestamp)
+        hdbg.dassert(hasattr(fills_df["timestamp"].dtype, "tz"))
         # The dataframe must not contain a row for cash.
         hdbg.dassert_not_in(
             Portfolio.CASH_ID,
-            order_df["asset_id"].to_list(),
+            fills_df["asset_id"].to_list(),
             "Order for cash detected.",
         )
         # There should be no more than one row per asset.
-        hdbg.dassert_no_duplicates(order_df["asset_id"].to_list())
+        hdbg.dassert_no_duplicates(fills_df["asset_id"].to_list())
         # All share values should be finite.
         hdbg.dassert(
-            np.isfinite(order_df["num_shares_filled"]).all(),
+            np.isfinite(fills_df["num_shares"]).all(),
             "All share values must be finite.",
         )

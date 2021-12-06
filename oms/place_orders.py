@@ -11,7 +11,6 @@ import datetime
 import logging
 from typing import Any, Dict, List
 
-import numpy as np
 import pandas as pd
 from tqdm.autonotebook import tqdm
 
@@ -21,6 +20,8 @@ import helpers.dbg as hdbg
 import helpers.hpandas as hpandas
 import helpers.htqdm as htqdm
 import helpers.printing as hprint
+import oms.broker as ombroker
+import oms.call_optimizer as ocalopti
 import oms.order as omorder
 import oms.portfolio as omportfo
 
@@ -95,55 +96,6 @@ def mark_to_market(
     return merged_df
 
 
-def compute_trades(
-    df: pd.DataFrame,
-    cash_asset_id: int,
-) -> pd.DataFrame:
-    """
-    Compute target trades from holdings (dollar-valued) and predictions.
-
-    This is a stand-in for optimization.
-
-    :param df: a dataframe with current positions and predictions
-    :param cash_asset_id: id used to represent cash
-    :return:
-    """
-    hdbg.dassert_isinstance(df, pd.DataFrame)
-    hdbg.dassert_is_subset(["asset_id", "prediction", "value"], df.columns)
-    # TODO(*): Check uniqueness of `asset_id` column.
-    hdbg.dassert_not_in("target_position", df.columns)
-    hdbg.dassert_not_in("target_trade", df.columns)
-    df = df.set_index("asset_id")
-    # In this placeholder, we maintain two invariants (approximately):
-    #   1. Net wealth is conserved from one step to the next.
-    #   2. Leverage is conserved from one step to the next.
-    # The second invariant may be restated as conserving gross exposure.
-    # TODO(Paul): Make this configurable.
-    TARGET_LEVERAGE = 0.1
-    _LOG.debug("TARGET_LEVERAGE=%s", TARGET_LEVERAGE)
-    predictions = df["prediction"]
-    predictions_l1 = predictions.abs().sum()
-    _LOG.debug("predictions_l1 =%s", predictions_l1)
-    hdbg.dassert(np.isfinite(predictions_l1), "scale_factor=%s", predictions_l1)
-    hdbg.dassert_lt(0, predictions_l1)
-    # These positions are expressed in dollars.
-    current_positions = df["value"]
-    net_wealth = current_positions.sum()
-    _LOG.debug("net_wealth=%s", net_wealth)
-    # Drop cash.
-    df.drop(index=cash_asset_id, inplace=True)
-    # NOTE: Some of these checks are now redundant.
-    hdbg.dassert(np.isfinite(net_wealth), "wealth=%s", net_wealth)
-    scale_factor = net_wealth * TARGET_LEVERAGE / predictions_l1
-    _LOG.debug("scale_factor=%s", scale_factor)
-    target_positions = scale_factor * predictions
-    target_positions[cash_asset_id] = current_positions[cash_asset_id]
-    target_trades = target_positions - current_positions
-    df["target_position"] = target_positions
-    df["target_trade"] = target_trades
-    return df
-
-
 def generate_orders(
     shares: pd.Series,
     order_config: Dict[str, Any],
@@ -176,61 +128,42 @@ def generate_orders(
     return orders
 
 
-def simulate_order_fills(orders: List[omorder.Order]) -> pd.DataFrame:
-    """
-    Create a dataframe of filled orders from a list of orders.
-
-    :param orders:
-    :return:
-    """
-    hdbg.dassert(orders)
-    orders_rows = []
-    for order in orders:
-        _LOG.debug("# Processing order=%s", order)
-        orders_row: Dict[str, Any] = collections.OrderedDict()
-        # Copy content of the order.
-        orders_row.update(order.to_dict())
-        # Complete fills.
-        orders_row["num_shares_filled"] = order.num_shares
-        # Account for the executed price of the order.
-        execution_price = order.get_execution_price()
-        orders_row["execution_price"] = execution_price
-        orders_rows.append(pd.Series(orders_row))
-    order_df = pd.concat(orders_rows, axis=1).transpose()
-    order_df = order_df.convert_dtypes()
-    return order_df
+def update_portfolio(
+    timestamp: pd.Timestamp,
+    portfolio: omportfo.Portfolio,
+    broker: ombroker.Broker,
+) -> None:
+    last_timestamp = portfolio.get_last_timestamp()
+    hdbg.dassert_lt(last_timestamp, timestamp)
+    fills = broker.get_fills(timestamp)
+    fill_rows = []
+    for fill in fills:
+        _LOG.debug("# Processing fill=%s", fill)
+        fill_row: Dict[str, Any] = collections.OrderedDict()
+        # Copy contents of the fill.
+        fill_row.update(fill.to_dict())
+        fill_rows.append(pd.Series(fill_row))
+    if fill_rows:
+        fills_df = pd.concat(fill_rows, axis=1).transpose()
+        fills_df = fills_df.convert_dtypes()
+    else:
+        fills_df = None
+    portfolio.advance_portfolio_state(timestamp, fills_df)
 
 
-def optimize_and_update(
+def compute_target_positions_in_shares(
     timestamp: pd.Timestamp,
     predictions: pd.Series,
     portfolio: omportfo.Portfolio,
-    order_config: Dict[str, Any],
-    orders,
-    order_id,
-) -> list:
+) -> pd.DataFrame:
     """
     Compute target holdings, generate orders, and update the portfolio.
 
-    :param current_timestamp: timestamp used for valuing holdings, timestamping
-        orders
+    :param timestamp: timestamp used for valuing holdings
     :param predictions: predictions indexed by `asset_id`
     :param portfolio: portfolio with current holdings
-    :param order_config: config for `Order`
-    :param initial_order_id: first `order_id` to use
-    :return: number of orders generated (and filled)
     """
-    _LOG.debug("# Optimize and update portfolio")
-    # Simulate order fills here.
-    # Advance the portfolio state with orders up till "now"
-    # Edge case: we are already initialized at this timestamp.
-    # Get orders.
-    if portfolio.get_last_timestamp() < timestamp:
-        if len(orders) > 0:
-            unfilled_orders = simulate_order_fills(orders)
-        else:
-            unfilled_orders = None
-        portfolio.advance_portfolio_state(timestamp, unfilled_orders)
+    hdbg.dassert_eq(portfolio.get_last_timestamp(), timestamp)
     if predictions.isna().sum() != 0:
         _LOG.debug(
             "Number of NaN predictions=`%i` at timestamp=`%s`",
@@ -238,20 +171,19 @@ def optimize_and_update(
             timestamp,
         )
     priced_holdings = mark_to_market(timestamp, predictions, portfolio)
-    df = compute_trades(priced_holdings, portfolio.CASH_ID)
+    df = ocalopti.compute_target_positions_in_cash(
+        priced_holdings, portfolio.CASH_ID
+    )
     # Round to nearest integer towards zero.
     # df["diff_num_shares"] = np.fix(df["target_trade"] / df["price"])
     df["diff_num_shares"] = df["target_trade"] / df["price"]
-    orders = generate_orders(
-        df["diff_num_shares"], order_config, order_id
-    )
-    return orders
+    return df
 
 
 # TODO(gp): We should use a RT graph executed once step at a time. For now we just
 #  play back the entire thing.
 # TODO(gp): -> update_holdings
-def place_orders(
+async def place_orders(
     predictions_df: pd.DataFrame,
     execution_mode: str,
     config: Dict[str, Any],
@@ -292,6 +224,9 @@ def place_orders(
     # - Check `portfolio`.
     portfolio = config["portfolio"]
     hdbg.dassert_issubclass(portfolio, omportfo.Portfolio)
+    # - Check `broker`.
+    broker = config["broker"]
+    hdbg.dassert_isinstance(broker, ombroker.Broker)
     # Make a copy of `portfolio` to return (rather than modifying in-place).
     portfolio = copy.copy(portfolio)
     # - Check `order_type`
@@ -328,7 +263,6 @@ def place_orders(
     tqdm_out = htqdm.TqdmToLogger(_LOG, level=logging.INFO)
     num_rows = len(predictions_df)
     iter_ = enumerate(predictions_df.iterrows())
-    orders = []
     for idx, (timestamp, predictions) in tqdm(
         iter_, total=num_rows, file=tqdm_out
     ):
@@ -355,9 +289,27 @@ def place_orders(
         # Enter position between now and the next 5 mins.
         timestamp_start = timestamp
         timestamp_end = timestamp + offset_5min
+        # Update `portfolio` based on last fills and market movement.
+        _LOG.debug(
+            "\n%s",
+            hprint.frame("Updating portfolio state from fills: timestamp=%s" % timestamp, char1="#"),
+        )
+        update_portfolio(timestamp, portfolio, broker)
+        # Continue if we are outside of our trading window.
         if time < trading_start_time or time > trading_end_time:
-            portfolio.advance_portfolio_state(timestamp_end, None)
             continue
+        # Compute target positions
+        _LOG.debug(
+            "\n%s",
+            hprint.frame("Computing target positions: timestamp=%s" % timestamp, char1="#"),
+        )
+        target_positions = compute_target_positions_in_shares(
+            timestamp, predictions, portfolio
+        )
+        _LOG.debug(
+            "\n%s",
+            hprint.frame("Generating orders: timestamp=%s" % timestamp, char1="#"),
+        )
         # Create an config for `Order`. This requires timestamps and so is
         # inside the loop.
         order_dict_ = {
@@ -368,14 +320,15 @@ def place_orders(
             "end_timestamp": timestamp_end,
         }
         order_config = cconfig.get_config_from_nested_dict(order_dict_)
-        # Optimize, generate orders, and update the portfolio.
-        orders = optimize_and_update(
-            timestamp,
-            predictions,
-            portfolio,
-            order_config,
-            orders,
-            order_id,
+        orders = generate_orders(
+            target_positions["diff_num_shares"], order_config, order_id
         )
         order_id += len(orders)
+        # Submit orders.
+        _LOG.debug(
+            "\n%s",
+            hprint.frame("Submitting orders to broker: timestamp=%s" % timestamp, char1="#"),
+        )
+        broker.submit_orders(orders)
+        await asyncio.sleep(60 * 5)
     return portfolio

@@ -38,7 +38,7 @@ class TestRealTimeReturnPipeline1(hunitest.TestCase):
                 start_datetime, end_datetime, columns, asset_ids
             )
             initial_replayed_delay = 5
-            rtpi = dartttdi.get_replayed_time_price_interface_example1(
+            rtpi, _ = dartttdi.get_replayed_time_price_interface_example1(
                 event_loop,
                 start_datetime,
                 end_datetime,

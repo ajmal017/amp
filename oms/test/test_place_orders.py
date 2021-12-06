@@ -1,15 +1,15 @@
+import asyncio
 import datetime
 import io
 import logging
 
-import numpy as np
 import pandas as pd
-import pytest
 
 import core.config as cconfig
 import core.dataflow.test.test_price_interface as dartttdi
 import helpers.hasyncio as hasynci
 import helpers.unit_test as hunitest
+import oms.broker as ombroker
 import oms.place_orders as oplaorde
 import oms.portfolio as omportfo
 import oms.test.test_portfolio as ottport
@@ -20,70 +20,56 @@ import oms.test.test_portfolio as ottport
 
 
 class TestPlaceOrders1(hunitest.TestCase):
-    @pytest.mark.skip("Need to debug")
-    def test1(self) -> None:
+    async def _test_coroutine1(self, event_loop) -> None:
+        config = {}
+        price_interface, get_wall_clock_time = ottport.get_replayed_time_price_interface(event_loop)
+        initial_timestamp = pd.Timestamp(
+            "2000-01-01 09:30:00-05:00", tz="America/New_York"
+        )
+        broker = ombroker.Broker(price_interface, get_wall_clock_time)
+        # Build predictions.
+        index = [
+            pd.Timestamp("2000-01-01 09:35:00-05:00", tz="America/New_York"),
+            pd.Timestamp("2000-01-01 09:40:00-05:00", tz="America/New_York"),
+            pd.Timestamp("2000-01-01 09:45:00-05:00", tz="America/New_York"),
+        ]
+        columns = [101, 202]
+        data = [
+            [0.1, 0.2],
+            [-0.1, 0.3],
+            [-0.3, 0.0],
+        ]
+        predictions = pd.DataFrame(data, index=index, columns=columns)
+        config["price_interface"] = price_interface
+        # Build a Portfolio.
+        portfolio = ottport.get_portfolio_example1(
+            price_interface, initial_timestamp
+        )
+        config["portfolio"] = portfolio
+        config["broker"] = broker
+        config["order_type"] = "price@twap"
+        config["ath_start_time"] = datetime.time(9, 30)
+        config["trading_start_time"] = datetime.time(9, 35)
+        config["ath_end_time"] = datetime.time(16, 00)
+        config["trading_end_time"] = datetime.time(15, 55)
+        # Run.
+        execution_mode = "batch"
+        await oplaorde.place_orders(
+            predictions,
+            execution_mode,
+            config,
+        )
+
+    def test_initialization1(self) -> None:
+        #event_loop = None
         with hasynci.solipsism_context() as event_loop:
-            config = {}
-            # # Build a ReplayedTimePriceInterface.
-            # start_datetime = pd.Timestamp("2000-01-01 09:30:00-05:00")
-            # end_datetime = pd.Timestamp("2000-01-01 10:30:00-05:00")
-            # initial_replayed_delay = 5
-            # delay_in_secs = 0
-            # asset_ids = [101, 202]
-            # columns = ["midpoint"]
-            # sleep_in_secs = 30
-            # time_out_in_secs = 60 * 5
-            # rtpi = dartttdi.get_replayed_time_price_interface_example1(
-            #     event_loop,
-            #     start_datetime,
-            #     end_datetime,
-            #     initial_replayed_delay,
-            #     delay_in_secs,
-            #     asset_ids=asset_ids,
-            #     columns=columns,
-            #     sleep_in_secs=sleep_in_secs,
-            #     time_out_in_secs=time_out_in_secs,
-            # )
-            rtpi = ottport.get_replayed_time_price_interface(event_loop)
-            # Build predictions.
-            index = [
-                pd.Timestamp("2000-01-01 09:35:00-05:00", tz="America/New_York"),
-                pd.Timestamp("2000-01-01 09:40:00-05:00", tz="America/New_York"),
-                pd.Timestamp("2000-01-01 09:45:00-05:00", tz="America/New_York"),
-            ]
-            columns = [101, 202]
-            data = [
-                [0.1, 0.2],
-                [-0.1, 0.3],
-                [-0.3, 0.0],
-            ]
-            predictions = pd.DataFrame(data, index=index, columns=columns)
-            config["price_interface"] = rtpi
-            # Build a Portfolio.
-            initial_timestamp = pd.Timestamp(
-                "2000-01-01 09:35:00-05:00", tz="America/New_York"
-            )
-            portfolio = ottport.get_portfolio_example1(rtpi, initial_timestamp)
-            config["portfolio"] = portfolio
-            config["order_type"] = "price@twap"
-            config["ath_start_time"] = datetime.time(9, 30)
-            config["trading_start_time"] = datetime.time(9, 30)
-            config["ath_end_time"] = datetime.time(16, 00)
-            config["trading_end_time"] = datetime.time(15, 55)
-            # Run.
-            execution_mode = "batch"
-            oplaorde.place_orders(
-                predictions,
-                execution_mode,
-                config,
-            )
+            hasynci.run(self._test_coroutine1(event_loop), event_loop=event_loop)
 
 
 class TestMarkToMarket1(hunitest.TestCase):
     def test_initialization1(self) -> None:
         # Set up price interface components.
         event_loop = None
-
         db_txt = """
 start_datetime,end_datetime,timestamp_db,price,asset_id
 2000-01-01 09:30:00-05:00,2000-01-01 09:35:00-05:00,2000-01-01 09:35:00-05:00,107.73,101
@@ -101,7 +87,7 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
         start_datetime = initial_timestamp
         end_datetime = pd.Timestamp("2000-01-01 09:35:00-05:00")
-        price_interface = dartttdi.get_replayed_time_price_interface_example1(
+        price_interface, _ = dartttdi.get_replayed_time_price_interface_example1(
             event_loop,
             start_datetime,
             end_datetime,
@@ -150,10 +136,9 @@ asset_id,curr_num_shares,prediction,price,value
 
 
 class TestOptimizeAndUpdate1(hunitest.TestCase):
-    def test_initialization1(self) -> None:
-        # Set up price interface components.
-        event_loop = None
 
+    async def _test_coroutine(self, event_loop):
+        # Set up price interface components.
         db_txt = """
 start_datetime,end_datetime,timestamp_db,price,asset_id
 2000-01-01 09:30:00-05:00,2000-01-01 09:35:00-05:00,2000-01-01 09:35:00-05:00,107.73,101
@@ -182,11 +167,12 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
         initial_timestamp = pd.Timestamp(
             "2000-01-01 09:35:00-05:00", tz="America/New_York"
         )
+        # TODO(gp): These params are not used.
         start_datetime = initial_timestamp
         end_datetime = pd.Timestamp(
-            "2000-01-01 09:35:00-05:00", tz="America/New_York"
+            "2000-01-01 09:40:00-05:00", tz="America/New_York"
         )
-        price_interface = dartttdi.get_replayed_time_price_interface_example1(
+        price_interface, get_wall_clock_time = dartttdi.get_replayed_time_price_interface_example1(
             event_loop,
             start_datetime,
             end_datetime,
@@ -207,11 +193,13 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             initial_cash=1e6,
             initial_timestamp=initial_timestamp,
         )
+        # Initialize broker.
+        broker = ombroker.Broker(price_interface, get_wall_clock_time)
         # Initialize a prediction series.
         predictions = pd.Series(
             index=[101, 202], data=[0.3, -0.1], name="prediction"
         )
-        # Set up order config.
+        # Set up order config for 9:35 to 9:40.
         end_timestamp = pd.Timestamp(
             "2000-01-01 09:40:00-05:00", tz="America/New_York"
         )
@@ -223,13 +211,22 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             "end_timestamp": end_timestamp,
         }
         order_config = cconfig.get_config_from_nested_dict(order_dict_)
-        # Mark to market.
-        orders = oplaorde.optimize_and_update(
-            initial_timestamp, predictions, portfolio, order_config, [], 0
+        # #####################################################################
+        # Compute target positions
+        target_positions = oplaorde.compute_target_positions_in_shares(
+            initial_timestamp,
+            predictions,
+            portfolio,
         )
-        _ = oplaorde.optimize_and_update(
-            end_timestamp, predictions, portfolio, order_config, orders, 2
+        orders = oplaorde.generate_orders(
+            target_positions["diff_num_shares"], order_config, 0
         )
+        # Submit orders.
+        broker.submit_orders(orders)
+        #wait 5 minutes
+        await asyncio.sleep(60 * 5)
+        oplaorde.update_portfolio(end_timestamp, portfolio, broker)
+        # #####################################################################
         actual = portfolio.get_characteristics(
             pd.Timestamp("2000-01-01 09:40:00-05:00", tz="America/New_York")
         )
@@ -251,5 +248,8 @@ leverage,0.1007
         ]
         self.assert_dfs_close(actual.to_frame(), expected, rtol=1e-2, atol=1e-2)
 
+    def test_initialization1(self) -> None:
+        with hasynci.solipsism_context() as event_loop:
+            hasynci.run(self._test_coroutine(event_loop), event_loop=event_loop)
 
 # class SimulateOrderFills1(hunitest.TestCase):

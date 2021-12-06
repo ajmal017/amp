@@ -172,8 +172,8 @@ class AbstractPriceInterface(abc.ABC):
         :param ts: the timestamp to filter on
         :param asset_ids: list of ids to filter on. `None` for all ids.
         """
-        start_ts = ts - pd.Timedelta(1, unit="ns")
-        end_ts = ts + pd.Timedelta(1, unit="ns")
+        start_ts = ts - pd.Timedelta(1, unit="s")
+        end_ts = ts + pd.Timedelta(1, unit="s")
         df = self.get_data_for_interval(
             start_ts,
             end_ts,
