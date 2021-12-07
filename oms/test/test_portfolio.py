@@ -13,74 +13,11 @@ import pandas as pd
 import core.dataflow.price_interface as cdtfprint
 import core.dataflow.price_interface_example as cdtfprinex
 import core.dataflow.real_time as cdtfretim
-import helpers.printing as hprint
 import helpers.unit_test as hunitest
 import oms.portfolio as omportfo
+import oms.portfolio_example as oporexam
 
 _LOG = logging.getLogger(__name__)
-
-
-def get_portfolio_example1(
-    price_interface: cdtfprint.AbstractPriceInterface,
-    initial_timestamp: pd.Timestamp,
-):
-    strategy_id = "st1"
-    account = "paper"
-    asset_id_column = "asset_id"
-    # price_column = "midpoint"
-    mark_to_market_col = "price"
-    timestamp_col = "end_datetime"
-    #
-    initial_cash = 1e6
-    portfolio = omportfo.Portfolio.from_cash(
-        strategy_id,
-        account,
-        #
-        price_interface,
-        asset_id_column,
-        mark_to_market_col,
-        timestamp_col,
-        #
-        initial_cash,
-        initial_timestamp,
-    )
-    return portfolio
-
-
-def get_replayed_time_price_interface(event_loop):
-    start_datetime = pd.Timestamp(
-        "2000-01-01 09:30:00-05:00", tz="America/New_York"
-    )
-    end_datetime = pd.Timestamp(
-        "2000-01-01 10:30:00-05:00", tz="America/New_York"
-    )
-    columns_ = ["price"]
-    asset_ids = [101, 202]
-    # asset_ids = [1000]
-    df = cdtfprinex.generate_synthetic_db_data(
-        start_datetime, end_datetime, columns_, asset_ids
-    )
-    _LOG.debug("df=%s", hprint.dataframe_to_str(df))
-    # Build a ReplayedTimePriceInterface.
-    initial_replayed_delay = 5
-    delay_in_secs = 0
-    sleep_in_secs = 30
-    time_out_in_secs = 60 * 5
-    (
-        price_interface,
-        get_wall_clock_time,
-    ) = cdtfprinex.get_replayed_time_price_interface_example1(
-        event_loop,
-        start_datetime,
-        end_datetime,
-        initial_replayed_delay,
-        delay_in_secs,
-        df=df,
-        sleep_in_secs=sleep_in_secs,
-        time_out_in_secs=time_out_in_secs,
-    )
-    return price_interface, get_wall_clock_time
-
 
 _5mins = pd.DateOffset(minutes=5)
 
@@ -136,10 +73,15 @@ class TestPortfolio1(hunitest.TestCase):
         """
         # Build a ReplayedTimePriceInterface.
         event_loop = None
-        price_interface, _ = get_replayed_time_price_interface(event_loop)
+        (
+            price_interface,
+            _,
+        ) = cdtfprinex.get_replayed_time_price_interface_example2(event_loop)
         # Build a Portfolio.
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
-        portfolio = get_portfolio_example1(price_interface, initial_timestamp)
+        portfolio = oporexam.get_portfolio_example1(
+            price_interface, initial_timestamp
+        )
         return portfolio
 
     def _test_get_holdings(
@@ -155,7 +97,10 @@ class TestPortfolio1(hunitest.TestCase):
 class TestPortfolio2(hunitest.TestCase):
     def test_initialization1(self) -> None:
         event_loop = None
-        price_interface, _ = get_replayed_time_price_interface(event_loop)
+        (
+            price_interface,
+            _,
+        ) = cdtfprinex.get_replayed_time_price_interface_example2(event_loop)
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
         portfolio = omportfo.Portfolio.from_cash(
             strategy_id="str1",
@@ -179,7 +124,10 @@ class TestPortfolio2(hunitest.TestCase):
 
     def test_initialization2(self) -> None:
         event_loop = None
-        price_interface, _ = get_replayed_time_price_interface(event_loop)
+        (
+            price_interface,
+            _,
+        ) = cdtfprinex.get_replayed_time_price_interface_example2(event_loop)
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
         dict_ = {101: 727.5, 202: 1040.3, -1: 10000}
         portfolio = omportfo.Portfolio.from_dict(
@@ -206,7 +154,10 @@ class TestPortfolio2(hunitest.TestCase):
 
     def test_characteristics1(self) -> None:
         event_loop = None
-        price_interface, _ = get_replayed_time_price_interface(event_loop)
+        (
+            price_interface,
+            _,
+        ) = cdtfprinex.get_replayed_time_price_interface_example2(event_loop)
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
         portfolio = omportfo.Portfolio.from_cash(
             strategy_id="str1",
@@ -237,7 +188,10 @@ leverage,0.0
 
     def test_characteristics2(self) -> None:
         event_loop = None
-        price_interface, _ = get_replayed_time_price_interface(event_loop)
+        (
+            price_interface,
+            _,
+        ) = cdtfprinex.get_replayed_time_price_interface_example2(event_loop)
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
         dict_ = {101: 727.5, 202: 1040.3, -1: 10000}
         portfolio = omportfo.Portfolio.from_dict(

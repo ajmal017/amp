@@ -12,11 +12,9 @@ import helpers.unit_test as hunitest
 import oms.broker as ombroker
 import oms.place_orders as oplaorde
 import oms.portfolio as omportfo
+import oms.portfolio_example as oporexam
 
 _LOG = logging.getLogger(__name__)
-
-# Do not import from other test files.
-import oms.test.test_portfolio as ottport
 
 
 class TestPlaceOrders1(hunitest.TestCase):
@@ -30,7 +28,7 @@ class TestPlaceOrders1(hunitest.TestCase):
         (
             price_interface,
             get_wall_clock_time,
-        ) = ottport.get_replayed_time_price_interface(event_loop)
+        ) = cdtfprinex.get_replayed_time_price_interface_example2(event_loop)
         initial_timestamp = pd.Timestamp(
             "2000-01-01 09:30:00-05:00", tz="America/New_York"
         )
@@ -50,7 +48,7 @@ class TestPlaceOrders1(hunitest.TestCase):
         predictions = pd.DataFrame(data, index=index, columns=columns)
         config["price_interface"] = price_interface
         # Build a Portfolio.
-        portfolio = ottport.get_portfolio_example1(
+        portfolio = oporexam.get_portfolio_example1(
             price_interface, initial_timestamp
         )
         config["portfolio"] = portfolio

@@ -3,6 +3,7 @@ Import as:
 
 import core.dataflow.price_interface_example as cdtfprinex
 """
+# TODO: Consider moving this out of dataflow and into oms.
 
 import asyncio
 import logging
@@ -130,6 +131,41 @@ def get_replayed_time_price_interface_example1(
         end_time_col_name,
         columns,
         get_wall_clock_time,
+        sleep_in_secs=sleep_in_secs,
+        time_out_in_secs=time_out_in_secs,
+    )
+    return price_interface, get_wall_clock_time
+
+
+def get_replayed_time_price_interface_example2(event_loop):
+    start_datetime = pd.Timestamp(
+        "2000-01-01 09:30:00-05:00", tz="America/New_York"
+    )
+    end_datetime = pd.Timestamp(
+        "2000-01-01 10:30:00-05:00", tz="America/New_York"
+    )
+    columns_ = ["price"]
+    asset_ids = [101, 202]
+    # asset_ids = [1000]
+    df = generate_synthetic_db_data(
+        start_datetime, end_datetime, columns_, asset_ids
+    )
+    _LOG.debug("df=%s", hprint.dataframe_to_str(df))
+    # Build a ReplayedTimePriceInterface.
+    initial_replayed_delay = 5
+    delay_in_secs = 0
+    sleep_in_secs = 30
+    time_out_in_secs = 60 * 5
+    (
+        price_interface,
+        get_wall_clock_time,
+    ) = get_replayed_time_price_interface_example1(
+        event_loop,
+        start_datetime,
+        end_datetime,
+        initial_replayed_delay,
+        delay_in_secs,
+        df=df,
         sleep_in_secs=sleep_in_secs,
         time_out_in_secs=time_out_in_secs,
     )
