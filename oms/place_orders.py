@@ -6,7 +6,6 @@ import oms.place_orders as oplaorde
 
 import asyncio
 import collections
-import copy
 import datetime
 import logging
 from typing import Any, Dict, List
@@ -183,16 +182,18 @@ def compute_target_positions_in_shares(
     return df
 
 
-# TODO(gp): We should use a RT graph executed once step at a time. For now we just
-#  play back the entire thing.
-# TODO(gp): -> update_holdings
+# TODO(Paul): -> process_forecasts()
 async def place_orders(
-    predictions_df: pd.DataFrame,
+    # TODO(gp): -> prediction_df
+    prediction_df: pd.DataFrame,
+    # volatility_df:
     execution_mode: str,
     config: Dict[str, Any],
-    # TODO(gp): -> initial_order_id
+    # TODO(Paul): Pass Portfolio from outside we can preserve it across invocations.
+    # portfolio: Portfolio,
+    # TODO(Paul): Remove this and allow the class to auto-generate the index.
     order_id: int = 0,
-) -> omportfo.Portfolio:
+) -> None:
     """
     Place orders corresponding to the predictions stored in the given df.
 
@@ -203,7 +204,7 @@ async def place_orders(
     - The columns ending with `+1` represent what happens in the next interval
       of time
 
-    :param predictions_df: a dataframe indexed by timestamps with one column for the
+    :param prediction_df: a dataframe indexed by timestamps with one column for the
         predictions for each asset
     :param execution_mode:
         - `batch`: place the trades for all the predictions (used in historical
@@ -220,6 +221,8 @@ async def place_orders(
         - `locates`: object used to access short locates
     :return: updated portfolio
     """
+    _LOG.info("** PLACE TRADES **")
+    _LOG.info("predictions_df=\n%s", prediction_df)
     # Check the config.
     # - Check `price_interface`.
     price_interface = config["price_interface"]
@@ -231,15 +234,16 @@ async def place_orders(
     broker = config["broker"]
     hdbg.dassert_isinstance(broker, ombroker.Broker)
     # Make a copy of `portfolio` to return (rather than modifying in-place).
-    portfolio = copy.copy(portfolio)
+    # TODO(Paul): We can't make a copy.
+    # portfolio = copy.copy(portfolio)
     # - Check `order_type`
     order_type = config["order_type"]
     # The `Order` class knows the valid order types.
     hdbg.dassert_isinstance(order_type, str)
     # - Check `predictions_df`.
-    hdbg.dassert_isinstance(predictions_df, pd.DataFrame)
-    hpandas.dassert_index_is_datetime(predictions_df)
-    hpandas.dassert_strictly_increasing_index(predictions_df)
+    hdbg.dassert_isinstance(prediction_df, pd.DataFrame)
+    hpandas.dassert_index_is_datetime(prediction_df)
+    hpandas.dassert_strictly_increasing_index(prediction_df)
     # TODO(Paul): Add a check for ATH start/end.
     ath_start_time = config["ath_start_time"]
     hdbg.dassert_isinstance(ath_start_time, datetime.time)
@@ -253,24 +257,25 @@ async def place_orders(
     hdbg.dassert_lte(trading_end_time, ath_end_time)
     #
     if execution_mode == "real_time":
-        predictions_df = predictions_df.tail(1)
+        prediction_df = prediction_df.tail(1)
     elif execution_mode == "batch":
         pass
     else:
         raise ValueError(f"Unrecognized execution mode='{execution_mode}'")
-    _LOG.debug("predictions_df=%s\n%s", str(predictions_df.shape), predictions_df)
-    _LOG.debug("predictions_df.index=%s", str(predictions_df.index))
+    _LOG.debug("predictions_df=%s\n%s", str(prediction_df.shape), prediction_df)
+    _LOG.debug("predictions_df.index=%s", str(prediction_df.index))
     # Cache a variable used many times.
     offset_5min = pd.DateOffset(minutes=5)
     #
     tqdm_out = htqdm.TqdmToLogger(_LOG, level=logging.INFO)
-    num_rows = len(predictions_df)
-    iter_ = enumerate(predictions_df.iterrows())
+    num_rows = len(prediction_df)
+    iter_ = enumerate(prediction_df.iterrows())
     for idx, (timestamp, predictions) in tqdm(
         iter_, total=num_rows, file=tqdm_out
     ):
         _LOG.debug("\n%s", hprint.frame("# timestamp=%s" % timestamp))
         _ = idx
+        # TODO(gp): Maybe move outside.
         time = timestamp.time()
         if time < ath_start_time:
             _LOG.debug(
@@ -286,10 +291,11 @@ async def place_orders(
                 ath_end_time,
             )
             continue
-        if idx == len(predictions_df) - 1:
-            # For the last timestamp we only need to mark to market, but not post
-            # any more orders.
-            continue
+        # if execution_mode == "batch":
+        #     if idx == len(predictions_df) - 1:
+        #         # For the last timestamp we only need to mark to market, but not post
+        #         # any more orders.
+        #         continue
         # Enter position between now and the next 5 mins.
         timestamp_start = timestamp
         timestamp_end = timestamp + offset_5min
@@ -335,4 +341,3 @@ async def place_orders(
         )
         broker.submit_orders(orders)
         await asyncio.sleep(60 * 5)
-    return portfolio

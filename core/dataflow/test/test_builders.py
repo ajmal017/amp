@@ -1,23 +1,19 @@
 import logging
 
+import pandas as pd
+
+import core.config as cconfig
 import core.dataflow as dtf
+import core.dataflow.builders as cdtfbuil
+import core.dataflow.core as cdtfcore
+import core.dataflow.nodes.sinks as cdtfnosin
+import core.dataflow.nodes.transformers as cdtfnotra
+import core.dataflow_source_nodes as cdtfsonod
 import helpers.printing as hprint
 import helpers.unit_test as hunitest
 
 _LOG = logging.getLogger(__name__)
 
-import logging
-
-import pandas as pd
-
-import core.config as cconfig
-import core.dataflow.builders as cdtfbuil
-import core.dataflow.core as cdtfcore
-import core.dataflow.nodes.transformers as cdtfnotra
-import core.dataflow_source_nodes as cdtfsonod
-import helpers.unit_test as hunitest
-
-_LOG = logging.getLogger(__name__)
 
 
 class _NaivePipeline(cdtfbuil.DagBuilder):
@@ -49,6 +45,10 @@ class _NaivePipeline(cdtfbuil.DagBuilder):
             data = hunitest.get_random_df(
                 num_cols, seed=seed, date_range_kwargs=date_range_kwargs
             )
+            # This needs to be multi-index.
+            data = pd.concat([data, data], axis=1, keys=["stock1", "stock2"])
+            data = data.swaplevel(i=0, j=1, axis=1)
+            data.sort_index(axis=1, level=0, inplace=True)
             return data
 
         def _process_data(df_in: pd.DataFrame) -> pd.DataFrame:
@@ -68,6 +68,12 @@ class _NaivePipeline(cdtfbuil.DagBuilder):
             # Process data.
             self._get_nid("process_data"): {
                 "func": _process_data,
+            },
+            # Place trades.
+            self._get_nid("process_forecasts"): {
+                "prediction_col": "price",
+                "execution_mode": "real_time",
+                "process_forecasts_config": {},
             },
         }
         config = cconfig.get_config_from_nested_dict(dict_)
@@ -95,6 +101,14 @@ class _NaivePipeline(cdtfbuil.DagBuilder):
         stage = "process_data"
         nid = self._get_nid(stage)
         node = cdtfnotra.FunctionWrapper(
+            nid,
+            **config[nid].to_dict(),
+        )
+        tail_nid = self._append(dag, tail_nid, node)
+        # Process forecasts.
+        stage = "process_forecasts"
+        nid = self._get_nid(stage)
+        node = cdtfnosin.ProcessForecasts(
             nid,
             **config[nid].to_dict(),
         )

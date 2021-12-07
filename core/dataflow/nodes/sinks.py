@@ -215,7 +215,7 @@ def consolidate_dfs(df_iter: Iterable[Tuple[str, pd.DataFrame]]) -> pd.DataFrame
 # #############################################################################
 
 
-class PlaceTrades(cdtfnobas.FitPredictNode):
+class ProcessForecasts(cdtfnobas.FitPredictNode):
     """
     Place trades from a model.
     """
@@ -223,16 +223,18 @@ class PlaceTrades(cdtfnobas.FitPredictNode):
     def __init__(
         self,
         nid: cdtfcore.NodeId,
+        prediction_col: str,
         execution_mode: bool,
-        config: Dict[str, Any],
+        process_forecasts_config: Dict[str, Any],
     ) -> None:
         """
-        Parameters have the same meaning as in `process_filled_orders()`.
+        Parameters have the same meaning as in `process_forecasts()`.
         """
         super().__init__(nid)
         hdbg.dassert_in(execution_mode, ("batch", "real_time"))
+        self._prediction_col = prediction_col
         self._execution_mode = execution_mode
-        self._config = config
+        self._process_forecasts_config = process_forecasts_config
 
     def fit(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
         return self._place_trades(df_in, fit=True)
@@ -240,20 +242,19 @@ class PlaceTrades(cdtfnobas.FitPredictNode):
     def predict(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
         return self._place_trades(df_in, fit=False)
 
-    def _place_trades(self, df, fit: bool = True) -> Dict[str, pd.DataFrame]:
+    def _place_trades(self, df: pd.DataFrame, fit: bool = True) -> Dict[str, pd.DataFrame]:
         import oms.place_orders as oplaorde
-
-        hdbg.dassert_in(self._pred_column, df.columns)
-        # TODO(gp): Make sure it's multi-index.
-        hdbg.dassert_lt(1, df.index.size)
+        hdbg.dassert_in(self._prediction_col, df.columns)
+        # Make sure it's multi-index.
+        hdbg.dassert_lte(2, df.columns.nlevels)
         hdbg.dassert_isinstance(df.index, pd.DatetimeIndex)
+        # TODO(gp): Maybe pass the entire multi-index df and the name of
+        #  pred_col and vol_col.
+        prediction_df = df[self._prediction_col]
         # Get the latest `df` index value.
-        if self._execution_mode == "batch":
-            oplaorde.place_trades(df, self._execution_mode, self._config)
-        elif self._execution_mode == "real_time":
-            oplaorde.place_trades(df[-1], self._execution_mode, self._config)
-        else:
-            raise "Invalid execution_mode='%s'" % self._execution_mode
+        oplaorde.place_orders(
+            prediction_df, self._execution_mode, self._process_forecasts_config
+        )
         # Compute stats.
         info = collections.OrderedDict()
         info["df_out_info"] = cdtfutil.get_df_info_as_string(df)

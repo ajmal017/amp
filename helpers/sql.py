@@ -91,6 +91,7 @@ def get_connection_from_string(
     Create a connection from a string.
 
     E.g., ` host=localhost dbname=im_db_local port=5432
+
     user= ... password=...`
     """
     connection = psycop.connect(conn_as_str)

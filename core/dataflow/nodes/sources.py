@@ -7,7 +7,7 @@ import core.dataflow.nodes.sources as cdtfnosou
 """
 import logging
 import os
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -380,6 +380,7 @@ class RealTimeDataSource(cdtfnobas.DataSource):
         nid: cdtfcore.NodeId,
         price_interface: cdtfprint.AbstractPriceInterface,
         period: str,
+        asset_id_col: Union[int, str],
         multiindex_output: bool,
     ) -> None:
         """
@@ -389,28 +390,28 @@ class RealTimeDataSource(cdtfnobas.DataSource):
         """
         super().__init__(nid)
         hdbg.dassert_isinstance(price_interface, cdtfprint.AbstractPriceInterface)
-        # TODO(gp): _rtpi -> _price_interface
-        self._rtpi = price_interface
+        self._price_interface = price_interface
         self._period = period
+        self._asset_id_col = asset_id_col
         self._multiindex_output = multiindex_output
 
     # TODO(gp): Can we use a run and move it inside fit?
     async def wait_for_latest_data(
         self,
     ) -> Tuple[pd.Timestamp, pd.Timestamp, int]:
-        ret = await self._rtpi.is_last_bar_available()
+        ret = await self._price_interface.is_last_bar_available()
         return ret  # type: ignore[no-any-return]
 
     def fit(self) -> Optional[Dict[str, pd.DataFrame]]:
         # TODO(gp): This approach of communicating params through the state
         #  makes the code difficult to understand.
-        self.df = self._rtpi.get_data(self._period)
+        self.df = self._price_interface.get_data(self._period)
         if self._multiindex_output:
             self._convert_to_multiindex()
         return super().fit()  # type: ignore[no-any-return]
 
     def predict(self) -> Optional[Dict[str, pd.DataFrame]]:
-        self.df = self._rtpi.get_data(self._period)
+        self.df = self._price_interface.get_data(self._period)
         if self._multiindex_output:
             self._convert_to_multiindex()
         return super().predict()  # type: ignore[no-any-return]
@@ -422,8 +423,9 @@ class RealTimeDataSource(cdtfnobas.DataSource):
             hprint.dataframe_to_str(self.df.head()),
         )
         dfs = {}
-        # TODO(gp): Pass the column name through the interface.
-        for asset_id, df in self.df.groupby("egid"):
+        # TODO(Paul): Pass the column name through the constructor, so we can make it
+        # programmable.
+        for asset_id, df in self.df.groupby(self._asset_id_col):
             dfs[asset_id] = df
         # Reorganize the data into the desired format.
         df = pd.concat(dfs.values(), axis=1, keys=dfs.keys())

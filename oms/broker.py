@@ -134,6 +134,7 @@ class Broker:
         # We should always get the "next" orders, for this reason one should use
         # a priority queue.
         timestamps = self._deadline_timestamp_to_orders.keys()
+        _LOG.debug("Timestamps of orders in queue: %s", timestamps)
         if not timestamps:
             return []
         hdbg.dassert_eq(min(timestamps), curr_timestamp)
@@ -151,7 +152,8 @@ class Broker:
             #  how many shares are filled.
             fills.extend(self._fully_fill(curr_timestamp, order))
         # Remove the orders that have been executed.
-        self._deadline_timestamp_to_orders[curr_timestamp] = None
+        _LOG.debug("Removing orders from queue with deadline=`%s`", curr_timestamp)
+        del self._deadline_timestamp_to_orders[curr_timestamp]
         _LOG.debug("Returning %d fills", len(fills))
         return fills
 

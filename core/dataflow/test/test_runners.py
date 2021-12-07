@@ -122,6 +122,7 @@ class TestRealTimeDagRunner1(hunitest.TestCase):
         # Get a naive pipeline as DAG.
         dag_builder = cdtfnttd._NaivePipeline()
         config = dag_builder.get_config_template()
+        config["process_forecasts"]["prediction_col"] = 0
         # Set up the event loop.
         sleep_interval_in_secs = 1.0
         execute_rt_loop_kwargs = (

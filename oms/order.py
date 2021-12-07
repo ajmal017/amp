@@ -17,6 +17,11 @@ _LOG = logging.getLogger(__name__)
 
 
 class Order:
+
+    # TODO(Paul): let's use this approach so that the orders are auto-counted,
+    # and we don't have to pass the order index around.
+    _order_id = 0
+
     def __init__(
         self,
         order_id: int,
@@ -56,7 +61,8 @@ class Order:
             - `price@twap`: pay the TWAP price in the interval
             - `partial_spread_0.2@twap`: pay the TWAP midpoint weighted by 0.2
         """
-        self.order_id = order_id
+        self.order_id = self._order_id
+        self._order_id += 1
         self.price_interface = price_interface
         self.creation_timestamp = creation_timestamp
         # By convention we use `asset_id = -1` for cash.
