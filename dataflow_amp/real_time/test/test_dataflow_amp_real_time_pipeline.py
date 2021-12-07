@@ -3,15 +3,16 @@ import logging
 import pandas as pd
 
 import core.config as cconfig
+import core.dataflow.price_interface_example as cdtfprinex
 import core.dataflow.runners as cdtfrunn
-import core.dataflow.test.test_builders as cdtfnttd
-import core.dataflow.test.test_price_interface as dartttdi
-import core.dataflow.test.test_real_time as cdtfttrt
 import dataflow_amp.real_time.pipeline as dtfaretipi
 import helpers.hasyncio as hasynci
 import helpers.unit_test as hunitest
 import oms.portfolio as omportfo
 
+# Do not import from other test files.
+import core.dataflow.test.test_builders as cdtfnttd
+import core.dataflow.test.test_real_time as cdtfttrt
 
 _LOG = logging.getLogger(__name__)
 
@@ -37,11 +38,14 @@ class TestRealTimeReturnPipeline1(hunitest.TestCase):
             end_datetime = pd.Timestamp("2000-01-01 10:30:00-05:00")
             columns = ["close", "vol"]
             asset_ids = [1000]
-            df = dartttdi.generate_synthetic_db_data(
+            df = cdtfprinex.generate_synthetic_db_data(
                 start_datetime, end_datetime, columns, asset_ids
             )
             initial_replayed_delay = 5
-            price_interface, _ = dartttdi.get_replayed_time_price_interface_example1(
+            (
+                price_interface,
+                _,
+            ) = cdtfprinex.get_replayed_time_price_interface_example1(
                 event_loop,
                 start_datetime,
                 end_datetime,
@@ -130,11 +134,14 @@ class TestRealTimePipelineWithOms1(hunitest.TestCase):
             )
             columns = ["price", "vol"]
             asset_ids = [1000, 1001]
-            df = dartttdi.generate_synthetic_db_data(
+            df = cdtfprinex.generate_synthetic_db_data(
                 start_datetime, end_datetime, columns, asset_ids
             )
             initial_replayed_delay = 0
-            price_interface, _ = dartttdi.get_replayed_time_price_interface_example1(
+            (
+                price_interface,
+                _,
+            ) = cdtfprinex.get_replayed_time_price_interface_example1(
                 event_loop,
                 start_datetime,
                 end_datetime,

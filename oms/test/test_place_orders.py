@@ -6,23 +6,31 @@ import logging
 import pandas as pd
 
 import core.config as cconfig
-import core.dataflow.test.test_price_interface as dartttdi
+import core.dataflow.price_interface_example as cdtfprinex
 import helpers.hasyncio as hasynci
 import helpers.unit_test as hunitest
 import oms.broker as ombroker
 import oms.place_orders as oplaorde
 import oms.portfolio as omportfo
-import oms.test.test_portfolio as ottport
 
 _LOG = logging.getLogger(__name__)
 
+# Do not import from other test files.
 import oms.test.test_portfolio as ottport
 
 
 class TestPlaceOrders1(hunitest.TestCase):
+    def test_initialization1(self) -> None:
+        # event_loop = None
+        with hasynci.solipsism_context() as event_loop:
+            hasynci.run(self._test_coroutine1(event_loop), event_loop=event_loop)
+
     async def _test_coroutine1(self, event_loop) -> None:
         config = {}
-        price_interface, get_wall_clock_time = ottport.get_replayed_time_price_interface(event_loop)
+        (
+            price_interface,
+            get_wall_clock_time,
+        ) = ottport.get_replayed_time_price_interface(event_loop)
         initial_timestamp = pd.Timestamp(
             "2000-01-01 09:30:00-05:00", tz="America/New_York"
         )
@@ -60,11 +68,6 @@ class TestPlaceOrders1(hunitest.TestCase):
             config,
         )
 
-    def test_initialization1(self) -> None:
-        #event_loop = None
-        with hasynci.solipsism_context() as event_loop:
-            hasynci.run(self._test_coroutine1(event_loop), event_loop=event_loop)
-
 
 class TestMarkToMarket1(hunitest.TestCase):
     def test_initialization1(self) -> None:
@@ -87,7 +90,10 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
         start_datetime = initial_timestamp
         end_datetime = pd.Timestamp("2000-01-01 09:35:00-05:00")
-        price_interface, _ = dartttdi.get_replayed_time_price_interface_example1(
+        (
+            price_interface,
+            _,
+        ) = cdtfprinex.get_replayed_time_price_interface_example1(
             event_loop,
             start_datetime,
             end_datetime,
@@ -136,6 +142,9 @@ asset_id,curr_num_shares,prediction,price,value
 
 
 class TestOptimizeAndUpdate1(hunitest.TestCase):
+    def test_initialization1(self) -> None:
+        with hasynci.solipsism_context() as event_loop:
+            hasynci.run(self._test_coroutine(event_loop), event_loop=event_loop)
 
     async def _test_coroutine(self, event_loop):
         # Set up price interface components.
@@ -172,7 +181,10 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
         end_datetime = pd.Timestamp(
             "2000-01-01 09:40:00-05:00", tz="America/New_York"
         )
-        price_interface, get_wall_clock_time = dartttdi.get_replayed_time_price_interface_example1(
+        (
+            price_interface,
+            get_wall_clock_time,
+        ) = cdtfprinex.get_replayed_time_price_interface_example1(
             event_loop,
             start_datetime,
             end_datetime,
@@ -223,7 +235,7 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
         )
         # Submit orders.
         broker.submit_orders(orders)
-        #wait 5 minutes
+        # wait 5 minutes
         await asyncio.sleep(60 * 5)
         oplaorde.update_portfolio(end_timestamp, portfolio, broker)
         # #####################################################################
@@ -248,8 +260,5 @@ leverage,0.1007
         ]
         self.assert_dfs_close(actual.to_frame(), expected, rtol=1e-2, atol=1e-2)
 
-    def test_initialization1(self) -> None:
-        with hasynci.solipsism_context() as event_loop:
-            hasynci.run(self._test_coroutine(event_loop), event_loop=event_loop)
 
 # class SimulateOrderFills1(hunitest.TestCase):

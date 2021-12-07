@@ -11,8 +11,8 @@ from typing import Any, Dict
 import pandas as pd
 
 import core.dataflow.price_interface as cdtfprint
+import core.dataflow.price_interface_example as cdtfprinex
 import core.dataflow.real_time as cdtfretim
-import core.dataflow.test.test_price_interface as dartttdi
 import helpers.printing as hprint
 import helpers.unit_test as hunitest
 import oms.portfolio as omportfo
@@ -48,12 +48,16 @@ def get_portfolio_example1(
 
 
 def get_replayed_time_price_interface(event_loop):
-    start_datetime = pd.Timestamp("2000-01-01 09:30:00-05:00", tz="America/New_York")
-    end_datetime = pd.Timestamp("2000-01-01 10:30:00-05:00", tz="America/New_York")
+    start_datetime = pd.Timestamp(
+        "2000-01-01 09:30:00-05:00", tz="America/New_York"
+    )
+    end_datetime = pd.Timestamp(
+        "2000-01-01 10:30:00-05:00", tz="America/New_York"
+    )
     columns_ = ["price"]
     asset_ids = [101, 202]
     # asset_ids = [1000]
-    df = dartttdi.generate_synthetic_db_data(
+    df = cdtfprinex.generate_synthetic_db_data(
         start_datetime, end_datetime, columns_, asset_ids
     )
     _LOG.debug("df=%s", hprint.dataframe_to_str(df))
@@ -62,7 +66,10 @@ def get_replayed_time_price_interface(event_loop):
     delay_in_secs = 0
     sleep_in_secs = 30
     time_out_in_secs = 60 * 5
-    price_interface, get_wall_clock_time = dartttdi.get_replayed_time_price_interface_example1(
+    (
+        price_interface,
+        get_wall_clock_time,
+    ) = cdtfprinex.get_replayed_time_price_interface_example1(
         event_loop,
         start_datetime,
         end_datetime,

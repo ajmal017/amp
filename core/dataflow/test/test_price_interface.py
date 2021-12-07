@@ -4,144 +4,18 @@ Import as:
 import core.dataflow.test.test_price_interface as dartttdi
 """
 
-import asyncio
 import logging
-from typing import Any, Callable, List, Optional, Tuple
+from typing import Any, Callable, Tuple
 
-import numpy as np
 import pandas as pd
 
 import core.dataflow.price_interface as cdtfprint
-import core.dataflow.real_time as cdtfretim
-import helpers.datetime_ as hdateti
-import helpers.dbg as hdbg
+import core.dataflow.price_interface_example as cdtfprinex
 import helpers.hasyncio as hasynci
-import helpers.hnumpy as hnumpy
 import helpers.printing as hprint
 import helpers.unit_test as hunitest
 
 _LOG = logging.getLogger(__name__)
-
-
-# TODO(Paul): -> Move price_interface_example.py
-def generate_synthetic_db_data(
-    start_datetime: pd.Timestamp,
-    end_datetime: pd.Timestamp,
-    columns: List[str],
-    # TODO(gp): -> asset_ids
-    ids: List[int],
-    *,
-    freq: str = "1T",
-    seed: int = 42,
-) -> pd.DataFrame:
-    """
-    Generate synthetic data used to mimic real-time data.
-
-    The data looks like:
-    ```
-    TODO(gp):
-    ```
-    """
-    _LOG.debug(hprint.to_str("start_datetime end_datetime columns ids freq seed"))
-    hdateti.dassert_tz_compatible(start_datetime, end_datetime)
-    hdbg.dassert_lte(start_datetime, end_datetime)
-    start_dates = pd.date_range(start_datetime, end_datetime, freq=freq)
-    dfs = []
-    offset = 1000
-    for id_ in ids:
-        df = pd.DataFrame()
-        df["start_datetime"] = start_dates
-        df["end_datetime"] = start_dates + pd.Timedelta(minutes=1)
-        # TODO(gp): We can add 1 sec here to make it more interesting.
-        df["timestamp_db"] = df["end_datetime"]
-        # TODO(gp): Filter by ATH, if needed.
-        # Random walk with increments independent and uniform in [-0.5, 0.5].
-        for column in columns:
-            with hnumpy.random_seed_context(seed):
-                data = np.random.rand(len(start_dates), 1) - 0.5  # type: ignore[var-annotated]
-            df[column] = offset + data.cumsum()
-        df["asset_id"] = id_
-        dfs.append(df)
-    df = pd.concat(dfs, axis=0)
-    return df
-
-
-# TODO(gp): initial_replayed_delay -> initial_delay_in_mins (or in secs).
-def get_replayed_time_price_interface_example1(
-    event_loop: asyncio.AbstractEventLoop,
-    start_datetime: pd.Timestamp,
-    end_datetime: pd.Timestamp,
-    initial_replayed_delay: int,
-    delay_in_secs: int = 0,
-    *,
-    asset_ids: Optional[List[int]] = None,
-    columns: Optional[List[str]] = None,
-    df: Optional[pd.DataFrame] = None,
-    sleep_in_secs: float = 1.0,
-    time_out_in_secs: int = 60 * 2,
-) -> cdtfprint.ReplayedTimePriceInterface:
-    """
-    Build a ReplayedTimePriceInterface backed by synthetic data.
-
-    :param start_datetime: start time for the generation of the synthetic data
-    :param end_datetime: end time for the generation of the synthetic data
-    :param initial_replayed_delay: how many minutes after the beginning of the data
-        the replayed time starts. This is useful to simulate the beginning / end of
-        the trading day
-    :param asset_ids: asset ids to generate data for. `None` defaults to asset_id=1000
-    """
-    # TODO(gp): This could / should be inferred from df.
-    if asset_ids is None:
-        asset_ids = [1000]
-    # TODO(gp): Move it to the client, if possible.
-    # Build the df with the data.
-    if df is None:
-        if columns is None:
-            columns = ["last_price"]
-        df = generate_synthetic_db_data(
-            start_datetime, end_datetime, columns, asset_ids
-        )
-    # Build the `ReplayedTimePriceInterface` backed by the df with
-    # `initial_replayed_dt` equal to a given number of minutes after the first
-    # timestamp of the data.
-    knowledge_datetime_col_name = "timestamp_db"
-    asset_id_col_name = "asset_id"
-    start_time_col_name = "start_datetime"
-    end_time_col_name = "end_datetime"
-    columns = None
-    # Get the wall clock.
-    tz = "ET"
-    initial_replayed_dt = df[start_time_col_name].min() + pd.Timedelta(
-        minutes=initial_replayed_delay
-    )
-    speed_up_factor = 1.0
-    get_wall_clock_time = cdtfretim.get_replayed_wall_clock_time(
-        tz,
-        initial_replayed_dt,
-        event_loop=event_loop,
-        speed_up_factor=speed_up_factor,
-    )
-    # Build object.
-    # TODO(Paul): rtpi -> price_interface
-    rtpi = cdtfprint.ReplayedTimePriceInterface(
-        df,
-        knowledge_datetime_col_name,
-        delay_in_secs,
-        #
-        asset_id_col_name,
-        asset_ids,
-        start_time_col_name,
-        end_time_col_name,
-        columns,
-        get_wall_clock_time,
-        sleep_in_secs=sleep_in_secs,
-        time_out_in_secs=time_out_in_secs,
-    )
-    # TODO(Paul): Change the caller to get wall clock
-    return rtpi, get_wall_clock_time
-
-
-# #############################################################################
 
 
 def _check_get_data(
@@ -159,11 +33,14 @@ def _check_get_data(
         # Build ReplayedTimePriceInterval.
         start_datetime = pd.Timestamp("2000-01-01 09:30:00-05:00")
         end_datetime = pd.Timestamp("2000-01-01 10:29:00-05:00")
-        rtpi, _ = get_replayed_time_price_interface_example1(
+        (
+            price_interface,
+            _,
+        ) = cdtfprinex.get_replayed_time_price_interface_example1(
             event_loop, start_datetime, end_datetime, initial_replayed_delay
         )
         # Execute function under test.
-        actual_df = func(rtpi)
+        actual_df = func(price_interface)
     # Check.
     actual_df = actual_df[sorted(actual_df.columns)]
     actual_df_as_str = hprint.df_to_short_str("df", actual_df)
@@ -174,13 +51,13 @@ def _check_get_data(
         dedent=True,
         fuzzy_match=True,
     )
-    return rtpi
+    return price_interface
 
 
 class TestReplayedTimePriceInterface1(hunitest.TestCase):
     def check_last_end_time(
         self,
-        rtpi: cdtfprint.ReplayedTimePriceInterface,
+        price_interface: cdtfprint.ReplayedTimePriceInterface,
         expected_last_end_time: pd.Timestamp,
         expected_is_online: bool,
     ) -> None:
@@ -188,11 +65,11 @@ class TestReplayedTimePriceInterface1(hunitest.TestCase):
         Check output of `get_last_end_time()` and `is_online()`.
         """
         #
-        last_end_time = rtpi.get_last_end_time()
+        last_end_time = price_interface.get_last_end_time()
         _LOG.info("-> last_end_time=%s", last_end_time)
         self.assertEqual(last_end_time, expected_last_end_time)
         #
-        is_online = rtpi.is_online()
+        is_online = price_interface.is_online()
         _LOG.info("-> is_online=%s", is_online)
         self.assertEqual(is_online, expected_is_online)
 
@@ -206,7 +83,9 @@ class TestReplayedTimePriceInterface1(hunitest.TestCase):
         #
         period = "last_5mins"
         normalize_data = True
-        func = lambda rtpi: rtpi.get_data(period, normalize_data=normalize_data)
+        func = lambda price_interface: price_interface.get_data(
+            period, normalize_data=normalize_data
+        )
         # pylint: disable=line-too-long
         expected_df_as_str = """
         # df=
@@ -223,13 +102,15 @@ class TestReplayedTimePriceInterface1(hunitest.TestCase):
         2000-01-01 09:34:00-05:00      1000    1000.655907  2000-01-01 09:33:00-05:00 2000-01-01 09:34:00-05:00
         2000-01-01 09:35:00-05:00      1000    1000.311925  2000-01-01 09:34:00-05:00 2000-01-01 09:35:00-05:00"""
         # pylint: enable=line-too-long
-        rtpi = _check_get_data(
+        price_interface = _check_get_data(
             self, initial_replayed_delay, func, expected_df_as_str
         )
         #
         expected_last_end_time = pd.Timestamp("2000-01-01 09:35:00-05:00")
         expected_is_online = True
-        self.check_last_end_time(rtpi, expected_last_end_time, expected_is_online)
+        self.check_last_end_time(
+            price_interface, expected_last_end_time, expected_is_online
+        )
 
     def test_get_data2(self) -> None:
         """
@@ -239,7 +120,9 @@ class TestReplayedTimePriceInterface1(hunitest.TestCase):
         #
         period = "last_5mins"
         normalize_data = False
-        func = lambda rtpi: rtpi.get_data(period, normalize_data=normalize_data)
+        func = lambda price_interface: price_interface.get_data(
+            period, normalize_data=normalize_data
+        )
         # pylint: disable=line-too-long
         expected_df_as_str = """
         # df=
@@ -255,13 +138,15 @@ class TestReplayedTimePriceInterface1(hunitest.TestCase):
         3      1000 2000-01-01 09:34:00-05:00    1000.655907 2000-01-01 09:33:00-05:00 2000-01-01 09:34:00-05:00
         4      1000 2000-01-01 09:35:00-05:00    1000.311925 2000-01-01 09:34:00-05:00 2000-01-01 09:35:00-05:00"""
         # pylint: enable=line-too-long
-        rtpi = _check_get_data(
+        price_interface = _check_get_data(
             self, initial_replayed_delay, func, expected_df_as_str
         )
         #
         expected_last_end_time = pd.Timestamp("2000-01-01 09:35:00-05:00")
         expected_is_online = True
-        self.check_last_end_time(rtpi, expected_last_end_time, expected_is_online)
+        self.check_last_end_time(
+            price_interface, expected_last_end_time, expected_is_online
+        )
 
     def test_get_data_for_minute_0(self) -> None:
         """
@@ -272,7 +157,9 @@ class TestReplayedTimePriceInterface1(hunitest.TestCase):
         #
         period = "last_5mins"
         normalize_data = True
-        func = lambda rtpi: rtpi.get_data(period, normalize_data=normalize_data)
+        func = lambda price_interface: price_interface.get_data(
+            period, normalize_data=normalize_data
+        )
         # Check.
         expected_df_as_str = """
         # df=
@@ -280,13 +167,15 @@ class TestReplayedTimePriceInterface1(hunitest.TestCase):
         Empty DataFrame
         Columns: [asset_id, last_price, start_datetime, timestamp_db]
         Index: []"""
-        rtpi = _check_get_data(
+        price_interface = _check_get_data(
             self, initial_replayed_delay, func, expected_df_as_str
         )
         #
         expected_last_end_time = None
         expected_is_online = False
-        self.check_last_end_time(rtpi, expected_last_end_time, expected_is_online)
+        self.check_last_end_time(
+            price_interface, expected_last_end_time, expected_is_online
+        )
 
     def test_get_data_for_minute_1(self) -> None:
         """
@@ -296,7 +185,9 @@ class TestReplayedTimePriceInterface1(hunitest.TestCase):
         initial_replayed_delay = 1
         period = "last_5mins"
         normalize_data = True
-        func = lambda rtpi: rtpi.get_data(period, normalize_data=normalize_data)
+        func = lambda price_interface: price_interface.get_data(
+            period, normalize_data=normalize_data
+        )
         #
         expected_df_as_str = """
         # df=
@@ -306,13 +197,15 @@ class TestReplayedTimePriceInterface1(hunitest.TestCase):
                                    asset_id  last_price            start_datetime              timestamp_db
         end_datetime
         2000-01-01 09:31:00-05:00      1000   999.87454 2000-01-01 09:30:00-05:00 2000-01-01 09:31:00-05:00"""
-        rtpi = _check_get_data(
+        price_interface = _check_get_data(
             self, initial_replayed_delay, func, expected_df_as_str
         )
         #
         expected_last_end_time = pd.Timestamp("2000-01-01 09:31:00-0500")
         expected_is_online = True
-        self.check_last_end_time(rtpi, expected_last_end_time, expected_is_online)
+        self.check_last_end_time(
+            price_interface, expected_last_end_time, expected_is_online
+        )
 
     def test_get_data_for_minute_3(self) -> None:
         """
@@ -323,7 +216,9 @@ class TestReplayedTimePriceInterface1(hunitest.TestCase):
         #
         period = "last_5mins"
         normalize_data = True
-        func = lambda rtpi: rtpi.get_data(period, normalize_data=normalize_data)
+        func = lambda price_interface: price_interface.get_data(
+            period, normalize_data=normalize_data
+        )
         # Check.
         # pylint: disable=line-too-long
         expected_df_as_str = """
@@ -337,13 +232,15 @@ class TestReplayedTimePriceInterface1(hunitest.TestCase):
         2000-01-01 09:32:00-05:00      1000    1000.325254 2000-01-01 09:31:00-05:00 2000-01-01 09:32:00-05:00
         2000-01-01 09:33:00-05:00      1000    1000.557248 2000-01-01 09:32:00-05:00 2000-01-01 09:33:00-05:00"""
         # pylint: enable=line-too-long
-        rtpi = _check_get_data(
+        price_interface = _check_get_data(
             self, initial_replayed_delay, func, expected_df_as_str
         )
         #
         expected_last_end_time = pd.Timestamp("2000-01-01 09:33:00-05:00")
         expected_is_online = True
-        self.check_last_end_time(rtpi, expected_last_end_time, expected_is_online)
+        self.check_last_end_time(
+            price_interface, expected_last_end_time, expected_is_online
+        )
 
     def test_get_data_for_minute_6(self) -> None:
         """
@@ -354,7 +251,9 @@ class TestReplayedTimePriceInterface1(hunitest.TestCase):
         #
         period = "last_5mins"
         normalize_data = True
-        func = lambda rtpi: rtpi.get_data(period, normalize_data=normalize_data)
+        func = lambda price_interface: price_interface.get_data(
+            period, normalize_data=normalize_data
+        )
         # Check.
         # pylint: disable=line-too-long
         expected_df_as_str = """# df=
@@ -371,13 +270,15 @@ class TestReplayedTimePriceInterface1(hunitest.TestCase):
         2000-01-01 09:35:00-05:00      1000    1000.311925  2000-01-01 09:34:00-05:00 2000-01-01 09:35:00-05:00
         2000-01-01 09:36:00-05:00      1000    999.967920   2000-01-01 09:35:00-05:00 2000-01-01 09:36:00-05:00"""
         # pylint: enable=line-too-long
-        rtpi = _check_get_data(
+        price_interface = _check_get_data(
             self, initial_replayed_delay, func, expected_df_as_str
         )
         #
         expected_last_end_time = pd.Timestamp("2000-01-01 09:36:00-05:00")
         expected_is_online = True
-        self.check_last_end_time(rtpi, expected_last_end_time, expected_is_online)
+        self.check_last_end_time(
+            price_interface, expected_last_end_time, expected_is_online
+        )
 
     def test_get_data_for_minute_63(self) -> None:
         """
@@ -388,7 +289,9 @@ class TestReplayedTimePriceInterface1(hunitest.TestCase):
         #
         period = "last_5mins"
         normalize_data = True
-        func = lambda rtpi: rtpi.get_data(period, normalize_data=normalize_data)
+        func = lambda price_interface: price_interface.get_data(
+            period, normalize_data=normalize_data
+        )
         # Check.
         # pylint: disable=line-too-long
         expected_df_as_str = """# df=
@@ -400,13 +303,15 @@ class TestReplayedTimePriceInterface1(hunitest.TestCase):
         2000-01-01 10:29:00-05:00      1000   998.224716  2000-01-01 10:28:00-05:00 2000-01-01 10:29:00-05:00
         2000-01-01 10:30:00-05:00      1000   998.050046  2000-01-01 10:29:00-05:00 2000-01-01 10:30:00-05:00"""
         # pylint: enable=line-too-long
-        rtpi = _check_get_data(
+        price_interface = _check_get_data(
             self, initial_replayed_delay, func, expected_df_as_str
         )
         #
         expected_last_end_time = pd.Timestamp("2000-01-01 10:30:00-0500")
         expected_is_online = False
-        self.check_last_end_time(rtpi, expected_last_end_time, expected_is_online)
+        self.check_last_end_time(
+            price_interface, expected_last_end_time, expected_is_online
+        )
 
 
 # #############################################################################
@@ -431,7 +336,7 @@ class TestReplayedTimePriceInterface2(hunitest.TestCase):
         ts_col_name = "end_datetime"
         asset_ids = None
         normalize_data = True
-        func = lambda rtpi: rtpi.get_data_for_interval(
+        func = lambda price_interface: price_interface.get_data_for_interval(
             start_ts,
             end_ts,
             ts_col_name,
@@ -468,7 +373,7 @@ class TestReplayedTimePriceInterface2(hunitest.TestCase):
         ts_col_name = "start_datetime"
         asset_ids = None
         normalize_data = True
-        func = lambda rtpi: rtpi.get_data_for_interval(
+        func = lambda price_interface: price_interface.get_data_for_interval(
             start_ts,
             end_ts,
             ts_col_name,
@@ -504,7 +409,7 @@ class TestReplayedTimePriceInterface2(hunitest.TestCase):
         ts_col_name = "start_datetime"
         asset_ids = None
         normalize_data = True
-        func = lambda rtpi: rtpi.get_data_at_timestamp(
+        func = lambda price_interface: price_interface.get_data_at_timestamp(
             ts, ts_col_name, asset_ids, normalize_data=normalize_data
         )
         # pylint: disable=line-too-long
@@ -530,7 +435,7 @@ class TestReplayedTimePriceInterface2(hunitest.TestCase):
         ts_col_name = "start_datetime"
         asset_ids = None
         normalize_data = True
-        func = lambda rtpi: rtpi.get_data_at_timestamp(
+        func = lambda price_interface: price_interface.get_data_at_timestamp(
             ts, ts_col_name, asset_ids, normalize_data=normalize_data
         )
         # pylint: disable=line-too-long
@@ -560,7 +465,10 @@ class TestReplayedTimePriceInterface3(hunitest.TestCase):
             end_datetime = pd.Timestamp("2000-01-01 10:30:00-05:00")
             initial_replayed_delay = 5
             delay_in_secs = 0
-            rtpi, _ = get_replayed_time_price_interface_example1(
+            (
+                price_interface,
+                _,
+            ) = cdtfprinex.get_replayed_time_price_interface_example1(
                 event_loop,
                 start_datetime,
                 end_datetime,
@@ -568,7 +476,7 @@ class TestReplayedTimePriceInterface3(hunitest.TestCase):
                 delay_in_secs,
             )
             # Call method.
-            last_end_time = rtpi.get_last_end_time()
+            last_end_time = price_interface.get_last_end_time()
         # Check.
         _LOG.info("-> last_end_time=%s", last_end_time)
         self.assertEqual(last_end_time, pd.Timestamp("2000-01-01 09:35:00-05:00"))
@@ -629,7 +537,10 @@ class TestReplayedTimePriceInterface3(hunitest.TestCase):
             delay_in_secs = 0
             sleep_in_secs = 30
             time_out_in_secs = 60 * 5
-            rtpi, _ = get_replayed_time_price_interface_example1(
+            (
+                price_interface,
+                _,
+            ) = cdtfprinex.get_replayed_time_price_interface_example1(
                 event_loop,
                 start_datetime,
                 end_datetime,
@@ -640,6 +551,6 @@ class TestReplayedTimePriceInterface3(hunitest.TestCase):
             )
             # Run the method.
             start_time, end_time, num_iter = hasynci.run(
-                rtpi.is_last_bar_available(), event_loop=event_loop
+                price_interface.is_last_bar_available(), event_loop=event_loop
             )
         return start_time, end_time, num_iter
