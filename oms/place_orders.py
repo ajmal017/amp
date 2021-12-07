@@ -101,31 +101,26 @@ def mark_to_market(
 def generate_orders(
     shares: pd.Series,
     order_config: Dict[str, Any],
-    initial_order_id: int = 0,
 ) -> List[omorder.Order]:
     """
     Turn a series of shares to trade into a list of orders.
 
     :param shares: number of shares to trade, indexed by `asset_id`
     :param order_config: common parameters used to initialize `Order`
-    :param initial_order_id: the starting point for enumerating orders
     :return: a list of nontrivial orders (i.e., no zero-share orders)
     """
     _LOG.debug("# Generate orders")
     orders: List[omorder.Order] = []
-    order_id = initial_order_id
     for asset_id, shares_ in shares.iteritems():
         if shares_ == 0.0:
             # No need to place trades.
             continue
         order = omorder.Order(
-            order_id=order_id,
             asset_id=asset_id,
             num_shares=shares_,
             **order_config.to_dict(),
         )
-        order_id += 1
-        _LOG.debug("order=%s", order)
+        _LOG.debug("order=%s", order.order_id)
         orders.append(order)
     return orders
 
@@ -184,15 +179,12 @@ def compute_target_positions_in_shares(
 
 # TODO(Paul): -> process_forecasts()
 async def place_orders(
-    # TODO(gp): -> prediction_df
     prediction_df: pd.DataFrame,
     # volatility_df:
     execution_mode: str,
     config: Dict[str, Any],
     # TODO(Paul): Pass Portfolio from outside we can preserve it across invocations.
     # portfolio: Portfolio,
-    # TODO(Paul): Remove this and allow the class to auto-generate the index.
-    order_id: int = 0,
 ) -> None:
     """
     Place orders corresponding to the predictions stored in the given df.
@@ -331,9 +323,8 @@ async def place_orders(
         }
         order_config = cconfig.get_config_from_nested_dict(order_dict_)
         orders = generate_orders(
-            target_positions["diff_num_shares"], order_config, order_id
+            target_positions["diff_num_shares"], order_config
         )
-        order_id += len(orders)
         # Submit orders.
         _LOG.debug(
             "\n%s",

@@ -18,13 +18,10 @@ _LOG = logging.getLogger(__name__)
 
 class Order:
 
-    # TODO(Paul): let's use this approach so that the orders are auto-counted,
-    # and we don't have to pass the order index around.
     _order_id = 0
 
     def __init__(
         self,
-        order_id: int,
         # TODO(gp): Remove price_interface.
         price_interface: cdtfprint.AbstractPriceInterface,
         creation_timestamp: pd.Timestamp,
@@ -54,7 +51,6 @@ class Order:
                - "vwap": using VWAP prices
         3) number of shares to buy (if positive) or sell (if negative)
 
-        :param order_id: unique ID for cross-referencing
         :param creation_timestamp: when the order was placed
         :param asset_id: ID of the asset
         :param type_: e.g.,

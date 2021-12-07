@@ -219,7 +219,7 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             portfolio,
         )
         orders = oplaorde.generate_orders(
-            target_positions["diff_num_shares"], order_config, 0
+            target_positions["diff_num_shares"], order_config
         )
         # Submit orders.
         broker.submit_orders(orders)
