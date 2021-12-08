@@ -19,11 +19,6 @@ import oms.order as omorder
 _LOG = logging.getLogger(__name__)
 
 
-# def set_wall_clock_time():
-#
-# def get_wall_clock_time()
-
-
 class Fill:
     """
     Represent an order fill.

@@ -117,9 +117,7 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             index=[101, 202], data=[0.3, -0.1], name="prediction"
         )
         # Mark to market.
-        actual = oplaorde.mark_to_market(
-            initial_timestamp, predictions, portfolio
-        )
+        actual = oplaorde._mark_to_market(initial_timestamp, predictions, portfolio)
         txt = r"""
 asset_id,curr_num_shares,prediction,price,value
 -1,1000000,0,1,1000000
@@ -223,19 +221,15 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
         order_config = cconfig.get_config_from_nested_dict(order_dict_)
         # #####################################################################
         # Compute target positions
-        target_positions = oplaorde.compute_target_positions_in_shares(
-            initial_timestamp,
-            predictions,
-            portfolio,
-        )
-        orders = oplaorde.generate_orders(
-            target_positions["diff_num_shares"], order_config
-        )
+        target_positions = oplaorde._compute_target_positions_in_shares(
+            initial_timestamp, predictions, portfolio)
+        orders = oplaorde._generate_orders(target_positions["diff_num_shares"],
+                                           order_config)
         # Submit orders.
         broker.submit_orders(orders)
         # wait 5 minutes
         await asyncio.sleep(60 * 5)
-        oplaorde.update_portfolio(end_timestamp, portfolio, broker)
+        oplaorde._update_portfolio(end_timestamp, portfolio, broker)
         # #####################################################################
         actual = portfolio.get_characteristics(
             pd.Timestamp("2000-01-01 09:40:00-05:00", tz="America/New_York")

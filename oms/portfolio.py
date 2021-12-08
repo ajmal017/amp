@@ -3,6 +3,7 @@ Import as:
 
 import oms.portfolio as omportfo
 """
+import abc
 import collections
 import logging
 from typing import Any, Dict, List, Optional
@@ -12,28 +13,30 @@ import pandas as pd
 
 import core.dataflow.price_interface as cdtfprint
 import helpers.dbg as hdbg
+import helpers.datetime_ as hdateti
 import helpers.printing as hprint
+import oms.broker as ombroker
 
 _LOG = logging.getLogger(__name__)
 
 
-# TODO(gp): Add an abstract interface and other implementations.
-class Portfolio:
+# TODO(Paul): Use curr_timestamp -> wall_clock_timestamp
+# TODO(Paul): timestamp -> as_of_datetime
+
+
+class AbstractPortfolio(abc.ABC):
     """
-    Store tables with the following info:
+    Store holdings over time, e.g., many shares of each asset are owned at any time.
 
-    - holdings over time
-        - how many shares of each asset are owned at any time
-        - cash is treated as any other asset to keep code uniform
-
-    The tables are indexed by knowledge time, i.e., when this information became
-    known by this object.
+    Cash is treated as any other asset to keep code uniform. The tables are
+    indexed by knowledge time, i.e., when this information became known by this
+    object.
     """
 
     # ID of asset representing cash.
     CASH_ID: int = -1
 
-    # Columns required in a `holding_df`, which represents the holdings over time:
+    # An `holding_df` represents the holdings over time, e.g.,
     # ```
     #                            asset_id  curr_num_shares
     # 2000-01-01 09:35:00-05:00        -1        1000000.0
@@ -41,19 +44,13 @@ class Portfolio:
     # ...
     # 2000-01-01 09:30:00-05:00       214       -1000000.0
     # ```
+    # Columns required in a `holding_df`.
     HOLDINGS_COLS = ["asset_id", "curr_num_shares"]
-
-    # Columns required in a `order_df`, which represents the executed orders
-    # time (e.g., what orders were executed, for how many shares, and at how much).
-    FILLS_COLS = [
-        "asset_id",
-        "timestamp",
-        "num_shares",
-        "price",
-    ]
 
     # Columns used in a dataframe resulting from mark to market.
     HOLDINGS_COLS = ["asset_id", "curr_num_shares"]
+
+    # Columns that a dataframe with prices should have.
     PRICE_COLS = ["asset_id", "price"]
 
     def __init__(
@@ -66,6 +63,8 @@ class Portfolio:
         mark_to_market_col: str,
         timestamp_col: str,
         holdings_df: pd.DataFrame,
+        # TODO(gp): Add wall clock.
+        #get_wall_clock_time: hdateti.GetWallClockTime,
     ):
         """
         Constructor.
@@ -81,7 +80,8 @@ class Portfolio:
             and non-cash) holdings
         """
         _LOG.debug(
-            hprint.to_str("strategy_id account asset_id_col mark_to_market_col")
+            hprint.to_str(
+                "strategy_id account asset_id_col mark_to_market_col timestamp_col")
         )
         self._strategy_id = strategy_id
         self._account = account
@@ -94,24 +94,31 @@ class Portfolio:
         #
         self._validate_initial_holdings_df(holdings_df)
         self._holdings = holdings_df
+        #self._get_wall_clock_time = get_wall_clock_time
         # Dictionary from timestamp to some portfolio statistics.
+        # TODO(gp): -> _statistics?
         self._characteristics = collections.OrderedDict()
 
     def __str__(self) -> str:
+        """
+        Return the state of the Portfolio in terms of the holdings as a string.
+        """
         act = []
-        act.append("# holdings=\n%s" % hprint.dataframe_to_str(self.holdings))
+        act.append("# holdings=\n%s" % hprint.dataframe_to_str(self._holdings))
         act = "\n".join(act)
         return act
 
     @classmethod
     def from_cash(
         cls,
+        # TODO(Paul): Use *args. It should work.
         strategy_id: str,
         account: str,
         price_interface: cdtfprint.AbstractPriceInterface,
         asset_id_col: str,
         mark_to_market_col: str,
         timestamp_col: str,
+        #,
         initial_cash: float,
         initial_timestamp: pd.Timestamp,
     ) -> "Portfolio":
@@ -139,12 +146,14 @@ class Portfolio:
     @classmethod
     def from_dict(
         cls,
+        # TODO(Paul): Use *args. It should work.
         strategy_id: str,
         account: str,
         price_interface: cdtfprint.AbstractPriceInterface,
         asset_id_col: str,
         mark_to_market_col: str,
         timestamp_col: str,
+        #
         holdings_dict: Dict[int, float],
         initial_timestamp: pd.Timestamp,
     ) -> "Portfolio":
@@ -170,7 +179,7 @@ class Portfolio:
         )
         return portfolio
 
-    # TODO(gp): Only for debug -> get_holdings_df
+    # TODO(Paul): This is only for debug maybe we should not expose it.
     @property
     def holdings(self) -> pd.DataFrame:
         return self._holdings
@@ -192,17 +201,16 @@ class Portfolio:
         Return the holdings in shares at `timestamp` for one or all the assets.
 
         :param timestamp: as-of timestamp
-        :param asset_id: consider only a specific asset. `None` means all holdings.
+        :param asset_id: consider only a specific asset. `None` means all assets.
         :param exclude_cash: exclude cash from the holdings
-        :return: a holdings_df, like:
+        :return: a `holdings_df` with columns `Portfolio.HOLDINGS_COLS`, e.g.,
             ```
                                        asset_id  curr_num_shares
             2000-01-01 09:35:00-05:00      -1.0        1000000.0
             ```
-            - An empty dataframe if there are no holdings for the requested
+            - Return an empty dataframe if there are no holdings for the requested
               `timestamp`
         """
-        # TODO(gp): Inline this.
         return Portfolio._get_holdings(
             self._holdings, timestamp, asset_id, exclude_cash=exclude_cash
         )
@@ -213,10 +221,10 @@ class Portfolio:
         asset_ids: List[int],
     ) -> pd.DataFrame:
         """
-        Use `price_interface` to price assets at `timestamp`.
+        Use `PriceInterface` to price assets at `timestamp`.
 
-        `CASH_ID` may be included among `asset_ids`. If it is, it is not
-        priced using `price_interface`, but rather is priced at `1.0`.
+        `CASH_ID` may be included among `asset_ids`. If it is, it is not priced
+        using `PriceInterface`, but rather is priced at `1.0`.
 
         :return: df with columns `Portfolio.PRICE_COLS`
         """
@@ -274,8 +282,8 @@ class Portfolio:
             - does not have columns PRICE_COLS
             - does not have duplicate asset_ids
             - does not have NaN `curr_num_shares`
-        :return: `df` merged with asset prices (valued at `timestamp`) and
-            valued according to `price` and `curr_num_shares`
+        :return: `df` merged with asset prices valued according to `price` and
+            `curr_num_shares` at `timestamp`
         """
         _LOG.debug(
             "\n%s",
@@ -311,6 +319,9 @@ class Portfolio:
         Return asset/cash values, net wealth, exposure, and leverage for the
         portfolio at a given timestamp.
         """
+        _LOG.debug(
+            "Computing portfolio characteristics for timestamp=`%s`", timestamp
+        )
         hdbg.dassert_in(
             timestamp,
             self._holdings.index,
@@ -349,28 +360,25 @@ class Portfolio:
         characteristics = pd.Series(dict_, name=timestamp)
         return characteristics
 
-    def advance_portfolio_state(
+    def update_state(
         self,
+        # TODO(gp): -> wall_clock_timestamp
         timestamp: pd.Timestamp,
         fills_df: Optional[pd.DataFrame],
     ) -> None:
         """
-        Update holdings using `order_df`.
-
-        :param timestamp:
-        :param fills_df:
-        :return:
+        Update holdings at `timestamp`.
         """
+        #wall_clock_timestamp = self._get_wall_clock_time()
         _LOG.debug(
             "\n%s",
             hprint.frame(
-                "advance_portfolio_state: timestamp=%s" % timestamp, char1="<"
+                "update_state: timestamp=%s" % timestamp, char1="<"
             ),
         )
-        # TODO(gp): Check that orders are all for different asset_ids.
-        # TODO(gp): Ensure that we are moving forward in time.
+        # TODO(gp): Move this to hdatetime.
         hdbg.dassert_isinstance(timestamp, pd.Timestamp)
-        hdbg.dassert(timestamp.tz is not None)
+        hdbg.dassert_is_not(timestamp.tz, None)
         hdbg.dassert_eq(timestamp.tz.zone, self._holdings.index.dtype.tz.zone)
         # Check that latest holdings are timestamped prior to `timestamp`.
         last_timestamp = self.get_last_timestamp()
@@ -378,42 +386,30 @@ class Portfolio:
         # Log portfolio characteristics at `last_timestamp` if not done already.
         # This could happen if there is a bar with no orders (or overnight).
         if last_timestamp not in self._characteristics:
-            _LOG.debug(
-                "Computing portfolio characteristics for timestamp=`%s`",
-                last_timestamp,
-            )
             val = self.get_characteristics(last_timestamp)
             self._characteristics[last_timestamp] = val
-        # Get latest holdings
-        last_holdings = self.get_holdings(last_timestamp, asset_id=None)
-        last_holdings.index.name = "last_timestamp"
-        last_holdings.reset_index(inplace=True)
-        last_holdings_srs = last_holdings.set_index("asset_id")["curr_num_shares"]
-        new_holdings_srs = last_holdings_srs.copy()
-        if fills_df is not None:
-            Portfolio._validate_fills_df(fills_df)
-            hdbg.dassert_lte(last_timestamp, fills_df["timestamp"].min())
-            hdbg.dassert_lte(fills_df["timestamp"].max(), timestamp)
-            holdings_diff = fills_df.set_index("asset_id")["num_shares"]
-            cash_diff = -1 * (fills_df["price"] * fills_df["num_shares"]).sum()
-            hdbg.dassert(np.isfinite(cash_diff))
-            new_holdings_srs = new_holdings_srs.add(holdings_diff, fill_value=0)
-            new_holdings_srs.loc[Portfolio.CASH_ID] += cash_diff
-        new_holdings_srs.name = "curr_num_shares"
-        new_holdings = new_holdings_srs.to_frame().reset_index()
-        new_holdings.index = [timestamp] * len(new_holdings)
-        new_holdings = new_holdings.convert_dtypes()
-        Portfolio._validate_holdings_df(new_holdings)
+        #
+        new_holdings = self._update_state(timestamp, fills_df)
+        # TODO(gp): Make sure that new_holdings are after self._holdings.
         # Add the information to the holdings.
+        Portfolio._validate_holdings_df(new_holdings)
         updated_state = pd.concat([new_holdings, self._holdings])
         updated_state = updated_state.convert_dtypes()
         self._holdings = updated_state
-        # Log portfolio characteristics at `last_timestamp` if not done already.
-        _LOG.debug(
-            "Computing portfolio characteristics for timestamp=`%s`", timestamp
-        )
+        # Log portfolio characteristics at `timestamp` if not done already.
         val = self.get_characteristics(timestamp)
         self._characteristics[timestamp] = val
+
+    @abc.abstractmethod
+    def _update_state(
+        self,
+        timestamp: pd.Timestamp,
+        fills_df: Optional[pd.DataFrame],
+    ) -> pd.DataFrame:
+        """
+        :return: a holding_df with the new holdings
+        """
+        ...
 
     def _get_holdings_as_scalar(
         self,
@@ -434,6 +430,8 @@ class Portfolio:
         _LOG.debug("value=%s for asset_id=%s", value, asset_id)
         return value
 
+    # TODO(gp): use self._holding_df and we can make it a method instead of
+    # static, if possible.
     @staticmethod
     def _get_holdings(
         holdings_df: pd.DataFrame,
@@ -443,10 +441,10 @@ class Portfolio:
         exclude_cash: bool = False,
     ) -> pd.DataFrame:
         """
-        Get holdings at time `timestamp` for the given assets.
+        Get holdings at time `timestamp` for the requested assets.
 
         :param asset_id: an asset or `None` for all available assets
-        :return the df looks like
+        :return: holding_df
         """
         Portfolio._validate_holdings_df(holdings_df)
         _LOG.debug(hprint.to_str("timestamp asset_id exclude_cash"))
@@ -486,7 +484,8 @@ class Portfolio:
             hdbg.dassert_ne(
                 asset_id,
                 Portfolio.CASH_ID,
-                "You cannot request cash (asset_id=`%s`) and simultaneously request to exclude it",
+                "You cannot request cash (asset_id=`%s`) and simultaneously "
+                "request to exclude it",
                 asset_id,
             )
             mask = holdings["asset_id"] != Portfolio.CASH_ID
@@ -599,9 +598,104 @@ class Portfolio:
             Portfolio.CASH_ID,
             exclude_cash=False,
         )
-        # Initial cash must be nonnegative.
+        # Initial cash must be non-negative.
         cash = cash_holdings["curr_num_shares"].values[0]
         hdbg.dassert_lte(0, cash)
+
+
+# #################################################################################
+
+
+# TODO(gp): -> SimulatedPortfolio
+# TODO(gp): Move in simulated_portfolio.py?
+class Portfolio(AbstractPortfolio):
+
+    def __init__(
+        self,
+        *args,
+        #broker: ombroker.Broker
+    ):
+        """
+        Constructor.
+        """
+        super().__init__(*args)
+        #self._broker = broker
+
+    # A `fills_df` represents orders that have been executed (e.g., how many shares,
+    # at how much).
+    # Columns required in a `fills_df`.
+    FILLS_COLS = [
+        "asset_id",
+        "timestamp",
+        "num_shares",
+        "price",
+    ]
+
+    # TODO(gp): if we pass the broker to Portfolio then it can get the fills
+    #  directly making the abstract interface uniform.
+    def _update_state(
+        self,
+        timestamp: pd.Timestamp,
+        fills_df: Optional[pd.DataFrame],
+    ) -> None:
+        """
+        Update holdings at `timestamp` using fills information in `fill_df`.
+        """
+        last_timestamp = self.get_last_timestamp()
+        # Get fills.
+        #fills_df = self._get_fills(curr_timestamp, fills_df)
+        # Get latest holdings
+        last_holdings = self.get_holdings(last_timestamp, asset_id=None)
+        last_holdings.index.name = "last_timestamp"
+        last_holdings.reset_index(inplace=True)
+        last_holdings_srs = last_holdings.set_index("asset_id")["curr_num_shares"]
+        # Update holdings.
+        new_holdings_srs = last_holdings_srs.copy()
+        if fills_df is not None:
+            Portfolio._validate_fills_df(fills_df)
+            # last_timestamp <= fills_df.index <= timestamp
+            hdbg.dassert_lte(last_timestamp, fills_df["timestamp"].min())
+            hdbg.dassert_lte(fills_df["timestamp"].max(), timestamp)
+            holdings_diff = fills_df.set_index("asset_id")["num_shares"]
+            cash_diff = -1 * (fills_df["price"] * fills_df["num_shares"]).sum()
+            hdbg.dassert(np.isfinite(cash_diff))
+            new_holdings_srs = new_holdings_srs.add(holdings_diff, fill_value=0)
+            new_holdings_srs.loc[Portfolio.CASH_ID] += cash_diff
+        new_holdings_srs.name = "curr_num_shares"
+        new_holdings = new_holdings_srs.to_frame().reset_index()
+        new_holdings.index = [timestamp] * len(new_holdings)
+        new_holdings = new_holdings.convert_dtypes()
+        return new_holdings
+
+#    def _get_fills(
+#        self,
+#        curr_timestamp: pd.Timestamp,
+#        fills: List[pd.DataFrame],
+#    ) -> pd.DataFrame:
+#        """
+#        Get the fills from the broker and convert it into a `fills_df`.
+#
+#        :return: fills_df
+#        """
+#        # Get the fills from the broker.
+#        # TODO(gp): Ensure that this returns all the fills before
+#        # curr_timestamp.
+#        #fills = self._broker.get_fills(curr_timestamp)
+#        # Convert the fills into a `fills_df`.
+#        fill_rows = []
+#        for fill in fills:
+#            _LOG.debug("# Processing fill=%s", fill)
+#            fill_row: Dict[str, Any] = collections.OrderedDict()
+#            # Copy contents of the fill.
+#            fill_row.update(fill.to_dict())
+#            fill_rows.append(pd.Series(fill_row))
+#        if fill_rows:
+#            fills_df = pd.concat(fill_rows, axis=1).transpose()
+#            fills_df = fills_df.convert_dtypes()
+#        else:
+#            fills_df = None
+#        _LOG.debug("fills_df=\n%s", hprint.dataframe_to_str(fills_df))
+#        return fills_df
 
     @staticmethod
     def _validate_fills_df(

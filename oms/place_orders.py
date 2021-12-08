@@ -29,7 +29,7 @@ import oms.portfolio as omportfo
 _LOG = logging.getLogger(__name__)
 
 
-def mark_to_market(
+def _mark_to_market(
     current_timestamp: pd.Timestamp,
     predictions: pd.Series,
     portfolio: omportfo.Portfolio,
@@ -100,7 +100,7 @@ def mark_to_market(
     return merged_df
 
 
-def generate_orders(
+def _generate_orders(
     shares: pd.Series,
     order_config: Dict[str, Any],
 ) -> List[omorder.Order]:
@@ -127,7 +127,7 @@ def generate_orders(
     return orders
 
 
-def update_portfolio(
+def _update_portfolio(
     timestamp: pd.Timestamp,
     portfolio: omportfo.Portfolio,
     broker: ombroker.Broker,
@@ -147,10 +147,10 @@ def update_portfolio(
         fills_df = fills_df.convert_dtypes()
     else:
         fills_df = None
-    portfolio.advance_portfolio_state(timestamp, fills_df)
+    portfolio.update_state(timestamp, fills_df)
 
 
-def compute_target_positions_in_shares(
+def _compute_target_positions_in_shares(
     timestamp: pd.Timestamp,
     predictions: pd.Series,
     portfolio: omportfo.Portfolio,
@@ -169,7 +169,7 @@ def compute_target_positions_in_shares(
             predictions.isna().sum(),
             timestamp,
         )
-    priced_holdings = mark_to_market(timestamp, predictions, portfolio)
+    priced_holdings = _mark_to_market(timestamp, predictions, portfolio)
     df = ocalopti.compute_target_positions_in_cash(
         priced_holdings, portfolio.CASH_ID
     )
@@ -298,7 +298,7 @@ async def place_orders(
             "\n%s",
             hprint.frame("Updating portfolio state from fills: timestamp=%s" % timestamp, char1="#"),
         )
-        update_portfolio(timestamp, portfolio, broker)
+        _update_portfolio(timestamp, portfolio, broker)
         # Continue if we are outside of our trading window.
         if time < trading_start_time or time > trading_end_time:
             continue
@@ -307,9 +307,8 @@ async def place_orders(
             "\n%s",
             hprint.frame("Computing target positions: timestamp=%s" % timestamp, char1="#"),
         )
-        target_positions = compute_target_positions_in_shares(
-            timestamp, predictions, portfolio
-        )
+        target_positions = _compute_target_positions_in_shares(
+                timestamp, predictions, portfolio)
         _LOG.debug(
             "\n%s",
             hprint.frame("Generating orders: timestamp=%s" % timestamp, char1="#"),
@@ -324,8 +323,8 @@ async def place_orders(
             "end_timestamp": timestamp_end,
         }
         order_config = cconfig.get_config_from_nested_dict(order_dict_)
-        orders = generate_orders(
-            target_positions["diff_num_shares"], order_config
+        orders = _generate_orders(
+                target_positions["diff_num_shares"], order_config
         )
         # Submit orders.
         _LOG.debug(
