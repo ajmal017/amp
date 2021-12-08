@@ -5,12 +5,13 @@ from typing import List, Optional, Tuple
 import numpy as np
 import pytest
 
-import core.dataflow as dtf
+import core.dataflow.builders as cdtfbuil
 import core.dataflow.real_time as cdtfretim
+import core.dataflow.real_time_example as cdtfretiex
 import core.dataflow.result_bundle as cdtfrebun
 import core.dataflow.runners as cdtfrunn
 import core.dataflow.test.test_builders as cdtfnttd
-import core.dataflow.test.test_real_time as cdtfttrt
+import core.dataflow.visitors as cdtfvisi
 import helpers.datetime_ as hdateti
 import helpers.hasyncio as hasynci
 import helpers.unit_test as hunitest
@@ -26,11 +27,11 @@ class TestRollingFitPredictDagRunner1(hunitest.TestCase):
         """
         Test the DagRunner using `ArmaReturnsBuilder`
         """
-        dag_builder = dtf.ArmaReturnsBuilder()
+        dag_builder = cdtfbuil.ArmaReturnsBuilder()
         config = dag_builder.get_config_template()
         dag_builder.get_dag(config)
         #
-        dag_runner = dtf.RollingFitPredictDagRunner(
+        dag_runner = cdtfrunn.RollingFitPredictDagRunner(
             config=config,
             dag_builder=dag_builder,
             start="2010-01-04 09:30",
@@ -50,15 +51,15 @@ class TestIncrementalDagRunner1(hunitest.TestCase):
         """
         Test the DagRunner using `ArmaReturnsBuilder`.
         """
-        dag_builder = dtf.ArmaReturnsBuilder()
+        dag_builder = cdtfbuil.ArmaReturnsBuilder()
         config = dag_builder.get_config_template()
         # Create DAG and generate fit state.
         dag = dag_builder.get_dag(config)
         nid = dag.get_unique_sink()
         dag.run_leq_node(nid, "fit")
-        fit_state = dtf.get_fit_state(dag)
+        fit_state = cdtfvisi.get_fit_state(dag)
         #
-        dag_runner = dtf.IncrementalDagRunner(
+        dag_runner = cdtfrunn.IncrementalDagRunner(
             config=config,
             dag_builder=dag_builder,
             start="2010-01-04 15:30",
@@ -126,7 +127,7 @@ class TestRealTimeDagRunner1(hunitest.TestCase):
         # Set up the event loop.
         sleep_interval_in_secs = 1.0
         execute_rt_loop_kwargs = (
-            cdtfttrt.get_replayed_time_execute_rt_loop_kwargs(
+            cdtfretiex.get_replayed_time_execute_rt_loop_kwargs(
                 sleep_interval_in_secs, event_loop=event_loop
             )
         )

@@ -5,129 +5,20 @@ import core.dataflow.test.test_real_time as cdtfttrt
 """
 import asyncio
 import logging
-from typing import Callable, Optional, Tuple
+from typing import Optional, Tuple
 
 import pandas as pd
 import pytest
 
 import core.dataflow.real_time as cdtfretim
+import core.dataflow.real_time_example as cdtfretiex
 import helpers.datetime_ as hdateti
 import helpers.hasyncio as hasynci
-import helpers.htypes as htypes
 import helpers.printing as hprint
 import helpers.timer as htimer
 import helpers.unit_test as hunitest
 
 _LOG = logging.getLogger(__name__)
-
-
-# #############################################################################
-
-
-# The test code for a module needs to provide test objects to the rest of the
-# testing code. This is to avoid recreating the same data structures everywhere
-# leading to coupling.
-# A potentially negative consequence of this approach is that test code needs
-# to import other test code, which might need to turn testing code into Python
-# package.
-
-
-def get_test_data_builder1() -> Tuple[Callable, htypes.Kwargs]:
-    """
-    Return a data builder producing between "2010-01-04 09:30:00" and
-    "2010-01-04 09:35:00" (for 5 minutes) every second.
-
-    :return: `data_builder` and its kwargs for use inside a dataflow node.
-    """
-    data_builder = cdtfretim.generate_synthetic_data
-    data_builder_kwargs = {
-        "columns": ["close", "volume"],
-        "start_datetime": pd.Timestamp("2010-01-04 09:30:00"),
-        "end_datetime": pd.Timestamp("2010-01-05 09:30:00"),
-        "freq": "1S",
-        "seed": 42,
-    }
-    return data_builder, data_builder_kwargs
-
-
-def get_test_data_builder2() -> Tuple[Callable, htypes.Kwargs]:
-    """
-    Return a data builder producing data between "2010-01-04 09:30:00" and
-    "2010-01-04 09:30:05" (for 5 seconds) every second.
-
-    :return: `data_builder` and its kwargs for use inside a dataflow node.
-    """
-    data_builder = cdtfretim.generate_synthetic_data
-    data_builder_kwargs = {
-        "columns": ["close", "volume"],
-        "start_datetime": pd.Timestamp("2010-01-04 09:30:00"),
-        "end_datetime": pd.Timestamp("2010-01-04 09:30:05"),
-        "freq": "1S",
-        "seed": 42,
-    }
-    return data_builder, data_builder_kwargs
-
-
-# TODO(gp): -> _get_replayed_time? This should not be used.
-# TODO(gp): Make `event_loop` mandatory.
-def get_replayed_time(
-    *,
-    event_loop: Optional[asyncio.AbstractEventLoop] = None,
-) -> cdtfretim.ReplayedTime:
-    """
-    Build a `ReplayedTime` object starting at the same time as the data (i.e.,
-    "2010-01-04 09:30:00").
-    """
-    start_datetime = pd.Timestamp("2010-01-04 09:30:00")
-    # Use a replayed real-time starting at the same time as the data.
-    get_wall_clock_time = lambda: hdateti.get_current_time(
-        tz="naive_ET", event_loop=event_loop
-    )
-    rt = cdtfretim.ReplayedTime(start_datetime, get_wall_clock_time)
-    return rt
-
-
-# TODO(gp): Make `event_loop` mandatory.
-def get_replayed_time_execute_rt_loop_kwargs(
-    sleep_interval_in_secs: float,
-    *,
-    event_loop: Optional[asyncio.AbstractEventLoop] = None,
-) -> htypes.Kwargs:
-    """
-    Return kwargs for a call to `execute_rt_loop` using replayed time.
-    """
-    # TODO(gp): Replace all these with `get_replayed_wall_clock_time()`.
-    rt = get_replayed_time(event_loop=event_loop)
-    get_wall_clock_time = rt.get_wall_clock_time
-    execute_rt_loop_kwargs = {
-        "get_wall_clock_time": get_wall_clock_time,
-        "sleep_interval_in_secs": sleep_interval_in_secs,
-        # TODO(gp): -> timeout everywhere
-        "time_out_in_secs": 3.0 * sleep_interval_in_secs,
-    }
-    return execute_rt_loop_kwargs
-
-
-def get_real_time_execute_rt_loop_kwargs(
-    sleep_interval_in_secs: float,
-    *,
-    event_loop: Optional[asyncio.AbstractEventLoop],
-) -> htypes.Kwargs:
-    """
-    Return kwargs for a call to `execute_rt_loop` using real time.
-    """
-    get_wall_clock_time = lambda: hdateti.get_current_time(
-        tz="naive_ET", event_loop=event_loop
-    )
-    execute_rt_loop_kwargs = {
-        "get_wall_clock_time": get_wall_clock_time,
-        "sleep_interval_in_secs": sleep_interval_in_secs,
-        "time_out_in_secs": 3.0 * sleep_interval_in_secs,
-    }
-    return execute_rt_loop_kwargs
-
-
-# #############################################################################
 
 
 class Test_align_on_time_grid1(hunitest.TestCase):
@@ -199,7 +90,7 @@ class TestReplayedTime1(hunitest.TestCase):
         """
         Rewind time to 9:30am of a day in the past.
         """
-        rt = get_replayed_time()
+        rt = cdtfretiex.get_replayed_time()
         # We assume that these 2 calls take less than 1 minute.
         exp = pd.Timestamp("2010-01-04 09:30:00")
         self._helper(rt, exp)

@@ -11,19 +11,16 @@ from typing import Any, Dict, Generator, List, Optional, Tuple
 import pandas as pd
 
 import core.config as cconfig
+import core.dataflow.builders as cdtfbuil
 import core.dataflow.core as cdtfcore
 import core.dataflow.nodes.sources as cdtfnosou
 import core.dataflow.real_time as cdtfretim
+import core.dataflow.result_bundle as cdtfrebun
 import core.dataflow.utils as cdtfutil
 import core.dataflow.visitors as cdtfvisi
 import helpers.datetime_ as hdateti
 import helpers.dbg as hdbg
 import helpers.printing as hprint
-
-# TODO(gp): Use the standard imports.
-from core.dataflow.builders import DagBuilder
-from core.dataflow.result_bundle import PredictionResultBundle, ResultBundle
-from core.dataflow.visitors import extract_info, set_fit_state
 
 _LOG = logging.getLogger(__name__)
 
@@ -42,7 +39,9 @@ class _AbstractDagRunner(abc.ABC):
     directly.
     """
 
-    def __init__(self, config: cconfig.Config, dag_builder: DagBuilder) -> None:
+    def __init__(
+        self, config: cconfig.Config, dag_builder: cdtfbuil.DagBuilder
+    ) -> None:
         """
         Constructor.
 
@@ -103,7 +102,7 @@ class _AbstractDagRunner(abc.ABC):
         nid = self._result_nid
         # TODO(gp): Add a check for `df_out`.
         df_out = self.dag.run_leq_node(nid, method)["df_out"]
-        info = extract_info(self.dag, [method])
+        info = cdtfvisi.extract_info(self.dag, [method])
         return df_out, info
 
     # TODO(gp): This could be folded into `_run_dag_helper()` if we collapse
@@ -113,11 +112,11 @@ class _AbstractDagRunner(abc.ABC):
         method: cdtfcore.Method,
         df_out: pd.DataFrame,
         info: cdtfvisi.NodeInfo,
-    ) -> ResultBundle:
+    ) -> cdtfrebun.ResultBundle:
         """
         Package the result of a DAG execution into a ResultBundle.
         """
-        return ResultBundle(
+        return cdtfrebun.ResultBundle(
             config=self.config,
             result_nid=self._result_nid,
             method=method,
@@ -155,14 +154,14 @@ class FitPredictDagRunner(_AbstractDagRunner):
         method = "predict"
         self._set_fit_predict_intervals(method, intervals)
 
-    def fit(self) -> ResultBundle:
+    def fit(self) -> cdtfrebun.ResultBundle:
         """
         Fitting means running `fit()` method on the DAG up to the sink node.
         """
         method = "fit"
         return self._run_dag(method)
 
-    def predict(self) -> ResultBundle:
+    def predict(self) -> cdtfrebun.ResultBundle:
         """
         Predicting means running `predict()` method on the DAG up to the sink
         node.
@@ -170,7 +169,7 @@ class FitPredictDagRunner(_AbstractDagRunner):
         method = "predict"
         return self._run_dag(method)
 
-    def _run_dag(self, method: cdtfcore.Method) -> ResultBundle:
+    def _run_dag(self, method: cdtfcore.Method) -> cdtfrebun.ResultBundle:
         df_out, info = self._run_dag_helper(method)
         return self._to_result_bundle(method, df_out, info)
 
@@ -186,12 +185,14 @@ class PredictionDagRunner(FitPredictDagRunner):
     `PredictionResultBundle`.
     """
 
-    def _run_dag(self, method: cdtfcore.Method) -> PredictionResultBundle:
+    def _run_dag(
+        self, method: cdtfcore.Method
+    ) -> cdtfrebun.PredictionResultBundle:
         """
         Same as super class but return a `PredictionResultBundle`.
         """
         df_out, info = self._run_dag_helper(method)
-        return PredictionResultBundle(
+        return cdtfrebun.PredictionResultBundle(
             config=self.config,
             result_nid=self._result_nid,
             method=method,
@@ -213,7 +214,7 @@ class RollingFitPredictDagRunner(_AbstractDagRunner):
     def __init__(
         self,
         config: cconfig.Config,
-        dag_builder: DagBuilder,
+        dag_builder: cdtfbuil.DagBuilder,
         start: hdateti.Datetime,
         end: hdateti.Datetime,
         retraining_freq: str,
@@ -262,7 +263,7 @@ class RollingFitPredictDagRunner(_AbstractDagRunner):
     def fit_predict_at_datetime(
         self,
         datetime_: hdateti.Datetime,
-    ) -> Tuple[ResultBundle, ResultBundle]:
+    ) -> Tuple[cdtfrebun.ResultBundle, cdtfrebun.ResultBundle]:
         """
         Fit with all the history up and including `datetime` and then predict
         forward.
@@ -292,7 +293,7 @@ class RollingFitPredictDagRunner(_AbstractDagRunner):
     # TODO(gp): -> _fit for symmetry with the rest of the code.
     def _run_fit(
         self, interval: Tuple[hdateti.Datetime, hdateti.Datetime]
-    ) -> ResultBundle:
+    ) -> cdtfrebun.ResultBundle:
         # Set fit interval on all source nodes of the DAG.
         for input_nid in self.dag.get_sources():
             node = self.dag.get_node(input_nid)
@@ -307,7 +308,7 @@ class RollingFitPredictDagRunner(_AbstractDagRunner):
         # TODO(gp): Use Interval
         interval: Tuple[hdateti.Datetime, hdateti.Datetime],
         oos_start: hdateti.Datetime,
-    ) -> ResultBundle:
+    ) -> cdtfrebun.ResultBundle:
         # Set predict interval on all source nodes of the DAG.
         for input_nid in self.dag.get_sources():
             self.dag.get_node(input_nid).set_predict_intervals([interval])
@@ -358,7 +359,7 @@ class RollingFitPredictDagRunner(_AbstractDagRunner):
         hdbg.dassert(not idx.empty)
         return idx
 
-    def _run_dag(self, method: cdtfcore.Method) -> ResultBundle:
+    def _run_dag(self, method: cdtfcore.Method) -> cdtfrebun.ResultBundle:
         """
         Run DAG and return a ResultBundle.
         """
@@ -379,7 +380,7 @@ class IncrementalDagRunner(_AbstractDagRunner):
     def __init__(
         self,
         config: cconfig.Config,
-        dag_builder: DagBuilder,
+        dag_builder: cdtfbuil.DagBuilder,
         start: hdateti.Datetime,
         end: hdateti.Datetime,
         freq: str,
@@ -404,7 +405,7 @@ class IncrementalDagRunner(_AbstractDagRunner):
         self._end = end
         self._freq = freq
         self._fit_state = fit_state
-        set_fit_state(self.dag, self._fit_state)
+        cdtfvisi.set_fit_state(self.dag, self._fit_state)
         # Create predict range.
         self._date_range = pd.date_range(
             start=self._start, end=self._end, freq=self._freq
@@ -426,7 +427,7 @@ class IncrementalDagRunner(_AbstractDagRunner):
             yield result_bundle
 
     # TODO(gp): dt -> datetime_ as used elsewhere.
-    def predict_at_datetime(self, dt: hdateti.Datetime) -> ResultBundle:
+    def predict_at_datetime(self, dt: hdateti.Datetime) -> cdtfrebun.ResultBundle:
         """
         Generate a prediction as of `dt` (for a future point in time).
 
@@ -442,7 +443,7 @@ class IncrementalDagRunner(_AbstractDagRunner):
         result_bundle = self._run_dag("predict")
         return result_bundle
 
-    def _run_dag(self, method: cdtfcore.Method) -> ResultBundle:
+    def _run_dag(self, method: cdtfcore.Method) -> cdtfrebun.ResultBundle:
         """
         Run DAG and return a ResultBundle.
         """
@@ -468,7 +469,7 @@ class RealTimeDagRunner(_AbstractDagRunner):
     def __init__(
         self,
         config: cconfig.Config,
-        dag_builder: DagBuilder,
+        dag_builder: cdtfbuil.DagBuilder,
         fit_state: cconfig.Config,
         execute_rt_loop_kwargs: Dict[str, Any],
         dst_dir: str,
@@ -482,7 +483,7 @@ class RealTimeDagRunner(_AbstractDagRunner):
         # Store information about the real-time execution.
         self._events: cdtfretim.Events = []
 
-    async def predict(self) -> List[ResultBundle]:
+    async def predict(self) -> List[cdtfrebun.ResultBundle]:
         """
         Execute the DAG for all the events.
 
@@ -494,7 +495,7 @@ class RealTimeDagRunner(_AbstractDagRunner):
         ]
         return result_bundles
 
-    async def predict_at_datetime(self) -> ResultBundle:
+    async def predict_at_datetime(self) -> cdtfrebun.ResultBundle:
         """
         Predict every time there is a real-time event.
 
@@ -514,7 +515,9 @@ class RealTimeDagRunner(_AbstractDagRunner):
     def events(self) -> Optional[cdtfretim.Events]:
         return self._events
 
-    def compute_run_signature(self, result_bundles: List[ResultBundle]) -> str:
+    def compute_run_signature(
+        self, result_bundles: List[cdtfrebun.ResultBundle]
+    ) -> str:
         """
         Compute a signature of an execution in terms of `ResultBundles` and `events`.
         """
@@ -530,7 +533,7 @@ class RealTimeDagRunner(_AbstractDagRunner):
         ret = "\n".join(ret)
         return ret
 
-    async def _run_dag(self, method: cdtfcore.Method) -> ResultBundle:
+    async def _run_dag(self, method: cdtfcore.Method) -> cdtfrebun.ResultBundle:
         # Wait until all the real-time source nodes are ready to compute.
         _LOG.debug("Waiting for real-time nodes to be ready ...")
         sources = self.dag.get_sources()

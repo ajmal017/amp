@@ -4,15 +4,15 @@ import pandas as pd
 
 import core.config as cconfig
 import core.dataflow.price_interface_example as cdtfprinex
+import core.dataflow.real_time_example as cdtfretiex
 import core.dataflow.runners as cdtfrunn
+
+# Do not import from other test files.
+import core.dataflow.test.test_builders as cdtfnttd
 import dataflow_amp.real_time.pipeline as dtfaretipi
 import helpers.hasyncio as hasynci
 import helpers.unit_test as hunitest
 import oms.portfolio as omportfo
-
-# Do not import from other test files.
-import core.dataflow.test.test_builders as cdtfnttd
-import core.dataflow.test.test_real_time as cdtfttrt
 
 _LOG = logging.getLogger(__name__)
 
@@ -68,7 +68,7 @@ class TestRealTimeReturnPipeline1(hunitest.TestCase):
             # Set up the event loop.
             sleep_interval_in_secs = 60 * 5
             execute_rt_loop_kwargs = (
-                cdtfttrt.get_replayed_time_execute_rt_loop_kwargs(
+                cdtfretiex.get_replayed_time_execute_rt_loop_kwargs(
                     sleep_interval_in_secs, event_loop=event_loop
                 )
             )
@@ -203,7 +203,7 @@ class TestRealTimePipelineWithOms1(hunitest.TestCase):
             # Set up the event loop.
             sleep_interval_in_secs = 60 * 5
             execute_rt_loop_kwargs = (
-                cdtfttrt.get_replayed_time_execute_rt_loop_kwargs(
+                cdtfretiex.get_replayed_time_execute_rt_loop_kwargs(
                     sleep_interval_in_secs, event_loop=event_loop
                 )
             )
