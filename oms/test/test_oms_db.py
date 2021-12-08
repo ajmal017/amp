@@ -318,7 +318,9 @@ class TestOmsDbTableInteraction1(_TestOmsDbHelper):
         oomsdb.create_accepted_orders_table(self.connection, incremental=False)
         with hasynci.solipsism_context() as event_loop:
             # Run.
-            coroutine = hasynci.gather_coroutines_with_wall_clock(event_loop, *coroutines)
+            coroutine = hasynci.gather_coroutines_with_wall_clock(
+                event_loop, *coroutines
+            )
             res = hasynci.run(coroutine, event_loop=event_loop)
             return res
         # Delete the table.

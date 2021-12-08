@@ -102,13 +102,19 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             time_out_in_secs=time_out_in_secs,
         )
         # Initialize portfolio.
+        strategy_id = "str1"
+        account = "paper"
+        price_interface = price_interface
+        asset_id_col = "asset_id"
+        mark_to_market_col = "price"
+        timestamp_col = "end_datetime"
         portfolio = omportfo.Portfolio.from_cash(
-            strategy_id="str1",
-            account="paper",
-            price_interface=price_interface,
-            asset_id_col="asset_id",
-            mark_to_market_col="price",
-            timestamp_col="end_datetime",
+            strategy_id,
+            account,
+            price_interface,
+            asset_id_col,
+            mark_to_market_col,
+            timestamp_col,
             initial_cash=1e6,
             initial_timestamp=initial_timestamp,
         )
@@ -117,7 +123,9 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             index=[101, 202], data=[0.3, -0.1], name="prediction"
         )
         # Mark to market.
-        actual = oplaorde._mark_to_market(initial_timestamp, predictions, portfolio)
+        actual = oplaorde._mark_to_market(
+            initial_timestamp, predictions, portfolio
+        )
         txt = r"""
 asset_id,curr_num_shares,prediction,price,value
 -1,1000000,0,1,1000000
@@ -191,13 +199,18 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             time_out_in_secs=time_out_in_secs,
         )
         # Initialize portfolio.
+        strategy_id = "str1"
+        account = "paper"
+        asset_id_col = "asset_id"
+        mark_to_market_col = "price"
+        timestamp_col = "end_datetime"
         portfolio = omportfo.Portfolio.from_cash(
-            strategy_id="str1",
-            account="paper",
-            price_interface=price_interface,
-            asset_id_col="asset_id",
-            mark_to_market_col="price",
-            timestamp_col="end_datetime",
+            strategy_id,
+            account,
+            price_interface,
+            asset_id_col,
+            mark_to_market_col,
+            timestamp_col,
             initial_cash=1e6,
             initial_timestamp=initial_timestamp,
         )
@@ -222,9 +235,11 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
         # #####################################################################
         # Compute target positions
         target_positions = oplaorde._compute_target_positions_in_shares(
-            initial_timestamp, predictions, portfolio)
-        orders = oplaorde._generate_orders(target_positions["diff_num_shares"],
-                                           order_config)
+            initial_timestamp, predictions, portfolio
+        )
+        orders = oplaorde._generate_orders(
+            target_positions["diff_num_shares"], order_config
+        )
         # Submit orders.
         broker.submit_orders(orders)
         # wait 5 minutes

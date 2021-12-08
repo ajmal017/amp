@@ -29,13 +29,12 @@ def get_portfolio_example1(
     portfolio = omportfo.Portfolio.from_cash(
         strategy_id,
         account,
-        #
         price_interface,
         asset_id_column,
         mark_to_market_col,
         timestamp_col,
         #
-        initial_cash,
-        initial_timestamp,
+        initial_cash=initial_cash,
+        initial_timestamp=initial_timestamp,
     )
     return portfolio

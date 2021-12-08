@@ -63,9 +63,11 @@ class MockedPortfolio:
         query = []
         query.append(f"SELECT id, current_position from {self._table_name}")
         trade_date = curr_timestamp.date()
-        query.append(f"WHERE account={self._account} AND tradedate='{trade_date}'")
+        query.append(
+            f"WHERE account={self._account} AND tradedate='{trade_date}'"
+        )
         if asset_id is not None:
-            query.append(f'AND {self._asset_id_col}={asset_id}')
+            query.append(f"AND {self._asset_id_col}={asset_id}")
         query.append(f"ORDER by {self._asset_id_col}")
         query = "\n".join(query)
         df = hsql.execute_query_to_df(self._db_connection, query)

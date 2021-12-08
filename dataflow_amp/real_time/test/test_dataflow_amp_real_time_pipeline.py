@@ -167,14 +167,20 @@ class TestRealTimePipelineWithOms1(hunitest.TestCase):
             initial_timestamp = pd.Timestamp(
                 "2000-01-01 09:30:00-05:00", tz="America/New_York"
             )
+            strategy_id="str1"
+            account="paper"
+            asset_id_col="asset_id"
+            mark_to_market_col="price"
+            # mark_to_market_col = "close"
+            timestamp_col="end_datetime"
             portfolio = omportfo.Portfolio.from_cash(
-                strategy_id="str1",
-                account="paper",
-                price_interface=price_interface,
-                asset_id_col="asset_id",
-                mark_to_market_col="price",
-                # mark_to_market_col="close",
-                timestamp_col="end_datetime",
+                strategy_id,
+                account,
+                price_interface,
+                asset_id_col,
+                mark_to_market_col,
+                # mark_to_market_col,
+                timestamp_col,
                 initial_cash=1e6,
                 initial_timestamp=initial_timestamp,
             )

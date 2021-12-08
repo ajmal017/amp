@@ -4,6 +4,7 @@ Import as:
 import oms.mocked_broker as omocbrok
 """
 
+
 class MockedBroker:
     """
     Implement an object that mocks a real OMS / broker backed by a DB where

@@ -76,7 +76,7 @@ class Fill:
         return dict_
 
 
-# ##############################
+# #############################################################################
 
 
 class AbstractBroker(abc.ABC):
@@ -96,7 +96,8 @@ class AbstractBroker(abc.ABC):
         self._last_timestamp = None
 
     def submit_orders(
-        self, orders: List[omorder.Order],
+        self,
+        orders: List[omorder.Order],
     ) -> None:
         """
         Submit a list of orders to the broker at `curr_timestamp`.
@@ -121,7 +122,8 @@ class AbstractBroker(abc.ABC):
 
     @abc.abstractmethod
     def _submit_orders(
-            self, orders: List[omorder.Order],
+        self,
+        orders: List[omorder.Order],
     ) -> None:
         ...
 
@@ -136,7 +138,7 @@ class AbstractBroker(abc.ABC):
         self._last_timestamp = curr_timestamp
 
 
-# ##############################
+# #############################################################################
 
 
 # TODO(Paul): -> SimulatedBroker
@@ -159,7 +161,8 @@ class Broker(AbstractBroker):
         self._fills: List[Fill] = []
 
     def _submit_orders(
-        self, orders: List[omorder.Order],
+        self,
+        orders: List[omorder.Order],
     ) -> None:
         """
         Submit a list of orders to the broker at `curr_timestamp`.
@@ -205,7 +208,9 @@ class Broker(AbstractBroker):
             #  how many shares are filled.
             fills.extend(self._fully_fill(curr_timestamp, order))
         # Remove the orders that have been executed.
-        _LOG.debug("Removing orders from queue with deadline=`%s`", curr_timestamp)
+        _LOG.debug(
+            "Removing orders from queue with deadline=`%s`", curr_timestamp
+        )
         del self._deadline_timestamp_to_orders[curr_timestamp]
         _LOG.debug("Returning %d fills", len(fills))
         return fills

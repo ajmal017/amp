@@ -30,7 +30,7 @@ _LOG = logging.getLogger(__name__)
 
 
 def _mark_to_market(
-    current_timestamp: pd.Timestamp,
+    wall_clock_timestamp: pd.Timestamp,
     predictions: pd.Series,
     portfolio: omportfo.Portfolio,
 ) -> pd.DataFrame:
@@ -43,11 +43,11 @@ def _mark_to_market(
         - The dataframe is the outer join of all the held assets in `portfolio` and
           `predictions`
     """
-    _LOG.debug("# Mark portfolio to market at timestamp=%s", current_timestamp)
+    _LOG.debug("# Mark portfolio to market at timestamp=%s", wall_clock_timestamp)
     # Get the current holdings for all the assets including cash.
     asset_id = None
     holdings = portfolio.get_holdings(
-        current_timestamp, asset_id, exclude_cash=False
+        wall_clock_timestamp, asset_id, exclude_cash=False
     )
     holdings.set_index("asset_id", drop=True, inplace=True)
     _LOG.debug("holdings=\n%s", hprint.dataframe_to_str(holdings))
@@ -55,12 +55,12 @@ def _mark_to_market(
     _LOG.debug(
         "Number of non-NaN predictions=`%i` at timestamp=`%s`",
         predictions.count(),
-        current_timestamp,
+        wall_clock_timestamp,
     )
     _LOG.debug(
         "Number of NaN predictions=`%i` at timestamp=`%s`",
         predictions.isna().sum(),
-        current_timestamp,
+        wall_clock_timestamp,
     )
     predictions = pd.DataFrame(predictions)
     predictions.columns = ["prediction"]
@@ -73,7 +73,7 @@ def _mark_to_market(
     _LOG.debug(
         "Number of NaNs in `curr_num_shares` post-merge is `%i` at timestamp=`%s`",
         merged_df["curr_num_shares"].isna().sum(),
-        current_timestamp,
+        wall_clock_timestamp,
     )
     merged_df["curr_num_shares"].fillna(0.0, inplace=True)
     # Move `asset_id` from the index to a column.
@@ -87,14 +87,14 @@ def _mark_to_market(
     )
     _LOG.debug("after merge: merged_df=\n%s", hprint.dataframe_to_str(merged_df))
     # Mark to market.
-    merged_df = portfolio.mark_to_market(current_timestamp, merged_df)
+    merged_df = portfolio.mark_to_market(wall_clock_timestamp, merged_df)
     _LOG.debug("merged_df=\n%s", hprint.dataframe_to_str(merged_df))
     columns = ["prediction", "price", "curr_num_shares", "value"]
     hdbg.dassert_is_subset(columns, merged_df.columns)
     _LOG.debug(
         "Number of NaN prices=`%i` at timestamp=`%s`",
         merged_df["price"].isna().sum(),
-        current_timestamp,
+        wall_clock_timestamp,
     )
     merged_df[columns] = merged_df[columns].fillna(0.0)
     return merged_df
@@ -151,25 +151,27 @@ def _update_portfolio(
 
 
 def _compute_target_positions_in_shares(
-    curr_timestamp: pd.Timestamp,
+    wall_clock_timestamp: pd.Timestamp,
     predictions: pd.Series,
     portfolio: omportfo.Portfolio,
 ) -> pd.DataFrame:
     """
     Compute target holdings, generate orders, and update the portfolio.
 
-    :param curr_timestamp: timestamp used for valuing holdings
+    :param wall_clock_timestamp: timestamp used for valuing holdings
     :param predictions: predictions indexed by `asset_id`
     :param portfolio: portfolio with current holdings
     """
-    hdbg.dassert_eq(portfolio.get_last_timestamp(), curr_timestamp)
+    hdbg.dassert_eq(portfolio.get_last_timestamp(), wall_clock_timestamp)
     if predictions.isna().sum() != 0:
         _LOG.debug(
             "Number of NaN predictions=`%i` at timestamp=`%s`",
             predictions.isna().sum(),
-            curr_timestamp,
+            wall_clock_timestamp,
         )
-    priced_holdings = _mark_to_market(curr_timestamp, predictions, portfolio)
+    priced_holdings = _mark_to_market(
+        wall_clock_timestamp, predictions, portfolio
+    )
     df = ocalopti.compute_target_positions_in_cash(
         priced_holdings, portfolio.CASH_ID
     )
@@ -215,7 +217,6 @@ async def place_orders(
         - `locates`: object used to access short locates
     :return: updated portfolio
     """
-    _LOG.info("** PLACE TRADES **")
     _LOG.info("predictions_df=\n%s", prediction_df)
     # Check the config.
     # - Check `price_interface`.
@@ -267,13 +268,21 @@ async def place_orders(
     tqdm_out = htqdm.TqdmToLogger(_LOG, level=logging.INFO)
     num_rows = len(prediction_df)
     iter_ = enumerate(prediction_df.iterrows())
-    for idx, (timestamp, predictions) in tqdm(
+    for idx, (next_timestamp, predictions) in tqdm(
         iter_, total=num_rows, file=tqdm_out
     ):
-        _LOG.debug("\n%s", hprint.frame("# timestamp=%s" % timestamp))
-        _ = idx
-        # TODO(gp): Maybe move outside.
-        time = timestamp.time()
+        _LOG.debug(
+            "\n%s",
+            hprint.frame("# idx=%s next_timestamp=%s" % (idx, next_timestamp)),
+        )
+        # TODO(gp): Synchronize here to avoid clock drift.
+        # Wait until get_wall_clock_time() == timestamp.
+        # hasyncio.wait_until(timestamp, get_wall_clock_time)
+        # wall_clock_timestamp = get_wall_clock_time()
+        wall_clock_timestamp = next_timestamp
+        _LOG.debug("wall_clock_timestamp=%s", wall_clock_timestamp)
+        #
+        time = wall_clock_timestamp.time()
         if time < ath_start_time:
             _LOG.debug(
                 "time=`%s` < `ath_start_time=`%s`, skipping...",
@@ -294,46 +303,61 @@ async def place_orders(
         #         # any more orders.
         #         continue
         # Enter position between now and the next 5 mins.
-        timestamp_start = timestamp
-        timestamp_end = timestamp + offset_5min
+        timestamp_start = wall_clock_timestamp
+        timestamp_end = wall_clock_timestamp + offset_5min
         # Update `portfolio` based on last fills and market movement.
         _LOG.debug(
             "\n%s",
-            hprint.frame("Updating portfolio state from fills: timestamp=%s" % timestamp, char1="#"),
+            hprint.frame(
+                "Updating portfolio state from fills: timestamp=%s"
+                % wall_clock_timestamp,
+                char1="#",
+            ),
         )
-        _update_portfolio(timestamp, portfolio, broker)
+        _update_portfolio(wall_clock_timestamp, portfolio, broker)
         # Continue if we are outside of our trading window.
         if time < trading_start_time or time > trading_end_time:
             continue
         # Compute target positions
         _LOG.debug(
             "\n%s",
-            hprint.frame("Computing target positions: timestamp=%s" % timestamp, char1="#"),
+            hprint.frame(
+                "Computing target positions: timestamp=%s" % wall_clock_timestamp,
+                char1="#",
+            ),
         )
         target_positions = _compute_target_positions_in_shares(
-                timestamp, predictions, portfolio)
+            wall_clock_timestamp, predictions, portfolio
+        )
         _LOG.debug(
             "\n%s",
-            hprint.frame("Generating orders: timestamp=%s" % timestamp, char1="#"),
+            hprint.frame(
+                "Generating orders: timestamp=%s" % wall_clock_timestamp,
+                char1="#",
+            ),
         )
         # Create an config for `Order`. This requires timestamps and so is
         # inside the loop.
         order_dict_ = {
             "price_interface": price_interface,
             "type_": order_type,
-            "creation_timestamp": timestamp,
+            "creation_timestamp": wall_clock_timestamp,
             "start_timestamp": timestamp_start,
             "end_timestamp": timestamp_end,
         }
         order_config = cconfig.get_config_from_nested_dict(order_dict_)
         orders = _generate_orders(
-                target_positions["diff_num_shares"], order_config
+            target_positions["diff_num_shares"], order_config
         )
         # Submit orders.
         _LOG.debug(
             "\n%s",
-            hprint.frame("Submitting orders to broker: timestamp=%s" % timestamp, char1="#"),
+            hprint.frame(
+                "Submitting orders to broker: timestamp=%s"
+                % wall_clock_timestamp,
+                char1="#",
+            ),
         )
         broker.submit_orders(orders)
-        # TODO(gp): Remove this.
+        # TODO(gp): Remove this once it's synchronized above.
         await asyncio.sleep(60 * 5)

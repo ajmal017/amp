@@ -102,13 +102,18 @@ class TestPortfolio2(hunitest.TestCase):
             _,
         ) = cdtfprinex.get_replayed_time_price_interface_example2(event_loop)
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
+        strategy_id = "str1"
+        account = "paper"
+        asset_id_col = "asset_id"
+        mark_to_market_col = "price"
+        timestamp_col = "end_datetime"
         portfolio = omportfo.Portfolio.from_cash(
-            strategy_id="str1",
-            account="paper",
-            price_interface=price_interface,
-            asset_id_col="asset_id",
-            mark_to_market_col="price",
-            timestamp_col="end_datetime",
+            strategy_id,
+            account,
+            price_interface,
+            asset_id_col,
+            mark_to_market_col,
+            timestamp_col,
             initial_cash=1e6,
             initial_timestamp=initial_timestamp,
         )
@@ -130,13 +135,19 @@ class TestPortfolio2(hunitest.TestCase):
         ) = cdtfprinex.get_replayed_time_price_interface_example2(event_loop)
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
         dict_ = {101: 727.5, 202: 1040.3, -1: 10000}
+        strategy_id = "str1"
+        account = "paper"
+        price_interface = price_interface
+        asset_id_col = "asset_id"
+        mark_to_market_col = "price"
+        timestamp_col = "end_datetime"
         portfolio = omportfo.Portfolio.from_dict(
-            strategy_id="str1",
-            account="paper",
-            price_interface=price_interface,
-            asset_id_col="asset_id",
-            mark_to_market_col="price",
-            timestamp_col="end_datetime",
+            strategy_id,
+            account,
+            price_interface,
+            asset_id_col,
+            mark_to_market_col,
+            timestamp_col,
             holdings_dict=dict_,
             initial_timestamp=initial_timestamp,
         )
@@ -159,13 +170,18 @@ class TestPortfolio2(hunitest.TestCase):
             _,
         ) = cdtfprinex.get_replayed_time_price_interface_example2(event_loop)
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
+        strategy_id = "str1"
+        account = "paper"
+        asset_id_col = "asset_id"
+        mark_to_market_col = "price"
+        timestamp_col = "end_datetime"
         portfolio = omportfo.Portfolio.from_cash(
-            strategy_id="str1",
-            account="paper",
-            price_interface=price_interface,
-            asset_id_col="asset_id",
-            mark_to_market_col="price",
-            timestamp_col="end_datetime",
+            strategy_id,
+            account,
+            price_interface,
+            asset_id_col,
+            mark_to_market_col,
+            timestamp_col,
             initial_cash=1e6,
             initial_timestamp=initial_timestamp,
         )
@@ -194,13 +210,18 @@ leverage,0.0
         ) = cdtfprinex.get_replayed_time_price_interface_example2(event_loop)
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
         dict_ = {101: 727.5, 202: 1040.3, -1: 10000}
+        strategy_id = "str1"
+        account = "paper"
+        asset_id_col = "asset_id"
+        mark_to_market_col = "price"
+        timestamp_col = "end_datetime"
         portfolio = omportfo.Portfolio.from_dict(
-            strategy_id="str1",
-            account="paper",
-            price_interface=price_interface,
-            asset_id_col="asset_id",
-            mark_to_market_col="price",
-            timestamp_col="end_datetime",
+            strategy_id,
+            account,
+            price_interface,
+            asset_id_col,
+            mark_to_market_col,
+            timestamp_col,
             holdings_dict=dict_,
             initial_timestamp=initial_timestamp,
         )
@@ -249,13 +270,18 @@ start_datetime,end_datetime,asset_id,price
             columns=[],
             get_wall_clock_time=get_wall_clock_time,
         )
+        strategy_id = "str1"
+        account = "paper"
+        asset_id_col = "asset_id"
+        mark_to_market_col = "price"
+        timestamp_col = "end_datetime"
         portfolio = omportfo.Portfolio.from_cash(
-            strategy_id="str1",
-            account="paper",
-            price_interface=price_interface,
-            asset_id_col="asset_id",
-            mark_to_market_col="price",
-            timestamp_col="end_datetime",
+            strategy_id,
+            account,
+            price_interface,
+            asset_id_col,
+            mark_to_market_col,
+            timestamp_col,
             initial_cash=1e6,
             initial_timestamp=initial_timestamp,
         )
