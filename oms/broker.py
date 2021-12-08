@@ -4,6 +4,7 @@ Import as:
 import oms.broker as ombroker
 """
 
+import abc
 import collections
 import logging
 from typing import Any, Dict, List
@@ -80,10 +81,10 @@ class Fill:
         return dict_
 
 
-# TODO(Paul): -> SimulatedBroker
-# TODO(*): At some point separate AbstractBroker from SimulatedBroker.
-# TODO(Paul): Add unit tests
-class Broker:
+# ##############################
+
+
+class AbstractBroker(abc.ABC):
     """
     Represent a broker to which we can place orders and receive fills back.
     """
@@ -95,15 +96,9 @@ class Broker:
     ) -> None:
         hdbg.dassert_issubclass(price_interface, cdtfprint.AbstractPriceInterface)
         self._price_interface = price_interface
-        # Map a timestamp to the orders with that execution time deadline.
-        self._deadline_timestamp_to_orders: Dict[
-            pd.Timestamp, List[omorder.Order]
-        ] = collections.defaultdict(list)
+        self._get_wall_clock_time = get_wall_clock_time
         # Last seen timestamp to enforce that time is only moving ahead.
         self._last_timestamp = None
-        # Track the fills for internal accounting.
-        self._fills: List[Fill] = []
-        self._get_wall_clock_time = get_wall_clock_time
 
     def submit_orders(
         self, orders: List[omorder.Order],
@@ -113,11 +108,7 @@ class Broker:
         """
         curr_timestamp = self._get_wall_clock_time()
         self._update_last_timestamp(curr_timestamp)
-        # Enqueue the orders based on their completion deadline time.
-        for order in orders:
-            # if self._
-            # TODO(gp): curr_timestamp <= order.start_timestamp
-            self._deadline_timestamp_to_orders[order.end_timestamp].append(order)
+        return self._submit_orders(orders)
 
     def get_fills(self, curr_timestamp: pd.Timestamp) -> List[Fill]:
         """
@@ -126,6 +117,73 @@ class Broker:
 
         Note that this function can be called only once since it passes
         the ownership of the...
+        """
+        wall_clock_time = self._get_wall_clock_time()
+        if curr_timestamp > wall_clock_time:
+            raise ValueError("You are asking about the future")
+        self._update_last_timestamp(curr_timestamp)
+        return self._get_fills(curr_timestamp)
+
+    @abc.abstractmethod
+    def _submit_orders(
+            self, orders: List[omorder.Order],
+    ) -> None:
+        ...
+
+    @abc.abstractmethod
+    def _get_fills(self, curr_timestamp: pd.Timestamp) -> List[Fill]:
+        ...
+
+    def _update_last_timestamp(self, curr_timestamp: pd.Timestamp) -> None:
+        if self._last_timestamp is not None:
+            hdbg.dassert_lte(self._last_timestamp, curr_timestamp)
+        # Update.
+        self._last_timestamp = curr_timestamp
+
+
+# ##############################
+
+
+# TODO(Paul): -> SimulatedBroker
+# TODO(Paul): Add unit tests
+class Broker(AbstractBroker):
+    """
+    Represent a broker to which we can place orders and receive fills back.
+    """
+
+    def __init__(
+        self,
+        *args: Any,
+    ) -> None:
+        super().__init__(*args)
+        # Map a timestamp to the orders with that execution time deadline.
+        self._deadline_timestamp_to_orders: Dict[
+            pd.Timestamp, List[omorder.Order]
+        ] = collections.defaultdict(list)
+        # Track the fills for internal accounting.
+        self._fills: List[Fill] = []
+
+    def _submit_orders(
+        self, orders: List[omorder.Order],
+    ) -> None:
+        """
+        Submit a list of orders to the broker at `curr_timestamp`.
+        """
+        curr_timestamp = self._get_wall_clock_time()
+        self._update_last_timestamp(curr_timestamp)
+        # Enqueue the orders based on their completion deadline time.
+        for order in orders:
+            # TODO(gp): curr_timestamp <= order.start_timestamp
+            self._deadline_timestamp_to_orders[order.end_timestamp].append(order)
+
+    def _get_fills(self, curr_timestamp: pd.Timestamp) -> List[Fill]:
+        """
+        Get fills for the orders that should have been executed by
+        `curr_timestamp`.
+
+        Note that this function can be called only once since the executed filled
+        are passed to the caller, assumed to be processed, and removed from this
+        class.
         """
         wall_clock_time = self._get_wall_clock_time()
         if curr_timestamp > wall_clock_time:
@@ -161,7 +219,7 @@ class Broker:
         self, curr_timestamp: pd.Timestamp, order: omorder.Order
     ) -> List[Fill]:
         num_shares = order.num_shares
-        # TODO(gp): We should move the logic here.
+        # TODO(Paul): We should move the logic here.
         price = order.get_execution_price()
         fill = Fill(order, curr_timestamp, num_shares, price)
         return [fill]

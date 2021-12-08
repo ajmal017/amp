@@ -231,6 +231,9 @@ def get_data_as_of_datetime(
 # #############################################################################
 
 
+# TODO(gp): Move to hasyncio.py
+
+# TODO(gp): Inline this function.
 async def _sleep(sleep_in_secs: float) -> None:
     hdbg.dassert_lte(0, sleep_in_secs)
     await asyncio.sleep(sleep_in_secs)
@@ -275,7 +278,7 @@ def align_on_time_grid(
     #
     if use_high_resolution:
         # Wait for a bit and then busy wait.
-        hdbg.dassert_eq(
+        hdbg.dassert_is(
             event_loop, None, "High resolution sleep works only in real-time"
         )
         _wait(secs_to_wait - 1)

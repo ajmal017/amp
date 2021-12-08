@@ -20,20 +20,26 @@
 
 <!--te-->
 
-# Invariants
+# Invariants and conventions
 
-- Use the new names and use "aka" to refer to the old name
-- All objects need to use:
-  - `get_wall_clock_time()` to get the "actual" time
-    - You don't want to pass `current_timestamp` because this is dangerous
-      - Difficult to enforce no future peeking (because one object tells another
-        what time is it, there is no way to double check)
-      - It's ok to ask for a view of the world as of `timestamp` (but then the
-        queried object needs to check that there is no future peeking by using
-        `get_wall_clock_time()`)
-  - `event_loop` to wait on events (`await`)
-  - TODO(gp): Clean it up so that we pass event loop all the time and event loop
-    has a reference to `get_wall_clock_time()`
+- In this doc we use the new names for concepts and use "aka" to refer to the old
+  name, if needed
+
+- We refer to:
+  - the as-of-date for a query as `as_of_timestamp`
+  - the actual time from `get_wall_clock_time()` as `wall_clock_timestamp` 
+ 
+- Objects need to use `get_wall_clock_time()` to get the "actual" time
+  - We don't want to pass `wall_clock_timestamp` because this is dangerous
+  - It is difficult to enforce no future peeking because one object tells another
+    what time is it, there is no way to double check
+  - It's ok to ask for a view of the world as of `as_of_timestamp`, but then the
+    queried object needs to check that there is no future peeking by using
+    `get_wall_clock_time()`
+
+- Objects might need to get `event_loop`
+  - TODO(gp): Clean it up so that we pass event loop all the times and event loop
+    has a reference to the global `get_wall_clock_time()`
 
 - The Optimizer only thinks in terms of dollar
 
