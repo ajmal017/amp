@@ -24,10 +24,12 @@ import os
 
 import pandas as pd
 
+# %%
+import amp.core.dataflow.test.builders_example
+import amp.core.dataflow_example
 import helpers.dbg as hdbg
 import helpers.printing as hprint
 
-# %%
 hprint.config_notebook()
 
 # hdbg.init_logger(verbosity=logging.DEBUG)
@@ -266,9 +268,8 @@ node = cdtfnotra.FunctionWrapper(nid, func, func_kwargs)
 node.fit(data)
 
 # %%
-import core.dataflow.test.test_builders as test_builders
 
-dag_builder = test_builders._NaivePipeline()
+dag_builder = amp.core.dataflow_example._NaivePipeline()
 
 config = dag_builder.get_config_template()
 

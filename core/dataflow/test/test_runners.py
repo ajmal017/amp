@@ -5,13 +5,14 @@ from typing import List, Optional, Tuple
 import numpy as np
 import pytest
 
-import core.dataflow.builders as cdtfbuil
+import core.dataflow.builders_example as cdtfbuexa
 import core.dataflow.real_time as cdtfretim
 import core.dataflow.real_time_example as cdtfretiex
 import core.dataflow.result_bundle as cdtfrebun
 import core.dataflow.runners as cdtfrunn
-import core.dataflow.test.test_builders as cdtfnttd
 import core.dataflow.visitors as cdtfvisi
+# TODO(*): Remove this dependency.
+import core.dataflow_example as cdtfexam
 import helpers.datetime_ as hdateti
 import helpers.hasyncio as hasynci
 import helpers.unit_test as hunitest
@@ -27,7 +28,7 @@ class TestRollingFitPredictDagRunner1(hunitest.TestCase):
         """
         Test the DagRunner using `ArmaReturnsBuilder`
         """
-        dag_builder = cdtfbuil.ArmaReturnsBuilder()
+        dag_builder = cdtfbuexa.ArmaReturnsBuilder()
         config = dag_builder.get_config_template()
         dag_builder.get_dag(config)
         #
@@ -51,7 +52,7 @@ class TestIncrementalDagRunner1(hunitest.TestCase):
         """
         Test the DagRunner using `ArmaReturnsBuilder`.
         """
-        dag_builder = cdtfbuil.ArmaReturnsBuilder()
+        dag_builder = cdtfbuexa.ArmaReturnsBuilder()
         config = dag_builder.get_config_template()
         # Create DAG and generate fit state.
         dag = dag_builder.get_dag(config)
@@ -121,7 +122,7 @@ class TestRealTimeDagRunner1(hunitest.TestCase):
         Test `RealTimeDagRunner` using a simple DAG triggering every 2 seconds.
         """
         # Get a naive pipeline as DAG.
-        dag_builder = cdtfnttd._NaivePipeline()
+        dag_builder = cdtfexam._NaivePipeline()
         config = dag_builder.get_config_template()
         config["process_forecasts"]["prediction_col"] = 0
         # Set up the event loop.

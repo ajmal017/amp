@@ -6,9 +6,7 @@ import core.config as cconfig
 import core.dataflow.price_interface_example as cdtfprinex
 import core.dataflow.real_time_example as cdtfretiex
 import core.dataflow.runners as cdtfrunn
-
-# Do not import from other test files.
-import core.dataflow.test.test_builders as cdtfnttd
+import core.dataflow_example as cdtfexam
 import dataflow_amp.real_time.pipeline as dtfaretipi
 import helpers.hasyncio as hasynci
 import helpers.unit_test as hunitest
@@ -123,7 +121,7 @@ class TestRealTimePipelineWithOms1(hunitest.TestCase):
             # Create the pipeline.
             # TODO(Paul): use another DAG instead of NaivePipeline().
             # dag_builder = dtfaretipi.RealTimeReturnPipeline()
-            dag_builder = cdtfnttd._NaivePipeline()
+            dag_builder = cdtfexam._NaivePipeline()
             config = dag_builder.get_config_template()
             # Inject the real-time node.
             start_datetime = pd.Timestamp(
