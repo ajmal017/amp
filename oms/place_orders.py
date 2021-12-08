@@ -105,7 +105,7 @@ def _generate_orders(
     order_config: Dict[str, Any],
 ) -> List[omorder.Order]:
     """
-    Turn a series of shares to trade into a list of orders.
+    Turn a series of asset_id / shares to trade into a list of orders.
 
     :param shares: number of shares to trade, indexed by `asset_id`
     :param order_config: common parameters used to initialize `Order`
@@ -151,25 +151,25 @@ def _update_portfolio(
 
 
 def _compute_target_positions_in_shares(
-    timestamp: pd.Timestamp,
+    curr_timestamp: pd.Timestamp,
     predictions: pd.Series,
     portfolio: omportfo.Portfolio,
 ) -> pd.DataFrame:
     """
     Compute target holdings, generate orders, and update the portfolio.
 
-    :param timestamp: timestamp used for valuing holdings
+    :param curr_timestamp: timestamp used for valuing holdings
     :param predictions: predictions indexed by `asset_id`
     :param portfolio: portfolio with current holdings
     """
-    hdbg.dassert_eq(portfolio.get_last_timestamp(), timestamp)
+    hdbg.dassert_eq(portfolio.get_last_timestamp(), curr_timestamp)
     if predictions.isna().sum() != 0:
         _LOG.debug(
             "Number of NaN predictions=`%i` at timestamp=`%s`",
             predictions.isna().sum(),
-            timestamp,
+            curr_timestamp,
         )
-    priced_holdings = _mark_to_market(timestamp, predictions, portfolio)
+    priced_holdings = _mark_to_market(curr_timestamp, predictions, portfolio)
     df = ocalopti.compute_target_positions_in_cash(
         priced_holdings, portfolio.CASH_ID
     )
@@ -241,11 +241,14 @@ async def place_orders(
     # TODO(Paul): Add a check for ATH start/end.
     ath_start_time = config["ath_start_time"]
     hdbg.dassert_isinstance(ath_start_time, datetime.time)
+    #
     trading_start_time = config["trading_start_time"]
     hdbg.dassert_isinstance(trading_start_time, datetime.time)
     hdbg.dassert_lte(ath_start_time, trading_start_time)
+    #
     ath_end_time = config["ath_end_time"]
     hdbg.dassert_isinstance(ath_end_time, datetime.time)
+    #
     trading_end_time = config["trading_end_time"]
     hdbg.dassert_isinstance(trading_end_time, datetime.time)
     hdbg.dassert_lte(trading_end_time, ath_end_time)
@@ -332,4 +335,5 @@ async def place_orders(
             hprint.frame("Submitting orders to broker: timestamp=%s" % timestamp, char1="#"),
         )
         broker.submit_orders(orders)
+        # TODO(gp): Remove this.
         await asyncio.sleep(60 * 5)

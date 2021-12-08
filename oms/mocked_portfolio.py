@@ -18,7 +18,7 @@ class MockedPortfolio:
 
     def __init__(
         self,
-        # TODO(GP): Add docstrings for these.
+        # TODO(gp): Add docstrings for these.
         strategy_id: str,
         account: str,
         #
@@ -27,29 +27,53 @@ class MockedPortfolio:
         mark_to_market_col: str,
         timestamp_col: str,
         #
-        db_connection_info: Any,
-        event_loop: Any,
+        db_connection: hsql.DbConnection,
+        table_name: str,
         get_wall_clock: Any,
     ):
         """
-        Same interface as Portfolio but no holdings_df.
-
-        Instead a pointer to the OMS DB.
+        :param table_name: the name of the table containing the current positions
+        :param asset_id_col: the name of the column storing the asset id
         """
-        # INV: the DB contains holdings and orders in the same format that the
-        # OMS would do.
+        self._db_connection = db_connection
+        self._table_name = table_name
+        self._asset_id_col = asset_col_id
+        # TODO(gp): Keep cash stored here.
 
-    @classmethod
-    def from_cash(
-        cls,
-        strategy_id: str,
-        account: str,
-        price_interface: cdtfprint.AbstractPriceInterface,
-        asset_id_col: str,
-        mark_to_market_col: str,
-        timestamp_col: str,
-        initial_cash: float,
-        # Can't pass this since the time is kept by the external clock.
-        # initial_timestamp: pd.Timestamp,
-    ) -> "Portfolio":
-        pass
+    def _update_state(
+        self,
+        curr_timestamp: pd.Timestamp,
+    ) -> pd.DataFrame:
+        asset_id = None
+        new_holdings = self._get_current_holdings(curr_timestamp, asset_id)
+        return new_holdings
+
+    def _get_current_holdings(
+        self,
+        curr_timestamp: pd.Timestamp,
+        asset_id: Optional[Any],
+    ) -> pd.DataFrame:
+        """
+        Return the holdings at `timestamp`.
+        """
+        # Wait until the portfolio is stable.
+        # TODO(gp): Implement.
+        #
+        # TODO(gp): How to compute the new cash amount?
+        query = []
+        query.append(f"SELECT id, current_position from {self._table_name}")
+        trade_date = curr_timestamp.date()
+        query.append(f"WHERE account={self._account} AND tradedate='{trade_date}'")
+        if asset_id is not None:
+            query.append(f'AND {self._asset_id_col}={asset_id}')
+        query.append(f"ORDER by {self._asset_id_col}")
+        query = "\n".join(query)
+        df = hsql.execute_query_to_df(self._db_connection, query)
+        hdbg.dassert_lt(0, df.shape[0])
+        # Convert a df like:
+        # ```
+        # ```
+        # into a `holding_df`:
+        # ```
+        # ```
+        return df

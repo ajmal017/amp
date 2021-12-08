@@ -363,42 +363,42 @@ class AbstractPortfolio(abc.ABC):
     def update_state(
         self,
         # TODO(gp): -> wall_clock_timestamp
-        timestamp: pd.Timestamp,
+        curr_timestamp: pd.Timestamp,
         fills_df: Optional[pd.DataFrame],
     ) -> None:
         """
         Update holdings at `timestamp`.
         """
-        #wall_clock_timestamp = self._get_wall_clock_time()
+        #curr_timestamp = self._get_wall_clock_time()
         _LOG.debug(
             "\n%s",
             hprint.frame(
-                "update_state: timestamp=%s" % timestamp, char1="<"
+                "update_state: curr_timestamp=%s" % curr_timestamp, char1="<"
             ),
         )
         # TODO(gp): Move this to hdatetime.
-        hdbg.dassert_isinstance(timestamp, pd.Timestamp)
-        hdbg.dassert_is_not(timestamp.tz, None)
-        hdbg.dassert_eq(timestamp.tz.zone, self._holdings.index.dtype.tz.zone)
-        # Check that latest holdings are timestamped prior to `timestamp`.
+        hdbg.dassert_isinstance(curr_timestamp, pd.Timestamp)
+        hdbg.dassert_is_not(curr_timestamp.tz, None)
+        hdbg.dassert_eq(curr_timestamp.tz.zone, self._holdings.index.dtype.tz.zone)
+        # Check that latest holdings are timestamped prior to `curr_timestamp`.
         last_timestamp = self.get_last_timestamp()
-        hdbg.dassert_lte(last_timestamp, timestamp)
+        hdbg.dassert_lte(last_timestamp, curr_timestamp)
         # Log portfolio characteristics at `last_timestamp` if not done already.
         # This could happen if there is a bar with no orders (or overnight).
         if last_timestamp not in self._characteristics:
             val = self.get_characteristics(last_timestamp)
             self._characteristics[last_timestamp] = val
         #
-        new_holdings = self._update_state(timestamp, fills_df)
+        new_holdings = self._update_state(curr_timestamp, fills_df)
         # TODO(gp): Make sure that new_holdings are after self._holdings.
         # Add the information to the holdings.
         Portfolio._validate_holdings_df(new_holdings)
         updated_state = pd.concat([new_holdings, self._holdings])
         updated_state = updated_state.convert_dtypes()
         self._holdings = updated_state
-        # Log portfolio characteristics at `timestamp` if not done already.
-        val = self.get_characteristics(timestamp)
-        self._characteristics[timestamp] = val
+        # Log portfolio characteristics at `curr_timestamp` if not done already.
+        val = self.get_characteristics(curr_timestamp)
+        self._characteristics[curr_timestamp] = val
 
     @abc.abstractmethod
     def _update_state(
@@ -643,7 +643,7 @@ class Portfolio(AbstractPortfolio):
         """
         last_timestamp = self.get_last_timestamp()
         # Get fills.
-        #fills_df = self._get_fills(curr_timestamp, fills_df)
+        #fills_df = self._get_fills(curr_timestamp)
         # Get latest holdings
         last_holdings = self.get_holdings(last_timestamp, asset_id=None)
         last_holdings.index.name = "last_timestamp"
@@ -667,35 +667,34 @@ class Portfolio(AbstractPortfolio):
         new_holdings = new_holdings.convert_dtypes()
         return new_holdings
 
-#    def _get_fills(
-#        self,
-#        curr_timestamp: pd.Timestamp,
-#        fills: List[pd.DataFrame],
-#    ) -> pd.DataFrame:
-#        """
-#        Get the fills from the broker and convert it into a `fills_df`.
-#
-#        :return: fills_df
-#        """
-#        # Get the fills from the broker.
-#        # TODO(gp): Ensure that this returns all the fills before
-#        # curr_timestamp.
-#        #fills = self._broker.get_fills(curr_timestamp)
-#        # Convert the fills into a `fills_df`.
-#        fill_rows = []
-#        for fill in fills:
-#            _LOG.debug("# Processing fill=%s", fill)
-#            fill_row: Dict[str, Any] = collections.OrderedDict()
-#            # Copy contents of the fill.
-#            fill_row.update(fill.to_dict())
-#            fill_rows.append(pd.Series(fill_row))
-#        if fill_rows:
-#            fills_df = pd.concat(fill_rows, axis=1).transpose()
-#            fills_df = fills_df.convert_dtypes()
-#        else:
-#            fills_df = None
-#        _LOG.debug("fills_df=\n%s", hprint.dataframe_to_str(fills_df))
-#        return fills_df
+    def _get_fills(
+        self,
+        curr_timestamp: pd.Timestamp,
+    ) -> pd.DataFrame:
+        """
+        Get the fills from the broker and convert it into a `fills_df`.
+
+        :return: fills_df
+        """
+        # Get the fills from the broker.
+        # TODO(gp): Ensure that this returns all the fills before
+        # curr_timestamp.
+        fills = self._broker.get_fills(curr_timestamp)
+        # Convert the fills into a `fills_df`.
+        fill_rows = []
+        for fill in fills:
+            _LOG.debug("# Processing fill=%s", fill)
+            fill_row: Dict[str, Any] = collections.OrderedDict()
+            # Copy contents of the fill.
+            fill_row.update(fill.to_dict())
+            fill_rows.append(pd.Series(fill_row))
+        if fill_rows:
+            fills_df = pd.concat(fill_rows, axis=1).transpose()
+            fills_df = fills_df.convert_dtypes()
+        else:
+            fills_df = None
+        _LOG.debug("fills_df=\n%s", hprint.dataframe_to_str(fills_df))
+        return fills_df
 
     @staticmethod
     def _validate_fills_df(
