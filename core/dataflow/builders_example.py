@@ -50,17 +50,21 @@ class ArmaReturnsBuilder(cdtfbuil.DagBuilder):
                         "end_time": datetime.time(16, 00),
                     },
                 },
-                # Resample returns.
-                self._get_nid("rets/resample"): {
-                    "rule": "1T",
-                    "price_cols": ["close"],
-                    "volume_cols": ["volume"],
-                },
                 # Compute TWAP and VWAP.
-                self._get_nid("rets/compute_wap"): {
-                    "rule": "5T",
-                    "price_col": "close",
-                    "volume_col": "volume",
+                self._get_nid("rets/resample"): {
+                    "func_kwargs": {
+                        "rule": "5T",
+                        "resampling_groups": [
+                            (
+                                {"close": "twap"},
+                                "mean",
+                                {},
+                            ),
+                        ],
+                        "vwap_groups": [
+                            ("close", "volume", "vwap"),
+                        ],
+                    },
                 },
                 # Calculate rets.
                 self._get_nid("rets/compute_ret_0"): {
@@ -124,13 +128,9 @@ class ArmaReturnsBuilder(cdtfbuil.DagBuilder):
         # Resample.
         stage = "rets/resample"
         nid = self._get_nid(stage)
-        node = cdtfnotra.TimeBarResampler(nid, **config[nid].to_dict())
-        tail_nid = self._append(dag, tail_nid, node)
-        # Compute TWAP and VWAP.
-        stage = "rets/compute_wap"
-        nid = self._get_nid(stage)
-        node = cdtfnotra.TwapVwapComputer(
+        node = cdtfnotra.FunctionWrapper(
             nid,
+            func=cofinanc.resample_bars,
             **config[nid].to_dict(),
         )
         tail_nid = self._append(dag, tail_nid, node)
