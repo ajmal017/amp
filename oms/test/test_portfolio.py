@@ -14,6 +14,7 @@ import core.dataflow.price_interface as cdtfprint
 import core.dataflow.price_interface_example as cdtfprinex
 import core.dataflow.real_time as cdtfretim
 import helpers.unit_test as hunitest
+import oms.broker as ombroker
 import oms.portfolio as omportfo
 import oms.portfolio_example as oporexam
 
@@ -94,29 +95,40 @@ class TestPortfolio1(hunitest.TestCase):
         self.assert_equal(str(holdings), expected, fuzzy_match=True)
 
 
+# #############################################################################
+
+
 class TestPortfolio2(hunitest.TestCase):
     def test_initialization1(self) -> None:
+        # Build a ReplayedTimePriceInterface.
         event_loop = None
         (
             price_interface,
-            _,
+            get_wall_clock_time,
         ) = cdtfprinex.get_replayed_time_price_interface_example2(event_loop)
-        initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
+        # Build Broker.
+        broker = ombroker.Broker(price_interface, get_wall_clock_time)
+        # Build a Portfolio.
         strategy_id = "str1"
         account = "paper"
         asset_id_col = "asset_id"
         mark_to_market_col = "price"
         timestamp_col = "end_datetime"
+        initial_cash = 1e6
+        initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
         portfolio = omportfo.Portfolio.from_cash(
             strategy_id,
             account,
             price_interface,
+            get_wall_clock_time,
             asset_id_col,
             mark_to_market_col,
             timestamp_col,
-            initial_cash=1e6,
+            broker=broker,
+            initial_cash=initial_cash,
             initial_timestamp=initial_timestamp,
         )
+        # Check.
         txt = r"""
 ,asset_id,curr_num_shares
 2000-01-01 09:35:00-05:00,-1.0,1000000.0"""
@@ -128,29 +140,36 @@ class TestPortfolio2(hunitest.TestCase):
         self.assert_dfs_close(portfolio.holdings, expected)
 
     def test_initialization2(self) -> None:
+        # Build a ReplayedTimePriceInterface.
         event_loop = None
         (
             price_interface,
-            _,
+            get_wall_clock_time,
         ) = cdtfprinex.get_replayed_time_price_interface_example2(event_loop)
-        initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
-        dict_ = {101: 727.5, 202: 1040.3, -1: 10000}
+        # Build Broker.
+        broker = ombroker.Broker(price_interface, get_wall_clock_time)
+        # Build a Portfolio.
         strategy_id = "str1"
         account = "paper"
         price_interface = price_interface
         asset_id_col = "asset_id"
         mark_to_market_col = "price"
         timestamp_col = "end_datetime"
+        holdings_dict = {101: 727.5, 202: 1040.3, -1: 10000}
+        initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
         portfolio = omportfo.Portfolio.from_dict(
             strategy_id,
             account,
             price_interface,
+            get_wall_clock_time,
             asset_id_col,
             mark_to_market_col,
             timestamp_col,
-            holdings_dict=dict_,
+            broker=broker,
+            holdings_dict=holdings_dict,
             initial_timestamp=initial_timestamp,
         )
+        # Check.
         txt = r"""
 ,asset_id,curr_num_shares
 2000-01-01 09:35:00-05:00,101,727.5
@@ -164,27 +183,35 @@ class TestPortfolio2(hunitest.TestCase):
         self.assert_dfs_close(portfolio.holdings, expected)
 
     def test_characteristics1(self) -> None:
+        # Build PriceInterface.
         event_loop = None
         (
             price_interface,
-            _,
+            get_wall_clock_time,
         ) = cdtfprinex.get_replayed_time_price_interface_example2(event_loop)
-        initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
+        # Build Broker.
+        broker = ombroker.Broker(price_interface, get_wall_clock_time)
+        # Build Portfolio.
         strategy_id = "str1"
         account = "paper"
         asset_id_col = "asset_id"
         mark_to_market_col = "price"
         timestamp_col = "end_datetime"
+        initial_cash = 1e6
+        initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
         portfolio = omportfo.Portfolio.from_cash(
             strategy_id,
             account,
             price_interface,
+            get_wall_clock_time,
             asset_id_col,
             mark_to_market_col,
             timestamp_col,
-            initial_cash=1e6,
+            broker=broker,
+            initial_cash=initial_cash,
             initial_timestamp=initial_timestamp,
         )
+        # Check.
         txt = r"""
 ,2000-01-01 09:35:00-05:00
 net_asset_holdings,0
@@ -197,19 +224,23 @@ leverage,0.0
             io.StringIO(txt),
             index_col=0,
         )
-        # The timestamp doesn't parse correctly from the csv.
+        # The timestamp doesn't parse correctly from the CSV.
         expected.columns = [initial_timestamp]
         actual = portfolio.get_characteristics(initial_timestamp)
         self.assert_dfs_close(actual.to_frame(), expected, rtol=1e-2, atol=1e-2)
 
     def test_characteristics2(self) -> None:
+        # Build PriceInterface.
         event_loop = None
         (
             price_interface,
-            _,
+            get_wall_clock_time,
         ) = cdtfprinex.get_replayed_time_price_interface_example2(event_loop)
+        # Build Broker.
+        broker = ombroker.Broker(price_interface, get_wall_clock_time)
+        # Build Portfolio.
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
-        dict_ = {101: 727.5, 202: 1040.3, -1: 10000}
+        holdings_dict = {101: 727.5, 202: 1040.3, -1: 10000}
         strategy_id = "str1"
         account = "paper"
         asset_id_col = "asset_id"
@@ -219,10 +250,12 @@ leverage,0.0
             strategy_id,
             account,
             price_interface,
+            get_wall_clock_time,
             asset_id_col,
             mark_to_market_col,
             timestamp_col,
-            holdings_dict=dict_,
+            broker=broker,
+            holdings_dict=holdings_dict,
             initial_timestamp=initial_timestamp,
         )
         txt = r"""
@@ -237,12 +270,13 @@ leverage,0.994
             io.StringIO(txt),
             index_col=0,
         )
-        # The timestamp doesn't parse correctly from the csv.
+        # The timestamp doesn't parse correctly from the CSV.
         expected.columns = [initial_timestamp]
         actual = portfolio.get_characteristics(initial_timestamp)
         self.assert_dfs_close(actual.to_frame(), expected, rtol=1e-2, atol=1e-2)
 
     def test_characteristics3(self) -> None:
+        # Build PriceInterface.
         tz = "ET"
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
         event_loop = None
@@ -270,6 +304,9 @@ start_datetime,end_datetime,asset_id,price
             columns=[],
             get_wall_clock_time=get_wall_clock_time,
         )
+        # Build Broker.
+        broker = ombroker.Broker(price_interface, get_wall_clock_time)
+        # Build Portfolio.
         strategy_id = "str1"
         account = "paper"
         asset_id_col = "asset_id"
@@ -279,12 +316,15 @@ start_datetime,end_datetime,asset_id,price
             strategy_id,
             account,
             price_interface,
+            get_wall_clock_time,
             asset_id_col,
             mark_to_market_col,
             timestamp_col,
+            broker=broker,
             initial_cash=1e6,
             initial_timestamp=initial_timestamp,
         )
+        # Check.
         txt = r"""
 ,2000-01-01 09:35:00-05:00
 net_asset_holdings,0
@@ -297,7 +337,7 @@ leverage,0.0
             io.StringIO(txt),
             index_col=0,
         )
-        # The timestamp doesn't parse correctly from the csv.
+        # The timestamp doesn't parse correctly from the CSV.
         expected.columns = [initial_timestamp]
         actual = portfolio.get_characteristics(initial_timestamp)
         self.assert_dfs_close(actual.to_frame(), expected, rtol=1e-2, atol=1e-2)

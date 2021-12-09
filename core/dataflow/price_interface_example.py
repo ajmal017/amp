@@ -3,11 +3,11 @@ Import as:
 
 import core.dataflow.price_interface_example as cdtfprinex
 """
-# TODO: Consider moving this out of dataflow and into oms.
+# TODO(Paul): Consider moving this out of dataflow and into oms.
 
 import asyncio
 import logging
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -22,31 +22,35 @@ import helpers.printing as hprint
 _LOG = logging.getLogger(__name__)
 
 
+# TODO(gp): -> generate_random_price_data()
 def generate_synthetic_db_data(
     start_datetime: pd.Timestamp,
     end_datetime: pd.Timestamp,
     columns: List[str],
-    # TODO(gp): -> asset_ids
-    ids: List[int],
+    asset_ids: List[int],
     *,
     freq: str = "1T",
     seed: int = 42,
 ) -> pd.DataFrame:
     """
-    Generate synthetic data used to mimic real-time data.
+    Generate synthetic data used to mimic real-time price data.
 
-    The data looks like:
-    ```
-    TODO(gp):
-    ```
+    The data:
+        - is a random walk with a bias of 1000 and increments ~ iid U[-0.5, 0.5]
+        - looks like:
+        ```
+        TODO(gp):
+        ```
     """
-    _LOG.debug(hprint.to_str("start_datetime end_datetime columns ids freq seed"))
+    _LOG.debug(
+        hprint.to_str("start_datetime end_datetime columns asset_ids freq seed")
+    )
     hdateti.dassert_tz_compatible(start_datetime, end_datetime)
     hdbg.dassert_lte(start_datetime, end_datetime)
     start_dates = pd.date_range(start_datetime, end_datetime, freq=freq)
     dfs = []
     offset = 1000
-    for id_ in ids:
+    for asset_id in asset_ids:
         df = pd.DataFrame()
         df["start_datetime"] = start_dates
         df["end_datetime"] = start_dates + pd.Timedelta(minutes=1)
@@ -58,7 +62,7 @@ def generate_synthetic_db_data(
             with hnumpy.random_seed_context(seed):
                 data = np.random.rand(len(start_dates), 1) - 0.5  # type: ignore[var-annotated]
             df[column] = offset + data.cumsum()
-        df["asset_id"] = id_
+        df["asset_id"] = asset_id
         dfs.append(df)
     df = pd.concat(dfs, axis=0)
     return df
@@ -77,7 +81,7 @@ def get_replayed_time_price_interface_example1(
     df: Optional[pd.DataFrame] = None,
     sleep_in_secs: float = 1.0,
     time_out_in_secs: int = 60 * 2,
-) -> cdtfprint.ReplayedTimePriceInterface:
+) -> Tuple[cdtfprint.ReplayedTimePriceInterface, hdateti.GetWallClockTime]:
     """
     Build a ReplayedTimePriceInterface backed by synthetic data.
 
@@ -100,14 +104,13 @@ def get_replayed_time_price_interface_example1(
             start_datetime, end_datetime, columns, asset_ids
         )
     # Build the `ReplayedTimePriceInterface` backed by the df with
-    # `initial_replayed_dt` equal to a given number of minutes after the first
-    # timestamp of the data.
+    # `initial_replayed_delay` after the first timestamp of the data.
     knowledge_datetime_col_name = "timestamp_db"
     asset_id_col_name = "asset_id"
     start_time_col_name = "start_datetime"
     end_time_col_name = "end_datetime"
     columns = None
-    # Get the wall clock.
+    # Build the wall clock.
     tz = "ET"
     initial_replayed_dt = df[start_time_col_name].min() + pd.Timedelta(
         minutes=initial_replayed_delay
@@ -119,7 +122,7 @@ def get_replayed_time_price_interface_example1(
         event_loop=event_loop,
         speed_up_factor=speed_up_factor,
     )
-    # Build object.
+    # Build a `ReplayedTimePriceInterface`.
     price_interface = cdtfprint.ReplayedTimePriceInterface(
         df,
         knowledge_datetime_col_name,
@@ -137,7 +140,15 @@ def get_replayed_time_price_interface_example1(
     return price_interface, get_wall_clock_time
 
 
-def get_replayed_time_price_interface_example2(event_loop):
+def get_replayed_time_price_interface_example2(
+    event_loop: asyncio.AbstractEventLoop,
+) -> Tuple[cdtfprint.ReplayedTimePriceInterface, hdateti.GetWallClockTime]:
+    """
+    Build a ReplayedTimePriceInterface:
+    - with synthetic data between `2000-01-01 9:30` and `10:30`
+    - for two assets
+    """
+    # Generate random price data.
     start_datetime = pd.Timestamp(
         "2000-01-01 09:30:00-05:00", tz="America/New_York"
     )
@@ -146,12 +157,11 @@ def get_replayed_time_price_interface_example2(event_loop):
     )
     columns_ = ["price"]
     asset_ids = [101, 202]
-    # asset_ids = [1000]
     df = generate_synthetic_db_data(
         start_datetime, end_datetime, columns_, asset_ids
     )
     _LOG.debug("df=%s", hprint.dataframe_to_str(df))
-    # Build a ReplayedTimePriceInterface.
+    # Build a `ReplayedTimePriceInterface`.
     initial_replayed_delay = 5
     delay_in_secs = 0
     sleep_in_secs = 30

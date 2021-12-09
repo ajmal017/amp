@@ -10,6 +10,7 @@ import core.dataflow_example as cdtfexam
 import dataflow_amp.real_time.pipeline as dtfaretipi
 import helpers.hasyncio as hasynci
 import helpers.unit_test as hunitest
+import oms.broker as ombroker
 import oms.portfolio as omportfo
 
 _LOG = logging.getLogger(__name__)
@@ -138,7 +139,7 @@ class TestRealTimePipelineWithOms1(hunitest.TestCase):
             initial_replayed_delay = 0
             (
                 price_interface,
-                _,
+                get_wall_clock_time,
             ) = cdtfprinex.get_replayed_time_price_interface_example1(
                 event_loop,
                 start_datetime,
@@ -164,23 +165,26 @@ class TestRealTimePipelineWithOms1(hunitest.TestCase):
             # Build Portfolio.
             # TODO(Paul): We want to have builder functions in the same class as
             #  the objects to build "standard" objects.
-            initial_timestamp = pd.Timestamp(
-                "2000-01-01 09:30:00-05:00", tz="America/New_York"
-            )
             strategy_id="str1"
             account="paper"
             asset_id_col="asset_id"
             mark_to_market_col="price"
             # mark_to_market_col = "close"
             timestamp_col="end_datetime"
+            broker = ombroker.Broker(price_interface, get_wall_clock_time)
+            initial_cash = 1e6
+            initial_timestamp = pd.Timestamp(
+                "2000-01-01 09:30:00-05:00", tz="America/New_York"
+            )
             portfolio = omportfo.Portfolio.from_cash(
                 strategy_id,
                 account,
                 price_interface,
+                get_wall_clock_time,
                 asset_id_col,
                 mark_to_market_col,
-                # mark_to_market_col,
                 timestamp_col,
+                broker=broker,
                 initial_cash=1e6,
                 initial_timestamp=initial_timestamp,
             )

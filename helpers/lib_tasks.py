@@ -326,8 +326,9 @@ def print_tasks(ctx, as_code=False):  # type: ignore
     _report_task()
     _ = ctx
     func_names = []
-    lib_tasks_file_name = os.path.join(hgit.get_amp_abs_path(),
-            "helpers/lib_tasks.py")
+    lib_tasks_file_name = os.path.join(
+        hgit.get_amp_abs_path(), "helpers/lib_tasks.py"
+    )
     hdbg.dassert_file_exists(lib_tasks_file_name)
     # TODO(gp): Use __file__ instead of hardwiring the file.
     cmd = rf'\grep "^@task" -A 1 {lib_tasks_file_name} | grep def'
@@ -2605,6 +2606,48 @@ def pytest_failed(  # type: ignore
 
 
 # #############################################################################
+
+
+def _purify_test_output(src_file_name: str, dst_file_name: str) -> None:
+    """
+    Clean up the output of `pytest -s --dbg` to make easier to compare two runs.
+
+    E.g., remove the timestamps, reference to Git repo.
+    """
+    _LOG.info("Converted '%s' -> '%s", src_file_name, dst_file_name)
+    txt = hio.from_file(src_file_name)
+    out_txt = []
+    for line in txt.split("\n"):
+        # 10:05:18       portfolio        : _get_holdings       : 431 :
+        m = re.match("^\d\d:\d\d:\d\d\s+(.*:.*)$", line)
+        if m:
+            new_line = m.group(1)
+        else:
+            new_line = line
+        out_txt.append(new_line)
+    #
+    out_txt = "\n".join(out_txt)
+    hio.to_file(dst_file_name, out_txt)
+
+
+@task
+def pytest_compare(ctx, file_name1, file_name2):  # type: ignore
+    """
+    Compare the output of two runs of `pytest -s --dbg` removing irrelevant details.
+    """
+    _report_task()
+    _ = ctx
+    # TODO(gp): Change the name of the file before the extension.
+    dst_file_name1 = file_name1 + ".purified"
+    _purify_test_output(file_name1, dst_file_name1)
+    dst_file_name2 = file_name2 + ".purified"
+    _purify_test_output(file_name2, dst_file_name2)
+    # TODO(gp): Call vimdiff automatically.
+    cmd = "vimdiff %s %s" % (dst_file_name1, dst_file_name2)
+    print(f"> {cmd}")
+
+
+# #############################################################################
 # Linter.
 # #############################################################################
 
@@ -2833,20 +2876,24 @@ def lint(  # type: ignore
     # ```
     if only_formatting:
         hdbg.dassert_eq(phases, "")
-        phases = " ".join([
-            "amp_isort",
-            "amp_class_method_order",
-            "amp_normalize_import",
-            "amp_format_separating_line",
-            "amp_black",
-            "amp_processjupytext",
-        ])
+        phases = " ".join(
+            [
+                "amp_isort",
+                "amp_class_method_order",
+                "amp_normalize_import",
+                "amp_format_separating_line",
+                "amp_black",
+                "amp_processjupytext",
+            ]
+        )
     if only_checks:
         hdbg.dassert_eq(phases, "")
-        phases = " ".join([
-            "amp_pylint",
-            "amp_mypy",
-        ])
+        phases = " ".join(
+            [
+                "amp_pylint",
+                "amp_mypy",
+            ]
+        )
     if run_linter_step:
         # We don't want to run this all the times.
         # docker_pull(ctx, stage=stage, images="dev_tools")

@@ -20,10 +20,6 @@ import oms.broker as ombroker
 _LOG = logging.getLogger(__name__)
 
 
-# TODO(Paul): Use curr_timestamp -> wall_clock_timestamp
-# TODO(Paul): timestamp -> as_of_datetime
-
-
 class AbstractPortfolio(abc.ABC):
     """
     Store holdings over time, e.g., many shares of each asset are owned at any time.
@@ -57,14 +53,12 @@ class AbstractPortfolio(abc.ABC):
         self,
         strategy_id: str,
         account: str,
-        #
         price_interface: cdtfprint.AbstractPriceInterface,
+        get_wall_clock_time: hdateti.GetWallClockTime,
         asset_id_col: str,
         mark_to_market_col: str,
         timestamp_col: str,
         holdings_df: pd.DataFrame,
-        #
-        # get_wall_clock_time: hdateti.GetWallClockTime,
     ):
         """
         Constructor.
@@ -89,13 +83,13 @@ class AbstractPortfolio(abc.ABC):
         #
         hdbg.dassert_issubclass(price_interface, cdtfprint.AbstractPriceInterface)
         self._price_interface = price_interface
+        self._get_wall_clock_time = get_wall_clock_time
         self._asset_id_col = asset_id_col
         self._mark_to_market_col = mark_to_market_col
         self._timestamp_col = timestamp_col
         #
         self._validate_initial_holdings_df(holdings_df)
         self._holdings = holdings_df
-        # self._get_wall_clock_time = get_wall_clock_time
         # Dictionary from timestamp to some portfolio statistics.
         # TODO(gp): -> _statistics?
         self._characteristics = collections.OrderedDict()
@@ -115,6 +109,7 @@ class AbstractPortfolio(abc.ABC):
         *args: Any,
         initial_cash: float,
         initial_timestamp: pd.Timestamp,
+        **kwargs: Any,
     ) -> "Portfolio":
         """
         Initialize a portfolio with no non-cash assets.
@@ -129,6 +124,7 @@ class AbstractPortfolio(abc.ABC):
         portfolio = cls(
             *args,
             holdings_df,
+            **kwargs,
         )
         return portfolio
 
@@ -138,6 +134,7 @@ class AbstractPortfolio(abc.ABC):
         *args: Any,
         holdings_dict: Dict[int, float],
         initial_timestamp: pd.Timestamp,
+        **kwargs: Any,
     ) -> "Portfolio":
         """
         Initialize from a dict of holdings and initial timestamp.
@@ -153,6 +150,7 @@ class AbstractPortfolio(abc.ABC):
         portfolio = cls(
             *args,
             holdings_df,
+            **kwargs,
         )
         return portfolio
 
@@ -352,7 +350,7 @@ class AbstractPortfolio(abc.ABC):
         """
         Update holdings at the current wall clock time.
         """
-        # wall_clock_timestamp = self._get_wall_clock_time()
+        wall_clock_timestamp = self._get_wall_clock_time()
         _LOG.debug(
             "\n%s",
             hprint.frame(
@@ -391,7 +389,6 @@ class AbstractPortfolio(abc.ABC):
         self,
         wall_clock_timestamp: pd.Timestamp,
         fills_df: Optional[pd.DataFrame],
-        # last_timestamp: pd.Timestamp,
     ) -> pd.DataFrame:
         """
         :return: a holding_df with the new holdings
@@ -597,18 +594,18 @@ class AbstractPortfolio(abc.ABC):
 
 
 # TODO(gp): -> SimulatedPortfolio
-# TODO(gp): Move in simulated_portfolio.py?
 class Portfolio(AbstractPortfolio):
     def __init__(
         self,
-        *args,
-        # broker: ombroker.Broker
+        *args: Any,
+        # In Python parameters after *args are always keywords-only.
+        broker: ombroker.Broker,
     ):
         """
         Constructor.
         """
         super().__init__(*args)
-        # self._broker = broker
+        self.broker = broker
 
     # A `fills_df` represents orders that have been executed (e.g., how many shares,
     # at how much).
@@ -620,8 +617,6 @@ class Portfolio(AbstractPortfolio):
         "price",
     ]
 
-    # TODO(gp): if we pass the broker to Portfolio then it can get the fills
-    #  directly making the abstract interface uniform.
     def _update_state(
         self,
         wall_clock_timestamp: pd.Timestamp,
@@ -630,15 +625,17 @@ class Portfolio(AbstractPortfolio):
         """
         Update holdings at `timestamp` using fills information in `fill_df`.
         """
+        _LOG.debug("")
         last_timestamp = self.get_last_timestamp()
+        _LOG.debug("last_timestamp=%s", last_timestamp)
         # Get fills.
-        # fills_df = self._get_fills(wall_clock_timestamp)
+        #fills_df = self._get_fills(wall_clock_timestamp)
         # Get latest holdings
         last_holdings = self.get_holdings(last_timestamp, asset_id=None)
         last_holdings.index.name = "last_timestamp"
         last_holdings.reset_index(inplace=True)
         last_holdings_srs = last_holdings.set_index("asset_id")["curr_num_shares"]
-        # Update holdings.
+        # Update holdings using the `fills_df`.
         new_holdings_srs = last_holdings_srs.copy()
         if fills_df is not None:
             Portfolio._validate_fills_df(fills_df)
@@ -665,10 +662,11 @@ class Portfolio(AbstractPortfolio):
 
         :return: fills_df
         """
+        _LOG.debug("")
         # Get the fills from the broker.
         # TODO(gp): Ensure that this returns all the fills before
-        # curr_timestamp.
-        fills = self._broker.get_fills(wall_clock_timestamp)
+        #  wall_clock_timestamp.
+        fills = self.broker.get_fills(wall_clock_timestamp)
         # Convert the fills into a `fills_df`.
         fill_rows = []
         for fill in fills:

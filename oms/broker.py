@@ -87,11 +87,14 @@ class AbstractBroker(abc.ABC):
     def __init__(
         self,
         price_interface: cdtfprint.AbstractPriceInterface,
+        # TODO(gp): -> price_interface.get_wall_clock_time
         get_wall_clock_time: hdateti.GetWallClockTime,
     ) -> None:
         hdbg.dassert_issubclass(price_interface, cdtfprint.AbstractPriceInterface)
         self._price_interface = price_interface
         self._get_wall_clock_time = get_wall_clock_time
+        # Track the orders for internal accounting.
+        self._orders = []
         # Last seen timestamp to enforce that time is only moving ahead.
         self._last_timestamp = None
 
@@ -100,25 +103,33 @@ class AbstractBroker(abc.ABC):
         orders: List[omorder.Order],
     ) -> None:
         """
-        Submit a list of orders to the broker at `curr_timestamp`.
+        Submit a list of orders to the broker at the current wall clock time.
         """
-        curr_timestamp = self._get_wall_clock_time()
-        self._update_last_timestamp(curr_timestamp)
-        return self._submit_orders(orders)
+        _ = self._update_last_timestamp()
+        # Submit the orders.
+        self._orders.extend(orders)
+        self._submit_orders(orders)
 
-    def get_fills(self, curr_timestamp: pd.Timestamp) -> List[Fill]:
+    def get_fills(self, as_of_timestamp: pd.Timestamp) -> List[Fill]:
         """
         Get fills for the orders that should have been executed by
-        `curr_timestamp`.
+        `as_of_timestamp`.
 
-        Note that this function can be called only once since it passes
-        the ownership of the...
+        Note that this function can be called only once for a given
+        `as_of_timestamp`. In fact it assumes that the fills are consumed and
+        processed from the caller and fills are deleted.
         """
-        wall_clock_time = self._get_wall_clock_time()
-        if curr_timestamp > wall_clock_time:
-            raise ValueError("You are asking about the future")
-        self._update_last_timestamp(curr_timestamp)
-        return self._get_fills(curr_timestamp)
+        wall_clock_timestamp = self._update_last_timestamp()
+        # Check future peeking.
+        if as_of_timestamp > wall_clock_timestamp:
+            raise ValueError(
+                f"You are asking about the future: "
+                "as_of_timestamp={as_of_timestamp} > "
+                "wall_clock_timestamp={wall_clock_timestamp}"
+            )
+        # Get the fills.
+        fills = self._get_fills(as_of_timestamp)
+        return fills
 
     @abc.abstractmethod
     def _submit_orders(
@@ -128,14 +139,23 @@ class AbstractBroker(abc.ABC):
         ...
 
     @abc.abstractmethod
-    def _get_fills(self, curr_timestamp: pd.Timestamp) -> List[Fill]:
+    def _get_fills(self, as_of_timestamp: pd.Timestamp) -> List[Fill]:
         ...
 
-    def _update_last_timestamp(self, curr_timestamp: pd.Timestamp) -> None:
+    def _update_last_timestamp(self) -> pd.Timestamp:
+        """
+        Make sure that the current wall clock time is after the previous interaction.
+
+        :return: current wall clock time
+        """
+        wall_clock_timestamp = self._get_wall_clock_time()
+        _LOG.debug("wall_clock_timestamp=%s", wall_clock_timestamp)
+        #
         if self._last_timestamp is not None:
-            hdbg.dassert_lte(self._last_timestamp, curr_timestamp)
+            hdbg.dassert_lte(self._last_timestamp, wall_clock_timestamp)
         # Update.
-        self._last_timestamp = curr_timestamp
+        self._last_timestamp = wall_clock_timestamp
+        return wall_clock_timestamp
 
 
 # #############################################################################
@@ -164,68 +184,46 @@ class Broker(AbstractBroker):
         self,
         orders: List[omorder.Order],
     ) -> None:
-        """
-        Submit a list of orders to the broker at `curr_timestamp`.
-        """
-        curr_timestamp = self._get_wall_clock_time()
-        self._update_last_timestamp(curr_timestamp)
         # Enqueue the orders based on their completion deadline time.
         for order in orders:
             # TODO(gp): curr_timestamp <= order.start_timestamp
             self._deadline_timestamp_to_orders[order.end_timestamp].append(order)
 
-    def _get_fills(self, curr_timestamp: pd.Timestamp) -> List[Fill]:
-        """
-        Get fills for the orders that should have been executed by
-        `curr_timestamp`.
-
-        Note that this function can be called only once since the executed filled
-        are passed to the caller, assumed to be processed, and removed from this
-        class.
-        """
-        wall_clock_time = self._get_wall_clock_time()
-        if curr_timestamp > wall_clock_time:
-            raise ValueError("You are asking about the future")
-        self._update_last_timestamp(curr_timestamp)
+    def _get_fills(self, as_of_timestamp: pd.Timestamp) -> List[Fill]:
         # We should always get the "next" orders, for this reason one should use
         # a priority queue.
         timestamps = self._deadline_timestamp_to_orders.keys()
         _LOG.debug("Timestamps of orders in queue: %s", timestamps)
         if not timestamps:
             return []
-        hdbg.dassert_eq(min(timestamps), curr_timestamp)
-        orders_to_execute = self._deadline_timestamp_to_orders[curr_timestamp]
+        # In our current execution model, we should ask about the orders that are
+        # terminating.
+        hdbg.dassert_eq(min(timestamps), as_of_timestamp)
+        orders_to_execute = self._deadline_timestamp_to_orders[as_of_timestamp]
         _LOG.debug("Executing %d orders", len(orders_to_execute))
-        # We can execute this function only once.
-        hdbg.dassert_is_not(orders_to_execute, None)
-        # `timestamp` should match the end time of the orders.
+        # `as_of_timestamp` should match the end time of the orders.
         for order in orders_to_execute:
-            hdbg.dassert_eq(curr_timestamp, order.end_timestamp)
+            hdbg.dassert_eq(as_of_timestamp, order.end_timestamp)
         # "Execute" the orders.
         fills = []
         for order in orders_to_execute:
             # TODO(gp): Here there should be a programmable logic that decides
             #  how many shares are filled.
-            fills.extend(self._fully_fill(curr_timestamp, order))
+            fills.extend(self._fully_fill(as_of_timestamp, order))
+        self._fills.append(fills)
         # Remove the orders that have been executed.
         _LOG.debug(
-            "Removing orders from queue with deadline=`%s`", curr_timestamp
+            "Removing orders from queue with deadline=`%s`", as_of_timestamp
         )
-        del self._deadline_timestamp_to_orders[curr_timestamp]
-        _LOG.debug("Returning %d fills", len(fills))
+        del self._deadline_timestamp_to_orders[as_of_timestamp]
+        _LOG.debug("-> Returning fills:\n%s", str(fills))
         return fills
 
     def _fully_fill(
-        self, curr_timestamp: pd.Timestamp, order: omorder.Order
+        self, wall_clock_timestamp: pd.Timestamp, order: omorder.Order
     ) -> List[Fill]:
         num_shares = order.num_shares
         # TODO(Paul): We should move the logic here.
         price = order.get_execution_price()
-        fill = Fill(order, curr_timestamp, num_shares, price)
+        fill = Fill(order, wall_clock_timestamp, num_shares, price)
         return [fill]
-
-    def _update_last_timestamp(self, curr_timestamp: pd.Timestamp) -> None:
-        if self._last_timestamp is not None:
-            hdbg.dassert_lte(self._last_timestamp, curr_timestamp)
-        # Update.
-        self._last_timestamp = curr_timestamp

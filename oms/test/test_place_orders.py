@@ -19,20 +19,17 @@ _LOG = logging.getLogger(__name__)
 
 class TestPlaceOrders1(hunitest.TestCase):
     def test_initialization1(self) -> None:
-        # event_loop = None
         with hasynci.solipsism_context() as event_loop:
             hasynci.run(self._test_coroutine1(event_loop), event_loop=event_loop)
 
-    async def _test_coroutine1(self, event_loop) -> None:
+    async def _test_coroutine1(
+        self, event_loop: asyncio.AbstractEventLoop
+    ) -> None:
         config = {}
         (
             price_interface,
             get_wall_clock_time,
         ) = cdtfprinex.get_replayed_time_price_interface_example2(event_loop)
-        initial_timestamp = pd.Timestamp(
-            "2000-01-01 09:30:00-05:00", tz="America/New_York"
-        )
-        broker = ombroker.Broker(price_interface, get_wall_clock_time)
         # Build predictions.
         index = [
             pd.Timestamp("2000-01-01 09:35:00-05:00", tz="America/New_York"),
@@ -46,13 +43,16 @@ class TestPlaceOrders1(hunitest.TestCase):
             [-0.3, 0.0],
         ]
         predictions = pd.DataFrame(data, index=index, columns=columns)
-        config["price_interface"] = price_interface
         # Build a Portfolio.
+        initial_timestamp = pd.Timestamp(
+            "2000-01-01 09:30:00-05:00", tz="America/New_York"
+        )
         portfolio = oporexam.get_portfolio_example1(
             price_interface, initial_timestamp
         )
+        config["price_interface"] = price_interface
         config["portfolio"] = portfolio
-        config["broker"] = broker
+        config["broker"] = portfolio.broker
         config["order_type"] = "price@twap"
         config["ath_start_time"] = datetime.time(9, 30)
         config["trading_start_time"] = datetime.time(9, 35)
@@ -90,7 +90,7 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
         end_datetime = pd.Timestamp("2000-01-01 09:35:00-05:00")
         (
             price_interface,
-            _,
+            get_wall_clock_time,
         ) = cdtfprinex.get_replayed_time_price_interface_example1(
             event_loop,
             start_datetime,
@@ -101,10 +101,10 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             sleep_in_secs=sleep_in_secs,
             time_out_in_secs=time_out_in_secs,
         )
+        broker = ombroker.Broker(price_interface, get_wall_clock_time)
         # Initialize portfolio.
         strategy_id = "str1"
         account = "paper"
-        price_interface = price_interface
         asset_id_col = "asset_id"
         mark_to_market_col = "price"
         timestamp_col = "end_datetime"
@@ -112,9 +112,11 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             strategy_id,
             account,
             price_interface,
+            get_wall_clock_time,
             asset_id_col,
             mark_to_market_col,
             timestamp_col,
+            broker=broker,
             initial_cash=1e6,
             initial_timestamp=initial_timestamp,
         )
@@ -198,6 +200,7 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             sleep_in_secs=sleep_in_secs,
             time_out_in_secs=time_out_in_secs,
         )
+        broker = ombroker.Broker(price_interface, get_wall_clock_time)
         # Initialize portfolio.
         strategy_id = "str1"
         account = "paper"
@@ -208,9 +211,11 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             strategy_id,
             account,
             price_interface,
+            get_wall_clock_time,
             asset_id_col,
             mark_to_market_col,
             timestamp_col,
+            broker=broker,
             initial_cash=1e6,
             initial_timestamp=initial_timestamp,
         )
@@ -266,6 +271,3 @@ leverage,0.1007
             pd.Timestamp("2000-01-01 09:40:00-05:00", tz="America/New_York")
         ]
         self.assert_dfs_close(actual.to_frame(), expected, rtol=1e-2, atol=1e-2)
-
-
-# class SimulateOrderFills1(hunitest.TestCase):

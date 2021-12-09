@@ -9,6 +9,7 @@ import logging
 import pandas as pd
 
 import core.dataflow.price_interface as cdtfprint
+import oms.broker as ombroker
 import oms.portfolio as omportfo
 
 _LOG = logging.getLogger(__name__)
@@ -20,19 +21,23 @@ def get_portfolio_example1(
 ) -> omportfo.Portfolio:
     strategy_id = "st1"
     account = "paper"
+    get_wall_clock_time = price_interface.get_wall_clock_time
     asset_id_column = "asset_id"
     # price_column = "midpoint"
     mark_to_market_col = "price"
     timestamp_col = "end_datetime"
+    broker = ombroker.Broker(price_interface, get_wall_clock_time)
     #
     initial_cash = 1e6
     portfolio = omportfo.Portfolio.from_cash(
         strategy_id,
         account,
         price_interface,
+        get_wall_clock_time,
         asset_id_column,
         mark_to_market_col,
         timestamp_col,
+        broker=broker,
         #
         initial_cash=initial_cash,
         initial_timestamp=initial_timestamp,
