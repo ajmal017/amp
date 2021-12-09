@@ -1,7 +1,7 @@
 """
 Import as:
 
-import core.dataflow.real_time_example as cdtfretiex
+import core.real_time_example as cretiexa
 """
 
 import asyncio
@@ -10,7 +10,7 @@ from typing import Callable, Optional, Tuple
 
 import pandas as pd
 
-import core.dataflow.real_time as cdtfretim
+import core.real_time as creatime
 import helpers.datetime_ as hdateti
 import helpers.htypes as htypes
 
@@ -24,7 +24,7 @@ def get_test_data_builder1() -> Tuple[Callable, htypes.Kwargs]:
 
     :return: `data_builder` and its kwargs for use inside a dataflow node.
     """
-    data_builder = cdtfretim.generate_synthetic_data
+    data_builder = creatime.generate_synthetic_data
     data_builder_kwargs = {
         "columns": ["close", "volume"],
         "start_datetime": pd.Timestamp("2010-01-04 09:30:00"),
@@ -42,7 +42,7 @@ def get_test_data_builder2() -> Tuple[Callable, htypes.Kwargs]:
 
     :return: `data_builder` and its kwargs for use inside a dataflow node.
     """
-    data_builder = cdtfretim.generate_synthetic_data
+    data_builder = creatime.generate_synthetic_data
     data_builder_kwargs = {
         "columns": ["close", "volume"],
         "start_datetime": pd.Timestamp("2010-01-04 09:30:00"),
@@ -58,7 +58,7 @@ def get_test_data_builder2() -> Tuple[Callable, htypes.Kwargs]:
 def get_replayed_time(
     *,
     event_loop: Optional[asyncio.AbstractEventLoop] = None,
-) -> cdtfretim.ReplayedTime:
+) -> creatime.ReplayedTime:
     """
     Build a `ReplayedTime` object starting at the same time as the data (i.e.,
     "2010-01-04 09:30:00").
@@ -68,7 +68,7 @@ def get_replayed_time(
     get_wall_clock_time = lambda: hdateti.get_current_time(
         tz="naive_ET", event_loop=event_loop
     )
-    rt = cdtfretim.ReplayedTime(start_datetime, get_wall_clock_time)
+    rt = creatime.ReplayedTime(start_datetime, get_wall_clock_time)
     return rt
 
 

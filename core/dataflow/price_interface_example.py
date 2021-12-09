@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 import core.dataflow.price_interface as cdtfprint
-import core.dataflow.real_time as cdtfretim
+import core.real_time as creatime
 import helpers.datetime_ as hdateti
 import helpers.dbg as hdbg
 import helpers.hnumpy as hnumpy
@@ -116,7 +116,7 @@ def get_replayed_time_price_interface_example1(
         minutes=initial_replayed_delay
     )
     speed_up_factor = 1.0
-    get_wall_clock_time = cdtfretim.get_replayed_wall_clock_time(
+    get_wall_clock_time = creatime.get_replayed_wall_clock_time(
         tz,
         initial_replayed_dt,
         event_loop=event_loop,
@@ -145,6 +145,7 @@ def get_replayed_time_price_interface_example2(
 ) -> Tuple[cdtfprint.ReplayedTimePriceInterface, hdateti.GetWallClockTime]:
     """
     Build a ReplayedTimePriceInterface:
+
     - with synthetic data between `2000-01-01 9:30` and `10:30`
     - for two assets
     """

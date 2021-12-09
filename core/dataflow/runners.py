@@ -14,10 +14,10 @@ import core.config as cconfig
 import core.dataflow.builders as cdtfbuil
 import core.dataflow.core as cdtfcore
 import core.dataflow.nodes.sources as cdtfnosou
-import core.dataflow.real_time as cdtfretim
 import core.dataflow.result_bundle as cdtfrebun
 import core.dataflow.utils as cdtfutil
 import core.dataflow.visitors as cdtfvisi
+import core.real_time as creatime
 import helpers.datetime_ as hdateti
 import helpers.dbg as hdbg
 import helpers.printing as hprint
@@ -481,7 +481,7 @@ class RealTimeDagRunner(_AbstractDagRunner):
         self._execute_rt_loop_kwargs = execute_rt_loop_kwargs
         self._dst_dir = dst_dir
         # Store information about the real-time execution.
-        self._events: cdtfretim.Events = []
+        self._events: creatime.Events = []
 
     async def predict(self) -> List[cdtfrebun.ResultBundle]:
         """
@@ -505,21 +505,22 @@ class RealTimeDagRunner(_AbstractDagRunner):
         # Adapt `_dag_workload()` to the expected call back signature.
         workload = lambda current_time: self._run_dag(method)
         # Call the event loop.
-        async for event, result_bundle in cdtfretim.execute_with_real_time_loop(
+        async for event, result_bundle in creatime.execute_with_real_time_loop(
             **self._execute_rt_loop_kwargs, workload=workload
         ):
             self._events.append(event)
             yield result_bundle
 
     @property
-    def events(self) -> Optional[cdtfretim.Events]:
+    def events(self) -> Optional[creatime.Events]:
         return self._events
 
     def compute_run_signature(
         self, result_bundles: List[cdtfrebun.ResultBundle]
     ) -> str:
         """
-        Compute a signature of an execution in terms of `ResultBundles` and `events`.
+        Compute a signature of an execution in terms of `ResultBundles` and
+        `events`.
         """
         ret = []
         events = self.events

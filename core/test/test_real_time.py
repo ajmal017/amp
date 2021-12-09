@@ -10,8 +10,8 @@ from typing import Optional, Tuple
 import pandas as pd
 import pytest
 
-import core.dataflow.real_time as cdtfretim
-import core.dataflow.real_time_example as cdtfretiex
+import core.real_time as creatime
+import core.real_time_example as cretiexa
 import helpers.datetime_ as hdateti
 import helpers.hasyncio as hasynci
 import helpers.printing as hprint
@@ -44,7 +44,7 @@ class Test_align_on_time_grid1(hunitest.TestCase):
             _ = current_time1
             # Align on an even second.
             grid_time_in_secs = 2
-            cdtfretim.align_on_time_grid(
+            creatime.align_on_time_grid(
                 get_wall_clock_time,
                 grid_time_in_secs,
                 event_loop=event_loop,
@@ -90,14 +90,14 @@ class TestReplayedTime1(hunitest.TestCase):
         """
         Rewind time to 9:30am of a day in the past.
         """
-        rt = cdtfretiex.get_replayed_time()
+        rt = cretiexa.get_replayed_time()
         # We assume that these 2 calls take less than 1 minute.
         exp = pd.Timestamp("2010-01-04 09:30:00")
         self._helper(rt, exp)
         #
         self._helper(rt, exp)
 
-    def _helper(self, rt: cdtfretim.ReplayedTime, exp: pd.Timestamp) -> None:
+    def _helper(self, rt: creatime.ReplayedTime, exp: pd.Timestamp) -> None:
         rct = rt.get_wall_clock_time()
         _LOG.info("  -> time=%s", rct)
         _LOG.debug(hprint.to_str("rct.date"))
@@ -154,14 +154,14 @@ class Test_execute_with_real_time_loop1(hunitest.TestCase):
         # Align on a 2-second boundary, since we want to start always from an even
         # second.
         grid_time_in_secs = 2
-        cdtfretim.align_on_time_grid(
+        creatime.align_on_time_grid(
             get_wall_clock_time, grid_time_in_secs, event_loop=event_loop
         )
         # Do 3 iterations of 1.0s.
         sleep_interval_in_secs = 1.0
         time_out_in_secs = 1.0 * 3 + 0.1
         #
-        coroutine = cdtfretim.execute_all_with_real_time_loop(
+        coroutine = creatime.execute_all_with_real_time_loop(
             get_wall_clock_time,
             sleep_interval_in_secs,
             time_out_in_secs,
@@ -184,7 +184,7 @@ class Test_execute_with_real_time_loop1(hunitest.TestCase):
         initial_replayed_dt = pd.Timestamp(
             "2010-01-04 09:30:01", tz=hdateti.get_ET_tz()
         )
-        get_wall_clock_time = cdtfretim.get_replayed_wall_clock_time(
+        get_wall_clock_time = creatime.get_replayed_wall_clock_time(
             tz, initial_replayed_dt, event_loop=event_loop
         )
         events_as_str, results_as_str = self.helper(

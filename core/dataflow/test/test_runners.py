@@ -6,11 +6,11 @@ import numpy as np
 import pytest
 
 import core.dataflow.builders_example as cdtfbuexa
-import core.dataflow.real_time as cdtfretim
-import core.dataflow.real_time_example as cdtfretiex
 import core.dataflow.result_bundle as cdtfrebun
 import core.dataflow.runners as cdtfrunn
 import core.dataflow.visitors as cdtfvisi
+import core.real_time as creatime
+import core.real_time_example as cretiexa
 import helpers.datetime_ as hdateti
 import helpers.hasyncio as hasynci
 import helpers.unit_test as hunitest
@@ -115,7 +115,7 @@ class TestRealTimeDagRunner1(hunitest.TestCase):
     @staticmethod
     def _helper(
         event_loop: Optional[asyncio.AbstractEventLoop],
-    ) -> Tuple[cdtfretim.Events, List[cdtfrebun.ResultBundle]]:
+    ) -> Tuple[creatime.Events, List[cdtfrebun.ResultBundle]]:
         """
         Test `RealTimeDagRunner` using a simple DAG triggering every 2 seconds.
         """
@@ -125,7 +125,7 @@ class TestRealTimeDagRunner1(hunitest.TestCase):
         # Set up the event loop.
         sleep_interval_in_secs = 1.0
         execute_rt_loop_kwargs = (
-            cdtfretiex.get_replayed_time_execute_rt_loop_kwargs(
+            cretiexa.get_replayed_time_execute_rt_loop_kwargs(
                 sleep_interval_in_secs, event_loop=event_loop
             )
         )
@@ -141,7 +141,7 @@ class TestRealTimeDagRunner1(hunitest.TestCase):
             tz="ET", event_loop=event_loop
         )
         grid_time_in_secs = 1
-        cdtfretim.align_on_time_grid(
+        creatime.align_on_time_grid(
             get_wall_clock_time, grid_time_in_secs, event_loop=event_loop
         )
         # Run.
@@ -156,7 +156,7 @@ class TestRealTimeDagRunner1(hunitest.TestCase):
     # TODO(gp): Centralize this.
     def _check(
         self,
-        events: cdtfretim.Events,
+        events: creatime.Events,
         result_bundles: List[cdtfrebun.ResultBundle],
     ) -> None:
         # Check the events.

@@ -4,9 +4,9 @@ import pandas as pd
 
 import core.config as cconfig
 import core.dataflow.price_interface_example as cdtfprinex
-import core.dataflow.real_time_example as cdtfretiex
 import core.dataflow.runners as cdtfrunn
 import core.dataflow_example as cdtfexam
+import core.real_time_example as cretiexa
 import dataflow_amp.real_time.pipeline as dtfaretipi
 import helpers.hasyncio as hasynci
 import helpers.unit_test as hunitest
@@ -67,7 +67,7 @@ class TestRealTimeReturnPipeline1(hunitest.TestCase):
             # Set up the event loop.
             sleep_interval_in_secs = 60 * 5
             execute_rt_loop_kwargs = (
-                cdtfretiex.get_replayed_time_execute_rt_loop_kwargs(
+                cretiexa.get_replayed_time_execute_rt_loop_kwargs(
                     sleep_interval_in_secs, event_loop=event_loop
                 )
             )
@@ -165,14 +165,13 @@ class TestRealTimePipelineWithOms1(hunitest.TestCase):
             # Build Portfolio.
             # TODO(Paul): We want to have builder functions in the same class as
             #  the objects to build "standard" objects.
-            strategy_id="str1"
-            account="paper"
-            asset_id_col="asset_id"
-            mark_to_market_col="price"
+            strategy_id = "str1"
+            account = "paper"
+            asset_id_col = "asset_id"
+            mark_to_market_col = "price"
             # mark_to_market_col = "close"
-            timestamp_col="end_datetime"
+            timestamp_col = "end_datetime"
             broker = ombroker.Broker(price_interface, get_wall_clock_time)
-            initial_cash = 1e6
             initial_timestamp = pd.Timestamp(
                 "2000-01-01 09:30:00-05:00", tz="America/New_York"
             )
@@ -211,7 +210,7 @@ class TestRealTimePipelineWithOms1(hunitest.TestCase):
             # Set up the event loop.
             sleep_interval_in_secs = 60 * 5
             execute_rt_loop_kwargs = (
-                cdtfretiex.get_replayed_time_execute_rt_loop_kwargs(
+                cretiexa.get_replayed_time_execute_rt_loop_kwargs(
                     sleep_interval_in_secs, event_loop=event_loop
                 )
             )

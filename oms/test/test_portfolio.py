@@ -12,7 +12,7 @@ import pandas as pd
 
 import core.dataflow.price_interface as cdtfprint
 import core.dataflow.price_interface_example as cdtfprinex
-import core.dataflow.real_time as cdtfretim
+import core.real_time as creatime
 import helpers.unit_test as hunitest
 import oms.broker as ombroker
 import oms.portfolio as omportfo
@@ -280,7 +280,7 @@ leverage,0.994
         tz = "ET"
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
         event_loop = None
-        get_wall_clock_time = cdtfretim.get_replayed_wall_clock_time(
+        get_wall_clock_time = creatime.get_replayed_wall_clock_time(
             tz,
             initial_timestamp,
             event_loop=event_loop,

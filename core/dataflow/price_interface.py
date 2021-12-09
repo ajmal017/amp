@@ -13,8 +13,8 @@ import numpy as np
 import pandas as pd
 from IPython.display import display
 
-import core.dataflow.real_time as cdtfretim
 import core.pandas_helpers as cpanh
+import core.real_time as creatime
 import helpers.datetime_ as hdateti
 import helpers.dbg as hdbg
 import helpers.hpandas as hpandas
@@ -181,7 +181,7 @@ class AbstractPriceInterface(abc.ABC):
             asset_ids,
             normalize_data=normalize_data,
         )
-        #_LOG.debug("-> df=\n%s", hprint.dataframe_to_str(df))
+        # _LOG.debug("-> df=\n%s", hprint.dataframe_to_str(df))
         return df
 
     def get_data_for_interval(
@@ -218,7 +218,7 @@ class AbstractPriceInterface(abc.ABC):
             normalize_data,
             limit,
         )
-        #_LOG.debug("-> df=\n%s", hprint.dataframe_to_str(df))
+        # _LOG.debug("-> df=\n%s", hprint.dataframe_to_str(df))
         return df
 
     def get_twap_price(
@@ -253,7 +253,7 @@ class AbstractPriceInterface(abc.ABC):
         hdbg.dassert_in(column, prices.columns)
         prices = prices[column]
         # Compute the mean value.
-        #_LOG.debug("prices=\n%s", prices)
+        # _LOG.debug("prices=\n%s", prices)
         price: float = prices.mean()
         hdbg.dassert(
             np.isfinite(price),
@@ -748,7 +748,7 @@ class ReplayedTimePriceInterface(AbstractPriceInterface):
         # Filter the data by the current time.
         current_time = self._get_wall_clock_time()
         _LOG.debug(hprint.to_str("current_time"))
-        df_tmp = cdtfretim.get_data_as_of_datetime(
+        df_tmp = creatime.get_data_as_of_datetime(
             self._df,
             self._knowledge_datetime_col_name,
             current_time,

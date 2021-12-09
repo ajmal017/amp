@@ -1,7 +1,7 @@
 """
 Import as:
 
-import core.dataflow.real_time_simple_model as cdtfrtsimo
+import core.real_time_simple_model as crtisimo
 """
 
 import asyncio
