@@ -10,10 +10,10 @@ from typing import Any, Dict
 
 import pandas as pd
 
-import core.dataflow.price_interface as cdtfprint
-import core.dataflow.price_interface_example as cdtfprinex
 import core.real_time as creatime
 import helpers.unit_test as hunitest
+import market_data.market_data_interface as mdmadain
+import market_data.market_data_interface_example as mdmdinex
 import oms.broker as ombroker
 import oms.portfolio as omportfo
 import oms.portfolio_example as oporexam
@@ -75,13 +75,15 @@ class TestPortfolio1(hunitest.TestCase):
         # Build a ReplayedTimePriceInterface.
         event_loop = None
         (
-            price_interface,
+            market_data_interface,
             _,
-        ) = cdtfprinex.get_replayed_time_price_interface_example2(event_loop)
+        ) = mdmdinex.get_replayed_time_market_data_interface_example2(
+            event_loop
+        )
         # Build a Portfolio.
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
         portfolio = oporexam.get_portfolio_example1(
-            price_interface, initial_timestamp
+            market_data_interface, initial_timestamp
         )
         return portfolio
 
@@ -103,11 +105,13 @@ class TestPortfolio2(hunitest.TestCase):
         # Build a ReplayedTimePriceInterface.
         event_loop = None
         (
-            price_interface,
+            market_data_interface,
             get_wall_clock_time,
-        ) = cdtfprinex.get_replayed_time_price_interface_example2(event_loop)
+        ) = mdmdinex.get_replayed_time_market_data_interface_example2(
+            event_loop
+        )
         # Build Broker.
-        broker = ombroker.Broker(price_interface, get_wall_clock_time)
+        broker = ombroker.Broker(market_data_interface, get_wall_clock_time)
         # Build a Portfolio.
         strategy_id = "str1"
         account = "paper"
@@ -119,7 +123,7 @@ class TestPortfolio2(hunitest.TestCase):
         portfolio = omportfo.Portfolio.from_cash(
             strategy_id,
             account,
-            price_interface,
+            market_data_interface,
             get_wall_clock_time,
             asset_id_col,
             mark_to_market_col,
@@ -143,15 +147,17 @@ class TestPortfolio2(hunitest.TestCase):
         # Build a ReplayedTimePriceInterface.
         event_loop = None
         (
-            price_interface,
+            market_data_interface,
             get_wall_clock_time,
-        ) = cdtfprinex.get_replayed_time_price_interface_example2(event_loop)
+        ) = mdmdinex.get_replayed_time_market_data_interface_example2(
+            event_loop
+        )
         # Build Broker.
-        broker = ombroker.Broker(price_interface, get_wall_clock_time)
+        broker = ombroker.Broker(market_data_interface, get_wall_clock_time)
         # Build a Portfolio.
         strategy_id = "str1"
         account = "paper"
-        price_interface = price_interface
+        market_data_interface = market_data_interface
         asset_id_col = "asset_id"
         mark_to_market_col = "price"
         timestamp_col = "end_datetime"
@@ -160,7 +166,7 @@ class TestPortfolio2(hunitest.TestCase):
         portfolio = omportfo.Portfolio.from_dict(
             strategy_id,
             account,
-            price_interface,
+            market_data_interface,
             get_wall_clock_time,
             asset_id_col,
             mark_to_market_col,
@@ -186,11 +192,13 @@ class TestPortfolio2(hunitest.TestCase):
         # Build PriceInterface.
         event_loop = None
         (
-            price_interface,
+            market_data_interface,
             get_wall_clock_time,
-        ) = cdtfprinex.get_replayed_time_price_interface_example2(event_loop)
+        ) = mdmdinex.get_replayed_time_market_data_interface_example2(
+            event_loop
+        )
         # Build Broker.
-        broker = ombroker.Broker(price_interface, get_wall_clock_time)
+        broker = ombroker.Broker(market_data_interface, get_wall_clock_time)
         # Build Portfolio.
         strategy_id = "str1"
         account = "paper"
@@ -202,7 +210,7 @@ class TestPortfolio2(hunitest.TestCase):
         portfolio = omportfo.Portfolio.from_cash(
             strategy_id,
             account,
-            price_interface,
+            market_data_interface,
             get_wall_clock_time,
             asset_id_col,
             mark_to_market_col,
@@ -233,11 +241,13 @@ leverage,0.0
         # Build PriceInterface.
         event_loop = None
         (
-            price_interface,
+            market_data_interface,
             get_wall_clock_time,
-        ) = cdtfprinex.get_replayed_time_price_interface_example2(event_loop)
+        ) = mdmdinex.get_replayed_time_market_data_interface_example2(
+            event_loop
+        )
         # Build Broker.
-        broker = ombroker.Broker(price_interface, get_wall_clock_time)
+        broker = ombroker.Broker(market_data_interface, get_wall_clock_time)
         # Build Portfolio.
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
         holdings_dict = {101: 727.5, 202: 1040.3, -1: 10000}
@@ -249,7 +259,7 @@ leverage,0.0
         portfolio = omportfo.Portfolio.from_dict(
             strategy_id,
             account,
-            price_interface,
+            market_data_interface,
             get_wall_clock_time,
             asset_id_col,
             mark_to_market_col,
@@ -293,7 +303,7 @@ start_datetime,end_datetime,asset_id,price
             io.StringIO(price_txt),
             parse_dates=["start_datetime", "end_datetime"],
         )
-        price_interface = cdtfprint.ReplayedTimePriceInterface(
+        market_data_interface = mdmadain.ReplayedTimeMarketDataInterface(
             price_df,
             start_time_col_name="start_datetime",
             end_time_col_name="end_datetime",
@@ -305,7 +315,7 @@ start_datetime,end_datetime,asset_id,price
             get_wall_clock_time=get_wall_clock_time,
         )
         # Build Broker.
-        broker = ombroker.Broker(price_interface, get_wall_clock_time)
+        broker = ombroker.Broker(market_data_interface, get_wall_clock_time)
         # Build Portfolio.
         strategy_id = "str1"
         account = "paper"
@@ -315,7 +325,7 @@ start_datetime,end_datetime,asset_id,price
         portfolio = omportfo.Portfolio.from_cash(
             strategy_id,
             account,
-            price_interface,
+            market_data_interface,
             get_wall_clock_time,
             asset_id_col,
             mark_to_market_col,

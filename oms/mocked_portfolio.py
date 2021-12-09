@@ -22,7 +22,7 @@ class MockedPortfolio:
         strategy_id: str,
         account: str,
         #
-        price_interface: cdtfprint.AbstractPriceInterface,
+        market_data_interface: cdtfprint.AbstractMarketDataInterface,
         asset_id_col: str,
         mark_to_market_col: str,
         timestamp_col: str,

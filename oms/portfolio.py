@@ -11,10 +11,10 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import pandas as pd
 
-import core.dataflow.price_interface as cdtfprint
 import helpers.datetime_ as hdateti
 import helpers.dbg as hdbg
 import helpers.printing as hprint
+import market_data.market_data_interface as mdmadain
 import oms.broker as ombroker
 
 _LOG = logging.getLogger(__name__)
@@ -22,11 +22,12 @@ _LOG = logging.getLogger(__name__)
 
 class AbstractPortfolio(abc.ABC):
     """
-    Store holdings over time, e.g., many shares of each asset are owned at any time.
+    Store holdings over time, e.g., many shares of each asset are owned at any
+    time.
 
-    Cash is treated as any other asset to keep code uniform. The tables are
-    indexed by knowledge time, i.e., when this information became known by this
-    object.
+    Cash is treated as any other asset to keep code uniform. The tables
+    are indexed by knowledge time, i.e., when this information became
+    known by this object.
     """
 
     # ID of asset representing cash.
@@ -53,7 +54,7 @@ class AbstractPortfolio(abc.ABC):
         self,
         strategy_id: str,
         account: str,
-        price_interface: cdtfprint.AbstractPriceInterface,
+        market_data_interface: mdmadain.AbstractMarketDataInterface,
         get_wall_clock_time: hdateti.GetWallClockTime,
         asset_id_col: str,
         mark_to_market_col: str,
@@ -65,7 +66,7 @@ class AbstractPortfolio(abc.ABC):
 
         :param strategy_id, account: back office information about the strategy
             driving this portfolio
-        :param asset_id_col: column name in the output df of `price_interface`
+        :param asset_id_col: column name in the output df of `market_data_interface`
             storing the asset id
         :param mark_to_market_col: column name used as price to mark holdings to
             market
@@ -81,8 +82,10 @@ class AbstractPortfolio(abc.ABC):
         self._strategy_id = strategy_id
         self._account = account
         #
-        hdbg.dassert_issubclass(price_interface, cdtfprint.AbstractPriceInterface)
-        self._price_interface = price_interface
+        hdbg.dassert_issubclass(
+            market_data_interface, mdmadain.AbstractMarketDataInterface
+        )
+        self._market_data_interface = market_data_interface
         self._get_wall_clock_time = get_wall_clock_time
         self._asset_id_col = asset_id_col
         self._mark_to_market_col = mark_to_market_col
@@ -211,7 +214,7 @@ class AbstractPortfolio(abc.ABC):
         non_cash_asset_ids = list(
             filter(lambda x: x != Portfolio.CASH_ID, asset_ids)
         )
-        price_df = self._price_interface.get_data_at_timestamp(
+        price_df = self._market_data_interface.get_data_at_timestamp(
             as_of_timestamp, self._timestamp_col, non_cash_asset_ids
         )
         hdbg.dassert_eq(
@@ -629,7 +632,7 @@ class Portfolio(AbstractPortfolio):
         last_timestamp = self.get_last_timestamp()
         _LOG.debug("last_timestamp=%s", last_timestamp)
         # Get fills.
-        #fills_df = self._get_fills(wall_clock_timestamp)
+        # fills_df = self._get_fills(wall_clock_timestamp)
         # Get latest holdings
         last_holdings = self.get_holdings(last_timestamp, asset_id=None)
         last_holdings.index.name = "last_timestamp"

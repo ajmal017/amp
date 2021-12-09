@@ -9,11 +9,11 @@ from typing import Any, Callable, Tuple
 
 import pandas as pd
 
-import core.dataflow.price_interface as cdtfprint
-import core.dataflow.price_interface_example as cdtfprinex
 import helpers.hasyncio as hasynci
 import helpers.printing as hprint
 import helpers.unit_test as hunitest
+import market_data.market_data_interface as mdmadain
+import market_data.market_data_interface_example as mdmdinex
 
 _LOG = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ def _check_get_data(
     initial_replayed_delay: int,
     func: Callable,
     expected_df_as_str: str,
-) -> cdtfprint.ReplayedTimePriceInterface:
+) -> mdmadain.ReplayedTimeMarketDataInterface:
     """
     - Build ReplayedTimePriceInterval
     - Execute `get_data*`
@@ -34,13 +34,13 @@ def _check_get_data(
         start_datetime = pd.Timestamp("2000-01-01 09:30:00-05:00")
         end_datetime = pd.Timestamp("2000-01-01 10:29:00-05:00")
         (
-            price_interface,
+            market_data_interface,
             _,
-        ) = cdtfprinex.get_replayed_time_price_interface_example1(
+        ) = mdmdinex.get_replayed_time_market_data_interface_example1(
             event_loop, start_datetime, end_datetime, initial_replayed_delay
         )
         # Execute function under test.
-        actual_df = func(price_interface)
+        actual_df = func(market_data_interface)
     # Check.
     actual_df = actual_df[sorted(actual_df.columns)]
     actual_df_as_str = hprint.df_to_short_str("df", actual_df)
@@ -51,13 +51,13 @@ def _check_get_data(
         dedent=True,
         fuzzy_match=True,
     )
-    return price_interface
+    return market_data_interface
 
 
-class TestReplayedTimePriceInterface1(hunitest.TestCase):
+class TestReplayedTimeMarketDataInterface1(hunitest.TestCase):
     def check_last_end_time(
         self,
-        price_interface: cdtfprint.ReplayedTimePriceInterface,
+        market_data_interface: mdmadain.ReplayedTimeMarketDataInterface,
         expected_last_end_time: pd.Timestamp,
         expected_is_online: bool,
     ) -> None:
@@ -65,11 +65,11 @@ class TestReplayedTimePriceInterface1(hunitest.TestCase):
         Check output of `get_last_end_time()` and `is_online()`.
         """
         #
-        last_end_time = price_interface.get_last_end_time()
+        last_end_time = market_data_interface.get_last_end_time()
         _LOG.info("-> last_end_time=%s", last_end_time)
         self.assertEqual(last_end_time, expected_last_end_time)
         #
-        is_online = price_interface.is_online()
+        is_online = market_data_interface.is_online()
         _LOG.info("-> is_online=%s", is_online)
         self.assertEqual(is_online, expected_is_online)
 
@@ -83,7 +83,7 @@ class TestReplayedTimePriceInterface1(hunitest.TestCase):
         #
         period = "last_5mins"
         normalize_data = True
-        func = lambda price_interface: price_interface.get_data(
+        func = lambda market_data_interface: market_data_interface.get_data(
             period, normalize_data=normalize_data
         )
         # pylint: disable=line-too-long
@@ -102,14 +102,14 @@ class TestReplayedTimePriceInterface1(hunitest.TestCase):
         2000-01-01 09:34:00-05:00      1000    1000.655907  2000-01-01 09:33:00-05:00 2000-01-01 09:34:00-05:00
         2000-01-01 09:35:00-05:00      1000    1000.311925  2000-01-01 09:34:00-05:00 2000-01-01 09:35:00-05:00"""
         # pylint: enable=line-too-long
-        price_interface = _check_get_data(
+        market_data_interface = _check_get_data(
             self, initial_replayed_delay, func, expected_df_as_str
         )
         #
         expected_last_end_time = pd.Timestamp("2000-01-01 09:35:00-05:00")
         expected_is_online = True
         self.check_last_end_time(
-            price_interface, expected_last_end_time, expected_is_online
+            market_data_interface, expected_last_end_time, expected_is_online
         )
 
     def test_get_data2(self) -> None:
@@ -120,7 +120,7 @@ class TestReplayedTimePriceInterface1(hunitest.TestCase):
         #
         period = "last_5mins"
         normalize_data = False
-        func = lambda price_interface: price_interface.get_data(
+        func = lambda market_data_interface: market_data_interface.get_data(
             period, normalize_data=normalize_data
         )
         # pylint: disable=line-too-long
@@ -138,14 +138,14 @@ class TestReplayedTimePriceInterface1(hunitest.TestCase):
         3      1000 2000-01-01 09:34:00-05:00    1000.655907 2000-01-01 09:33:00-05:00 2000-01-01 09:34:00-05:00
         4      1000 2000-01-01 09:35:00-05:00    1000.311925 2000-01-01 09:34:00-05:00 2000-01-01 09:35:00-05:00"""
         # pylint: enable=line-too-long
-        price_interface = _check_get_data(
+        market_data_interface = _check_get_data(
             self, initial_replayed_delay, func, expected_df_as_str
         )
         #
         expected_last_end_time = pd.Timestamp("2000-01-01 09:35:00-05:00")
         expected_is_online = True
         self.check_last_end_time(
-            price_interface, expected_last_end_time, expected_is_online
+            market_data_interface, expected_last_end_time, expected_is_online
         )
 
     def test_get_data_for_minute_0(self) -> None:
@@ -157,7 +157,7 @@ class TestReplayedTimePriceInterface1(hunitest.TestCase):
         #
         period = "last_5mins"
         normalize_data = True
-        func = lambda price_interface: price_interface.get_data(
+        func = lambda market_data_interface: market_data_interface.get_data(
             period, normalize_data=normalize_data
         )
         # Check.
@@ -167,14 +167,14 @@ class TestReplayedTimePriceInterface1(hunitest.TestCase):
         Empty DataFrame
         Columns: [asset_id, last_price, start_datetime, timestamp_db]
         Index: []"""
-        price_interface = _check_get_data(
+        market_data_interface = _check_get_data(
             self, initial_replayed_delay, func, expected_df_as_str
         )
         #
         expected_last_end_time = None
         expected_is_online = False
         self.check_last_end_time(
-            price_interface, expected_last_end_time, expected_is_online
+            market_data_interface, expected_last_end_time, expected_is_online
         )
 
     def test_get_data_for_minute_1(self) -> None:
@@ -185,7 +185,7 @@ class TestReplayedTimePriceInterface1(hunitest.TestCase):
         initial_replayed_delay = 1
         period = "last_5mins"
         normalize_data = True
-        func = lambda price_interface: price_interface.get_data(
+        func = lambda market_data_interface: market_data_interface.get_data(
             period, normalize_data=normalize_data
         )
         #
@@ -197,14 +197,14 @@ class TestReplayedTimePriceInterface1(hunitest.TestCase):
                                    asset_id  last_price            start_datetime              timestamp_db
         end_datetime
         2000-01-01 09:31:00-05:00      1000   999.87454 2000-01-01 09:30:00-05:00 2000-01-01 09:31:00-05:00"""
-        price_interface = _check_get_data(
+        market_data_interface = _check_get_data(
             self, initial_replayed_delay, func, expected_df_as_str
         )
         #
         expected_last_end_time = pd.Timestamp("2000-01-01 09:31:00-0500")
         expected_is_online = True
         self.check_last_end_time(
-            price_interface, expected_last_end_time, expected_is_online
+            market_data_interface, expected_last_end_time, expected_is_online
         )
 
     def test_get_data_for_minute_3(self) -> None:
@@ -216,7 +216,7 @@ class TestReplayedTimePriceInterface1(hunitest.TestCase):
         #
         period = "last_5mins"
         normalize_data = True
-        func = lambda price_interface: price_interface.get_data(
+        func = lambda market_data_interface: market_data_interface.get_data(
             period, normalize_data=normalize_data
         )
         # Check.
@@ -232,14 +232,14 @@ class TestReplayedTimePriceInterface1(hunitest.TestCase):
         2000-01-01 09:32:00-05:00      1000    1000.325254 2000-01-01 09:31:00-05:00 2000-01-01 09:32:00-05:00
         2000-01-01 09:33:00-05:00      1000    1000.557248 2000-01-01 09:32:00-05:00 2000-01-01 09:33:00-05:00"""
         # pylint: enable=line-too-long
-        price_interface = _check_get_data(
+        market_data_interface = _check_get_data(
             self, initial_replayed_delay, func, expected_df_as_str
         )
         #
         expected_last_end_time = pd.Timestamp("2000-01-01 09:33:00-05:00")
         expected_is_online = True
         self.check_last_end_time(
-            price_interface, expected_last_end_time, expected_is_online
+            market_data_interface, expected_last_end_time, expected_is_online
         )
 
     def test_get_data_for_minute_6(self) -> None:
@@ -251,7 +251,7 @@ class TestReplayedTimePriceInterface1(hunitest.TestCase):
         #
         period = "last_5mins"
         normalize_data = True
-        func = lambda price_interface: price_interface.get_data(
+        func = lambda market_data_interface: market_data_interface.get_data(
             period, normalize_data=normalize_data
         )
         # Check.
@@ -270,14 +270,14 @@ class TestReplayedTimePriceInterface1(hunitest.TestCase):
         2000-01-01 09:35:00-05:00      1000    1000.311925  2000-01-01 09:34:00-05:00 2000-01-01 09:35:00-05:00
         2000-01-01 09:36:00-05:00      1000    999.967920   2000-01-01 09:35:00-05:00 2000-01-01 09:36:00-05:00"""
         # pylint: enable=line-too-long
-        price_interface = _check_get_data(
+        market_data_interface = _check_get_data(
             self, initial_replayed_delay, func, expected_df_as_str
         )
         #
         expected_last_end_time = pd.Timestamp("2000-01-01 09:36:00-05:00")
         expected_is_online = True
         self.check_last_end_time(
-            price_interface, expected_last_end_time, expected_is_online
+            market_data_interface, expected_last_end_time, expected_is_online
         )
 
     def test_get_data_for_minute_63(self) -> None:
@@ -289,7 +289,7 @@ class TestReplayedTimePriceInterface1(hunitest.TestCase):
         #
         period = "last_5mins"
         normalize_data = True
-        func = lambda price_interface: price_interface.get_data(
+        func = lambda market_data_interface: market_data_interface.get_data(
             period, normalize_data=normalize_data
         )
         # Check.
@@ -303,21 +303,21 @@ class TestReplayedTimePriceInterface1(hunitest.TestCase):
         2000-01-01 10:29:00-05:00      1000   998.224716  2000-01-01 10:28:00-05:00 2000-01-01 10:29:00-05:00
         2000-01-01 10:30:00-05:00      1000   998.050046  2000-01-01 10:29:00-05:00 2000-01-01 10:30:00-05:00"""
         # pylint: enable=line-too-long
-        price_interface = _check_get_data(
+        market_data_interface = _check_get_data(
             self, initial_replayed_delay, func, expected_df_as_str
         )
         #
         expected_last_end_time = pd.Timestamp("2000-01-01 10:30:00-0500")
         expected_is_online = False
         self.check_last_end_time(
-            price_interface, expected_last_end_time, expected_is_online
+            market_data_interface, expected_last_end_time, expected_is_online
         )
 
 
 # #############################################################################
 
 
-class TestReplayedTimePriceInterface2(hunitest.TestCase):
+class TestReplayedTimeMarketDataInterface2(hunitest.TestCase):
 
     # TODO(gp): Add same tests for the SQL version.
     def test_get_data_for_interval1(self) -> None:
@@ -336,7 +336,7 @@ class TestReplayedTimePriceInterface2(hunitest.TestCase):
         ts_col_name = "end_datetime"
         asset_ids = None
         normalize_data = True
-        func = lambda price_interface: price_interface.get_data_for_interval(
+        func = lambda market_data_interface: market_data_interface.get_data_for_interval(
             start_ts,
             end_ts,
             ts_col_name,
@@ -373,7 +373,7 @@ class TestReplayedTimePriceInterface2(hunitest.TestCase):
         ts_col_name = "start_datetime"
         asset_ids = None
         normalize_data = True
-        func = lambda price_interface: price_interface.get_data_for_interval(
+        func = lambda market_data_interface: market_data_interface.get_data_for_interval(
             start_ts,
             end_ts,
             ts_col_name,
@@ -409,7 +409,7 @@ class TestReplayedTimePriceInterface2(hunitest.TestCase):
         ts_col_name = "start_datetime"
         asset_ids = None
         normalize_data = True
-        func = lambda price_interface: price_interface.get_data_at_timestamp(
+        func = lambda market_data_interface: market_data_interface.get_data_at_timestamp(
             ts, ts_col_name, asset_ids, normalize_data=normalize_data
         )
         # pylint: disable=line-too-long
@@ -435,7 +435,7 @@ class TestReplayedTimePriceInterface2(hunitest.TestCase):
         ts_col_name = "start_datetime"
         asset_ids = None
         normalize_data = True
-        func = lambda price_interface: price_interface.get_data_at_timestamp(
+        func = lambda market_data_interface: market_data_interface.get_data_at_timestamp(
             ts, ts_col_name, asset_ids, normalize_data=normalize_data
         )
         # pylint: disable=line-too-long
@@ -452,10 +452,10 @@ class TestReplayedTimePriceInterface2(hunitest.TestCase):
 # #############################################################################
 
 
-class TestReplayedTimePriceInterface3(hunitest.TestCase):
+class TestReplayedTimeMarketDataInterface3(hunitest.TestCase):
     """
-    Test `ReplayedTimePriceInterface.is_last_bar_available()` using simulated
-    time.
+    Test `ReplayedTimeMarketDataInterface.is_last_bar_available()` using
+    simulated time.
     """
 
     def test_get_last_end_time1(self) -> None:
@@ -466,9 +466,9 @@ class TestReplayedTimePriceInterface3(hunitest.TestCase):
             initial_replayed_delay = 5
             delay_in_secs = 0
             (
-                price_interface,
+                market_data_interface,
                 _,
-            ) = cdtfprinex.get_replayed_time_price_interface_example1(
+            ) = mdmdinex.get_replayed_time_market_data_interface_example1(
                 event_loop,
                 start_datetime,
                 end_datetime,
@@ -476,7 +476,7 @@ class TestReplayedTimePriceInterface3(hunitest.TestCase):
                 delay_in_secs,
             )
             # Call method.
-            last_end_time = price_interface.get_last_end_time()
+            last_end_time = market_data_interface.get_last_end_time()
         # Check.
         _LOG.info("-> last_end_time=%s", last_end_time)
         self.assertEqual(last_end_time, pd.Timestamp("2000-01-01 09:35:00-05:00"))
@@ -527,20 +527,20 @@ class TestReplayedTimePriceInterface3(hunitest.TestCase):
         self, initial_replayed_delay: int
     ) -> Tuple[pd.Timestamp, pd.Timestamp, int]:
         """
-        - Build a ReplayedTimePriceInterface
+        - Build a ReplayedTimeMarketDataInterface
         - Run `is_last_bar_available()`
         """
         with hasynci.solipsism_context() as event_loop:
-            # Build a ReplayedTimePriceInterface.
+            # Build a ReplayedTimeMarketDataInterface.
             start_datetime = pd.Timestamp("2000-01-01 09:30:00-05:00")
             end_datetime = pd.Timestamp("2000-01-01 10:30:00-05:00")
             delay_in_secs = 0
             sleep_in_secs = 30
             time_out_in_secs = 60 * 5
             (
-                price_interface,
+                market_data_interface,
                 _,
-            ) = cdtfprinex.get_replayed_time_price_interface_example1(
+            ) = mdmdinex.get_replayed_time_market_data_interface_example1(
                 event_loop,
                 start_datetime,
                 end_datetime,
@@ -551,6 +551,7 @@ class TestReplayedTimePriceInterface3(hunitest.TestCase):
             )
             # Run the method.
             start_time, end_time, num_iter = hasynci.run(
-                price_interface.is_last_bar_available(), event_loop=event_loop
+                market_data_interface.is_last_bar_available(),
+                event_loop=event_loop,
             )
         return start_time, end_time, num_iter

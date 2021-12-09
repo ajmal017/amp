@@ -15,7 +15,6 @@ import pandas as pd
 import core.artificial_signal_generators as carsigen
 import core.dataflow.core as cdtfcore
 import core.dataflow.nodes.base as cdtfnobas
-import core.dataflow.price_interface as cdtfprint
 import core.finance as cofinanc
 import core.pandas_helpers as cpanh
 import helpers.datetime_ as hdateti
@@ -23,6 +22,7 @@ import helpers.dbg as hdbg
 import helpers.hpandas as hpandas
 import helpers.printing as hprint
 import helpers.s3 as hs3
+import market_data.market_data_interface as mdmadain
 
 _LOG = logging.getLogger(__name__)
 
@@ -378,7 +378,7 @@ class RealTimeDataSource(cdtfnobas.DataSource):
     def __init__(
         self,
         nid: cdtfcore.NodeId,
-        price_interface: cdtfprint.AbstractPriceInterface,
+        market_data_interface: mdmadain.AbstractMarketDataInterface,
         period: str,
         asset_id_col: Union[int, str],
         multiindex_output: bool,
@@ -389,8 +389,10 @@ class RealTimeDataSource(cdtfnobas.DataSource):
         :param period: how much history is needed from the real-time node
         """
         super().__init__(nid)
-        hdbg.dassert_isinstance(price_interface, cdtfprint.AbstractPriceInterface)
-        self._price_interface = price_interface
+        hdbg.dassert_isinstance(
+            market_data_interface, mdmadain.AbstractMarketDataInterface
+        )
+        self._market_data_interface = market_data_interface
         self._period = period
         self._asset_id_col = asset_id_col
         self._multiindex_output = multiindex_output
@@ -399,19 +401,19 @@ class RealTimeDataSource(cdtfnobas.DataSource):
     async def wait_for_latest_data(
         self,
     ) -> Tuple[pd.Timestamp, pd.Timestamp, int]:
-        ret = await self._price_interface.is_last_bar_available()
+        ret = await self._market_data_interface.is_last_bar_available()
         return ret  # type: ignore[no-any-return]
 
     def fit(self) -> Optional[Dict[str, pd.DataFrame]]:
         # TODO(gp): This approach of communicating params through the state
         #  makes the code difficult to understand.
-        self.df = self._price_interface.get_data(self._period)
+        self.df = self._market_data_interface.get_data(self._period)
         if self._multiindex_output:
             self._convert_to_multiindex()
         return super().fit()  # type: ignore[no-any-return]
 
     def predict(self) -> Optional[Dict[str, pd.DataFrame]]:
-        self.df = self._price_interface.get_data(self._period)
+        self.df = self._market_data_interface.get_data(self._period)
         if self._multiindex_output:
             self._convert_to_multiindex()
         return super().predict()  # type: ignore[no-any-return]

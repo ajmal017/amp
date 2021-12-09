@@ -6,9 +6,9 @@ import logging
 import pandas as pd
 
 import core.config as cconfig
-import core.dataflow.price_interface_example as cdtfprinex
 import helpers.hasyncio as hasynci
 import helpers.unit_test as hunitest
+import market_data.market_data_interface_example as mdmdinex
 import oms.broker as ombroker
 import oms.place_orders as oplaorde
 import oms.portfolio as omportfo
@@ -27,9 +27,11 @@ class TestPlaceOrders1(hunitest.TestCase):
     ) -> None:
         config = {}
         (
-            price_interface,
+            market_data_interface,
             get_wall_clock_time,
-        ) = cdtfprinex.get_replayed_time_price_interface_example2(event_loop)
+        ) = mdmdinex.get_replayed_time_market_data_interface_example2(
+            event_loop
+        )
         # Build predictions.
         index = [
             pd.Timestamp("2000-01-01 09:35:00-05:00", tz="America/New_York"),
@@ -48,9 +50,9 @@ class TestPlaceOrders1(hunitest.TestCase):
             "2000-01-01 09:30:00-05:00", tz="America/New_York"
         )
         portfolio = oporexam.get_portfolio_example1(
-            price_interface, initial_timestamp
+            market_data_interface, initial_timestamp
         )
-        config["price_interface"] = price_interface
+        config["market_data_interface"] = market_data_interface
         config["portfolio"] = portfolio
         config["broker"] = portfolio.broker
         config["order_type"] = "price@twap"
@@ -89,9 +91,9 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
         start_datetime = initial_timestamp
         end_datetime = pd.Timestamp("2000-01-01 09:35:00-05:00")
         (
-            price_interface,
+            market_data_interface,
             get_wall_clock_time,
-        ) = cdtfprinex.get_replayed_time_price_interface_example1(
+        ) = mdmdinex.get_replayed_time_market_data_interface_example1(
             event_loop,
             start_datetime,
             end_datetime,
@@ -101,7 +103,7 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             sleep_in_secs=sleep_in_secs,
             time_out_in_secs=time_out_in_secs,
         )
-        broker = ombroker.Broker(price_interface, get_wall_clock_time)
+        broker = ombroker.Broker(market_data_interface, get_wall_clock_time)
         # Initialize portfolio.
         strategy_id = "str1"
         account = "paper"
@@ -111,7 +113,7 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
         portfolio = omportfo.Portfolio.from_cash(
             strategy_id,
             account,
-            price_interface,
+            market_data_interface,
             get_wall_clock_time,
             asset_id_col,
             mark_to_market_col,
@@ -188,9 +190,9 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             "2000-01-01 09:40:00-05:00", tz="America/New_York"
         )
         (
-            price_interface,
+            market_data_interface,
             get_wall_clock_time,
-        ) = cdtfprinex.get_replayed_time_price_interface_example1(
+        ) = mdmdinex.get_replayed_time_market_data_interface_example1(
             event_loop,
             start_datetime,
             end_datetime,
@@ -200,7 +202,7 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             sleep_in_secs=sleep_in_secs,
             time_out_in_secs=time_out_in_secs,
         )
-        broker = ombroker.Broker(price_interface, get_wall_clock_time)
+        broker = ombroker.Broker(market_data_interface, get_wall_clock_time)
         # Initialize portfolio.
         strategy_id = "str1"
         account = "paper"
@@ -210,7 +212,7 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
         portfolio = omportfo.Portfolio.from_cash(
             strategy_id,
             account,
-            price_interface,
+            market_data_interface,
             get_wall_clock_time,
             asset_id_col,
             mark_to_market_col,
@@ -220,7 +222,7 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             initial_timestamp=initial_timestamp,
         )
         # Initialize broker.
-        broker = ombroker.Broker(price_interface, get_wall_clock_time)
+        broker = ombroker.Broker(market_data_interface, get_wall_clock_time)
         # Initialize a prediction series.
         predictions = pd.Series(
             index=[101, 202], data=[0.3, -0.1], name="prediction"
@@ -230,7 +232,7 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             "2000-01-01 09:40:00-05:00", tz="America/New_York"
         )
         order_dict_ = {
-            "price_interface": price_interface,
+            "market_data_interface": market_data_interface,
             "type_": "price@twap",
             "creation_timestamp": initial_timestamp,
             "start_timestamp": initial_timestamp,

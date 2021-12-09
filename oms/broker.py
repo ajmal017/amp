@@ -11,9 +11,9 @@ from typing import Any, Dict, List
 
 import pandas as pd
 
-import core.dataflow.price_interface as cdtfprint
 import helpers.datetime_ as hdateti
 import helpers.dbg as hdbg
+import market_data.market_data_interface as mdmadain
 import oms.order as omorder
 
 _LOG = logging.getLogger(__name__)
@@ -86,12 +86,14 @@ class AbstractBroker(abc.ABC):
 
     def __init__(
         self,
-        price_interface: cdtfprint.AbstractPriceInterface,
-        # TODO(gp): -> price_interface.get_wall_clock_time
+        market_data_interface: mdmadain.AbstractMarketDataInterface,
+        # TODO(gp): -> market_data_interface.get_wall_clock_time
         get_wall_clock_time: hdateti.GetWallClockTime,
     ) -> None:
-        hdbg.dassert_issubclass(price_interface, cdtfprint.AbstractPriceInterface)
-        self._price_interface = price_interface
+        hdbg.dassert_issubclass(
+            market_data_interface, mdmadain.AbstractMarketDataInterface
+        )
+        self._market_data_interface = market_data_interface
         self._get_wall_clock_time = get_wall_clock_time
         # Track the orders for internal accounting.
         self._orders = []
@@ -116,8 +118,8 @@ class AbstractBroker(abc.ABC):
         `as_of_timestamp`.
 
         Note that this function can be called only once for a given
-        `as_of_timestamp`. In fact it assumes that the fills are consumed and
-        processed from the caller and fills are deleted.
+        `as_of_timestamp`. In fact it assumes that the fills are
+        consumed and processed from the caller and fills are deleted.
         """
         wall_clock_timestamp = self._update_last_timestamp()
         # Check future peeking.
@@ -144,7 +146,8 @@ class AbstractBroker(abc.ABC):
 
     def _update_last_timestamp(self) -> pd.Timestamp:
         """
-        Make sure that the current wall clock time is after the previous interaction.
+        Make sure that the current wall clock time is after the previous
+        interaction.
 
         :return: current wall clock time
         """

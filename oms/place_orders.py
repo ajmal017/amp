@@ -16,11 +16,11 @@ import pandas as pd
 from tqdm.autonotebook import tqdm
 
 import core.config as cconfig
-import core.dataflow.price_interface as cdtfprint
 import helpers.dbg as hdbg
 import helpers.hpandas as hpandas
 import helpers.htqdm as htqdm
 import helpers.printing as hprint
+import market_data.market_data_interface as mdmadain
 import oms.broker as ombroker
 import oms.call_optimizer as ocalopti
 import oms.order as omorder
@@ -208,7 +208,7 @@ async def place_orders(
         - `real_time`: place the trades only for the last prediction as in a
            real-time set-up
     :param config:
-        - `price_interface`: the interface to get price data
+        - `market_data_interface`: the interface to get price data
         - `pred_column`: the column in the df from the DAG containing the predictions
            for all the assets
         - `mark_column`: the column from the PriceInterface to mark holdings to
@@ -219,9 +219,11 @@ async def place_orders(
     """
     _LOG.info("predictions_df=\n%s", prediction_df)
     # Check the config.
-    # - Check `price_interface`.
-    price_interface = config["price_interface"]
-    hdbg.dassert_issubclass(price_interface, cdtfprint.AbstractPriceInterface)
+    # - Check `market_data_interface`.
+    market_data_interface = config["market_data_interface"]
+    hdbg.dassert_issubclass(
+        market_data_interface, mdmadain.AbstractMarketDataInterface
+    )
     # - Check `portfolio`.
     portfolio = config["portfolio"]
     hdbg.dassert_issubclass(portfolio, omportfo.Portfolio)
@@ -339,7 +341,7 @@ async def place_orders(
         # Create an config for `Order`. This requires timestamps and so is
         # inside the loop.
         order_dict_ = {
-            "price_interface": price_interface,
+            "market_data_interface": market_data_interface,
             "type_": order_type,
             "creation_timestamp": wall_clock_timestamp,
             "start_timestamp": timestamp_start,

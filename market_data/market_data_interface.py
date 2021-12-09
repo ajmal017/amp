@@ -1,7 +1,7 @@
 """
 Import as:
 
-import core.dataflow.price_interface as cdtfprint
+import market_data.market_data_interface as mdmadain
 """
 
 import abc
@@ -26,11 +26,11 @@ _LOG = logging.getLogger(__name__)
 
 
 # #############################################################################
-# AbstractPriceInterface
+# AbstractMarketDataInterface
 # #############################################################################
 
 
-class AbstractPriceInterface(abc.ABC):
+class AbstractMarketDataInterface(abc.ABC):
     """
     Implement an interface to an historical / real-time source of price data.
 
@@ -437,12 +437,12 @@ class AbstractPriceInterface(abc.ABC):
 
 
 # #############################################################################
-# SqlPriceInterface
+# SqlMarketDataInterface
 # #############################################################################
 
 
 # TODO(gp): This should be pushed to the IM
-class SqlPriceInterface(AbstractPriceInterface):
+class SqlMarketDataInterface(AbstractMarketDataInterface):
     """
     Implement an interface to a real-time SQL database with 1-minute bar data.
     """
@@ -458,7 +458,7 @@ class SqlPriceInterface(AbstractPriceInterface):
         table_name: str,
         where_clause: Optional[str],
         valid_id: Any,
-        # Params from `AbstractPriceInterface`.
+        # Params from `AbstractMarketDataInterface`.
         *args: List[Any],
         **kwargs: Dict[str, Any],
     ):
@@ -669,12 +669,12 @@ class SqlPriceInterface(AbstractPriceInterface):
 
 
 # #############################################################################
-# ReplayedTimePriceInterface
+# ReplayedTimeMarketDataInterface
 # #############################################################################
 
 
 # TODO(gp): This should have a delay and / or we should use timestamp_db.
-class ReplayedTimePriceInterface(AbstractPriceInterface):
+class ReplayedTimeMarketDataInterface(AbstractMarketDataInterface):
     """
     Implement an interface to a replayed time historical / RT database.
 
@@ -687,7 +687,7 @@ class ReplayedTimePriceInterface(AbstractPriceInterface):
         df: pd.DataFrame,
         knowledge_datetime_col_name: str,
         delay_in_secs: int,
-        # Params from `AbstractPriceInterface`.
+        # Params from `AbstractMarketDataInterface`.
         *args: List[Any],
         **kwargs: Dict[str, Any],
     ):
@@ -818,7 +818,7 @@ class ReplayedTimePriceInterface(AbstractPriceInterface):
 # #############################################################################
 
 
-# TODO(gp): These should be methods of AbstractPriceInterface.
+# TODO(gp): These should be methods of AbstractMarketDataInterface.
 def _to_sql_datetime_string(dt: pd.Timestamp) -> str:
     """
     Convert a timestamp into an SQL string to query the DB.
@@ -897,7 +897,7 @@ def _process_period(
 
 
 def save_raw_data(
-    rtdbi: AbstractPriceInterface,
+    rtdbi: AbstractMarketDataInterface,
     file_name: str,
     period: str,
     limit: int,

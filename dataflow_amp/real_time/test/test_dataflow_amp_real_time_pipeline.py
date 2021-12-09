@@ -3,13 +3,13 @@ import logging
 import pandas as pd
 
 import core.config as cconfig
-import core.dataflow.price_interface_example as cdtfprinex
 import core.dataflow.runners as cdtfrunn
 import core.dataflow_example as cdtfexam
 import core.real_time_example as cretiexa
 import dataflow_amp.real_time.pipeline as dtfaretipi
 import helpers.hasyncio as hasynci
 import helpers.unit_test as hunitest
+import market_data.market_data_interface_example as mdmdinex
 import oms.broker as ombroker
 import oms.portfolio as omportfo
 
@@ -37,14 +37,14 @@ class TestRealTimeReturnPipeline1(hunitest.TestCase):
             end_datetime = pd.Timestamp("2000-01-01 10:30:00-05:00")
             columns = ["close", "vol"]
             asset_ids = [1000]
-            df = cdtfprinex.generate_synthetic_db_data(
+            df = mdmdinex.generate_synthetic_db_data(
                 start_datetime, end_datetime, columns, asset_ids
             )
             initial_replayed_delay = 5
             (
-                price_interface,
+                market_data_interface,
                 _,
-            ) = cdtfprinex.get_replayed_time_price_interface_example1(
+            ) = mdmdinex.get_replayed_time_market_data_interface_example1(
                 event_loop,
                 start_datetime,
                 end_datetime,
@@ -53,7 +53,7 @@ class TestRealTimeReturnPipeline1(hunitest.TestCase):
             )
             period = "last_5mins"
             source_node_kwargs = {
-                "price_interface": price_interface,
+                "market_data_interface": market_data_interface,
                 "period": period,
                 "asset_id_col": "asset_id",
                 "multiindex_output": False,
@@ -133,14 +133,14 @@ class TestRealTimePipelineWithOms1(hunitest.TestCase):
             )
             columns = ["price", "vol"]
             asset_ids = [1000, 1001]
-            df = cdtfprinex.generate_synthetic_db_data(
+            df = mdmdinex.generate_synthetic_db_data(
                 start_datetime, end_datetime, columns, asset_ids
             )
             initial_replayed_delay = 0
             (
-                price_interface,
+                market_data_interface,
                 get_wall_clock_time,
-            ) = cdtfprinex.get_replayed_time_price_interface_example1(
+            ) = mdmdinex.get_replayed_time_market_data_interface_example1(
                 event_loop,
                 start_datetime,
                 end_datetime,
@@ -149,7 +149,7 @@ class TestRealTimePipelineWithOms1(hunitest.TestCase):
             )
             period = "last_5mins"
             source_node_kwargs = {
-                "price_interface": price_interface,
+                "market_data_interface": market_data_interface,
                 "period": period,
                 "asset_id_col": "asset_id",
                 "multiindex_output": True,
@@ -171,14 +171,14 @@ class TestRealTimePipelineWithOms1(hunitest.TestCase):
             mark_to_market_col = "price"
             # mark_to_market_col = "close"
             timestamp_col = "end_datetime"
-            broker = ombroker.Broker(price_interface, get_wall_clock_time)
+            broker = ombroker.Broker(market_data_interface, get_wall_clock_time)
             initial_timestamp = pd.Timestamp(
                 "2000-01-01 09:30:00-05:00", tz="America/New_York"
             )
             portfolio = omportfo.Portfolio.from_cash(
                 strategy_id,
                 account,
-                price_interface,
+                market_data_interface,
                 get_wall_clock_time,
                 asset_id_col,
                 mark_to_market_col,
@@ -190,7 +190,7 @@ class TestRealTimePipelineWithOms1(hunitest.TestCase):
             order_type = "price@twap"
             # Populate place trades.
             config["process_forecasts"]["process_forecasts_config"] = {
-                "price_interface": price_interface,
+                "market_data_interface": market_data_interface,
                 "portfolio": portfolio,
                 "order_type": order_type,
                 "ath_start_time": pd.Timestamp(

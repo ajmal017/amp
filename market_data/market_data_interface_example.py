@@ -1,7 +1,7 @@
 """
 Import as:
 
-import core.dataflow.price_interface_example as cdtfprinex
+import market_data.market_data_interface_example as mdmdinex
 """
 # TODO(Paul): Consider moving this out of dataflow and into oms.
 
@@ -12,12 +12,12 @@ from typing import List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
-import core.dataflow.price_interface as cdtfprint
 import core.real_time as creatime
 import helpers.datetime_ as hdateti
 import helpers.dbg as hdbg
 import helpers.hnumpy as hnumpy
 import helpers.printing as hprint
+import market_data.market_data_interface as mdmadain
 
 _LOG = logging.getLogger(__name__)
 
@@ -69,7 +69,7 @@ def generate_synthetic_db_data(
 
 
 # TODO(gp): initial_replayed_delay -> initial_delay_in_mins (or in secs).
-def get_replayed_time_price_interface_example1(
+def get_replayed_time_market_data_interface_example1(
     event_loop: asyncio.AbstractEventLoop,
     start_datetime: pd.Timestamp,
     end_datetime: pd.Timestamp,
@@ -81,9 +81,9 @@ def get_replayed_time_price_interface_example1(
     df: Optional[pd.DataFrame] = None,
     sleep_in_secs: float = 1.0,
     time_out_in_secs: int = 60 * 2,
-) -> Tuple[cdtfprint.ReplayedTimePriceInterface, hdateti.GetWallClockTime]:
+) -> Tuple[mdmadain.ReplayedTimeMarketDataInterface, hdateti.GetWallClockTime]:
     """
-    Build a ReplayedTimePriceInterface backed by synthetic data.
+    Build a ReplayedTimeMarketDataInterface backed by synthetic data.
 
     :param start_datetime: start time for the generation of the synthetic data
     :param end_datetime: end time for the generation of the synthetic data
@@ -103,7 +103,7 @@ def get_replayed_time_price_interface_example1(
         df = generate_synthetic_db_data(
             start_datetime, end_datetime, columns, asset_ids
         )
-    # Build the `ReplayedTimePriceInterface` backed by the df with
+    # Build the `ReplayedTimeMarketDataInterface` backed by the df with
     # `initial_replayed_delay` after the first timestamp of the data.
     knowledge_datetime_col_name = "timestamp_db"
     asset_id_col_name = "asset_id"
@@ -122,8 +122,8 @@ def get_replayed_time_price_interface_example1(
         event_loop=event_loop,
         speed_up_factor=speed_up_factor,
     )
-    # Build a `ReplayedTimePriceInterface`.
-    price_interface = cdtfprint.ReplayedTimePriceInterface(
+    # Build a `ReplayedTimeMarketDataInterface`.
+    market_data_interface = mdmadain.ReplayedTimeMarketDataInterface(
         df,
         knowledge_datetime_col_name,
         delay_in_secs,
@@ -137,14 +137,14 @@ def get_replayed_time_price_interface_example1(
         sleep_in_secs=sleep_in_secs,
         time_out_in_secs=time_out_in_secs,
     )
-    return price_interface, get_wall_clock_time
+    return market_data_interface, get_wall_clock_time
 
 
-def get_replayed_time_price_interface_example2(
+def get_replayed_time_market_data_interface_example2(
     event_loop: asyncio.AbstractEventLoop,
-) -> Tuple[cdtfprint.ReplayedTimePriceInterface, hdateti.GetWallClockTime]:
+) -> Tuple[mdmadain.ReplayedTimeMarketDataInterface, hdateti.GetWallClockTime]:
     """
-    Build a ReplayedTimePriceInterface:
+    Build a ReplayedTimeMarketDataInterface:
 
     - with synthetic data between `2000-01-01 9:30` and `10:30`
     - for two assets
@@ -162,15 +162,15 @@ def get_replayed_time_price_interface_example2(
         start_datetime, end_datetime, columns_, asset_ids
     )
     _LOG.debug("df=%s", hprint.dataframe_to_str(df))
-    # Build a `ReplayedTimePriceInterface`.
+    # Build a `ReplayedTimeMarketDataInterface`.
     initial_replayed_delay = 5
     delay_in_secs = 0
     sleep_in_secs = 30
     time_out_in_secs = 60 * 5
     (
-        price_interface,
+        market_data_interface,
         get_wall_clock_time,
-    ) = get_replayed_time_price_interface_example1(
+    ) = get_replayed_time_market_data_interface_example1(
         event_loop,
         start_datetime,
         end_datetime,
@@ -180,4 +180,4 @@ def get_replayed_time_price_interface_example2(
         sleep_in_secs=sleep_in_secs,
         time_out_in_secs=time_out_in_secs,
     )
-    return price_interface, get_wall_clock_time
+    return market_data_interface, get_wall_clock_time

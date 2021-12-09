@@ -22,7 +22,7 @@ import pandas as pd
 
 # %%
 # hdbg.init_logger(verbosity=logging.INFO)
-import amp.core.dataflow.price_interface_example
+import amp.market_data.market_data_interface_example
 import amp.oms.portfolio_example
 import helpers.dbg as hdbg
 import helpers.printing as hprint
@@ -40,7 +40,7 @@ hprint.config_notebook()
 
 # %%
 event_loop = None
-price_interface = amp.core.dataflow.price_interface_example.get_replayed_time_price_interface_example2(
+price_interface = amp.market_data.market_data_interface_example.get_replayed_time_price_interface_example2(
     event_loop
 )
 
