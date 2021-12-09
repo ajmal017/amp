@@ -11,8 +11,6 @@ import core.dataflow.real_time_example as cdtfretiex
 import core.dataflow.result_bundle as cdtfrebun
 import core.dataflow.runners as cdtfrunn
 import core.dataflow.visitors as cdtfvisi
-# TODO(*): Remove this dependency.
-import core.dataflow_example as cdtfexam
 import helpers.datetime_ as hdateti
 import helpers.hasyncio as hasynci
 import helpers.unit_test as hunitest
@@ -122,9 +120,8 @@ class TestRealTimeDagRunner1(hunitest.TestCase):
         Test `RealTimeDagRunner` using a simple DAG triggering every 2 seconds.
         """
         # Get a naive pipeline as DAG.
-        dag_builder = cdtfexam._NaivePipeline()
+        dag_builder = cdtfbuexa.MvnReturnsBuilder()
         config = dag_builder.get_config_template()
-        config["process_forecasts"]["prediction_col"] = 0
         # Set up the event loop.
         sleep_interval_in_secs = 1.0
         execute_rt_loop_kwargs = (
