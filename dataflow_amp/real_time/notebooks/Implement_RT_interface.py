@@ -25,7 +25,6 @@ import os
 import pandas as pd
 
 # %%
-import amp.core.dataflow.test.builders_example
 import amp.core.dataflow_example
 import helpers.dbg as hdbg
 import helpers.printing as hprint
@@ -47,7 +46,7 @@ _LOG = logging.getLogger(__name__)
 # %%
 import core.config as cconfig
 import core.dataflow as cdataf
-import core.dataflow.real_time as cdtfretim
+import core.real_time as creatime
 import dataflow_amp.returns.pipeline as dtfamrepip
 
 dag_builder = dtfamrepip.ReturnsPipeline()
@@ -122,9 +121,9 @@ if False:
 node = dag.get_node("load_prices")
 node.reset_current_time()
 
-for now in cdtfretim.get_now_time(start_date, end_date):
+for now in creatime.get_now_time(start_date, end_date):
     print("now=", now)
-    execute = cdtfretim.is_dag_to_execute(now)
+    execute = creatime.is_dag_to_execute(now)
     if execute:
         print("Time to execute the DAG")
         node = dag.get_node("load_prices")
@@ -155,14 +154,14 @@ cdataf.draw(dag)
 
 # %%
 # # Align on a even second.
-# cdtfretim.align_on_even_second()
+# creatime.align_on_even_second()
 # #
 # sleep_interval_in_secs = 1.0
 # num_iterations = 3
 # get_wall_clock_time = rrt.get_wall_clock_time
-# need_to_execute = cdtfretim.execute_every_2_seconds
+# need_to_execute = creatime.execute_every_2_seconds
 # #
-# events, results = cdtfretim.execute_dag_with_real_time_loop(
+# events, results = creatime.execute_dag_with_real_time_loop(
 #     get_wall_clock_time,
 #     sleep_interval_in_secs,
 #     num_iterations,
@@ -175,7 +174,7 @@ results[0][1]["df_out"]
 # %%
 ##
 
-import core.dataflow.real_time as cdtfretim
+import core.dataflow.real_time as creatime
 
 # %%
 import helpers.datetime_ as hdateti
@@ -184,7 +183,7 @@ start_datetime = pd.Timestamp("2010-01-04 09:30:00", tz=hdateti.get_ET_tz())
 end_datetime = pd.Timestamp("2010-01-05 09:30:00", tz=hdateti.get_ET_tz())
 
 # Use a replayed real-time starting at the same time as the data.
-rrt = cdtfretim.ReplayedTime(start_datetime, hdateti.get_current_time(tz="ET"))
+rrt = creatime.ReplayedTime(start_datetime, hdateti.get_current_time(tz="ET"))
 get_wall_clock_time = rrt.get_wall_clock_time
 
 # %%
@@ -212,7 +211,7 @@ dag_runner = cdtf.RealTimeDagRunner(**kwargs)
 # Align on a even second.
 grid_time_in_secs = 2
 event_loop = None
-cdtfretim.align_on_time_grid(
+creatime.align_on_time_grid(
     get_wall_clock_time, grid_time_in_secs, event_loop=event_loop
 )
 result = dag_runner.predict()
@@ -252,7 +251,7 @@ node = cdnt.Reample("resample", **config)
 df_out = node.fit(data)["df_out"]
 
 # %%
-import core.dataflow.nodes.transformers as cdtfnotra
+import dataflow.nodes.transformers as cdtfnotra
 
 nid = "nop"
 

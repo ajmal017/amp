@@ -20,12 +20,13 @@ import logging
 
 import pandas as pd
 
-# %%
-# hdbg.init_logger(verbosity=logging.INFO)
-import amp.market_data.market_data_interface_example
-import amp.oms.portfolio_example
 import helpers.dbg as hdbg
 import helpers.printing as hprint
+
+# %%
+# hdbg.init_logger(verbosity=logging.INFO)
+import market_data.market_data_interface_example as mdmdinex
+import oms.portfolio_example as oporexam
 
 hdbg.init_logger(verbosity=logging.DEBUG)
 
@@ -40,15 +41,13 @@ hprint.config_notebook()
 
 # %%
 event_loop = None
-price_interface = amp.market_data.market_data_interface_example.get_replayed_time_price_interface_example2(
+market_data_interface = mdmdinex.get_replayed_time_market_data_interface_example2(
     event_loop
 )
 
 # %%
 initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
-portfolio = amp.oms.portfolio_example.get_portfolio_example1(
-    price_interface, initial_timestamp
-)
+portfolio = oporexam.get_portfolio_example1(market_data_interface, initial_timestamp)
 
 # %%
 str(portfolio)
