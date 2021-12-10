@@ -19,7 +19,8 @@ import logging
 import os
 from typing import Optional
 
-import dataflow_model.utils as cdtfmouti
+# TODO(*): Remove this dependency!
+import dataflow.model.utils as cdtfmouti
 
 import core.config as cconfig
 import helpers.datetime_ as hdateti
