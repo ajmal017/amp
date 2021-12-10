@@ -127,29 +127,6 @@ def _generate_orders(
     return orders
 
 
-def _update_portfolio(
-    timestamp: pd.Timestamp,
-    portfolio: omportfo.Portfolio,
-    broker: ombroker.Broker,
-) -> None:
-    last_timestamp = portfolio.get_last_timestamp()
-    hdbg.dassert_lt(last_timestamp, timestamp)
-    fills = broker.get_fills(timestamp)
-    fill_rows = []
-    for fill in fills:
-        _LOG.debug("# Processing fill=%s", fill)
-        fill_row: Dict[str, Any] = collections.OrderedDict()
-        # Copy contents of the fill.
-        fill_row.update(fill.to_dict())
-        fill_rows.append(pd.Series(fill_row))
-    if fill_rows:
-        fills_df = pd.concat(fill_rows, axis=1).transpose()
-        fills_df = fills_df.convert_dtypes()
-    else:
-        fills_df = None
-    portfolio.update_state(timestamp, fills_df)
-
-
 def _compute_target_positions_in_shares(
     wall_clock_timestamp: pd.Timestamp,
     predictions: pd.Series,
@@ -316,7 +293,8 @@ async def place_orders(
                 char1="#",
             ),
         )
-        _update_portfolio(wall_clock_timestamp, portfolio, broker)
+        # _update_portfolio(wall_clock_timestamp, portfolio, broker)
+        portfolio.update_state()
         # Continue if we are outside of our trading window.
         if time < trading_start_time or time > trading_end_time:
             continue

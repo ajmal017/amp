@@ -3,7 +3,6 @@ Import as:
 
 import market_data.market_data_interface_example as mdmdinex
 """
-# TODO(Paul): Consider moving this out of dataflow and into oms.
 
 import asyncio
 import logging

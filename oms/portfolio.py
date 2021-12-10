@@ -347,8 +347,6 @@ class AbstractPortfolio(abc.ABC):
 
     def update_state(
         self,
-        wall_clock_timestamp: pd.Timestamp,
-        fills_df: Optional[pd.DataFrame],
     ) -> None:
         """
         Update holdings at the current wall clock time.
@@ -376,7 +374,7 @@ class AbstractPortfolio(abc.ABC):
             val = self.get_characteristics(last_timestamp)
             self._characteristics[last_timestamp] = val
         #
-        new_holdings = self._update_state(wall_clock_timestamp, fills_df)
+        new_holdings = self._update_state(wall_clock_timestamp)
         # TODO(gp): Make sure that new_holdings are after self._holdings.
         # Add the information to the holdings.
         Portfolio._validate_holdings_df(new_holdings)
@@ -391,7 +389,7 @@ class AbstractPortfolio(abc.ABC):
     def _update_state(
         self,
         wall_clock_timestamp: pd.Timestamp,
-        fills_df: Optional[pd.DataFrame],
+        # fills_df: Optional[pd.DataFrame],
     ) -> pd.DataFrame:
         """
         :return: a holding_df with the new holdings
@@ -623,8 +621,7 @@ class Portfolio(AbstractPortfolio):
     def _update_state(
         self,
         wall_clock_timestamp: pd.Timestamp,
-        fills_df: Optional[pd.DataFrame],
-    ) -> None:
+    ) -> pd.DataFrame:
         """
         Update holdings at `timestamp` using fills information in `fill_df`.
         """
@@ -632,7 +629,7 @@ class Portfolio(AbstractPortfolio):
         last_timestamp = self.get_last_timestamp()
         _LOG.debug("last_timestamp=%s", last_timestamp)
         # Get fills.
-        # fills_df = self._get_fills(wall_clock_timestamp)
+        fills_df = self._get_fills(wall_clock_timestamp)
         # Get latest holdings
         last_holdings = self.get_holdings(last_timestamp, asset_id=None)
         last_holdings.index.name = "last_timestamp"

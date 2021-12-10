@@ -188,7 +188,9 @@ class Broker(AbstractBroker):
         orders: List[omorder.Order],
     ) -> None:
         # Enqueue the orders based on their completion deadline time.
+        _LOG.debug("Submitting %d orders", len(orders))
         for order in orders:
+            _LOG.debug("Submitting order %s", order.order_id)
             # TODO(gp): curr_timestamp <= order.start_timestamp
             self._deadline_timestamp_to_orders[order.end_timestamp].append(order)
 

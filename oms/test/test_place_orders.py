@@ -70,7 +70,7 @@ class TestPlaceOrders1(hunitest.TestCase):
 
 
 class TestMarkToMarket1(hunitest.TestCase):
-    def test_initialization1(self) -> None:
+    def test1(self) -> None:
         # Set up price interface components.
         event_loop = None
         db_txt = """
@@ -150,18 +150,18 @@ asset_id,curr_num_shares,prediction,price,value
 
 
 class TestOptimizeAndUpdate1(hunitest.TestCase):
-    def test_initialization1(self) -> None:
+    def test1(self) -> None:
         with hasynci.solipsism_context() as event_loop:
             hasynci.run(self._test_coroutine(event_loop), event_loop=event_loop)
 
     async def _test_coroutine(self, event_loop):
-        # Set up price interface components.
+        # Get price data.
         db_txt = """
 start_datetime,end_datetime,timestamp_db,price,asset_id
 2000-01-01 09:30:00-05:00,2000-01-01 09:35:00-05:00,2000-01-01 09:35:00-05:00,107.73,101
 2000-01-01 09:30:00-05:00,2000-01-01 09:35:00-05:00,2000-01-01 09:35:00-05:00,93.25,202
-2000-01-01 09:35:00-05:00,2000-01-01 09:40:00-05:00,2000-01-01 09:35:00-05:00,108.73,101
-2000-01-01 09:35:00-05:00,2000-01-01 09:40:00-05:00,2000-01-01 09:35:00-05:00,93.13,202
+2000-01-01 09:35:00-05:00,2000-01-01 09:40:00-05:00,2000-01-01 09:40:00-05:00,108.73,101
+2000-01-01 09:35:00-05:00,2000-01-01 09:40:00-05:00,2000-01-01 09:40:00-05:00,93.13,202
 """
         db_df = pd.read_csv(
             io.StringIO(db_txt),
@@ -202,8 +202,9 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             sleep_in_secs=sleep_in_secs,
             time_out_in_secs=time_out_in_secs,
         )
+        # Initialize broker.
         broker = ombroker.Broker(market_data_interface, get_wall_clock_time)
-        # Initialize portfolio.
+        # Initialize Portfolio.
         strategy_id = "str1"
         account = "paper"
         asset_id_col = "asset_id"
@@ -221,8 +222,6 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             initial_cash=1e6,
             initial_timestamp=initial_timestamp,
         )
-        # Initialize broker.
-        broker = ombroker.Broker(market_data_interface, get_wall_clock_time)
         # Initialize a prediction series.
         predictions = pd.Series(
             index=[101, 202], data=[0.3, -0.1], name="prediction"
@@ -239,8 +238,7 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             "end_timestamp": end_timestamp,
         }
         order_config = cconfig.get_config_from_nested_dict(order_dict_)
-        # #####################################################################
-        # Compute target positions
+        # Compute target positions.
         target_positions = oplaorde._compute_target_positions_in_shares(
             initial_timestamp, predictions, portfolio
         )
@@ -249,13 +247,13 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
         )
         # Submit orders.
         broker.submit_orders(orders)
-        # wait 5 minutes
+        # Wait 5 minutes.
         await asyncio.sleep(60 * 5)
-        oplaorde._update_portfolio(end_timestamp, portfolio, broker)
-        # #####################################################################
+        portfolio.update_state()
         actual = portfolio.get_characteristics(
             pd.Timestamp("2000-01-01 09:40:00-05:00", tz="America/New_York")
         )
+        # Check.
         txt = r"""
 ,2000-01-01 09:40:00-05:00
 net_asset_holdings,50728.36
@@ -268,7 +266,7 @@ leverage,0.1007
             io.StringIO(txt),
             index_col=0,
         )
-        # The timestamp doesn't parse correctly from the csv.
+        # The timestamp doesn't parse correctly from the CSV.
         expected.columns = [
             pd.Timestamp("2000-01-01 09:40:00-05:00", tz="America/New_York")
         ]
