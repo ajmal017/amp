@@ -1,7 +1,7 @@
 """
 Import as:
 
-import dataflow.pipelines as dtfpipeli
+import dataflow.pipelines.event_study.pipeline as dtfpevstpi
 """
 
 import logging
@@ -11,6 +11,8 @@ import sklearn
 import core.config as cconfig
 import core.event_study as cevent
 import core.signal_processing as csigproc
+
+# TODO(Paul): Fix these imports.
 from dataflow.builders import DagBuilder
 from dataflow.core import DAG
 from dataflow.nodes.base import YConnector

@@ -20,4 +20,3 @@ from dataflow.core.result_bundle import *  # pylint: disable=unused-import # NOQ
 from dataflow.core.runners import *  # pylint: disable=unused-import # NOQA
 from dataflow.core.visitors import *  # pylint: disable=unused-import # NOQA
 from dataflow.core.visualization import *  # pylint: disable=unused-import # NOQA
-from dataflow.pipelines import *  # pylint: disable=unused-import # NOQA

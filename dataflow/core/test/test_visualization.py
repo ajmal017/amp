@@ -1,7 +1,8 @@
 import logging
 import os
 
-import dataflow.core.core as dtfcorcore
+import dataflow.core.dag as dtfcordag
+import dataflow.core.node as dtfcornode
 import dataflow.core.visualization as dtfcorvisu
 import helpers.unit_test as hunitest
 
@@ -30,8 +31,8 @@ class Test_dataflow_core_visualization1(hunitest.TestCase):
         self.assertTrue(os.path.exists(file_name))
 
     @staticmethod
-    def _build_dag() -> dtfcorcore.DAG:
-        dag = dtfcorcore.DAG()
-        n1 = dtfcorcore.Node("n1")
+    def _build_dag() -> dtfcordag.DAG:
+        dag = dtfcordag.DAG()
+        n1 = dtfcornode.Node("n1")
         dag.add_node(n1)
         return dag

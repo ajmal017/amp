@@ -10,12 +10,12 @@ import IPython
 import networkx as networ
 import pygraphviz
 
-import dataflow.core.core as dtfcorcore
+import dataflow.core.dag as dtfcordag
 import helpers.dbg as hdbg
 import helpers.io_ as hio
 
 
-def draw(dag: dtfcorcore.DAG) -> IPython.core.display.Image:
+def draw(dag: dtfcordag.DAG) -> IPython.core.display.Image:
     """
     Render DAG in a notebook.
     """
@@ -24,7 +24,7 @@ def draw(dag: dtfcorcore.DAG) -> IPython.core.display.Image:
     return image
 
 
-def draw_to_file(dag: dtfcorcore.DAG, file_name: str = "graph.png") -> str:
+def draw_to_file(dag: dtfcordag.DAG, file_name: str = "graph.png") -> str:
     """
     Save DAG rendering to a file.
     """
@@ -35,12 +35,12 @@ def draw_to_file(dag: dtfcorcore.DAG, file_name: str = "graph.png") -> str:
     return file_name
 
 
-def _extract_agraph_from_dag(dag: dtfcorcore.DAG) -> pygraphviz.agraph.AGraph:
+def _extract_agraph_from_dag(dag: dtfcordag.DAG) -> pygraphviz.agraph.AGraph:
     """
     Extract a pygraphviz `agraph` from a DAG.
     """
     # Extract networkx DAG.
-    hdbg.dassert_isinstance(dag, dtfcorcore.DAG)
+    hdbg.dassert_isinstance(dag, dtfcordag.DAG)
     graph = dag.dag
     hdbg.dassert_isinstance(graph, networ.Graph)
     # Convert the DAG into a pygraphviz graph.
