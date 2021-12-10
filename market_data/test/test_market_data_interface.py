@@ -1,9 +1,3 @@
-"""
-Import as:
-
-import dataflow.test.test_price_interface as dartttdi
-"""
-
 import logging
 from typing import Any, Callable, Tuple
 
@@ -188,7 +182,7 @@ class TestReplayedTimeMarketDataInterface1(hunitest.TestCase):
         func = lambda market_data_interface: market_data_interface.get_data(
             period, normalize_data=normalize_data
         )
-        #
+        # pylint: disable=line-too-long
         expected_df_as_str = """
         # df=
         df.index in [2000-01-01 09:31:00-05:00, 2000-01-01 09:31:00-05:00]
@@ -197,6 +191,7 @@ class TestReplayedTimeMarketDataInterface1(hunitest.TestCase):
                                    asset_id  last_price            start_datetime              timestamp_db
         end_datetime
         2000-01-01 09:31:00-05:00      1000   999.87454 2000-01-01 09:30:00-05:00 2000-01-01 09:31:00-05:00"""
+        # pylint: enable=line-too-long
         market_data_interface = _check_get_data(
             self, initial_replayed_delay, func, expected_df_as_str
         )

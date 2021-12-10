@@ -571,15 +571,14 @@ class TestLibTasksGetDockerCmd1(_LibTasksTestCase):
             print_docker_config=print_docker_config,
         )
         exp = r"""
-        IMAGE=*****/amp_test:local \
-            docker-compose \
-            --file $GIT_ROOT/devops/compose/docker-compose.yml --file $GIT_ROOT/devops/compose/docker-compose_as_submodule.yml \
-            --env-file devops/env/default.env \
-            run \
-            --rm \
-            app \
-            bash
-        """
+        IMAGE=*****/amp_test:local-$USER_NAME-1.0.0 \
+        docker-compose \
+        --file $GIT_ROOT/devops/compose/docker-compose.yml --file $GIT_ROOT/devops/compose/docker-compose_as_submodule.yml \
+        --env-file devops/env/default.env \
+        run \
+        --rm \
+        app \
+        bash """
         self._check(act, exp)
 
     @pytest.mark.skipif(
@@ -604,16 +603,16 @@ class TestLibTasksGetDockerCmd1(_LibTasksTestCase):
             print_docker_config=print_docker_config,
         )
         exp = r"""
-        IMAGE=*****/amp_test:local-1.0.0 \
+        IMAGE=*****/amp_test:local-$USER_NAME-1.0.0 \
         PORT=9999 \
         SKIP_RUN=1 \
-            docker-compose \
-            --file $GIT_ROOT/devops/compose/docker-compose.yml --file $GIT_ROOT/devops/compose/docker-compose_as_submodule.yml \
-            --env-file devops/env/default.env \
-            run \
-            --rm \
-            app \
-            bash
+        docker-compose \
+        --file $GIT_ROOT/devops/compose/docker-compose.yml --file $GIT_ROOT/devops/compose/docker-compose_as_submodule.yml \
+        --env-file devops/env/default.env \
+        run \
+        --rm \
+        app \
+        bash 
         """
         self._check(act, exp)
 
@@ -648,6 +647,7 @@ class TestLibTasksGetDockerCmd1(_LibTasksTestCase):
         """
         self._check(act, exp)
 
+    @pytest.mark.skip(reason="Wait for integration")
     @pytest.mark.skipif(
         not hgit.is_in_amp_as_submodule(), reason="Only run in amp as submodule"
     )
