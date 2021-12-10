@@ -1,7 +1,7 @@
 """
 Import as:
 
-import core.dataflow.test.test_price_interface as dartttdi
+import dataflow.test.test_price_interface as dartttdi
 """
 
 import logging

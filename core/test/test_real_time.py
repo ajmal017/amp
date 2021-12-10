@@ -1,7 +1,7 @@
 """
 Import as:
 
-import core.dataflow.test.test_real_time as cdtfttrt
+import dataflow.test.test_real_time as cdtfttrt
 """
 import asyncio
 import logging
