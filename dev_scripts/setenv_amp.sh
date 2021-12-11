@@ -113,8 +113,16 @@ alias il="invoke --list"
 # Print the aliases.
 alias
 
-if [[ $(whoami) == "saggese" && $(git remote -v) =~ "cmamp.git" ]]; then
-    export GIT_SSH_COMMAND="ssh -i ~/.ssh/cryptomatic/id_rsa.cryptomtc.github"
+if [[ $(whoami) == "saggese" ]]; then
+    # > ls -l ~/.ssh/*.github
+    # .ssh/id_rsa.cryptomtc.github
+    # .ssh/id_rsa.gpsaggese.github
+    GIT_REMOTE=$(git remote -v)
+    if [[ $GIT_REMOTE =~ "cmamp.git" || $GIT_REMOTE =~ "dev_tools.git" ]]; then
+        export GIT_SSH_COMMAND="ssh -i ~/.ssh/id_rsa.cryptomtc.github"
+    elif [[ $GIT_REMOTE =~ "amp.git" || $GIT_REMOTE =~ "lemonade.git" ]]; then
+        export GIT_SSH_COMMAND="ssh -i ~/.ssh/id_rsa.gpsaggese.github"
+    fi;
     echo "GIT_SSH_COMMAND=$GIT_SSH_COMMAND"
 fi;
 
