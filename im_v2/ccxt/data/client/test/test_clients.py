@@ -12,6 +12,7 @@ import helpers.unit_test as hunitest
 import im.ccxt.db.utils as imccdbuti
 import im_v2.ccxt.data.client.clients as imvcdclcl
 import im_v2.common.data.client as imvcdcli
+import im_v2.common.db.utils as imcodbuti
 
 _AM_S3_ROOT_DIR = os.path.join(hs3.get_path(), "data")
 
@@ -75,53 +76,8 @@ class TestGetFilePath(hunitest.TestCase):
     hgit.is_dev_tools() or hgit.is_lime(),
     reason="lime and dev_tools doesn't have dind support",
 )
-class TestCcxtDbClient(hunitest.TestCase):
-    def setUp(self) -> None:
-        """
-        Initialize the test container.
-        """
-        super().setUp()
-        self.docker_compose_file_path = os.path.join(
-            hgit.get_amp_abs_path(), "im_v2/devops/compose/docker-compose.yml"
-        )
-        cmd = (
-            "sudo docker-compose "
-            f"--file {self.docker_compose_file_path} "
-            "up -d im_postgres_local"
-        )
-        hsysinte.system(cmd, suppress_output=False)
-        # Set DB credentials.
-        self.host = "localhost"
-        self.dbname = "im_postgres_db_local"
-        self.port = 5432
-        self.user = "aljsdalsd"
-        self.password = "alsdkqoen"
-        # Wait for DB connection.
-        hsql.wait_db_connection(
-            self.host, self.dbname, self.port, self.user, self.password
-        )
-        # Get DB connection.
-        self.connection = hsql.get_connection(
-            self.host,
-            self.dbname,
-            self.port,
-            self.user,
-            self.password,
-            autocommit=True,
-        )
-
-    def tearDown(self) -> None:
-        """
-        Bring down the test container.
-        """
-        cmd = (
-            "sudo docker-compose "
-            f"--file {self.docker_compose_file_path} down -v"
-        )
-        hsysinte.system(cmd, suppress_output=False)
-        super().tearDown()
-
-    @pytest.mark.slow("8 seconds.")
+class TestCcxtDbClient(imcodbuti.TestImDbHelper):
+    @pytest.mark.slow("6 seconds.")
     def test_read_data1(self) -> None:
         """
         Verify that data from DB is read correctly.
@@ -135,6 +91,8 @@ class TestCcxtDbClient(hunitest.TestCase):
         df = ccxt_db_client.read_data("binance::BTC_USDT")
         actual = hunitest.convert_df_to_json_string(df, n_tail=None)
         self.check_string(actual)
+        # Delete the table.
+        hsql.remove_table(self.connection, "ccxt_ohlcv")
 
     @pytest.mark.slow("8 seconds.")
     def test_read_data2(self) -> None:
@@ -154,6 +112,8 @@ class TestCcxtDbClient(hunitest.TestCase):
         )
         actual = hunitest.convert_df_to_json_string(df, n_tail=None)
         self.check_string(actual)
+        # Delete the table.
+        hsql.remove_table(self.connection, "ccxt_ohlcv")
 
     @pytest.mark.slow("8 seconds.")
     def test_read_data3(self) -> None:
@@ -172,6 +132,8 @@ class TestCcxtDbClient(hunitest.TestCase):
         )
         actual = hunitest.convert_df_to_json_string(df, n_tail=None)
         self.check_string(actual)
+        # Delete the table.
+        hsql.remove_table(self.connection, "ccxt_ohlcv")
 
     def _create_test_table(self) -> None:
         """
@@ -353,7 +315,7 @@ class TestMultipleSymbolsCcxtFileSystemClient(hunitest.TestCase):
             expected_currency_pairs,
         )
 
-    @pytest.mark.slow
+    @pytest.mark.slow("9 seconds")
     def test3(self) -> None:
         """
         Test that all files are being read correctly without normalization.
@@ -474,53 +436,8 @@ class TestMultipleSymbolsCcxtFileSystemClient(hunitest.TestCase):
     hgit.is_dev_tools() or hgit.is_lime(),
     reason="lime and dev_tools doesn't have dind support",
 )
-class TestMultipleSymbolsCcxtDbClient(hunitest.TestCase):
-    def setUp(self) -> None:
-        """
-        Initialize the test container.
-        """
-        super().setUp()
-        self.docker_compose_file_path = os.path.join(
-            hgit.get_amp_abs_path(), "im_v2/devops/compose/docker-compose.yml"
-        )
-        cmd = (
-            "sudo docker-compose "
-            f"--file {self.docker_compose_file_path} "
-            "up -d im_postgres_local"
-        )
-        hsysinte.system(cmd, suppress_output=False)
-        # Set DB credentials.
-        self.host = "localhost"
-        self.dbname = "im_postgres_db_local"
-        self.port = 5432
-        self.password = "alsdkqoen"
-        self.user = "aljsdalsd"
-        # Wait for DB connection.
-        hsql.wait_db_connection(
-            self.host, self.dbname, self.port, self.user, self.password
-        )
-        # Get DB connection.
-        self.connection = hsql.get_connection(
-            self.host,
-            self.dbname,
-            self.port,
-            self.user,
-            self.password,
-            autocommit=True,
-        )
-
-    def tearDown(self) -> None:
-        """
-        Bring down the test container.
-        """
-        cmd = (
-            "sudo docker-compose "
-            f"--file {self.docker_compose_file_path} down -v"
-        )
-        hsysinte.system(cmd, suppress_output=False)
-        super().tearDown()
-
-    @pytest.mark.slow("8 seconds.")
+class TestMultipleSymbolsCcxtDbClient(imcodbuti.TestImDbHelper):
+    @pytest.mark.slow("10 seconds.")
     def test1(self) -> None:
         """
         Test that data for provided list of full symbols is being read
@@ -548,8 +465,10 @@ class TestMultipleSymbolsCcxtDbClient(hunitest.TestCase):
             expected_exchange_ids,
             expected_currency_pairs,
         )
+        # Delete the table.
+        hsql.remove_table(self.connection, "ccxt_ohlcv")
 
-    @pytest.mark.slow("10 seconds.")
+    @pytest.mark.slow("9 seconds.")
     def test2(self) -> None:
         """
         Test that all files are being read and filtered correctly.
@@ -580,8 +499,10 @@ class TestMultipleSymbolsCcxtDbClient(hunitest.TestCase):
             expected_exchange_ids,
             expected_currency_pairs,
         )
+        # Delete the table.
+        hsql.remove_table(self.connection, "ccxt_ohlcv")
 
-    @pytest.mark.slow("10 seconds.")
+    @pytest.mark.slow("9 seconds.")
     def test3(self) -> None:
         """
         Test that all files are being read correctly without normalization.
@@ -611,8 +532,10 @@ class TestMultipleSymbolsCcxtDbClient(hunitest.TestCase):
             expected_exchange_ids,
             expected_currency_pairs,
         )
+        # Delete the table.
+        hsql.remove_table(self.connection, "ccxt_ohlcv")
 
-    @pytest.mark.slow("10 seconds.")
+    @pytest.mark.slow("9 seconds.")
     def test4(self) -> None:
         """
         Test that all files are being read correctly in dict output mode.
@@ -661,6 +584,8 @@ class TestMultipleSymbolsCcxtDbClient(hunitest.TestCase):
             ]
         )
         self.check_string(actual_string)
+        # Delete the table.
+        hsql.remove_table(self.connection, "ccxt_ohlcv")
 
     def _create_test_table(self) -> None:
         """

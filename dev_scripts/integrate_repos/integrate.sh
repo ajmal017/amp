@@ -1,7 +1,7 @@
 #!/bin/bash -xe
 
 # Diff everything.
-if [[ 0 == 1 ]]; then
+if [[ 1 == 1 ]]; then
     dev_scripts/diff_to_vimdiff.py --dir1 $AMP_DIR --dir2 $CMAMP_DIR
     exit 0
 fi;
@@ -9,7 +9,9 @@ fi;
 #SUBDIR=helpers
 #SUBDIR=im
 #SUBDIR=im_v2
-SUBDIR=oms
+#SUBDIR=oms
+#SUBDIR=market_data
+SUBDIR=dataflow
 #SUBDIR=optimizer
 #SUBDIR=research/cc
 #SUBDIR=research_amp
