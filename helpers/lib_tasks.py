@@ -35,6 +35,14 @@ import helpers.versioning as hversio
 
 _LOG = logging.getLogger(__name__)
 
+# Conventions around pyinvoke
+# - pyinvoke uses introspection to infer properties of a task, but doesn't
+#   support many Python3 features
+# - mimize the code in `@tasks` calling other functions to use Python3 features
+# - use "" as default instead None since pyinvoke can only infer a single type
+# - don't use type hints in `@tasks`
+#   - we use `# ignore: type` to avoid mypy complaints
+
 # #############################################################################
 # Default params.
 # #############################################################################
