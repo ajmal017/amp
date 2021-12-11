@@ -27,8 +27,9 @@ _LOG = logging.getLogger(__name__)
 
 if True:
 
+    @pytest.mark.slow
     class TestContinuousDeepArModel(hunitest.TestCase):
-        @pytest.mark.slow
+
         def test_fit_dag1(self) -> None:
             dag = self._get_dag()
             #

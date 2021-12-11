@@ -10,9 +10,7 @@ _LOG = logging.getLogger(__name__)
 
 class TestSimulatedBroker1(hunitest.TestCase):
     def test1(self) -> None:
-        """
-        
-        """
+        """"""
         event_loop = None
         broker = obroexam.get_broker_example1(event_loop)
         order = oordexam.get_order_example1()
@@ -24,9 +22,7 @@ class TestSimulatedBroker1(hunitest.TestCase):
 
 class TestMockedBroker1(ottb.TestOmsDbHelper):
     def test1(self) -> None:
-        """
-        
-        """
+        """"""
         event_loop = None
         broker = obroexam.get_broker_example1(event_loop)
         order = oordexam.get_order_example1()

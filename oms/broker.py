@@ -131,9 +131,9 @@ class AbstractBroker(abc.ABC):
         # Check future peeking.
         if as_of_timestamp > wall_clock_timestamp:
             raise ValueError(
-                "You are asking about the future: " +
-                f"as_of_timestamp={as_of_timestamp} > " +
-                f"wall_clock_timestamp={wall_clock_timestamp}"
+                "You are asking about the future: "
+                + f"as_of_timestamp={as_of_timestamp} > "
+                + f"wall_clock_timestamp={wall_clock_timestamp}"
             )
         # Get the fills.
         fills = self._get_fills(as_of_timestamp)
