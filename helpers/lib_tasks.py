@@ -2375,8 +2375,7 @@ def _run_test_cmd(
             coverage_rc = hsysinte.system(script_name)
             if coverage_rc != 0:
                 _LOG.warning(
-                    "Setting `rc` to `0` even though the coverage script"
-                    "fails."
+                    "Setting `rc` to `0` even though the coverage script" "fails."
                 )
                 rc = 0
     return rc
