@@ -116,15 +116,17 @@ class AbstractPortfolio(abc.ABC):
         initial_cash: float,
         initial_timestamp: pd.Timestamp,
         **kwargs: Any,
-    ) -> "Portfolio":
+    ) -> "SimulatedPortfolio":
         """
         Initialize a portfolio with no non-cash assets.
         """
         hdbg.dassert_lt(0, initial_cash)
         # The holdings_df has a single row about cash.
-        row = [Portfolio.CASH_ID, initial_cash]
+        row = [SimulatedPortfolio.CASH_ID, initial_cash]
         holdings_df = pd.DataFrame(
-            [row], index=[initial_timestamp], columns=Portfolio.HOLDINGS_COLS
+            [row],
+            index=[initial_timestamp],
+            columns=SimulatedPortfolio.HOLDINGS_COLS,
         )
         # Build the portfolio.
         portfolio = cls(
@@ -141,14 +143,14 @@ class AbstractPortfolio(abc.ABC):
         holdings_dict: Dict[int, float],
         initial_timestamp: pd.Timestamp,
         **kwargs: Any,
-    ) -> "Portfolio":
+    ) -> "SimulatedPortfolio":
         """
         Initialize from a dict of holdings and initial timestamp.
         """
         # Convert the dictionary into a df with `asset_id`, `curr_num_shares`.
         hdbg.dassert_isinstance(holdings_dict, dict)
         holdings_df = pd.Series(holdings_dict).to_frame().reset_index()
-        holdings_df.columns = Portfolio.HOLDINGS_COLS
+        holdings_df.columns = SimulatedPortfolio.HOLDINGS_COLS
         hdbg.dassert_isinstance(initial_timestamp, pd.Timestamp)
         size = len(holdings_dict)
         holdings_df.index = [initial_timestamp] * size
@@ -215,7 +217,7 @@ class AbstractPortfolio(abc.ABC):
         hdbg.dassert_no_duplicates(asset_ids)
         # Get `price_df` for all the non-cash assets from the price interface.
         non_cash_asset_ids = list(
-            filter(lambda x: x != Portfolio.CASH_ID, asset_ids)
+            filter(lambda x: x != SimulatedPortfolio.CASH_ID, asset_ids)
         )
         price_df = self._market_data_interface.get_data_at_timestamp(
             as_of_timestamp, self._timestamp_col, non_cash_asset_ids
@@ -236,15 +238,15 @@ class AbstractPortfolio(abc.ABC):
         hdbg.dassert_is_subset(columns, price_df.columns)
         price_df = price_df[columns]
         # Rename using the canonical names.
-        price_df.columns = Portfolio.PRICE_COLS
+        price_df.columns = SimulatedPortfolio.PRICE_COLS
         # Add the current timestamp.
         price_df.index = [as_of_timestamp] * price_df.index.size
         # Add cash, if missing.
         if len(non_cash_asset_ids) < len(asset_ids):
             cash_df = pd.DataFrame(
                 {
-                    Portfolio.PRICE_COLS[0]: Portfolio.CASH_ID,
-                    Portfolio.PRICE_COLS[1]: 1,
+                    SimulatedPortfolio.PRICE_COLS[0]: SimulatedPortfolio.CASH_ID,
+                    SimulatedPortfolio.PRICE_COLS[1]: 1,
                 },
                 index=[as_of_timestamp],
             )
@@ -274,7 +276,7 @@ class AbstractPortfolio(abc.ABC):
         )
         self._validate_mark_to_market_df(df)
         if df.empty:
-            cols = Portfolio.HOLDINGS_COLS + ["value", "price"]
+            cols = SimulatedPortfolio.HOLDINGS_COLS + ["value", "price"]
             result_df = pd.DataFrame(columns=cols)
             return result_df
         # Get asset ids.
@@ -440,7 +442,7 @@ class AbstractPortfolio(abc.ABC):
                 "Timestamp=`%s` not found in holdings index", as_of_timestamp
             )
             empty_holdings = pd.DataFrame(
-                [], index=[], columns=Portfolio.HOLDINGS_COLS
+                [], index=[], columns=SimulatedPortfolio.HOLDINGS_COLS
             )
             return empty_holdings
         holdings = holdings_df.loc[as_of_timestamp]
@@ -470,12 +472,12 @@ class AbstractPortfolio(abc.ABC):
             # _LOG.debug("exclude_cash: holdings=\n%s", holdings)
             hdbg.dassert_ne(
                 asset_id,
-                Portfolio.CASH_ID,
+                SimulatedPortfolio.CASH_ID,
                 "You cannot request cash (asset_id=`%s`) and simultaneously "
                 "request to exclude it",
                 asset_id,
             )
-            mask = holdings["asset_id"] != Portfolio.CASH_ID
+            mask = holdings["asset_id"] != SimulatedPortfolio.CASH_ID
             # _LOG.debug("mask=\n%s", mask)
             holdings = holdings[mask]
             if holdings.empty:
@@ -495,7 +497,7 @@ class AbstractPortfolio(abc.ABC):
         # The input should be a dataframe satisfying the following column
         # constraints.
         hdbg.dassert_isinstance(df, pd.DataFrame)
-        hdbg.dassert_is_subset(Portfolio.HOLDINGS_COLS, df.columns)
+        hdbg.dassert_is_subset(SimulatedPortfolio.HOLDINGS_COLS, df.columns)
         hdbg.dassert_not_in("price", df.columns)
         hdbg.dassert_not_in("value", df.columns)
         # The columns should be of the correct types. Skip if the dataframe is
@@ -534,7 +536,7 @@ class AbstractPortfolio(abc.ABC):
         # The dataframe must have the correct columns.
         hdbg.dassert_eq_all(
             holdings_df.columns.to_list(),
-            Portfolio.HOLDINGS_COLS,
+            SimulatedPortfolio.HOLDINGS_COLS,
             "Columns do not conform to requirements.",
         )
         # The columns should be of the correct types.
@@ -550,7 +552,7 @@ class AbstractPortfolio(abc.ABC):
         )
         # The dataframe must contain a row for cash.
         hdbg.dassert_in(
-            Portfolio.CASH_ID,
+            SimulatedPortfolio.CASH_ID,
             holdings_df["asset_id"].to_list(),
             "No cash holdings available.",
         )
@@ -560,8 +562,7 @@ class AbstractPortfolio(abc.ABC):
             "All share values must be finite.",
         )
 
-    @staticmethod
-    def _validate_initial_holdings_df(holdings_df: pd.DataFrame) -> None:
+    def _validate_initial_holdings_df(self, holdings_df: pd.DataFrame) -> None:
         """
         Ensure that `holdings_df` qualifies as an initial holdings df.
 
@@ -578,7 +579,7 @@ class AbstractPortfolio(abc.ABC):
         # At initialization there should be no more than one row per asset.
         hdbg.dassert_no_duplicates(holdings_df["asset_id"].to_list())
         # Initial cash must be non-negative.
-        mask = holdings_df["asset_id"] == Portfolio.CASH_ID
+        mask = holdings_df["asset_id"] == SimulatedPortfolio.CASH_ID
         cash_holdings = holdings_df[mask]
         hdbg.dassert_eq(cash_holdings.shape[0], 1)
         cash = cash_holdings["curr_num_shares"].values[0]
@@ -588,13 +589,12 @@ class AbstractPortfolio(abc.ABC):
 # #############################################################################
 
 
-# TODO(gp): -> SimulatedPortfolio
-class Portfolio(AbstractPortfolio):
+class SimulatedPortfolio(AbstractPortfolio):
     def __init__(
         self,
         *args: Any,
         # In Python parameters after *args are always keywords-only.
-        broker: ombroker.Broker,
+        broker: ombroker.SimulatedBroker,
     ):
         """
         Constructor.
@@ -632,7 +632,7 @@ class Portfolio(AbstractPortfolio):
         # Update holdings using the `fills_df`.
         new_holdings_srs = last_holdings_srs.copy()
         if fills_df is not None:
-            Portfolio._validate_fills_df(fills_df)
+            SimulatedPortfolio._validate_fills_df(fills_df)
             # last_timestamp <= fills_df.index <= timestamp
             hdbg.dassert_lte(last_timestamp, fills_df["timestamp"].min())
             hdbg.dassert_lte(fills_df["timestamp"].max(), wall_clock_timestamp)
@@ -640,7 +640,7 @@ class Portfolio(AbstractPortfolio):
             cash_diff = -1 * (fills_df["price"] * fills_df["num_shares"]).sum()
             hdbg.dassert(np.isfinite(cash_diff))
             new_holdings_srs = new_holdings_srs.add(holdings_diff, fill_value=0)
-            new_holdings_srs.loc[Portfolio.CASH_ID] += cash_diff
+            new_holdings_srs.loc[SimulatedPortfolio.CASH_ID] += cash_diff
         new_holdings_srs.name = "curr_num_shares"
         new_holdings = new_holdings_srs.to_frame().reset_index()
         new_holdings.index = [wall_clock_timestamp] * len(new_holdings)
@@ -689,7 +689,7 @@ class Portfolio(AbstractPortfolio):
         hdbg.dassert(not fills_df.empty, "The dataframe must be nonempty.")
         # The dataframe must have the correct columns.
         hdbg.dassert_is_subset(
-            Portfolio.FILLS_COLS,
+            SimulatedPortfolio.FILLS_COLS,
             fills_df.columns.to_list(),
             "Columns do not conform to requirements.",
         )
@@ -709,7 +709,7 @@ class Portfolio(AbstractPortfolio):
         hdbg.dassert(hasattr(fills_df["timestamp"].dtype, "tz"))
         # The dataframe must not contain a row for cash.
         hdbg.dassert_not_in(
-            Portfolio.CASH_ID,
+            SimulatedPortfolio.CASH_ID,
             fills_df["asset_id"].to_list(),
             "Order for cash detected.",
         )

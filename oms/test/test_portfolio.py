@@ -136,7 +136,7 @@ class TestPortfolio2(hunitest.TestCase):
         timestamp_col = "end_datetime"
         holdings_dict = {101: 727.5, 202: 1040.3, -1: 10000}
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
-        portfolio = omportfo.Portfolio.from_dict(
+        portfolio = omportfo.SimulatedPortfolio.from_dict(
             strategy_id,
             account,
             market_data_interface,
@@ -210,7 +210,7 @@ leverage,0.0
         timestamp_col = "end_datetime"
         holdings_dict = {101: 727.5, 202: 1040.3, -1: 10000}
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
-        portfolio = omportfo.Portfolio.from_dict(
+        portfolio = omportfo.SimulatedPortfolio.from_dict(
             strategy_id,
             account,
             market_data_interface,

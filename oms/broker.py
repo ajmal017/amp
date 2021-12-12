@@ -22,6 +22,8 @@ _LOG = logging.getLogger(__name__)
 
 
 # #############################################################################
+# Fill
+# #############################################################################
 
 
 class Fill:
@@ -82,12 +84,16 @@ class Fill:
 
 
 # #############################################################################
+# AbstractBroker
+# #############################################################################
 
 
 class AbstractBroker(abc.ABC):
     """
     Represent a broker to which we can place orders and receive fills back.
     """
+
+    _submitted_order_id: int = 0
 
     def __init__(
         self,
@@ -169,20 +175,25 @@ class AbstractBroker(abc.ABC):
         """
         wall_clock_timestamp = self._get_wall_clock_time()
         _LOG.debug("wall_clock_timestamp=%s", wall_clock_timestamp)
-        #
+        # Update.
         if self._last_timestamp is not None:
             hdbg.dassert_lte(self._last_timestamp, wall_clock_timestamp)
-        # Update.
         self._last_timestamp = wall_clock_timestamp
         return wall_clock_timestamp
 
+    def _get_next_submitted_order_id(self) -> int:
+        submitted_order_id = self._submitted_order_id
+        self._submitted_order_id += 1
+        return submitted_order_id
 
+
+# #############################################################################
+# SimulatedBroker
 # #############################################################################
 
 
-# TODO(Paul): -> SimulatedBroker
 # TODO(Paul): Add unit tests
-class Broker(AbstractBroker):
+class SimulatedBroker(AbstractBroker):
     """
     Represent a broker to which we can place orders and receive fills back.
     """
@@ -258,27 +269,19 @@ class Broker(AbstractBroker):
 
 
 # #############################################################################
+# MockedBroker
+# #############################################################################
 
 
 class MockedBroker(AbstractBroker):
     """
-    Implement an object that mocks a real OMS / broker backed by a DB where
-    updates to the state representing the placed orders are asynchronous.
+    Implement an object that mocks a real broker backed by a DB with asynchronous
+    updates to the state representing the placed orders.
 
     The DB contains the following tables:
-    - `processed`
-        - tradedate
-        - strategyid
-        - timestamp_db
-            - when the order list was received from the OMS
-
-    - A more complex implementation can also have:
-        - target_count
-        - changed_count
-        - unchanged_count
+    - `submitted_orders`: storing information about orders placed by strategies
+    - `accepted_orders`: storing information about orders accepted by the broker
     """
-
-    _submitted_order_id: int = 0
 
     def __init__(
         self,
@@ -295,10 +298,14 @@ class MockedBroker(AbstractBroker):
     def submit_orders(
         self,
         orders: List[omorder.Order],
+        *,
+        dry_run: bool = False,
     ) -> None:
+        if dry_run:
+            _LOG.warning("Not submitting orders because of dry_run")
+            return
         # Add an order in the submitted orders table.
         submitted_order_id = self._get_next_submitted_order_id()
-        #
         file_name = f"filename_{submitted_order_id}.txt"
         timestamp_db = self._get_wall_clock_time()
         orders_as_txt = omorder.orders_to_string(orders)
@@ -319,8 +326,3 @@ class MockedBroker(AbstractBroker):
         state of a table representing the current holdings.
         """
         raise NotImplementedError
-
-    def _get_next_submitted_order_id(self) -> int:
-        submitted_order_id = self._submitted_order_id
-        self._submitted_order_id += 1
-        return submitted_order_id

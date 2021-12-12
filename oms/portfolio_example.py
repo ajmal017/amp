@@ -19,7 +19,7 @@ _LOG = logging.getLogger(__name__)
 def get_portfolio_example1(
     market_data_interface: mdmadain.AbstractMarketDataInterface,
     initial_timestamp: pd.Timestamp,
-) -> omportfo.Portfolio:
+) -> omportfo.SimulatedPortfolio:
     # Build Broker.
     event_loop = None
     broker = obroexam.get_broker_example1(
@@ -33,7 +33,7 @@ def get_portfolio_example1(
     mark_to_market_col = "price"
     timestamp_col = "end_datetime"
     initial_cash = 1e6
-    portfolio = omportfo.Portfolio.from_cash(
+    portfolio = omportfo.SimulatedPortfolio.from_cash(
         strategy_id,
         account,
         market_data_interface,

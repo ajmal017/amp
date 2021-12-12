@@ -112,7 +112,7 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
         asset_id_col = "asset_id"
         mark_to_market_col = "price"
         timestamp_col = "end_datetime"
-        portfolio = omportfo.Portfolio.from_cash(
+        portfolio = omportfo.SimulatedPortfolio.from_cash(
             strategy_id,
             account,
             market_data_interface,
@@ -214,7 +214,7 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
         asset_id_col = "asset_id"
         mark_to_market_col = "price"
         timestamp_col = "end_datetime"
-        portfolio = omportfo.Portfolio.from_cash(
+        portfolio = omportfo.SimulatedPortfolio.from_cash(
             strategy_id,
             account,
             market_data_interface,

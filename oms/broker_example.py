@@ -19,7 +19,7 @@ def get_broker_example1(
     event_loop: Optional[asyncio.AbstractEventLoop],
     *,
     market_data_interface: Optional[mdmadain.AbstractMarketDataInterface] = None,
-) -> ombroker.Broker:
+) -> ombroker.SimulatedBroker:
     """
     Build a simulated broker example.
     """
@@ -33,7 +33,7 @@ def get_broker_example1(
     strategy_id = "SAU1"
     account = "candidate"
     get_wall_clock_time = market_data_interface.get_wall_clock_time
-    broker = ombroker.Broker(
+    broker = ombroker.SimulatedBroker(
         strategy_id, account, market_data_interface, get_wall_clock_time
     )
     return broker
@@ -45,7 +45,7 @@ def get_mocked_broker_example1(
     *,
     submitted_orders_table_name: str = oomsdb.SUBMITTED_ORDERS_TABLE_NAME,
     accepted_orders_table_name: str = oomsdb.ACCEPTED_ORDERS_TABLE_NAME,
-) -> ombroker.Broker:
+) -> ombroker.SimulatedBroker:
     """
     Build a mocked broker.
     """

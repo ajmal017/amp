@@ -87,7 +87,7 @@ class AbstractMarketDataInterface(abc.ABC):
         self._end_time_col_name = end_time_col_name
         self._columns = columns
         hdbg.dassert_isinstance(get_wall_clock_time, Callable)
-        self._get_wall_clock_time = get_wall_clock_time
+        self.get_wall_clock_time = get_wall_clock_time
         #
         hdbg.dassert_lt(0, sleep_in_secs)
         self._sleep_in_secs = sleep_in_secs
@@ -97,10 +97,6 @@ class AbstractMarketDataInterface(abc.ABC):
         max_iters = int(time_out_in_secs / sleep_in_secs)
         hdbg.dassert_lte(1, max_iters)
         self._max_iters = max_iters
-
-    @property
-    def get_wall_clock_time(self) -> hdateti.GetWallClockTime:
-        return self._get_wall_clock_time
 
     # TODO(gp): If the DB supports asyncio this should become async.
     # TODO(gp): -> get_data_for_last_period
@@ -138,7 +134,7 @@ class AbstractMarketDataInterface(abc.ABC):
         """
         # Handle `period`.
         _LOG.debug(hprint.to_str("period"))
-        current_time = self._get_wall_clock_time()
+        current_time = self.get_wall_clock_time()
         start_ts = _process_period(period, current_time)
         end_ts = None
         # By convention to get the last chunk of data we use the start_time column.
@@ -346,7 +342,7 @@ class AbstractMarketDataInterface(abc.ABC):
                 last_db_end_time,
                 last_db_end_time.floor("Min"),
             )
-            current_time = self._get_wall_clock_time()
+            current_time = self.get_wall_clock_time()
             _LOG.debug(
                 "current_time=%s -> %s", current_time, current_time.floor("Min")
             )
@@ -370,13 +366,13 @@ class AbstractMarketDataInterface(abc.ABC):
               was ready
             - num_iters: number of iterations
         """
-        start_sampling_time = self._get_wall_clock_time()
+        start_sampling_time = self.get_wall_clock_time()
         _LOG.debug("DB on-line: %s", self.is_online())
         #
         _LOG.debug("Waiting on last bar ...")
         num_iter = 0
         while True:
-            current_time = self._get_wall_clock_time()
+            current_time = self.get_wall_clock_time()
             last_db_end_time = self.get_last_end_time()
             _LOG.debug(
                 "\n%s",
@@ -746,7 +742,7 @@ class ReplayedTimeMarketDataInterface(AbstractMarketDataInterface):
             )
         )
         # Filter the data by the current time.
-        current_time = self._get_wall_clock_time()
+        current_time = self.get_wall_clock_time()
         _LOG.debug(hprint.to_str("current_time"))
         df_tmp = creatime.get_data_as_of_datetime(
             self._df,

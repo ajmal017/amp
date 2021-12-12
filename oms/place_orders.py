@@ -31,7 +31,7 @@ _LOG = logging.getLogger(__name__)
 def _mark_to_market(
     wall_clock_timestamp: pd.Timestamp,
     predictions: pd.Series,
-    portfolio: omportfo.Portfolio,
+    portfolio: omportfo.SimulatedPortfolio,
 ) -> pd.DataFrame:
     """
     Return price, value of all assets in `portfolio` or for which we have a
@@ -129,7 +129,7 @@ def _generate_orders(
 def _compute_target_positions_in_shares(
     wall_clock_timestamp: pd.Timestamp,
     predictions: pd.Series,
-    portfolio: omportfo.Portfolio,
+    portfolio: omportfo.SimulatedPortfolio,
 ) -> pd.DataFrame:
     """
     Compute target holdings, generate orders, and update the portfolio.
@@ -202,10 +202,10 @@ async def place_orders(
     )
     # - Check `portfolio`.
     portfolio = config["portfolio"]
-    hdbg.dassert_issubclass(portfolio, omportfo.Portfolio)
+    hdbg.dassert_issubclass(portfolio, omportfo.SimulatedPortfolio)
     # - Check `broker`.
     broker = config["broker"]
-    hdbg.dassert_isinstance(broker, ombroker.Broker)
+    hdbg.dassert_isinstance(broker, ombroker.SimulatedBroker)
     # Make a copy of `portfolio` to return (rather than modifying in-place).
     # TODO(Paul): We can't make a copy.
     # portfolio = copy.copy(portfolio)
