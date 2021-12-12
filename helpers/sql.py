@@ -467,9 +467,7 @@ def remove_table(
     connection.cursor().execute(query)
 
 
-def remove_all_tables(
-    connection: DbConnection, cascade: bool = False
-) -> None:
+def remove_all_tables(connection: DbConnection, cascade: bool = False) -> None:
     """
     Remove all the tables from a database.
 
@@ -694,7 +692,7 @@ def is_row_with_value_present(
     field_name: str,
     target_value: str,
     *,
-    show_db_state: bool = False,
+    show_db_state: bool = True,
 ) -> hasynci.PollOutput:
     """
     A polling function that checks if a row with `field_name` == `target_value`
@@ -710,7 +708,7 @@ def is_row_with_value_present(
     _LOG.debug(hprint.to_str("connection table_name field_name target_value"))
     # Print the state of the DB, if needed.
     if show_db_state:
-        query = f"SELECT * FROM {table_name}"
+        query = f"SELECT * FROM {table_name} ORDER BY filename"
         df = execute_query_to_df(connection, query)
         _LOG.debug("df=\n%s", hprint.dataframe_to_str(df, use_tabulate=False))
     # Check if the required row is available.

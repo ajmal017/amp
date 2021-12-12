@@ -17,7 +17,6 @@ class TestSimulatedBroker1(hunitest.TestCase):
         #
         orders = [order]
         broker.submit_orders(orders)
-        #
 
 
 class TestMockedBroker1(ottb.TestOmsDbHelper):

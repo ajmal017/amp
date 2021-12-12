@@ -91,10 +91,15 @@ class AbstractBroker(abc.ABC):
 
     def __init__(
         self,
+        strategy_id: str,
+        account: str,
         market_data_interface: mdmadain.AbstractMarketDataInterface,
         # TODO(gp): -> market_data_interface.get_wall_clock_time
         get_wall_clock_time: hdateti.GetWallClockTime,
     ) -> None:
+        self._strategy_id = strategy_id
+        self._account = account
+        #
         hdbg.dassert_issubclass(
             market_data_interface, mdmadain.AbstractMarketDataInterface
         )
@@ -108,15 +113,17 @@ class AbstractBroker(abc.ABC):
     def submit_orders(
         self,
         orders: List[omorder.Order],
+        *,
+        dry_run: bool = False,
     ) -> None:
         """
         Submit a list of orders to the broker at the current wall clock time.
         """
-        _ = self._update_last_timestamp()
+        wall_clock_timestamp = self._update_last_timestamp()
         # Submit the orders.
         _LOG.debug("Submitting orders=%s", omorder.orders_to_string(orders))
         self._orders.extend(orders)
-        self._submit_orders(orders)
+        self._submit_orders(orders, wall_clock_timestamp, dry_run=dry_run)
 
     def get_fills(self, as_of_timestamp: pd.Timestamp) -> List[Fill]:
         """
@@ -143,6 +150,9 @@ class AbstractBroker(abc.ABC):
     def _submit_orders(
         self,
         orders: List[omorder.Order],
+        wall_clock_timestamp: pd.Timestamp,
+        *,
+        dry_run: bool,
     ) -> None:
         ...
 
@@ -192,7 +202,14 @@ class Broker(AbstractBroker):
     def _submit_orders(
         self,
         orders: List[omorder.Order],
+        wall_clock_timestamp: pd.Timestamp,
+        *,
+        dry_run: bool,
     ) -> None:
+        _ = wall_clock_timestamp
+        if dry_run:
+            _LOG.warning("Not submitting orders because of dry_run")
+            return
         # Enqueue the orders based on their completion deadline time.
         _LOG.debug("Submitting %d orders", len(orders))
         for order in orders:

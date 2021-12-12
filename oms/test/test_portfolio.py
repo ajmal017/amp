@@ -9,6 +9,7 @@ import helpers.unit_test as hunitest
 import market_data.market_data_interface as mdmadain
 import market_data.market_data_interface_example as mdmdinex
 import oms.broker as ombroker
+import oms.broker_example as obroexam
 import oms.portfolio as omportfo
 import oms.portfolio_example as oporexam
 
@@ -100,27 +101,9 @@ class TestPortfolio2(hunitest.TestCase):
             market_data_interface,
             get_wall_clock_time,
         ) = mdmdinex.get_replayed_time_market_data_interface_example2(event_loop)
-        # Build Broker.
-        broker = ombroker.Broker(market_data_interface, get_wall_clock_time)
-        # Build a Portfolio.
-        strategy_id = "str1"
-        account = "paper"
-        asset_id_col = "asset_id"
-        mark_to_market_col = "price"
-        timestamp_col = "end_datetime"
-        initial_cash = 1e6
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
-        portfolio = omportfo.Portfolio.from_cash(
-            strategy_id,
-            account,
-            market_data_interface,
-            get_wall_clock_time,
-            asset_id_col,
-            mark_to_market_col,
-            timestamp_col,
-            broker=broker,
-            initial_cash=initial_cash,
-            initial_timestamp=initial_timestamp,
+        portfolio = oporexam.get_portfolio_example1(
+            market_data_interface, initial_timestamp
         )
         # Check.
         txt = r"""
@@ -141,7 +124,9 @@ class TestPortfolio2(hunitest.TestCase):
             get_wall_clock_time,
         ) = mdmdinex.get_replayed_time_market_data_interface_example2(event_loop)
         # Build Broker.
-        broker = ombroker.Broker(market_data_interface, get_wall_clock_time)
+        broker = obroexam.get_broker_example1(
+            event_loop, market_data_interface=market_data_interface
+        )
         # Build a Portfolio.
         strategy_id = "str1"
         account = "paper"
@@ -183,27 +168,10 @@ class TestPortfolio2(hunitest.TestCase):
             market_data_interface,
             get_wall_clock_time,
         ) = mdmdinex.get_replayed_time_market_data_interface_example2(event_loop)
-        # Build Broker.
-        broker = ombroker.Broker(market_data_interface, get_wall_clock_time)
-        # Build Portfolio.
-        strategy_id = "str1"
-        account = "paper"
-        asset_id_col = "asset_id"
-        mark_to_market_col = "price"
-        timestamp_col = "end_datetime"
-        initial_cash = 1e6
+        #
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
-        portfolio = omportfo.Portfolio.from_cash(
-            strategy_id,
-            account,
-            market_data_interface,
-            get_wall_clock_time,
-            asset_id_col,
-            mark_to_market_col,
-            timestamp_col,
-            broker=broker,
-            initial_cash=initial_cash,
-            initial_timestamp=initial_timestamp,
+        portfolio = oporexam.get_portfolio_example1(
+            market_data_interface, initial_timestamp
         )
         # Check.
         txt = r"""
@@ -231,15 +199,17 @@ leverage,0.0
             get_wall_clock_time,
         ) = mdmdinex.get_replayed_time_market_data_interface_example2(event_loop)
         # Build Broker.
-        broker = ombroker.Broker(market_data_interface, get_wall_clock_time)
+        broker = obroexam.get_broker_example1(
+            event_loop, market_data_interface=market_data_interface
+        )
         # Build Portfolio.
-        initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
-        holdings_dict = {101: 727.5, 202: 1040.3, -1: 10000}
         strategy_id = "str1"
         account = "paper"
         asset_id_col = "asset_id"
         mark_to_market_col = "price"
         timestamp_col = "end_datetime"
+        holdings_dict = {101: 727.5, 202: 1040.3, -1: 10000}
+        initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
         portfolio = omportfo.Portfolio.from_dict(
             strategy_id,
             account,
@@ -298,25 +268,8 @@ start_datetime,end_datetime,asset_id,price
             columns=[],
             get_wall_clock_time=get_wall_clock_time,
         )
-        # Build Broker.
-        broker = ombroker.Broker(market_data_interface, get_wall_clock_time)
-        # Build Portfolio.
-        strategy_id = "str1"
-        account = "paper"
-        asset_id_col = "asset_id"
-        mark_to_market_col = "price"
-        timestamp_col = "end_datetime"
-        portfolio = omportfo.Portfolio.from_cash(
-            strategy_id,
-            account,
-            market_data_interface,
-            get_wall_clock_time,
-            asset_id_col,
-            mark_to_market_col,
-            timestamp_col,
-            broker=broker,
-            initial_cash=1e6,
-            initial_timestamp=initial_timestamp,
+        portfolio = oporexam.get_portfolio_example1(
+            market_data_interface, initial_timestamp
         )
         # Check.
         txt = r"""

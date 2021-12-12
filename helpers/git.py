@@ -38,6 +38,47 @@ _LOG = logging.getLogger(__name__)
 #  `super-module` in comment) we might want to spell `supermodule` everywhere.
 
 # #############################################################################
+# Git branch functions
+# #############################################################################
+
+
+@functools.lru_cache()
+def get_branch_name(dir_name: str = ".") -> str:
+    """
+    Return the name of the Git branch including a certain dir.
+
+    E.g., `master` or `AmpTask672_Add_script_to_check_and_merge_PR`
+    """
+    hdbg.dassert_exists(dir_name)
+    # > git rev-parse --abbrev-ref HEAD
+    # master
+    cmd = "cd %s && git rev-parse --abbrev-ref HEAD" % dir_name
+    data: Tuple[int, str] = hsysinte.system_to_one_line(cmd)
+    _, output = data
+    return output
+
+
+def get_branch_next_name(dir_name: str = ".") -> str:
+    """
+    Return a name derived from the branch so that the branch doesn't exist.
+
+    E.g., `AmpTask1903_Implemented_system_Portfolio` ->
+        `AmpTask1903_Implemented_system_Portfolio_3`
+    """
+    curr_branch_name = get_branch_name()
+    hdbg.dassert_ne(curr_branch_name, "master")
+    _LOG.debug("curr_branch_name=%s", curr_branch_name)
+    #
+    for i in range(1, 10):
+        new_branch_name = f"{curr_branch_name}_{i}"
+        exists = does_branch_exist(new_branch_name, dir_name=dir_name)
+        _LOG.debug("'%s' -> exists=%s", new_branch_name, exists)
+        if not exists:
+            return new_branch_name
+    hdbg.dassert("Can't find the next branch name for '%s'", curr_branch_name)
+
+
+# #############################################################################
 # Git submodule functions
 # #############################################################################
 
@@ -96,22 +137,6 @@ def get_project_dirname(only_index: bool = False) -> str:
         ret = last_char
     _LOG.debug("ret=%s", ret)
     return ret
-
-
-@functools.lru_cache()
-def get_branch_name(dir_name: str = ".") -> str:
-    """
-    Return the name of the Git branch including a certain dir.
-
-    E.g., `master` or `AmpTask672_Add_script_to_check_and_merge_PR`
-    """
-    hdbg.dassert_exists(dir_name)
-    # > git rev-parse --abbrev-ref HEAD
-    # master
-    cmd = "cd %s && git rev-parse --abbrev-ref HEAD" % dir_name
-    data: Tuple[int, str] = hsysinte.system_to_one_line(cmd)
-    _, output = data
-    return output
 
 
 @functools.lru_cache()
@@ -1058,7 +1083,8 @@ def git_describe(
 
     If there is no tag, this will return short commit hash.
 
-    :param match: e.g., `dev_tools-*`, only consider tags matching the given glob pattern
+    :param match: e.g., `dev_tools-*`, only consider tags matching the given glob
+        pattern
     """
     _LOG.debug("# Looking for version ...")
     cmd = "git describe --tags --always --abbrev=0"
@@ -1113,17 +1139,26 @@ def fetch_origin_master_if_needed() -> None:
             hsysinte.system(cmd)
 
 
-def is_client_clean(dir_name: str, abort_if_needed: bool = True) -> bool:
-    hdbg.dassert_dir_exists(dir_name)
-    cmd = f"cd {dir_name}; git status --untracked-files=no --porcelain"
-    _, txt = hsysinte.system_to_string(cmd)
-    if abort_if_needed and txt != "":
-        _LOG.error("There are uncommitted changes in tracked files\n:%s", txt)
-        sys.exit(-1)
-    return txt == ""
+def is_client_clean(
+    dir_name: str = ".", abort_if_not_clean: bool = False
+) -> bool:
+    """
+    Return whether there are files modified, added, or removed in `dir_name`.
+
+    :param abort_if_not_clean: if True and the client is not clean, abort reporting
+        the files modified
+    """
+    files = get_modified_files(dir_name)
+    # A Git client is clean iff there are no files in the index.
+    is_clean = len(files) == 0
+    if abort_if_not_clean:
+        hdbg.dassert(
+            is_clean, "The Git client is not clean:\n%s", "\n".join(files)
+        )
+    return is_clean
 
 
-def does_branch_exist(dir_name: str, branch_name: str) -> bool:
+def does_branch_exist(branch_name: str, dir_name: str = ".") -> bool:
     # From https://stackoverflow.com/questions/35941566
     cmd = f"cd {dir_name} && git fetch --prune"
     hsysinte.system(cmd, abort_on_error=False)

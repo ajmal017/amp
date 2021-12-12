@@ -7,7 +7,7 @@ import oms.oms_db as oomsdb
 """
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import helpers.datetime_ as hdateti
 import helpers.dbg as hdbg

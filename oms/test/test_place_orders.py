@@ -10,6 +10,7 @@ import helpers.hasyncio as hasynci
 import helpers.unit_test as hunitest
 import market_data.market_data_interface_example as mdmdinex
 import oms.broker as ombroker
+import oms.broker_example as obroexam
 import oms.place_orders as oplaorde
 import oms.portfolio as omportfo
 import oms.portfolio_example as oporexam
@@ -101,7 +102,10 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             sleep_in_secs=sleep_in_secs,
             time_out_in_secs=time_out_in_secs,
         )
-        broker = ombroker.Broker(market_data_interface, get_wall_clock_time)
+        # Build a Broker.
+        broker = obroexam.get_broker_example1(
+            event_loop, market_data_interface=market_data_interface
+        )
         # Initialize portfolio.
         strategy_id = "str1"
         account = "paper"
@@ -200,8 +204,10 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             sleep_in_secs=sleep_in_secs,
             time_out_in_secs=time_out_in_secs,
         )
-        # Initialize broker.
-        broker = ombroker.Broker(market_data_interface, get_wall_clock_time)
+        # Build a Broker.
+        broker = obroexam.get_broker_example1(
+            event_loop, market_data_interface=market_data_interface
+        )
         # Initialize Portfolio.
         strategy_id = "str1"
         account = "paper"

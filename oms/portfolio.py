@@ -20,6 +20,9 @@ import oms.broker as ombroker
 _LOG = logging.getLogger(__name__)
 
 
+# #############################################################################
+
+
 class AbstractPortfolio(abc.ABC):
     """
     Store holdings over time, e.g., many shares of each asset are owned at any
@@ -189,8 +192,8 @@ class AbstractPortfolio(abc.ABC):
             - Return an empty dataframe if there are no holdings for the requested
               `timestamp`
         """
-        return Portfolio._get_holdings(
-            self._holdings, as_of_timestamp, asset_id, exclude_cash=exclude_cash
+        return self._get_holdings(
+            as_of_timestamp, asset_id, exclude_cash=exclude_cash
         )
 
     def get_asset_price_at_timestamp(
@@ -269,7 +272,7 @@ class AbstractPortfolio(abc.ABC):
                 "mark_to_market: timestamp=%s" % as_of_timestamp, char1="<"
             ),
         )
-        Portfolio._validate_mark_to_market_df(df)
+        self._validate_mark_to_market_df(df)
         if df.empty:
             cols = Portfolio.HOLDINGS_COLS + ["value", "price"]
             result_df = pd.DataFrame(columns=cols)
@@ -377,7 +380,7 @@ class AbstractPortfolio(abc.ABC):
         new_holdings = self._update_state(wall_clock_timestamp)
         # TODO(gp): Make sure that new_holdings are after self._holdings.
         # Add the information to the holdings.
-        Portfolio._validate_holdings_df(new_holdings)
+        self._validate_holdings_df(new_holdings)
         updated_state = pd.concat([new_holdings, self._holdings])
         updated_state = updated_state.convert_dtypes()
         self._holdings = updated_state
@@ -389,7 +392,6 @@ class AbstractPortfolio(abc.ABC):
     def _update_state(
         self,
         wall_clock_timestamp: pd.Timestamp,
-        # fills_df: Optional[pd.DataFrame],
     ) -> pd.DataFrame:
         """
         :return: a holding_df with the new holdings
@@ -415,23 +417,21 @@ class AbstractPortfolio(abc.ABC):
         _LOG.debug("value=%s for asset_id=%s", value, asset_id)
         return value
 
-    # TODO(gp): use self._holding_df and we can make it a method instead of
-    # static, if possible.
-    @staticmethod
     def _get_holdings(
-        holdings_df: pd.DataFrame,
+        self,
         as_of_timestamp: pd.Timestamp,
         asset_id: Optional[Any],
         *,
         exclude_cash: bool = False,
     ) -> pd.DataFrame:
         """
-        Get holdings at time `timestamp` for the requested assets.
+        Get holdings at time `as_of_timestamp` for the requested assets.
 
         :param asset_id: an asset or `None` for all available assets
         :return: holding_df
         """
-        Portfolio._validate_holdings_df(holdings_df)
+        holdings_df = self._holdings
+        self._validate_holdings_df(holdings_df)
         _LOG.debug(hprint.to_str("as_of_timestamp asset_id exclude_cash"))
         # Extract `holdings` at the requested timestamp.
         # _LOG.debug("holdings=\n%s", hprint.dataframe_to_str(holdings_df))
@@ -566,27 +566,21 @@ class AbstractPortfolio(abc.ABC):
         Ensure that `holdings_df` qualifies as an initial holdings df.
 
         The dataframe should specify asset holdings (in shares) at a
-        single point in time. Cash must be included and be nonnegative.
+        single point in time. Cash must be included and be non-negative.
         """
-        Portfolio._validate_holdings_df(holdings_df)
+        AbstractPortfolio._validate_holdings_df(holdings_df)
         # Initialization should be at a single point in time.
         hdbg.dassert_eq(
             holdings_df.index.nunique(),
             1,
-            "Encountered `%s` unique index values in initial holdings dataframe",
-            holdings_df.index.nunique(),
+            "Encountered too many unique index values in initial holdings dataframe",
         )
         # At initialization there should be no more than one row per asset.
         hdbg.dassert_no_duplicates(holdings_df["asset_id"].to_list())
-        #
-        initialization_timestamp = holdings_df.index[0]
-        cash_holdings = Portfolio._get_holdings(
-            holdings_df,
-            initialization_timestamp,
-            Portfolio.CASH_ID,
-            exclude_cash=False,
-        )
         # Initial cash must be non-negative.
+        mask = holdings_df["asset_id"] == Portfolio.CASH_ID
+        cash_holdings = holdings_df[mask]
+        hdbg.dassert_eq(cash_holdings.shape[0], 1)
         cash = cash_holdings["curr_num_shares"].values[0]
         hdbg.dassert_lte(0, cash)
 
