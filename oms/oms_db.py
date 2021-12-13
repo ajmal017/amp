@@ -291,7 +291,7 @@ async def order_processor(
     row = hsql.csv_to_series(txt, sep=",")
     hsql.execute_insert_query(db_connection, row, accepted_orders_table_name)
     # Wait.
-    hdbg.dassert_lt(0, delay_to_fill_in_ses)
+    hdbg.dassert_lt(0, delay_to_fill_in_secs)
     await hasynci.sleep(delay_to_fill_in_secs)
     # Get the fills.
     broker.get_fills()
