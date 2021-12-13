@@ -10,8 +10,6 @@ import dataflow.pipelines.real_time.pipeline as dtfpretipi
 import helpers.hasyncio as hasynci
 import helpers.unit_test as hunitest
 import market_data.market_data_interface_example as mdmdinex
-import oms.broker as ombroker
-import oms.portfolio as omportfo
 import oms.portfolio_example as oporexam
 
 _LOG = logging.getLogger(__name__)
@@ -168,8 +166,10 @@ class TestRealTimePipelineWithOms1(hunitest.TestCase):
                 "2000-01-01 09:30:00-05:00", tz="America/New_York"
             )
             portfolio = oporexam.get_simulated_portfolio_example1(
-                event_loop, initial_timestamp,
-                market_data_interface=market_data_interface)
+                event_loop,
+                initial_timestamp,
+                market_data_interface=market_data_interface,
+            )
             # Populate place trades.
             order_type = "price@twap"
             config["process_forecasts"]["process_forecasts_config"] = {

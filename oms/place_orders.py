@@ -163,8 +163,6 @@ async def place_orders(
     # volatility_df:
     execution_mode: str,
     config: Dict[str, Any],
-    # TODO(Paul): Pass Portfolio from outside we can preserve it across invocations.
-    # portfolio: Portfolio,
 ) -> None:
     """
     Place orders corresponding to the predictions stored in the given df.
@@ -206,9 +204,6 @@ async def place_orders(
     # - Check `broker`.
     broker = config["broker"]
     hdbg.dassert_isinstance(broker, ombroker.SimulatedBroker)
-    # Make a copy of `portfolio` to return (rather than modifying in-place).
-    # TODO(Paul): We can't make a copy.
-    # portfolio = copy.copy(portfolio)
     # - Check `order_type`
     order_type = config["order_type"]
     # The `Order` class knows the valid order types.

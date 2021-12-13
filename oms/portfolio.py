@@ -765,6 +765,14 @@ class MockedPortfolio(AbstractPortfolio):
         self._poll_kwargs = poll_kwargs
         hdbg.dassert_isinstance(asset_id_col, str)
         self._asset_id_col = asset_id_col
+        # Keep a mapping between the wall clock timestamp and the image of the
+        # holdings in the account (without cash).
+        self._timestamp_to_snapshot_df = {}
+
+    # def _get_snapshot_df(self, as_of_datetime):
+    #     dbg.dassert_in(as_of_datetime, self._timestamp_to_snapshot_df)
+    #     snapshot_df = self._timestamp_to_snapshot_df[as_of_datetime]
+    #     return snapshot_df
 
     def _update_state(self, wall_clock_timestamp: pd.Timestamp) -> pd.DataFrame:
         # The current positions table has the following fields:
@@ -815,24 +823,26 @@ class MockedPortfolio(AbstractPortfolio):
         query.append(f"ORDER BY {self._asset_id_col}")
         query = "\n".join(query)
         _LOG.debug("query=%s", query)
-        sql_df = hsql.execute_query_to_df(self._db_connection, query)
-        # sql_df looks like:
+        snapshot_df = hsql.execute_query_to_df(self._db_connection, query)
+        # Update snapshot_df.
+        #self._timestamp_to_snapshot_df[wall_clock_timestamp] = snapshot_df
+        # snapshot_df looks like:
         # ```
         #  tradedate asset_id         published_dt   target_position  current_position
         # 2021-12-09    10005  2021-12-09 11:54:28   0.0              0
         # 2021-12-09    10006  2021-12-09 11:54:28   0.0              0
         # 2021-12-09    10009  1970-01-01 00:00:00   0.0              0
         # ```
-        _LOG.debug("sql_df=\n%s", hprint.dataframe_to_str(sql_df))
+        _LOG.debug("snapshot_df=\n%s", hprint.dataframe_to_str(snapshot_df))
         # TODO(gp): Save df to disk.
-        hdbg.dassert_lt(0, sql_df.shape[0])
+        hdbg.dassert_lt(0, snapshot_df.shape[0])
 
-        # Convert `sql_df` into a `holdings_df`.
-        holdings_df = self._convert_to_holdings_df(sql_df, wall_clock_timestamp)
+        # Convert `snapshot_df` into a `holdings_df`.
+        holdings_df = self._convert_to_holdings_df(snapshot_df, wall_clock_timestamp)
         _LOG.debug("holdings_df=\n%s", hprint.dataframe_to_str(holdings_df))
         # Update cash.
         cash_holdings = self._update_cash(
-            sql_df, last_timestamp, wall_clock_timestamp
+            snapshot_df, last_timestamp, wall_clock_timestamp
         )
         _LOG.debug("cash_holdings=\n%s", hprint.dataframe_to_str(cash_holdings))
         #
@@ -843,33 +853,34 @@ class MockedPortfolio(AbstractPortfolio):
         return holdings_df
 
     def _convert_to_holdings_df(
-        self, sql_df: pd.DataFrame, as_of_timestamp: pd.Timestamp
+        self, snapshot_df: pd.DataFrame, as_of_timestamp: pd.Timestamp
     ) -> pd.DataFrame:
         """
         Convert df from SQL query into a holdings_df.
         """
-        holdings_df = sql_df[[self._asset_id_col, "current_position"]]
+        holdings_df = snapshot_df[[self._asset_id_col, "current_position"]]
         holdings_df.columns = AbstractPortfolio.HOLDINGS_COLS
-        holdings_df.index = [as_of_timestamp] * sql_df.shape[0]
+        holdings_df.index = [as_of_timestamp] * snapshot_df.shape[0]
         holdings_df = holdings_df.convert_dtypes()
         return holdings_df
 
     def _update_cash(
         self,
-        sql_df: pd.DataFrame,
+        snapshot_df: pd.DataFrame,
         as_of_timestamp: pd.Timestamp,
         wall_clock_timestamp: pd.Timestamp,
     ) -> pd.DataFrame:
-        # `sql_df` should not have CASH_ID.
-        hdbg.dassert_not_in(AbstractPortfolio.CASH_ID, sql_df[self._asset_id_col])
-        # Get the cash available.
+        # `snapshot_df` should not have CASH_ID.
+        hdbg.dassert_not_in(AbstractPortfolio.CASH_ID, snapshot_df[self._asset_id_col])
+        # Get the cash available at as_of_timestamp.
         cash = self._get_holdings_as_scalar(
             as_of_timestamp, asset_id=self.CASH_ID
         )
         _LOG.debug("cash=%s", cash)
         hdbg.dassert(np.isfinite(cash), "cash=%s", cash)
-        # TODO(Paul): Compute cost from sql_df.
-        cost = 0
+        # TODO(Paul): Compute cost from snapshot_df.
+        #last_net_cost = self._get_snapshot_df(as_of_timestamp)
+        #cost = current_net_cost.sum() - last_net_cost.sum()
         hdbg.dassert(np.isfinite(cost), "cost=%s", cost)
         updated_cash = cash - cost
         cash_holdings = self._create_holdings_df_from_cash(

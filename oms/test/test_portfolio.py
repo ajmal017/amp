@@ -17,7 +17,6 @@ import oms.portfolio as omportfo
 import oms.portfolio_example as oporexam
 import oms.test.test_oms_db as ottodb
 
-
 _LOG = logging.getLogger(__name__)
 
 _5mins = pd.DateOffset(minutes=5)
@@ -84,8 +83,9 @@ class TestSimulatedPortfolio1(hunitest.TestCase):
         # Build a Portfolio.
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
         portfolio = oporexam.get_simulated_portfolio_example1(
-            event_loop, initial_timestamp,
-            market_data_interface=market_data_interface
+            event_loop,
+            initial_timestamp,
+            market_data_interface=market_data_interface,
         )
         return portfolio
 
@@ -116,8 +116,9 @@ class TestSimulatedPortfolio2(hunitest.TestCase):
         # Build Portfolio.
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
         portfolio = oporexam.get_simulated_portfolio_example1(
-            event_loop, initial_timestamp,
-            market_data_interface=market_data_interface
+            event_loop,
+            initial_timestamp,
+            market_data_interface=market_data_interface,
         )
         # Check.
         txt = r"""
@@ -188,7 +189,8 @@ class TestSimulatedPortfolio2(hunitest.TestCase):
         #
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
         portfolio = oporexam.get_simulated_portfolio_example1(
-            event_loop, initial_timestamp,
+            event_loop,
+            initial_timestamp,
             market_data_interface=market_data_interface,
         )
         # Check.
@@ -287,8 +289,9 @@ start_datetime,end_datetime,asset_id,price
             get_wall_clock_time=get_wall_clock_time,
         )
         portfolio = oporexam.get_simulated_portfolio_example1(
-            event_loop, initial_timestamp,
-            market_data_interface=market_data_interface
+            event_loop,
+            initial_timestamp,
+            market_data_interface=market_data_interface,
         )
         # Check.
         txt = r"""

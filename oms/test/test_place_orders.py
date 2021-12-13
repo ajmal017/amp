@@ -48,8 +48,9 @@ class TestPlaceOrders1(hunitest.TestCase):
             "2000-01-01 09:30:00-05:00", tz="America/New_York"
         )
         portfolio = oporexam.get_simulated_portfolio_example1(
-            event_loop, initial_timestamp,
-            market_data_interface=market_data_interface
+            event_loop,
+            initial_timestamp,
+            market_data_interface=market_data_interface,
         )
         config["market_data_interface"] = market_data_interface
         config["portfolio"] = portfolio
