@@ -881,6 +881,7 @@ class MockedPortfolio(AbstractPortfolio):
         # TODO(Paul): Compute cost from snapshot_df.
         #last_net_cost = self._get_snapshot_df(as_of_timestamp)
         #cost = current_net_cost.sum() - last_net_cost.sum()
+        cost = 0
         hdbg.dassert(np.isfinite(cost), "cost=%s", cost)
         updated_cash = cash - cost
         cash_holdings = self._create_holdings_df_from_cash(
