@@ -9,7 +9,7 @@ import io
 import logging
 import os
 import time
-from typing import Any, Dict, List, NamedTuple, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 import psycopg2 as psycop
@@ -486,6 +486,7 @@ def remove_all_tables(connection: DbConnection, cascade: bool = False) -> None:
 # #############################################################################
 
 
+# TODO(gp): -> as_df
 def execute_query_to_df(
     connection: DbConnection,
     query: str,

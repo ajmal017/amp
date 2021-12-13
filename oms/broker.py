@@ -15,7 +15,6 @@ import helpers.datetime_ as hdateti
 import helpers.dbg as hdbg
 import helpers.sql as hsql
 import market_data.market_data_interface as mdmadain
-import oms.oms_db as oomsdb
 import oms.order as omorder
 
 _LOG = logging.getLogger(__name__)
@@ -100,7 +99,6 @@ class AbstractBroker(abc.ABC):
         strategy_id: str,
         account: str,
         market_data_interface: mdmadain.AbstractMarketDataInterface,
-        # TODO(gp): -> market_data_interface.get_wall_clock_time
         get_wall_clock_time: hdateti.GetWallClockTime,
     ) -> None:
         self._strategy_id = strategy_id
@@ -109,7 +107,9 @@ class AbstractBroker(abc.ABC):
         hdbg.dassert_issubclass(
             market_data_interface, mdmadain.AbstractMarketDataInterface
         )
-        self._market_data_interface = market_data_interface
+        self.market_data_interface = market_data_interface
+        # TODO(gp): Use market_data_interface.get_wall_clock_time and remove
+        #  from the interface.
         self._get_wall_clock_time = get_wall_clock_time
         # Track the orders for internal accounting.
         self._orders: List[omorder.Order] = []
@@ -192,7 +192,6 @@ class AbstractBroker(abc.ABC):
 # #############################################################################
 
 
-# TODO(Paul): Add unit tests
 class SimulatedBroker(AbstractBroker):
     """
     Represent a broker to which we can place orders and receive fills back.
@@ -275,8 +274,8 @@ class SimulatedBroker(AbstractBroker):
 
 class MockedBroker(AbstractBroker):
     """
-    Implement an object that mocks a real broker backed by a DB with asynchronous
-    updates to the state representing the placed orders.
+    Implement an object that mocks a real broker backed by a DB with
+    asynchronous updates to the state representing the placed orders.
 
     The DB contains the following tables:
     - `submitted_orders`: storing information about orders placed by strategies
@@ -295,9 +294,10 @@ class MockedBroker(AbstractBroker):
         self._submitted_orders_table_name = submitted_orders_table_name
         self._accepted_orders_table_name = accepted_orders_table_name
 
-    def submit_orders(
+    def _submit_orders(
         self,
         orders: List[omorder.Order],
+        wall_clock_timestamp: pd.Timestamp,
         *,
         dry_run: bool = False,
     ) -> None:
@@ -307,7 +307,7 @@ class MockedBroker(AbstractBroker):
         # Add an order in the submitted orders table.
         submitted_order_id = self._get_next_submitted_order_id()
         file_name = f"filename_{submitted_order_id}.txt"
-        timestamp_db = self._get_wall_clock_time()
+        timestamp_db = wall_clock_timestamp
         orders_as_txt = omorder.orders_to_string(orders)
         row = [
             ("filename", file_name),
@@ -320,7 +320,7 @@ class MockedBroker(AbstractBroker):
         )
         # TODO(gp): Wait on `OmsDb.processed_orders`.
 
-    def get_fills(self, curr_timestamp: pd.Timestamp) -> List[Fill]:
+    def _get_fills(self, curr_timestamp: pd.Timestamp) -> List[Fill]:
         """
         The reference system doesn't return fills but directly updates the
         state of a table representing the current holdings.

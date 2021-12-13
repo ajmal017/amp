@@ -35,8 +35,8 @@ class AbstractMarketDataInterface(abc.ABC):
     Implement an interface to an historical / real-time source of price data.
 
     Responsibilities:
-    - Delegates to a data backend in Instrument Master (IM) to retrieve
-      historical and real-time data
+    - Delegate to a data backend in AbstractImClient to retrieve historical
+      and real-time data
     - Implement RT behaviors (e.g, `is_last_bar_available`, wall_clock, ...)
         - TODO(gp): Maybe move them in IM too?
     - Stitch together different data representations (e.g., historical / RT)
@@ -45,12 +45,12 @@ class AbstractMarketDataInterface(abc.ABC):
     - Implement some market related transformations (e.g., TWAP)
 
     Non-responsibilities:
-    - In general it doesn't access the data directly but relies on an Instrument
-      Master object to retrieve the data from different backends
+    - In general don't access data directly but rely on an AbstractImClient object
+      to retrieve the data from different backends
 
     All the timestamps in the interface are in ET timezone.
     - TODO(gp): Maybe UTC with the possibility of a switch to enforce certain
-      tz?
+       tz?
     """
 
     def __init__(

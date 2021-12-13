@@ -167,8 +167,9 @@ class TestRealTimePipelineWithOms1(hunitest.TestCase):
             initial_timestamp = pd.Timestamp(
                 "2000-01-01 09:30:00-05:00", tz="America/New_York"
             )
-            portfolio = oporexam.get_portfolio_example1(market_data_interface,
-                    initial_timestamp)
+            portfolio = oporexam.get_simulated_portfolio_example1(
+                event_loop, initial_timestamp,
+                market_data_interface=market_data_interface)
             # Populate place trades.
             order_type = "price@twap"
             config["process_forecasts"]["process_forecasts_config"] = {

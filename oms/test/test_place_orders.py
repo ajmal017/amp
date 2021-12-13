@@ -9,7 +9,6 @@ import core.config as cconfig
 import helpers.hasyncio as hasynci
 import helpers.unit_test as hunitest
 import market_data.market_data_interface_example as mdmdinex
-import oms.broker as ombroker
 import oms.broker_example as obroexam
 import oms.place_orders as oplaorde
 import oms.portfolio as omportfo
@@ -48,8 +47,9 @@ class TestPlaceOrders1(hunitest.TestCase):
         initial_timestamp = pd.Timestamp(
             "2000-01-01 09:30:00-05:00", tz="America/New_York"
         )
-        portfolio = oporexam.get_portfolio_example1(
-            market_data_interface, initial_timestamp
+        portfolio = oporexam.get_simulated_portfolio_example1(
+            event_loop, initial_timestamp,
+            market_data_interface=market_data_interface
         )
         config["market_data_interface"] = market_data_interface
         config["portfolio"] = portfolio
@@ -103,7 +103,7 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             time_out_in_secs=time_out_in_secs,
         )
         # Build a Broker.
-        broker = obroexam.get_broker_example1(
+        broker = obroexam.get_simulated_broker_example1(
             event_loop, market_data_interface=market_data_interface
         )
         # Initialize portfolio.
@@ -205,7 +205,7 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             time_out_in_secs=time_out_in_secs,
         )
         # Build a Broker.
-        broker = obroexam.get_broker_example1(
+        broker = obroexam.get_simulated_broker_example1(
             event_loop, market_data_interface=market_data_interface
         )
         # Initialize Portfolio.
