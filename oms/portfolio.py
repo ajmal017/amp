@@ -524,7 +524,6 @@ class AbstractPortfolio(abc.ABC):
                 [np.float64, np.int64],
                 "The column `curr_num_shares` should be a float column.",
             )
-            pass
         # There should be no more than one row per asset.
         hdbg.dassert_no_duplicates(df["asset_id"].to_list())
         # All share values should be finite.
@@ -853,6 +852,7 @@ class MockedPortfolio(AbstractPortfolio):
         _LOG.debug("cash_holdings=\n%s", hprint.dataframe_to_str(cash_holdings))
         #
         holdings_df = pd.concat([holdings_df, cash_holdings], axis=0)
+        holdings_df = holdings_df.convert_dtypes()
         _LOG.debug(
             "updated holdings_df=\n%s", hprint.dataframe_to_str(holdings_df)
         )
@@ -888,7 +888,8 @@ class MockedPortfolio(AbstractPortfolio):
             )
             return 0.0
         df = self._timestamp_to_snapshot_df[as_of_timestamp]
-        hdbg.dassert(not df.empty)
+        if df.empty:
+            return 0.0
         hdbg.dassert_in("net_cost", df.columns)
         net_cost = df["net_cost"].sum()
         _LOG.debug("net_cost=%f as of %s", net_cost, as_of_timestamp)

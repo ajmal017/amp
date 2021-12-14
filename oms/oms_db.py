@@ -6,6 +6,7 @@ Import as:
 import oms.oms_db as oomsdb
 """
 
+import asyncio
 import logging
 from typing import Any, Dict
 
@@ -115,11 +116,11 @@ def create_accepted_orders_table(
     query.append(
         f"""
         CREATE TABLE IF NOT EXISTS {table_name} (
+            strategyid VARCHAR(64),
             targetlistid SERIAL PRIMARY KEY,
             tradedate DATE NOT NULL,
             instanceid INT,
             filename VARCHAR(255) NOT NULL,
-            strategyid VARCHAR(64),
             timestamp_processed TIMESTAMP NOT NULL,
             timestamp_db TIMESTAMP NOT NULL,
             target_count INT,
@@ -274,7 +275,7 @@ async def order_processor(
     # TODO(gp): Implement.
     # Delay.
     hdbg.dassert_lt(0, delay_to_accept_in_secs)
-    await hasynci.sleep(delay_to_accept_in_secs)
+    await asyncio.sleep(delay_to_accept_in_secs)
     # Write in `accepted_orders_table_name` to acknowledge the orders.
     timestamp_db = get_wall_clock_time()
     trade_date = timestamp_db.date()
@@ -292,7 +293,7 @@ async def order_processor(
     hsql.execute_insert_query(db_connection, row, accepted_orders_table_name)
     # Wait.
     hdbg.dassert_lt(0, delay_to_fill_in_secs)
-    await hasynci.sleep(delay_to_fill_in_secs)
+    await asyncio.sleep(delay_to_fill_in_secs)
     # Get the fills.
     broker.get_fills()
     # Get the current holdings from the portfolio.

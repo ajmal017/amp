@@ -28,7 +28,7 @@ _LOG = logging.getLogger(__name__)
 # TODO(gp): Move this to TestDbHelper although I am not sure it will work.
 @pytest.mark.skipif(
     not hgit.execute_repo_config_code("has_dind_support()"),
-    reason="Need dind support"
+    reason="Need dind support",
 )
 class TestOmsDbHelper(hsqltest.TestDbHelper):
     """
@@ -97,7 +97,7 @@ class TestOmsDbRemoveAllTables1(TestOmsDbHelper):
 
 @pytest.mark.skipif(
     not hgit.execute_repo_config_code("has_dind_support()"),
-    reason="Need dind support"
+    reason="Need dind support",
 )
 class TestOmsDbSubmittedOrdersTable1(TestOmsDbHelper):
     """
@@ -182,7 +182,7 @@ def _get_row3() -> pd.Series:
 
 @pytest.mark.skipif(
     not hgit.execute_repo_config_code("has_dind_support()"),
-    reason="Need dind support"
+    reason="Need dind support",
 )
 class TestOmsDbAcceptedOrdersTable1(TestOmsDbHelper):
     """
@@ -219,13 +219,14 @@ class TestOmsDbAcceptedOrdersTable1(TestOmsDbHelper):
         # Check the content of the table.
         query = f"SELECT * FROM {table_name}"
         df = hsql.execute_query_to_df(self.connection, query)
-        act = hprint.dataframe_to_str(df)
-        exp = r"""
-           targetlistid   tradedate  instanceid                                                                filename strategyid        timestamp_processed               timestamp_db  target_count  changed_count  unchanged_count  cancel_count  success                                                     reason
-        0             1  2021-11-12        3504                                                         hello_world.txt       SAU1 2021-11-12 19:59:23.710677 2021-11-12 19:59:23.716732             1              0                0             0    False   "There were a total of 1 malformed requests in the file.
-        1             2  2021-11-12        3504  s3://targets/20211112000000/positions.16.2021-11-12_15:44:04-05:00.csv       SAU1 2021-11-12 20:45:07.463641 2021-11-12 20:45:07.469807             1              0                0             0    False  "There were a total of 1 malformed requests in the file."
-        2             5  2021-11-12        3504   s3://targets/20211112000000/positions.3.2021-11-12_16:38:22-05:00.csv       SAU1 2021-11-12 21:38:39.414138 2021-11-12 21:38:39.419536             1              1                0             0     True                                                           """
-        self.assert_equal(act, exp, fuzzy_match=True)
+        actual = hprint.dataframe_to_str(df)
+        expected = r"""
+        strategyid  targetlistid   tradedate  instanceid                                                                filename        timestamp_processed               timestamp_db  target_count  changed_count  unchanged_count  cancel_count  success                                                     reason
+        0       SAU1             1  2021-11-12        3504                                                         hello_world.txt 2021-11-12 19:59:23.710677 2021-11-12 19:59:23.716732       1              0                0             0    False   "There were a total of 1 malformed requests in the file.
+        1       SAU1             2  2021-11-12        3504  s3://targets/20211112000000/positions.16.2021-11-12_15:44:04-05:00.csv 2021-11-12 20:45:07.463641 2021-11-12 20:45:07.469807       1              0                0             0    False  "There were a total of 1 malformed requests in the file."
+        2       SAU1             5  2021-11-12        3504   s3://targets/20211112000000/positions.3.2021-11-12_16:38:22-05:00.csv 2021-11-12 21:38:39.414138 2021-11-12 21:38:39.419536       1              1                0             0     True
+        """
+        self.assert_equal(actual, expected, fuzzy_match=True)
         # Delete the table.
         hsql.remove_table(self.connection, oomsdb.ACCEPTED_ORDERS_TABLE_NAME)
 
@@ -235,7 +236,7 @@ class TestOmsDbAcceptedOrdersTable1(TestOmsDbHelper):
 
 @pytest.mark.skipif(
     not hgit.execute_repo_config_code("has_dind_support()"),
-    reason="Need dind support"
+    reason="Need dind support",
 )
 class TestOmsDbTableInteraction1(TestOmsDbHelper):
     """
@@ -354,7 +355,7 @@ class TestOmsDbTableInteraction1(TestOmsDbHelper):
 
 @pytest.mark.skipif(
     not hgit.execute_repo_config_code("has_dind_support()"),
-    reason="Need dind support"
+    reason="Need dind support",
 )
 class TestOmsDbCurrentPositionsTable1(TestOmsDbHelper):
     """

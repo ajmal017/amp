@@ -31,7 +31,7 @@ _LOG = logging.getLogger(__name__)
 def _mark_to_market(
     wall_clock_timestamp: pd.Timestamp,
     predictions: pd.Series,
-    portfolio: omportfo.SimulatedPortfolio,
+    portfolio: omportfo.AbstractPortfolio,
 ) -> pd.DataFrame:
     """
     Return price, value of all assets in `portfolio` or for which we have a
@@ -129,7 +129,7 @@ def _generate_orders(
 def _compute_target_positions_in_shares(
     wall_clock_timestamp: pd.Timestamp,
     predictions: pd.Series,
-    portfolio: omportfo.SimulatedPortfolio,
+    portfolio: omportfo.AbstractPortfolio,
 ) -> pd.DataFrame:
     """
     Compute target holdings, generate orders, and update the portfolio.
@@ -200,10 +200,10 @@ async def place_orders(
     )
     # - Check `portfolio`.
     portfolio = config["portfolio"]
-    hdbg.dassert_issubclass(portfolio, omportfo.SimulatedPortfolio)
+    hdbg.dassert_issubclass(portfolio, omportfo.AbstractPortfolio)
     # - Check `broker`.
     broker = config["broker"]
-    hdbg.dassert_isinstance(broker, ombroker.SimulatedBroker)
+    hdbg.dassert_isinstance(broker, ombroker.AbstractBroker)
     # - Check `order_type`
     order_type = config["order_type"]
     # The `Order` class knows the valid order types.

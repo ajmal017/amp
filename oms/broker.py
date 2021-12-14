@@ -127,7 +127,7 @@ class AbstractBroker(abc.ABC):
         """
         wall_clock_timestamp = self._update_last_timestamp()
         # Submit the orders.
-        _LOG.debug("Submitting orders=%s", omorder.orders_to_string(orders))
+        _LOG.debug("Submitting orders=\n%s", omorder.orders_to_string(orders))
         self._orders.extend(orders)
         self._submit_orders(orders, wall_clock_timestamp, dry_run=dry_run)
 
@@ -309,12 +309,9 @@ class MockedBroker(AbstractBroker):
         file_name = f"filename_{submitted_order_id}.txt"
         timestamp_db = wall_clock_timestamp
         orders_as_txt = omorder.orders_to_string(orders)
-        row = [
-            ("filename", file_name),
-            ("timestamp_db", timestamp_db),
-            ("orders_as_txt", orders_as_txt),
-        ]
-        row = pd.Series(row)
+        index = ["filename", "timestamp_db", "orders_as_txt"]
+        data = [file_name, timestamp_db, orders_as_txt]
+        row = pd.Series(data, index=index)
         hsql.execute_insert_query(
             self._db_connection, row, self._submitted_orders_table_name
         )
