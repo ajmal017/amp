@@ -514,17 +514,16 @@ class AbstractPortfolio(abc.ABC):
         # The columns should be of the correct types. Skip if the dataframe is
         # empty (since the correct types are not inferred in that case).
         if not df.empty:
-            # TODO(Paul): Relax the constraint.
-            # hdbg.dassert_eq(
-            #     df["asset_id"].dtype.type,
-            #     np.int64,
-            #     "The column `asset_id` should only contain integer ids.",
-            # )
-            # hdbg.dassert_eq(
-            #     df["curr_num_shares"].dtype.type,
-            #     np.float64,
-            #     "The column `curr_num_shares` should be a float column.",
-            # )
+            hdbg.dassert_eq(
+                df["asset_id"].dtype.type,
+                np.int64,
+                "The column `asset_id` should only contain integer ids.",
+            )
+            hdbg.dassert_in(
+                df["curr_num_shares"].dtype.type,
+                [np.float64, np.int64],
+                "The column `curr_num_shares` should be a float column.",
+            )
             pass
         # There should be no more than one row per asset.
         hdbg.dassert_no_duplicates(df["asset_id"].to_list())
@@ -757,7 +756,10 @@ class MockedPortfolio(AbstractPortfolio):
         Constructor.
         """
         super().__init__(*args)
-        # TODO(gp): Check it's a Broker.
+        hdbg.dassert_issubclass(
+            broker,
+            ombroker.AbstractBroker,
+        )
         self.broker = broker
         self._db_connection = db_connection
         self._table_name = table_name
@@ -825,7 +827,7 @@ class MockedPortfolio(AbstractPortfolio):
         _LOG.debug("query=%s", query)
         snapshot_df = hsql.execute_query_to_df(self._db_connection, query)
         # Update snapshot_df.
-        #self._timestamp_to_snapshot_df[wall_clock_timestamp] = snapshot_df
+        # self._timestamp_to_snapshot_df[wall_clock_timestamp] = snapshot_df
         # snapshot_df looks like:
         # ```
         #  tradedate asset_id         published_dt   target_position  current_position
@@ -834,11 +836,15 @@ class MockedPortfolio(AbstractPortfolio):
         # 2021-12-09    10009  1970-01-01 00:00:00   0.0              0
         # ```
         _LOG.debug("snapshot_df=\n%s", hprint.dataframe_to_str(snapshot_df))
+        #
+        hdbg.dassert_not_in(wall_clock_timestamp, self._timestamp_to_snapshot_df)
+        self._timestamp_to_snapshot_df[wall_clock_timestamp] = snapshot_df
         # TODO(gp): Save df to disk.
         hdbg.dassert_lt(0, snapshot_df.shape[0])
-
         # Convert `snapshot_df` into a `holdings_df`.
-        holdings_df = self._convert_to_holdings_df(snapshot_df, wall_clock_timestamp)
+        holdings_df = self._convert_to_holdings_df(
+            snapshot_df, wall_clock_timestamp
+        )
         _LOG.debug("holdings_df=\n%s", hprint.dataframe_to_str(holdings_df))
         # Update cash.
         cash_holdings = self._update_cash(
@@ -864,6 +870,30 @@ class MockedPortfolio(AbstractPortfolio):
         holdings_df = holdings_df.convert_dtypes()
         return holdings_df
 
+    def _get_net_cost(self, as_of_timestamp: pd.Timestamp) -> float:
+        """
+        Return `net_cost` of assets at `as_of_timestamp`.
+
+        This is a helper for `_update_cash()`.
+        """
+        # We only invoke this function after a snapshot update, and so the the
+        # snapshot dictionary should not be empty.
+        hdbg.dassert(self._timestamp_to_snapshot_df, "No snapshots available.")
+        # We should only enter this branch if `as_of_timestamp` is the
+        # initialization time.
+        if as_of_timestamp not in self._timestamp_to_snapshot_df:
+            hdbg.dassert_eq(len(self._timestamp_to_snapshot_df), 1)
+            _LOG.debug(
+                "Timestamp %s not located in `snapshot_df`", as_of_timestamp
+            )
+            return 0.0
+        df = self._timestamp_to_snapshot_df[as_of_timestamp]
+        hdbg.dassert(not df.empty)
+        hdbg.dassert_in("net_cost", df.columns)
+        net_cost = df["net_cost"].sum()
+        _LOG.debug("net_cost=%f as of %s", net_cost, as_of_timestamp)
+        return net_cost
+
     def _update_cash(
         self,
         snapshot_df: pd.DataFrame,
@@ -871,17 +901,18 @@ class MockedPortfolio(AbstractPortfolio):
         wall_clock_timestamp: pd.Timestamp,
     ) -> pd.DataFrame:
         # `snapshot_df` should not have CASH_ID.
-        hdbg.dassert_not_in(AbstractPortfolio.CASH_ID, snapshot_df[self._asset_id_col])
+        hdbg.dassert_not_in(
+            AbstractPortfolio.CASH_ID, snapshot_df[self._asset_id_col]
+        )
         # Get the cash available at as_of_timestamp.
         cash = self._get_holdings_as_scalar(
             as_of_timestamp, asset_id=self.CASH_ID
         )
         _LOG.debug("cash=%s", cash)
         hdbg.dassert(np.isfinite(cash), "cash=%s", cash)
-        # TODO(Paul): Compute cost from snapshot_df.
-        #last_net_cost = self._get_snapshot_df(as_of_timestamp)
-        #cost = current_net_cost.sum() - last_net_cost.sum()
-        cost = 0
+        last_net_cost = self._get_net_cost(as_of_timestamp)
+        current_net_cost = self._get_net_cost(wall_clock_timestamp)
+        cost = current_net_cost - last_net_cost
         hdbg.dassert(np.isfinite(cost), "cost=%s", cost)
         updated_cash = cash - cost
         cash_holdings = self._create_holdings_df_from_cash(

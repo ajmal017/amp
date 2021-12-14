@@ -315,7 +315,7 @@ leverage,0.0
 # #############################################################################
 
 
-def _get_row() -> pd.Series:
+def _get_row1() -> pd.Series:
     row = """
     strategyid,SAU1
     account,candidate
@@ -334,6 +334,25 @@ def _get_row() -> pd.Series:
     return srs
 
 
+def _get_row2() -> pd.Series:
+    row = """
+    strategyid,SAU1
+    account,candidate
+    id,0
+    tradedate,2000-01-01
+    timestamp_db,2000-01-01 21:38:39.419536
+    asset_id,101
+    target_position,10
+    current_position,20.0
+    open_quantity,0
+    net_cost,1903.1217
+    bod_position,0
+    bod_price,0
+    """
+    srs = hsql.csv_to_series(row, sep=",")
+    return srs
+
+
 class TestMockedPortfolio1(ottodb.TestOmsDbHelper):
     def test1(self) -> None:
         """
@@ -341,7 +360,7 @@ class TestMockedPortfolio1(ottodb.TestOmsDbHelper):
         """
         with hasynci.solipsism_context() as event_loop:
             # Create current positions in the table.
-            row = _get_row()
+            row = _get_row1()
             table_name = oomsdb.CURRENT_POSITIONS_TABLE_NAME
             oomsdb.create_current_positions_table(
                 self.connection, incremental=False, table_name=table_name
@@ -369,4 +388,40 @@ class TestMockedPortfolio1(ottodb.TestOmsDbHelper):
             2000-01-01 09:35:00-05:00       101               20
             2000-01-01 09:35:00-05:00        -1          1000000
             2000-01-01 09:30:00-05:00        -1          1000000"""
+            self.assert_equal(actual, expected, fuzzy_match=True)
+
+    def test2(self) -> None:
+        """
+        Test that the update of Portfolio works when accounting for costs.
+        """
+        with hasynci.solipsism_context() as event_loop:
+            # Create current positions in the table.
+            row = _get_row2()
+            table_name = oomsdb.CURRENT_POSITIONS_TABLE_NAME
+            oomsdb.create_current_positions_table(
+                self.connection, incremental=False, table_name=table_name
+            )
+            hsql.execute_insert_query(self.connection, row, table_name)
+            if False:
+                # Print the DB status.
+                query = """SELECT * FROM current_positions"""
+                df = hsql.execute_query_to_df(self.connection, query)
+                print(hprint.dataframe_to_str(df))
+                assert 0
+            #
+            # Create MockedPortfolio with some initial cash.
+            initial_timestamp = pd.Timestamp(
+                "2000-01-01 09:30:00-05:00", tz="America/New_York"
+            )
+            portfolio = oporexam.get_mocked_portfolio_example1(
+                event_loop, self.connection, table_name, initial_timestamp
+            )
+            portfolio.update_state()
+            # Check.
+            actual = str(portfolio)
+            expected = r"""# holdings=
+                                       asset_id  curr_num_shares
+            2000-01-01 09:35:00-05:00       101          20.0
+            2000-01-01 09:35:00-05:00        -1      998096.8783
+            2000-01-01 09:30:00-05:00        -1     1000000.0"""
             self.assert_equal(actual, expected, fuzzy_match=True)
