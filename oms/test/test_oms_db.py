@@ -27,7 +27,8 @@ _LOG = logging.getLogger(__name__)
 
 # TODO(gp): Move this to TestDbHelper although I am not sure it will work.
 @pytest.mark.skipif(
-    hgit.is_dev_tools() or hgit.is_lime(), reason="Need dind support"
+    not hgit.execute_repo_config_code("has_dind_support()"),
+    reason="Need dind support"
 )
 class TestOmsDbHelper(hsqltest.TestDbHelper):
     """
@@ -95,7 +96,8 @@ class TestOmsDbRemoveAllTables1(TestOmsDbHelper):
 
 
 @pytest.mark.skipif(
-    hgit.is_dev_tools() or hgit.is_lime(), reason="Need dind support"
+    not hgit.execute_repo_config_code("has_dind_support()"),
+    reason="Need dind support"
 )
 class TestOmsDbSubmittedOrdersTable1(TestOmsDbHelper):
     """
@@ -179,7 +181,8 @@ def _get_row3() -> pd.Series:
 
 
 @pytest.mark.skipif(
-    hgit.is_dev_tools() or hgit.is_lime(), reason="Need dind support"
+    not hgit.execute_repo_config_code("has_dind_support()"),
+    reason="Need dind support"
 )
 class TestOmsDbAcceptedOrdersTable1(TestOmsDbHelper):
     """
@@ -231,7 +234,8 @@ class TestOmsDbAcceptedOrdersTable1(TestOmsDbHelper):
 
 
 @pytest.mark.skipif(
-    hgit.is_dev_tools() or hgit.is_lime(), reason="Need dind support"
+    not hgit.execute_repo_config_code("has_dind_support()"),
+    reason="Need dind support"
 )
 class TestOmsDbTableInteraction1(TestOmsDbHelper):
     """
@@ -349,7 +353,8 @@ class TestOmsDbTableInteraction1(TestOmsDbHelper):
 
 
 @pytest.mark.skipif(
-    hgit.is_dev_tools() or hgit.is_lime(), reason="Need dind support"
+    not hgit.execute_repo_config_code("has_dind_support()"),
+    reason="Need dind support"
 )
 class TestOmsDbCurrentPositionsTable1(TestOmsDbHelper):
     """

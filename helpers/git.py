@@ -10,8 +10,7 @@ import logging
 import os
 import pprint
 import re
-import sys
-from typing import Dict, List, Match, Optional, Tuple
+from typing import Any, Dict, List, Match, Optional, Tuple
 
 import helpers.dbg as hdbg
 import helpers.io_ as hio
@@ -182,6 +181,34 @@ def is_amp() -> bool:
     return _is_repo("amp")
 
 
+# TODO(gp): Be consistent with submodule and sub-module in the code. Same for
+# supermodule.
+def is_in_amp_as_submodule() -> bool:
+    """
+    Return whether we are in the `amp` repo and it's a sub-module, e.g., of
+    `lm`.
+    """
+    return is_amp() and is_inside_submodule(".")
+
+
+def is_in_amp_as_supermodule() -> bool:
+    """
+    Return whether we are in the `amp` repo and it's a super-module, i.e.,
+    `amp` by itself.
+    """
+    return is_amp() and not is_inside_submodule(".")
+
+
+# Using these functions is the last resort to skip / change the tests depending
+# on the repo. We should control the tests through what functionalities they have,
+# e.g.,
+# ```
+# hgit.execute_repo_config_code("has_dind_support()"),
+# ```
+# 
+# rather than their name.
+
+
 def is_dev_tools() -> bool:
     """
     Return whether we are inside `dev_tools` repo.
@@ -208,24 +235,6 @@ def is_lime() -> bool:
     Return whether we are inside `lime` repo.
     """
     return _is_repo("lime")
-
-
-# TODO(gp): submodule -> sub_module
-def is_in_amp_as_submodule() -> bool:
-    """
-    Return whether we are in the `amp` repo and it's a sub-module, e.g., of
-    `lm`.
-    """
-    return is_amp() and is_inside_submodule(".")
-
-
-# TODO(gp): supermodule -> super_module
-def is_in_amp_as_supermodule() -> bool:
-    """
-    Return whether we are in the `amp` repo and it's a super-module, i.e.,
-    `amp` by itself.
-    """
-    return is_amp() and not is_inside_submodule(".")
 
 
 # #############################################################################
@@ -465,16 +474,34 @@ def get_repo_full_name_from_client(super_module: bool) -> str:
 
 # /////////////////////////////////////////////////////////////////////////
 
+# Execute code from the `repo_config.py` in the super module.
 
-def _get_repo_config_code() -> str:
+def _get_repo_config_code(super_module: bool = True) -> str:
     """
     Return the text of the code stored in `repo_config.py`.
     """
     # TODO(gp): We should actually ask Git where the super-module is.
-    file_name = "./repo_config.py"
+    client_root = get_client_root(super_module)
+    file_name = os.path.join(client_root, "repo_config.py")
     hdbg.dassert_file_exists(file_name)
     code: str = hio.from_file(file_name)
     return code
+
+
+def execute_repo_config_code(code_to_execute: str) -> Any:
+    """
+    Execute code in `repo_config.py`.
+    """
+    # Read the info from the current repo.
+    code = _get_repo_config_code()
+    # TODO(gp): make the linter happy creating this symbol that comes from the
+    #  `exec()`.
+    exec(code, globals())  # pylint: disable=exec-used
+    ret = eval(code_to_execute)
+    return ret
+
+
+# /////////////////////////////////////////////////////////////////////////
 
 
 def _decorate_with_host_name(
