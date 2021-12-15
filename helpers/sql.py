@@ -731,11 +731,11 @@ async def wait_for_change_in_number_of_rows(
 
     :param poll_kwargs: a dictionary with the kwargs for `poll()`.
     """
-    num_orders = get_num_rows(connection, table_name)
+    num_rows = get_num_rows(connection, table_name)
 
     def _is_number_of_rows_changed() -> hasynci.PollOutput:
-        new_num_orders = get_num_rows(connection, table_name)
-        success = new_num_orders != num_orders
+        new_num_rows = get_num_rows(connection, table_name)
+        success = new_num_rows != num_rows
         result_tmp = None
         return success, result_tmp
 
