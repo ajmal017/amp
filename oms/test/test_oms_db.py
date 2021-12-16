@@ -19,6 +19,7 @@ import helpers.printing as hprint
 import helpers.sql as hsql
 import oms.broker_example as obroexam
 import oms.oms_db as oomsdb
+import oms.oms_lib_tasks as oomlitas
 import oms.order_example as oordexam
 
 _LOG = logging.getLogger(__name__)
@@ -41,14 +42,18 @@ class TestOmsDbHelper(hsqltest.TestDbHelper):
     def _get_compose_file() -> str:
         return "oms/devops/compose/docker-compose.yml"
 
-    # TODO(Dan): Deprecate after #585.
-    @staticmethod
-    def _get_db_name() -> str:
-        return "oms_postgres_db_local"
-
     @staticmethod
     def _get_service_name() -> str:
         return "oms_postgres_local"
+
+    @staticmethod
+    def _get_db_env_path() -> str:
+        """
+        See `_get_db_env_path()` in the parent class.
+        """
+        # Use the `local` stage for testing.
+        env_file_path = oomlitas.get_db_env_path("local")
+        return env_file_path  # type: ignore[no-any-return]
 
     def _test_create_table_helper(
         self: Any,
@@ -100,7 +105,7 @@ class TestOmsDbRemoveAllTables1(TestOmsDbHelper):
 @pytest.mark.skipif(
     not hgit.execute_repo_config_code("has_dind_support()"),
     reason="Need dind support",
- )
+)
 class TestOmsDbSubmittedOrdersTable1(TestOmsDbHelper):
     """
     Test operations on the submitted orders table.
@@ -183,7 +188,7 @@ def _get_row3() -> pd.Series:
 
 
 @pytest.mark.skipif(
-   not hgit.execute_repo_config_code("has_dind_support()"),
+    not hgit.execute_repo_config_code("has_dind_support()"),
     reason="Need dind support",
 )
 class TestOmsDbAcceptedOrdersTable1(TestOmsDbHelper):
@@ -221,14 +226,14 @@ class TestOmsDbAcceptedOrdersTable1(TestOmsDbHelper):
         # Check the content of the table.
         query = f"SELECT * FROM {table_name}"
         df = hsql.execute_query_to_df(self.connection, query)
-        actual = hprint.dataframe_to_str(df)
-        expected = r"""
-        strategyid  targetlistid   tradedate  instanceid                                                                filename        timestamp_processed               timestamp_db  target_count  changed_count  unchanged_count  cancel_count  success                                                     reason
-        0       SAU1             1  2021-11-12        3504                                                         hello_world.txt 2021-11-12 19:59:23.710677 2021-11-12 19:59:23.716732       1              0                0             0    False   "There were a total of 1 malformed requests in the file.
-        1       SAU1             2  2021-11-12        3504  s3://targets/20211112000000/positions.16.2021-11-12_15:44:04-05:00.csv 2021-11-12 20:45:07.463641 2021-11-12 20:45:07.469807       1              0                0             0    False  "There were a total of 1 malformed requests in the file."
-        2       SAU1             5  2021-11-12        3504   s3://targets/20211112000000/positions.3.2021-11-12_16:38:22-05:00.csv 2021-11-12 21:38:39.414138 2021-11-12 21:38:39.419536       1              1                0             0     True
-        """
-        self.assert_equal(actual, expected, fuzzy_match=True)
+        act = hprint.dataframe_to_str(df)
+        # pylint: disable=line-too-long
+        exp = r"""  strategyid  targetlistid   tradedate  instanceid                                                                filename        timestamp_processed               timestamp_db  target_count  changed_count  unchanged_count  cancel_count  success                                                     reason
+0       SAU1             1  2021-11-12        3504                                                         hello_world.txt 2021-11-12 19:59:23.710677 2021-11-12 19:59:23.716732             1              0                0             0    False   "There were a total of 1 malformed requests in the file.
+1       SAU1             2  2021-11-12        3504  s3://targets/20211112000000/positions.16.2021-11-12_15:44:04-05:00.csv 2021-11-12 20:45:07.463641 2021-11-12 20:45:07.469807             1              0                0             0    False  "There were a total of 1 malformed requests in the file."
+2       SAU1             5  2021-11-12        3504   s3://targets/20211112000000/positions.3.2021-11-12_16:38:22-05:00.csv 2021-11-12 21:38:39.414138 2021-11-12 21:38:39.419536             1              1                0             0     True                                                           """
+        # pylint: enable=line-too-long
+        self.assert_equal(act, exp, fuzzy_match=True)
         # Delete the table.
         hsql.remove_table(self.connection, oomsdb.ACCEPTED_ORDERS_TABLE_NAME)
 

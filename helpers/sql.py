@@ -8,9 +8,11 @@ import collections
 import io
 import logging
 import os
+import re
 import time
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import dotenv
 import pandas as pd
 import psycopg2 as psycop
 import psycopg2.extras as extras
@@ -27,12 +29,12 @@ _LOG = logging.getLogger(__name__)
 # Connection
 # #############################################################################
 
-# TODO(gp): mypy doesn't like this. Understand why and / or inline.
+# TODO(gp): mypy doesn't like this. Understand why and / or inline CMTask #756.
 DbConnection = psycop.extensions.connection
 
 
 # Invariant: keep the arguments in the interface in the same order as:
-# host, dbname, port, user, password
+# host, dbname, port, user, password.
 DbConnectionInfo = collections.namedtuple(
     "DbConnectionInfo", ["host", "dbname", "port", "user", "password"]
 )
@@ -55,7 +57,7 @@ def get_connection(
     )
     if autocommit:
         connection.autocommit = True
-    return connection
+    return connection  # type: ignore[no-any-return]
 
 
 def get_connection_from_env_vars() -> DbConnection:
@@ -64,7 +66,6 @@ def get_connection_from_env_vars() -> DbConnection:
     variables.
     """
     # Get values from the environment variables.
-    # TODO(gp): -> POSTGRES_DBNAME
     host = os.environ["POSTGRES_HOST"]
     dbname = os.environ["POSTGRES_DB"]
     port = int(os.environ["POSTGRES_PORT"])
@@ -91,10 +92,32 @@ def get_connection_from_string(
     E.g., `host=localhost dbname=im_db_local port=5432 user=...
     password=...`
     """
+    regex = r"host=\w+ dbname=\w+ port=\d+ user=\w+ password=\w+"
+    m = re.match(regex, conn_as_str)
+    hdbg.dassert(m, "Invalid connection string: '%s'", conn_as_str)
     connection = psycop.connect(conn_as_str)
     if autocommit:
         connection.autocommit = True
-    return connection
+    return connection  # type: ignore[no-any-return]
+
+
+def get_connection_info_from_env_file(env_file_path: str) -> DbConnectionInfo:
+    """
+    Get connection parameters from environment file.
+
+    :param env_file_path: path to an environment file that contains db connection parameters
+    """
+    db_config = dotenv.dotenv_values(env_file_path)
+    # The parameters' names are fixed and cannot be changed, see
+    # `https:://hub.docker.com/_/postgres`.
+    connection_parameters = DbConnectionInfo(
+        host=db_config["POSTGRES_HOST"],
+        dbname=db_config["POSTGRES_DB"],
+        port=int(db_config["POSTGRES_PORT"]),
+        user=db_config["POSTGRES_USER"],
+        password=db_config["POSTGRES_PASSWORD"],
+    )
+    return connection_parameters
 
 
 def check_db_connection(
@@ -228,6 +251,7 @@ def get_indexes(connection: DbConnection) -> pd.DataFrame:
 def disconnect_all_clients(connection: DbConnection) -> None:
     # From https://stackoverflow.com/questions/36502401
     # Not sure this will work in our case, since it might kill our own connection.
+    dbname = connection.info.host
     query = f"""
         SELECT pg_terminate_backend(pid)
             FROM pg_stat_activity
@@ -532,7 +556,7 @@ def execute_query_to_df(
 # #############################################################################
 
 
-def csv_to_series(csv_as_txt: str, sep=",") -> pd.Series:
+def csv_to_series(csv_as_txt: str, sep: str = ",") -> pd.Series:
     """
     Convert a text with (key, value) separated by `sep` into a `pd.Series`.
 
@@ -542,6 +566,7 @@ def csv_to_series(csv_as_txt: str, sep=",") -> pd.Series:
         tradedate,2021-11-12
         targetlistid,1
         ```
+    :param sep: csv separator, e.g. `,`
     :return: series
     """
     lines = hprint.dedent(csv_as_txt).split("\n")
@@ -628,6 +653,19 @@ def execute_insert_query(
     connection.commit()
 
 
+def execute_query(connection: DbConnection, query: str) -> None:
+    """
+    Used for generic simple operations.
+
+    :param connection: connection to the DB
+    :param query: generic query that can be: insert, update, delete, etc.
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(query)
+        if not connection.autocommit:
+            connection.commit()
+
+
 # #############################################################################
 # Build more complex SQL queries.
 # #############################################################################
@@ -679,7 +717,7 @@ def get_num_rows(connection: DbConnection, table_name: str) -> int:
     cursor.execute(query)
     vals = cursor.fetchall()
     hdbg.dassert_eq(len(vals), 1)
-    return vals[0]
+    return vals[0]  # type: ignore[no-any-return]
 
 
 # #############################################################################

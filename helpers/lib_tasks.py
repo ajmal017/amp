@@ -157,6 +157,7 @@ def _to_single_line_cmd(cmd: Union[str, List[str]]) -> str:
     return cmd
 
 
+# TODO(Grisha): make it public #755.
 def _to_multi_line_cmd(docker_cmd_: List[str]) -> str:
     r"""
     Convert a command encoded as a list of strings into a single command
@@ -202,13 +203,20 @@ def _to_multi_line_cmd(docker_cmd_: List[str]) -> str:
 use_one_line_cmd = False
 
 
-def _run(ctx: Any, cmd: str, *args: Any, **ctx_run_kwargs: Any) -> int:
+# TODO(Grisha): make it public #755.
+def _run(ctx: Any, cmd: str, *args, dry_run: bool = False, **ctx_run_kwargs: Any) -> int:
     _LOG.debug("cmd=%s", cmd)
     if use_one_line_cmd:
         cmd = _to_single_line_cmd(cmd)
     _LOG.debug("cmd=%s", cmd)
-    result = ctx.run(cmd, *args, **ctx_run_kwargs)
-    return result.return_code
+    if dry_run:
+        print(f"> {cmd}")
+        _LOG.warning("Skipping execution")
+        res = None
+    else:
+        result = ctx.run(cmd, *args, **ctx_run_kwargs)
+        res = result.return_code
+    return res
 
 
 # TODO(gp): We should factor out the meaning of the params in a string and add it
@@ -407,6 +415,15 @@ def git_merge_master(ctx, ff_only=False, abort_if_not_clean=True):  # type: igno
     _run(ctx, cmd)
 
 
+# TODO(gp): Add git_co(ctx)
+# Reuse hgit.git_stash_push() and hgit.stash_apply()
+# git stash save your-file-name
+# git checkout master
+# # do whatever you had to do with master
+# git checkout staging
+# git stash pop
+
+
 @task
 def git_clean(ctx, dry_run=False):  # type: ignore
     """
@@ -497,7 +514,7 @@ def git_create_patch(  # type: ignore
     # Summary of files.
     _LOG.info(
         "Difference between HEAD and master:\n%s",
-        hgit.get_summary_files_in_branch("master", "."),
+        hgit.get_summary_files_in_branch("master", dir_name="."),
     )
     # Get the files.
     all_ = False
@@ -642,7 +659,7 @@ def git_branch_files(ctx):  # type: ignore
     _ = ctx
     print(
         "Difference between HEAD and master:\n"
-        + hgit.get_summary_files_in_branch("master", ".")
+        + hgit.get_summary_files_in_branch("master", dir_name=".")
     )
 
 
@@ -868,6 +885,76 @@ def git_branch_copy(ctx, new_branch_name="", use_patch=False):  # type: ignore
     _run(ctx, cmd)
 
 
+@task
+def git_branch_diff_with_base(ctx ,diff_type="", subdir_name=""):  # type: ignore
+    """
+    Diff files of the current branch with master at the branching point.
+    """
+    _ = ctx
+    # This branch is not master.
+    curr_branch_name = hgit.get_branch_name()
+    hdbg.dassert_ne(curr_branch_name, "master")
+    # Get the branching point.
+    dir_name = "."
+    hash_ = hgit.get_branch_hash(dir_name=dir_name)
+    # Get the modified files.
+    cmd = []
+    cmd.append("git diff")
+    if diff_type:
+        cmd.append(f"--diff-filter={diff_type}")
+    cmd.append(f"--name-only HEAD {hash_}")
+    cmd = " ".join(cmd)
+    files = hsysinte.system_to_files(
+        cmd, dir_name, remove_files_non_present=False
+    )
+    files = sorted(files)
+    print("files=%s\n%s" % (len(files), "\n".join(files)))
+    # Retrieve the original file and create the diff command.
+    script_txt = []
+    for branch_file in files:
+        _LOG.debug("\n%s", hprint.frame(f"branch_file={branch_file}"))
+        # Check if it needs to be compared.
+        if subdir_name != "":
+            if not branch_file.startswith(subdir_name):
+                _LOG.debug("Skipping since '%s' doesn't start with '%s'",
+                           branch_file, subdir_name)
+                continue
+        # Get the file on the right of the vimdiff.
+        if os.path.exists(branch_file):
+            right_file = branch_file
+        else:
+            right_file = "/dev/null"
+        #
+        tmp_file = branch_file.replace(".py", ".base.py")
+        # Flatten the file dirs: e.g.,
+        # dataflow/core/nodes/test/test_volatility_models.base.py
+        tmp_file = "tmp." + tmp_file.replace("/", "_")
+        _LOG.debug("branch_file='%s' exists in branch -> master_file='%s'", branch_file, tmp_file)
+        # Save the base file.
+        cmd = f"git show {hash_}:{branch_file} >{tmp_file}"
+        rc = hsysinte.system(cmd, abort_on_error=False)
+        if rc != 0:
+            # For new files we get the error:
+            # fatal: path 'dev_scripts/configure_env.sh' exists on disk, but
+            # not in 'c92cfe4382325678fdfccd0ddcd1927008090602'
+            _LOG.debug("branch_file='%s' doesn't exist in master", branch_file)
+            left_file = "/dev/null"
+        else:
+            left_file = tmp_file
+        # Update the script to diff.
+        cmd = f"vimdiff {left_file} {right_file}"
+        _LOG.debug("-> %s", cmd)
+        script_txt.append(cmd)
+    script_txt = "\n".join(script_txt)
+    # Files to diff.
+    print(hprint.frame("Diffing script"))
+    print(script_txt)
+    # Save the script to compare.
+    script_file_name = "./tmp.vimdiff_branch_with_base.sh"
+    hsysinte.create_executable_script(script_file_name, script_txt)
+    print(f"# To diff against the base run:\n> {script_file_name}")
+
+
 # TODO(gp): Add the following scripts:
 # dev_scripts/git/git_backup.sh
 # dev_scripts/git/gcl
@@ -880,33 +967,174 @@ def git_branch_copy(ctx, new_branch_name="", use_patch=False):  # type: ignore
 # #############################################################################
 
 
+def _dassert_current_dir_matches(dir_name: str) -> None:
+    """
+    Ensure that the name of the current dir is the expected one.
+    """
+    curr_dir_name = os.path.basename(os.getcwd())
+    hdbg.dassert_eq(curr_dir_name, dir_name, "The current dir '%s' is not the source dir '%s'",
+                    curr_dir_name, dir_name)
+
+
+def _dassert_is_integration_branch(dir_name: str) -> None:
+    curr_branch = hgit.get_branch_name(dir_name=dir_name)
+    hdbg.dassert_ne(curr_branch, "master")
+    hdbg.dassert_in("Integrate", curr_branch)
+
+
+def _clean_both_integration_dirs(dir_name1: str, dir_name2: str) -> None:
+    cmd = f"cd {dir_name1} && invoke git_clean"
+    hsysinte.system(cmd)
+    cmd = f"cd {dir_name2} && invoke git_clean"
+    hsysinte.system(cmd)
+
+
 @task
-def integrate_save_base_files(ctx, file_name):  # type: ignore
+def integrate_create_branches(ctx, dir_name, dry_run=False):  # type: ignore
     """
-    Save the files from `file_name` at the commit before this branch was branched.
+    Create the branch for integration in the current dir.
+
+    The dir needs to be specified to ensure the set-up is correct.
     """
-    # Find the hash before the branch was created
-    # > git merge-base master AmpTask1786_Integrate_20211210
-    # 77383ac21bbd3fa353f9572ac3ae9ad144c44db1
-    hash_ = "77383ac21bbd3fa353f9572ac3ae9ad144c44db1"
-    # Get the files to diff.
-    _LOG.info("Reading file names from '%s'", file_name)
-    files = hio.from_file(file_name).split("\n")
+    _report_task()
+    #
+    _dassert_current_dir_matches(dir_name)
+    _dassert_is_integration_branch(src_dir)
+    _dassert_is_integration_branch(dst_dir)
+    #
+    date = datetime.datetime.now().date()
+    date_as_str = date.strftime("%Y%m%d")
+    branch_name = f"AmpTask1786_Integrate_{date_as_str}"
+    #query_yes_no("Are you sure you want to create the brach ")
+    _LOG.info("Creating branch '%s'", branch_name)
+    cmd = f"invoke git_create_branch -b '{branch_name}'"
+    _run(ctx, cmd, dry_run=dry_run)
+
+
+def _get_src_dst_dirs(src_dir: str, dst_dir: str, subdir_name: str) -> Tuple[str, str]:
+    """
+    Return the full path of `src_dir` and `dst_dir` assuming that
+    - `src_dir` is the current dir
+    - `dst_dir` is parallel dir to the current one
+
+    :return: full paths of both directories
+    """
+    curr_parent_dir = os.path.dirname(os.getcwd())
+    #
+    src_dir = os.path.join(curr_parent_dir, src_dir, subdir_name)
+    src_dir = os.path.normpath(src_dir)
+    hdbg.dassert_dir_exists(src_dir)
+    #
+    dst_dir = os.path.join(curr_parent_dir, dst_dir, subdir_name)
+    dst_dir = os.path.normpath(dst_dir)
+    hdbg.dassert_dir_exists(dst_dir)
+    return src_dir, dst_dir
+
+
+@task
+def integrate_diff_dirs(ctx, src_dir="amp1", dst_dir="cmamp1", subdir_name="", use_linux_diff=False, dry_run=False):  # type: ignore
+    """
+    Integrate repos from dir `src_dir` to `dst_dir`.
+
+    We use default values for src / dst dirs to represent the usual set-up.
+
+    ```
+    > i integrate_diff_dirs --subdir-name . --src-dir amp1 --dst-dir cmamp1
+    ```
+
+    :param use_linux_diff: use Linux `diff` instead of `diff_to_vimdiff.py`
+    """
+    _report_task()
+    #
+    _dassert_current_dir_matches(src_dir)
+    #
+    src_dir, dst_dir = _get_src_dst_dirs(src_dir, dst_dir, subdir_name)
+    _dassert_is_integration_branch(src_dir)
+    _dassert_is_integration_branch(dst_dir)
+    _clean_both_integration_dirs(src_dir, dst_dir)
+    #
+    if use_linux_diff:
+        cmd = f"diff -r --brief {src_dir} {dst_dir}"
+    else:
+        cmd = f"dev_scripts/diff_to_vimdiff.py --dir1 {src_dir} --dir2 {dst_dir}"
+    _run(ctx, cmd, dry_run=dry_run)
+
+
+@task
+def integrate_copy_dirs(ctx, src_dir, dst_dir, subdir_name="", dry_run=False):  # type: ignore
+    """
+    Copy dir `subdir_name` from dir `src_dir` to `dst_dir`.
+
+    ```
+    > i integrate_copy_dirs --subdir-name documentation --src-dir amp1 --dst-dir cmamp1
+    ```
+
+    :param dry_run: diff the dirs as a preview instead of copying
+    """
+    _report_task()
+    #
+    src_dir, dst_dir = _get_src_dst_dirs(src_dir, dst_dir, subdir_name)
+    _dassert_is_integration_branch(src_dir)
+    _dassert_is_integration_branch(dst_dir)
+    _clean_both_integration_dirs(src_dir, dst_dir)
+    #
+    if dry_run:
+        cmd = f"diff -r --brief {src_dir} {dst_dir}"
+    else:
+        rsync_opts = "--delete -a"
+        cmd = f"rsync {rsync_opts} {src_dir}/ {dst_dir}"
+    _run(ctx, cmd)
+
+
+@task
+def integrate_compare_branch_with_base(ctx, src_dir, dst_dir, subdir_name=""):  # type: ignore
+    """
+    Compare the files modified in both the branches in src_dir and dst_dir to master
+    before this current branch was branched.
+
+    This is used to check what changes were made to files modified by both branches.
+    """
+    _report_task()
+    _ = ctx
+    #
+    _dassert_current_dir_matches(src_dir)
+    src_dir, dst_dir = _get_src_dst_dirs(src_dir, dst_dir, subdir_name)
+    _dassert_is_integration_branch(src_dir)
+    _dassert_is_integration_branch(dst_dir)
+    _clean_both_integration_dirs(src_dir, dst_dir)
+    #
+    # Find the files modified by both branches.
+    src_hash = hgit.get_branch_hash(src_dir)
+    _LOG.info("src_hash=%s", src_hash)
+    dst_hash = hgit.get_branch_hash(dst_dir)
+    _LOG.info("dst_hash=%s", dst_hash)
+    diff_files1 = os.path.abspath("./tmp.files_modified1.txt")
+    diff_files2 = os.path.abspath("./tmp.files_modified2.txt")
+    cmd = f"cd {src_dir} && git diff --name-only {src_hash} HEAD >{diff_files1}"
+    hsysinte.system(cmd)
+    cmd = f"cd {dst_dir} && git diff --name-only {dst_hash} HEAD >{diff_files2}"
+    hsysinte.system(cmd)
+    common_files = "./tmp.common_files.txt"
+    cmd = f"comm -12 {diff_files1} {diff_files2} >{common_files}"
+    hsysinte.system(cmd)
+    # Get the base files to diff.
+    files = hio.from_file(common_files).split("\n")
     files = [f for f in files if f != ""]
-    _LOG.info("Found %d files:\n%s", len(files), "\n".join(files))
+    _LOG.info("Found %d files to diff:\n%s", len(files), "\n".join(files))
+    # Retrieve the original file and create the diff command.
     script_txt = []
     for src_file in files:
         hdbg.dassert_file_exists(src_file)
         # TODO(gp): Add function to add a suffix to a name, using
-        # os.path.dirname(), os.path.basename(), os.path.split_extension().
+        #  os.path.dirname(), os.path.basename(), os.path.split_extension().
         dst_file = src_file.replace(".py", ".base.py")
         # Save the base file.
-        cmd = f"git show {hash_}:{src_file} >{dst_file}"
+        cmd = f"git show {src_hash}:{src_file} >{dst_file}"
         hsysinte.system(cmd)
         # Update the script to diff.
         script_txt.append(f"vimdiff {dst_file} {src_file}")
     # Save the script to compare.
-    script_file_name = "./tmp.vimdiff_with_base.sh"
+    script_file_name = "./tmp.vimdiff_branch_with_base.sh"
     script_txt = "\n".join(script_txt)
     hsysinte.create_executable_script(script_file_name, script_txt)
     print(f"# To diff against the base run:\n> {script_file_name}")
@@ -2453,7 +2681,7 @@ def _run_test_cmd(
             coverage_rc = hsysinte.system(script_name)
             if coverage_rc != 0:
                 _LOG.warning(
-                    "Setting `rc` to `0` even though the coverage script" "fails."
+                    "Setting `rc` to `0` even though the coverage script fails."
                 )
                 rc = 0
     return rc
@@ -2501,7 +2729,7 @@ def _run_tests(
 
 # TODO(gp): Pass a test_list in fast, slow, ... instead of duplicating all the code.
 @task
-def run_fast_tests(  # type: ignore
+def run_fast_tests(  # type: ignore # due to https://github.com/pyinvoke/invoke/issues/357.
     ctx,
     stage="dev",
     version="",
