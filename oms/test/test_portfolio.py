@@ -15,7 +15,7 @@ import oms.broker_example as obroexam
 import oms.oms_db as oomsdb
 import oms.portfolio as omportfo
 import oms.portfolio_example as oporexam
-import oms.test.test_oms_db as ottodb
+import oms.test.oms_db_helper as omtodh
 
 _LOG = logging.getLogger(__name__)
 
@@ -353,7 +353,7 @@ def _get_row2() -> pd.Series:
     return srs
 
 
-class TestMockedPortfolio1(ottodb.TestOmsDbHelper):
+class TestMockedPortfolio1(omtodh.TestOmsDbHelper):
     def test1(self) -> None:
         """
         Test that the update of Portfolio works.

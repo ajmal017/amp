@@ -7,14 +7,16 @@ import oms.broker as ombroker
 import abc
 import collections
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
 import helpers.datetime_ as hdateti
 import helpers.dbg as hdbg
+import helpers.hasyncio as hasynci
 import helpers.sql as hsql
 import market_data.market_data_interface as mdmadain
+import oms.oms_db as oomsdb
 import oms.order as omorder
 
 _LOG = logging.getLogger(__name__)
@@ -116,7 +118,7 @@ class AbstractBroker(abc.ABC):
         # Last seen timestamp to enforce that time is only moving ahead.
         self._last_timestamp = None
 
-    def submit_orders(
+    async def submit_orders(
         self,
         orders: List[omorder.Order],
         *,
@@ -129,7 +131,7 @@ class AbstractBroker(abc.ABC):
         # Submit the orders.
         _LOG.debug("Submitting orders=\n%s", omorder.orders_to_string(orders))
         self._orders.extend(orders)
-        self._submit_orders(orders, wall_clock_timestamp, dry_run=dry_run)
+        await self._submit_orders(orders, wall_clock_timestamp, dry_run=dry_run)
 
     def get_fills(self, as_of_timestamp: pd.Timestamp) -> List[Fill]:
         """
@@ -153,7 +155,7 @@ class AbstractBroker(abc.ABC):
         return fills
 
     @abc.abstractmethod
-    def _submit_orders(
+    async def _submit_orders(
         self,
         orders: List[omorder.Order],
         wall_clock_timestamp: pd.Timestamp,
@@ -209,7 +211,7 @@ class SimulatedBroker(AbstractBroker):
         # Track the fills for internal accounting.
         self._fills: List[Fill] = []
 
-    def _submit_orders(
+    async def _submit_orders(
         self,
         orders: List[omorder.Order],
         wall_clock_timestamp: pd.Timestamp,
@@ -288,14 +290,18 @@ class MockedBroker(AbstractBroker):
         db_connection: hsql.DbConnection,
         submitted_orders_table_name: str,
         accepted_orders_table_name: str,
+        poll_kwargs: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(*args)
         self._db_connection = db_connection
         self._submitted_orders_table_name = submitted_orders_table_name
         self._accepted_orders_table_name = accepted_orders_table_name
         self._submissions = collections.OrderedDict()
+        if poll_kwargs is None:
+            poll_kwargs = hasynci.get_poll_kwargs(self._get_wall_clock_time)
+        self._poll_kwargs = poll_kwargs
 
-    def _submit_orders(
+    async def _submit_orders(
         self,
         orders: List[omorder.Order],
         wall_clock_timestamp: pd.Timestamp,
@@ -320,9 +326,11 @@ class MockedBroker(AbstractBroker):
         # Poll accepted orders and wait.
         # This is the only place where this object is using
         # `accepted_orders_table`.
-        # coro = oomsdb.wait_for_order_accepted(
-        #    self.connection, target_value, poll_kwargs
-        # )
+        _LOG.debug("Wait for accepted orders ...")
+        await oomsdb.wait_for_order_acceptance(
+            self._db_connection, file_name, self._poll_kwargs
+        )
+        _LOG.debug("Wait for accepted orders ... done")
 
     def _get_fills(self, as_of_timestamp: pd.Timestamp) -> List[Fill]:
         """
