@@ -79,8 +79,8 @@ async def gather_coroutines_with_wall_clock(
     event_loop: asyncio.AbstractEventLoop, *coroutines: List[Coroutine]
 ) -> List[Any]:
     """
-    Inject a wall clock associated to `event_loop` in all the coroutines and then
-    gathers them in a single coroutine.
+    Inject a wall clock associated to `event_loop` in all the coroutines and
+    then gathers them in a single coroutine.
     """
     get_wall_clock_time = lambda: hdateti.get_current_time(
         tz="ET", event_loop=event_loop
@@ -245,7 +245,7 @@ async def wait(
 
 
 async def wait_until(
-    timestamp: pd.Timestamp,
+    wait_until_timestamp: pd.Timestamp,
     get_wall_clock_time: hdateti.GetWallClockTime,
 ) -> None:
     """
@@ -253,8 +253,10 @@ async def wait_until(
     """
     curr_timestamp = get_wall_clock_time()
     # We only wait for times in the future.
-    hdbg.dassert_lte(curr_timestamp, timestamp)
+    hdbg.dassert_lte(curr_timestamp, wait_until_timestamp)
     #
-    time_in_secs = (curr_timestamp - timestamp).seconds
+    time_in_secs = (wait_until_timestamp - curr_timestamp).seconds
+    _LOG.debug("Sleep for %s secs", time_in_secs)
     hdbg.dassert_lte(0, time_in_secs)
     asyncio.sleep(time_in_secs)
+    _LOG.debug("Done waiting: wall_clock_time=%s", get_wall_clock_time())

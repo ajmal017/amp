@@ -717,7 +717,7 @@ def get_num_rows(connection: DbConnection, table_name: str) -> int:
     cursor.execute(query)
     vals = cursor.fetchall()
     hdbg.dassert_eq(len(vals), 1)
-    return vals[0]  # type: ignore[no-any-return]
+    return vals[0][0]  # type: ignore[no-any-return]
 
 
 # #############################################################################
@@ -763,19 +763,25 @@ def is_row_with_value_present(
 # TODO(gp): Add unit test.
 async def wait_for_change_in_number_of_rows(
     connection: DbConnection, table_name: str, poll_kwargs: Dict[str, Any]
-) -> None:
+) -> int:
     """
     Wait until the number of rows in a table changes.
 
     :param poll_kwargs: a dictionary with the kwargs for `poll()`.
+    :return: number of new rows found
     """
     num_rows = get_num_rows(connection, table_name)
 
     def _is_number_of_rows_changed() -> hasynci.PollOutput:
         new_num_rows = get_num_rows(connection, table_name)
+        _LOG.debug("new_num_rows=%s num_rows=%s", new_num_rows, num_rows)
         success = new_num_rows != num_rows
-        result_tmp = None
-        return success, result_tmp
+        diff_num_rows = new_num_rows - num_rows
+        return success, diff_num_rows
 
     # Poll.
-    await hasynci.poll(_is_number_of_rows_changed, **poll_kwargs)
+    num_iters, diff_num_rows = await hasynci.poll(
+        _is_number_of_rows_changed, **poll_kwargs
+    )
+    _ = num_iters
+    return diff_num_rows
