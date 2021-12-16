@@ -200,10 +200,10 @@ class AbstractPortfolio(abc.ABC):
         asset_ids: List[int],
     ) -> pd.DataFrame:
         """
-        Use `PriceInterface` to price assets at `timestamp`.
+        Use `MarketDataInterface` to price assets at `timestamp`.
 
         `CASH_ID` may be included among `asset_ids`. If it is, it is not priced
-        using `PriceInterface`, but rather is priced at `1.0`.
+        using `MarketDataInterface`, but rather is priced at `1.0`.
 
         :return: df with columns `Portfolio.PRICE_COLS`
         """

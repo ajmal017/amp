@@ -28,11 +28,6 @@ _LOG = logging.getLogger(__name__)
 # #############################################################################
 
 
-# TODO(gp): Move this to TestDbHelper although I am not sure it will work.
-# @pytest.mark.skipif(
-#     not hgit.execute_repo_config_code("has_dind_support()"),
-#     reason="Need dind support",
-# )
 class TestOmsDbHelper(hsqltest.TestDbHelper):
     """
     Configure the helper to build an OMS test DB.
@@ -102,10 +97,6 @@ class TestOmsDbRemoveAllTables1(TestOmsDbHelper):
 # #############################################################################
 
 
-@pytest.mark.skipif(
-    not hgit.execute_repo_config_code("has_dind_support()"),
-    reason="Need dind support",
-)
 class TestOmsDbSubmittedOrdersTable1(TestOmsDbHelper):
     """
     Test operations on the submitted orders table.
@@ -187,10 +178,6 @@ def _get_row3() -> pd.Series:
 # #############################################################################
 
 
-@pytest.mark.skipif(
-    not hgit.execute_repo_config_code("has_dind_support()"),
-    reason="Need dind support",
-)
 class TestOmsDbAcceptedOrdersTable1(TestOmsDbHelper):
     """
     Test operations on the accepted orders table.
@@ -241,10 +228,6 @@ class TestOmsDbAcceptedOrdersTable1(TestOmsDbHelper):
 # #############################################################################
 
 
-@pytest.mark.skipif(
-    not hgit.execute_repo_config_code("has_dind_support()"),
-    reason="Need dind support",
-)
 class TestOmsDbTableInteraction1(TestOmsDbHelper):
     """
     Test interactions through the DB.
@@ -360,10 +343,6 @@ class TestOmsDbTableInteraction1(TestOmsDbHelper):
 # #############################################################################
 
 
-@pytest.mark.skipif(
-    not hgit.execute_repo_config_code("has_dind_support()"),
-    reason="Need dind support",
-)
 class TestOmsDbCurrentPositionsTable1(TestOmsDbHelper):
     """
     Test operations on the submitted orders table.
@@ -382,10 +361,6 @@ class TestOmsDbCurrentPositionsTable1(TestOmsDbHelper):
 # #############################################################################
 
 
-@pytest.mark.skipif(
-    not hgit.execute_repo_config_code("has_dind_support()"),
-    reason="Need dind support",
-)
 class TestOmsDbOrderProcessor1(TestOmsDbHelper):
     """
     Test operations on the submitted orders table.

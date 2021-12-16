@@ -74,7 +74,7 @@ class TestSimulatedPortfolio1(hunitest.TestCase):
         """
         Return a freshly minted Portfolio with only cash.
         """
-        # Build a ReplayedTimePriceInterface.
+        # Build a ReplayedTimeMarketDataInterface.
         event_loop = None
         (
             market_data_interface,
@@ -107,7 +107,7 @@ class TestSimulatedPortfolio2(hunitest.TestCase):
         """
         Initialize a Portfolio with cash.
         """
-        # Build ReplayedTimePriceInterface.
+        # Build ReplayedTimeMarketDataInterface.
         event_loop = None
         (
             market_data_interface,
@@ -135,7 +135,7 @@ class TestSimulatedPortfolio2(hunitest.TestCase):
         """
         Initialize a Portfolio with holdings.
         """
-        # Build ReplayedTimePriceInterface.
+        # Build ReplayedTimeMarketDataInterface.
         event_loop = None
         (
             market_data_interface,
@@ -180,7 +180,7 @@ class TestSimulatedPortfolio2(hunitest.TestCase):
         self.assert_dfs_close(portfolio.holdings, expected)
 
     def test_characteristics1(self) -> None:
-        # Build PriceInterface.
+        # Build MarketDataInterface.
         event_loop = None
         (
             market_data_interface,
@@ -212,7 +212,7 @@ leverage,0.0
         self.assert_dfs_close(actual.to_frame(), expected, rtol=1e-2, atol=1e-2)
 
     def test_characteristics2(self) -> None:
-        # Build PriceInterface.
+        # Build MarketDataInterface.
         event_loop = None
         (
             market_data_interface,
@@ -260,7 +260,7 @@ leverage,0.994
         self.assert_dfs_close(actual.to_frame(), expected, rtol=1e-2, atol=1e-2)
 
     def test_characteristics3(self) -> None:
-        # Build PriceInterface.
+        # Build MarketDataInterface.
         tz = "ET"
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
         event_loop = None

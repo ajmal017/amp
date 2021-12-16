@@ -82,7 +82,7 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             io.StringIO(db_txt),
             parse_dates=["start_datetime", "end_datetime", "timestamp_db"],
         )
-        # Build a ReplayedTimePriceInterface.
+        # Build a ReplayedTimeMarketDataInterface.
         initial_replayed_delay = 5
         delay_in_secs = 0
         sleep_in_secs = 30
@@ -179,7 +179,7 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
         db_df["timestamp_db"] = db_df["timestamp_db"].dt.tz_convert(
             "America/New_York"
         )
-        # Build a ReplayedTimePriceInterface.
+        # Build a ReplayedTimeMarketDataInterface.
         initial_replayed_delay = 5
         delay_in_secs = 0
         sleep_in_secs = 30

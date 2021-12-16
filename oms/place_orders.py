@@ -185,7 +185,7 @@ async def place_orders(
         - `market_data_interface`: the interface to get price data
         - `pred_column`: the column in the df from the DAG containing the predictions
            for all the assets
-        - `mark_column`: the column from the PriceInterface to mark holdings to
+        - `mark_column`: the column from the MarketDataInterface to mark holdings to
           market
         - `portfolio`: object used to store positions
         - `locates`: object used to access short locates
