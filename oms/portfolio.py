@@ -88,6 +88,7 @@ class AbstractPortfolio(abc.ABC):
         hdbg.dassert_issubclass(
             market_data_interface, mdmadain.AbstractMarketDataInterface
         )
+        # TODO(gp): Make it public.
         self._market_data_interface = market_data_interface
         self._get_wall_clock_time = get_wall_clock_time
         self._asset_id_col = asset_id_col
@@ -839,7 +840,7 @@ class MockedPortfolio(AbstractPortfolio):
         hdbg.dassert_not_in(wall_clock_timestamp, self._timestamp_to_snapshot_df)
         self._timestamp_to_snapshot_df[wall_clock_timestamp] = snapshot_df
         # TODO(gp): Save df to disk.
-        hdbg.dassert_lt(0, snapshot_df.shape[0])
+        # hdbg.dassert_lt(0, snapshot_df.shape[0])
         # Convert `snapshot_df` into a `holdings_df`.
         holdings_df = self._convert_to_holdings_df(
             snapshot_df, wall_clock_timestamp

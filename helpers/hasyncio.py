@@ -258,5 +258,5 @@ async def wait_until(
     time_in_secs = (wait_until_timestamp - curr_timestamp).seconds
     _LOG.debug("Sleep for %s secs", time_in_secs)
     hdbg.dassert_lte(0, time_in_secs)
-    asyncio.sleep(time_in_secs)
+    await asyncio.sleep(time_in_secs)
     _LOG.debug("Done waiting: wall_clock_time=%s", get_wall_clock_time())

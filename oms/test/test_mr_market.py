@@ -1,5 +1,8 @@
 import asyncio
 
+import pandas as pd
+import pytest
+
 import helpers.hasyncio as hasynci
 import oms.broker_example as obroexam
 import oms.mr_market as omrmark
@@ -13,6 +16,7 @@ class TestMrMarketOrderProcessor1(omtodh.TestOmsDbHelper):
     Test operations on the submitted orders table.
     """
 
+    @pytest.mark.skip("AmpTask1962")
     def test1(self) -> None:
         """
         Test creating the table.
@@ -33,12 +37,16 @@ class TestMrMarketOrderProcessor1(omtodh.TestOmsDbHelper):
             poll_kwargs = hasynci.get_poll_kwargs(get_wall_clock_time)
             delay_to_accept_in_secs = 3
             delay_to_fill_in_secs = 10
+            end_timestamp = pd.Timestamp(
+                "2000-01-01 10:30:00-05:00", tz="America/New_York"
+            )
             order_processor = omrmark.order_processor(
                 self.connection,
                 poll_kwargs,
                 delay_to_accept_in_secs,
                 delay_to_fill_in_secs,
                 broker,
+                end_timestamp,
             )
             #
             coroutines = [order_processor, async_broker]

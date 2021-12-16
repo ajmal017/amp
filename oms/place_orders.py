@@ -6,7 +6,6 @@ import oms.place_orders as oplaorde
 
 # TODO(Paul): -> process_forecasts.py
 
-import asyncio
 import datetime
 import logging
 from typing import Any, Dict, List
@@ -16,6 +15,7 @@ from tqdm.autonotebook import tqdm
 
 import core.config as cconfig
 import helpers.dbg as hdbg
+import helpers.hasyncio as hasynci
 import helpers.hpandas as hpandas
 import helpers.htqdm as htqdm
 import helpers.printing as hprint
@@ -238,6 +238,7 @@ async def place_orders(
     # Cache a variable used many times.
     offset_5min = pd.DateOffset(minutes=5)
     #
+    get_wall_clock_time = market_data_interface.get_wall_clock_time
     tqdm_out = htqdm.TqdmToLogger(_LOG, level=logging.INFO)
     num_rows = len(prediction_df)
     iter_ = enumerate(prediction_df.iterrows())
@@ -250,9 +251,9 @@ async def place_orders(
         )
         # TODO(gp): Synchronize here to avoid clock drift.
         # Wait until get_wall_clock_time() == timestamp.
-        # hasyncio.wait_until(timestamp, get_wall_clock_time)
-        # wall_clock_timestamp = get_wall_clock_time()
-        wall_clock_timestamp = next_timestamp
+        await hasynci.wait_until(next_timestamp, get_wall_clock_time)
+        wall_clock_timestamp = get_wall_clock_time()
+        # wall_clock_timestamp = next_timestamp
         _LOG.debug("wall_clock_timestamp=%s", wall_clock_timestamp)
         #
         time = wall_clock_timestamp.time()
@@ -332,6 +333,4 @@ async def place_orders(
                 char1="#",
             ),
         )
-        broker.submit_orders(orders)
-        # TODO(gp): Remove this once it's synchronized above.
-        await asyncio.sleep(60 * 5)
+        await broker.submit_orders(orders)
