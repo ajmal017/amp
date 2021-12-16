@@ -427,7 +427,7 @@ def git_merge_master(ctx, ff_only=False, abort_if_not_clean=True):  # type: igno
 
 
 @task
-def git_clean(ctx, dry_run=False):  # type: ignore
+def git_clean(ctx, fix_perms=False, dry_run=False):  # type: ignore
     """
     Clean the repo_short_name and its submodules from artifacts.
 
@@ -436,6 +436,10 @@ def git_clean(ctx, dry_run=False):  # type: ignore
     _report_task(hprint.to_str("dry_run"))
     # TODO(*): Add "are you sure?" or a `--force switch` to avoid to cancel by
     #  mistake.
+    # Fix permissions, if needed.
+    if fix_perms:
+        cmd = "invoke fix_perms"
+        _run(ctx, cmd)
     # Clean recursively.
     git_clean_cmd = "git clean -fd"
     if dry_run:
@@ -3354,6 +3358,11 @@ def lint(  # type: ignore
 ):
     """
     Lint files.
+
+    # To lint only a repo including `amp` but not `amp` itself:
+    ```
+    > i lint --files="$(find . -name '*.py' -not -path './compute/*' -not -path './amp/*')"
+    ```
 
     :param modified: select the files modified in the client
     :param branch: select the files modified in the current branch
