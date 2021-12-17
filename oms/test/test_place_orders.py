@@ -187,7 +187,6 @@ start_datetime,end_datetime,timestamp_db,price,asset_id
             "2000-01-01 09:40:00-05:00", tz="America/New_York"
         )
         order_dict_ = {
-            "market_data_interface": market_data_interface,
             "type_": "price@twap",
             "creation_timestamp": initial_timestamp,
             "start_timestamp": initial_timestamp,

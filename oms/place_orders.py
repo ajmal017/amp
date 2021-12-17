@@ -117,9 +117,7 @@ def _generate_orders(
             # No need to place trades.
             continue
         order = omorder.Order(
-            asset_id=asset_id,
-            num_shares=shares_,
-            **order_config.to_dict(),
+            asset_id=asset_id, num_shares=shares_, **order_config.to_dict()
         )
         _LOG.debug("order=%s", order.order_id)
         orders.append(order)
@@ -311,7 +309,6 @@ async def place_orders(
         # Create an config for `Order`. This requires timestamps and so is
         # inside the loop.
         order_dict_ = {
-            "market_data_interface": market_data_interface,
             "type_": order_type,
             "creation_timestamp": wall_clock_timestamp,
             "start_timestamp": timestamp_start,

@@ -35,7 +35,7 @@ class TestSimulatedBroker1(hunitest.TestCase):
             "2000-01-01 09:35:00-05:00", tz="America/New_York"
         )
         fills = broker.get_fills(timestamp)
-        # TODO: Assert that len(fills) == 1.
+        assert len(fills) == 1
         actual = str(fills[0])
         expected = r"""Fill: asset_id=101 fill_id=0 timestamp=2000-01-01 09:35:00-05:00 num_shares=100.0 price=1000.3449750508295
         """
@@ -54,6 +54,7 @@ class TestMockedBroker1(omtodh.TestOmsDbHelper):
         #
         order = oordexam.get_order_example1()
         orders = [order]
-        broker.submit_orders(orders)
+        # await broker.submit_orders(orders)
         # Check fills.
+        broker.get_fills
         # TODO(gp): Implement this.
