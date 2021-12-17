@@ -389,6 +389,8 @@ def log_frame(
     :param char: char to prepend the logged text with
     :param verbosity: logging verbosity
     """
+    hdbg.dassert_isinstance(logger, logging.Logger)
+    hdbg.dassert_isinstance(fstring, str)
     msg = fstring % args
     msg = msg.rstrip().lstrip()
     msg = frame(msg)
@@ -399,6 +401,29 @@ def log_frame(
     # Add an empty space.
     msg = "\n" + msg
     logger.log(verbosity, "%s", msg)
+
+
+def install_log_verb_debug(logger: logging.Logger, *, verbose: bool) -> None:
+    """
+    Create in a module a _LOG.debug() that can be disabled in a centralized way.
+
+    This is useful when we want to make a module not too chatty.
+
+    Use example:
+    ```
+    _LOG = logging.getLogger(__name__)
+    hprint.install_log_verb_debug(_LOG, verbose=True)
+
+    _LOG.verb_debug(...)
+    ```
+    """
+    hdbg.dassert_isinstance(logger, logging.Logger)
+
+    def _verb_debug(*args: Any, **kwargs: Any) -> None:
+        if verbose:
+            logger.debug(*args, **kwargs)
+
+    logger.verb_debug = _verb_debug
 
 
 # #############################################################################

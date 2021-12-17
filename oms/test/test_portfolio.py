@@ -277,16 +277,23 @@ start_datetime,end_datetime,asset_id,price
             io.StringIO(price_txt),
             parse_dates=["start_datetime", "end_datetime"],
         )
+        start_time_col_name = "start_datetime"
+        end_time_col_name = "end_datetime"
+        knowledge_datetime_col_name = "end_datetime"
+        delay_in_secs = 0
+        asset_id_col_name = "asset_id"
+        asset_ids = None
+        columns = []
         market_data_interface = mdmadain.ReplayedTimeMarketDataInterface(
             price_df,
-            start_time_col_name="start_datetime",
-            end_time_col_name="end_datetime",
-            knowledge_datetime_col_name="end_datetime",
-            delay_in_secs=0,
-            id_col_name="asset_id",
-            ids=None,
-            columns=[],
-            get_wall_clock_time=get_wall_clock_time,
+            knowledge_datetime_col_name,
+            delay_in_secs,
+            asset_id_col_name,
+            asset_ids,
+            start_time_col_name,
+            end_time_col_name,
+            columns,
+            get_wall_clock_time,
         )
         portfolio = oporexam.get_simulated_portfolio_example1(
             event_loop,

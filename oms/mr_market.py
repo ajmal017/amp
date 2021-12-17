@@ -66,6 +66,7 @@ async def order_processor(
     target_list_id = 0
     while True:
         wall_clock_time = get_wall_clock_time()
+        # Check whether we should exit or continue.
         if isinstance(termination_condition, pd.Timestamp):
             exit = wall_clock_time >= termination_condition
         elif isinstance(termination_condition, int):
