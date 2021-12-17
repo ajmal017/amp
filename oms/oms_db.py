@@ -219,6 +219,15 @@ def create_oms_tables(
     create_current_positions_table(db_connection, incremental)
 
 
+def remove_oms_tables(db_connection: hsql.DbConnection) -> None:
+    for table_name in [
+        SUBMITTED_ORDERS_TABLE_NAME,
+        ACCEPTED_ORDERS_TABLE_NAME,
+        CURRENT_POSITIONS_TABLE_NAME,
+    ]:
+        hsql.remove_table(db_connection, table_name)
+
+
 async def wait_for_order_acceptance(
     db_connection: hsql.DbConnection,
     target_value: str,
@@ -240,6 +249,7 @@ async def wait_for_order_acceptance(
     polling_func = lambda: hsql.is_row_with_value_present(
         db_connection, table_name, field_name, target_value
     )
+    tag = "wait_for_order_acceptance"
     # Poll.
-    rc, result = await hasynci.poll(polling_func, **poll_kwargs)
+    rc, result = await hasynci.poll(polling_func, tag=tag, **poll_kwargs)
     return rc, result

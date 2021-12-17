@@ -279,6 +279,7 @@ class TestPlaceOrders1(hunitest.TestCase):
             execution_mode,
             config,
         )
+        # TODO(Paul): Add a check of the output.
 
 
 class TestMockedPlaceOrders1(omtodh.TestOmsDbHelper):
@@ -318,11 +319,11 @@ class TestMockedPlaceOrders1(omtodh.TestOmsDbHelper):
             end_timestamp = pd.Timestamp("2000-01-01 09:50:00-05:00")
             order_processor = omrmark.order_processor(
                 db_connection,
-                poll_kwargs,
                 delay_to_accept_in_secs,
                 delay_to_fill_in_secs,
                 broker,
                 end_timestamp,
+                poll_kwargs=poll_kwargs,
             )
             coroutines = [self._test_mocked_system1(portfolio), order_processor]
             hasynci.run(asyncio.gather(*coroutines), event_loop=event_loop)
@@ -365,4 +366,4 @@ class TestMockedPlaceOrders1(omtodh.TestOmsDbHelper):
             execution_mode,
             config,
         )
-        # TODO(gp): Add a check of the output.
+        # TODO(Paul): Add a check of the output.

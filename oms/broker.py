@@ -48,8 +48,7 @@ class Fill:
         num_shares: float,
         price: float,
     ):
-        # TODO(Paul): decide how to id these.
-        self._fill_id = Fill._fill_id
+        self._fill_id = self._get_next_fill_id()
         # Pointer to the order.
         self.order = order
         # TODO(gp): An Order should contain a list of pointers to its fills for
@@ -82,6 +81,11 @@ class Fill:
         dict_["num_shares"] = self.num_shares
         dict_["price"] = self.price
         return dict_
+
+    def _get_next_fill_id(self) -> int:
+        fill_id = Fill._fill_id
+        Fill._fill_id += 1
+        return fill_id
 
 
 # #############################################################################
@@ -328,7 +332,9 @@ class MockedBroker(AbstractBroker):
         # `accepted_orders_table`.
         _LOG.debug("Wait for accepted orders ...")
         await oomsdb.wait_for_order_acceptance(
-            self._db_connection, file_name, self._poll_kwargs
+            self._db_connection,
+            file_name,
+            self._poll_kwargs,
         )
         _LOG.debug("Wait for accepted orders ... done")
 

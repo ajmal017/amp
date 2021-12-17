@@ -12,7 +12,6 @@ import re
 import time
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-import dotenv
 import pandas as pd
 import psycopg2 as psycop
 import psycopg2.extras as extras
@@ -20,6 +19,7 @@ import psycopg2.sql as psql
 
 import helpers.dbg as hdbg
 import helpers.hasyncio as hasynci
+import helpers.introspection as hintros
 import helpers.printing as hprint
 import helpers.timer as htimer
 
@@ -107,6 +107,8 @@ def get_connection_info_from_env_file(env_file_path: str) -> DbConnectionInfo:
 
     :param env_file_path: path to an environment file that contains db connection parameters
     """
+    import dotenv
+
     db_config = dotenv.dotenv_values(env_file_path)
     # The parameters' names are fixed and cannot be changed, see
     # `https:://hub.docker.com/_/postgres`.
@@ -762,7 +764,11 @@ def is_row_with_value_present(
 
 # TODO(gp): Add unit test.
 async def wait_for_change_in_number_of_rows(
-    connection: DbConnection, table_name: str, poll_kwargs: Dict[str, Any]
+    connection: DbConnection,
+    table_name: str,
+    poll_kwargs: Dict[str, Any],
+    *,
+    tag: Optional[str] = None,
 ) -> int:
     """
     Wait until the number of rows in a table changes.
@@ -780,8 +786,13 @@ async def wait_for_change_in_number_of_rows(
         return success, diff_num_rows
 
     # Poll.
+    if tag is None:
+        # Use name of the caller function.
+        tag = hintros.get_function_name(count=0)
     num_iters, diff_num_rows = await hasynci.poll(
-        _is_number_of_rows_changed, **poll_kwargs
+        _is_number_of_rows_changed,
+        tag=tag,
+        **poll_kwargs,
     )
     _ = num_iters
     return diff_num_rows

@@ -4,53 +4,84 @@ Import as:
 import oms.mr_market as omrmark
 """
 
-import asyncio
+# TODO(gp): Not sure I get the joke of mr_market.py. Mean-reversion market?
+# map-reduce market?
+# -> order_processor.py
+
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Union
 
 import pandas as pd
 
 import helpers.dbg as hdbg
+import helpers.hasyncio as hasynci
 import helpers.printing as hprint
 import helpers.sql as hsql
-
-_LOG = logging.getLogger(__name__)
 import oms.broker as ombroker
 import oms.oms_db as oomsdb
+
+_LOG = logging.getLogger(__name__)
 
 # #############################################################################
 # Order processor
 # #############################################################################
 
-# This mocks the behavior of the actual broker + market.
-
 
 async def order_processor(
     db_connection: hsql.DbConnection,
-    poll_kwargs: Dict[str, Any],
     delay_to_accept_in_secs: float,
     delay_to_fill_in_secs: float,
     broker: ombroker.AbstractBroker,
-    end_timestamp: pd.Timestamp,
+    termination_condition: Union[pd.Timestamp, int],
     *,
     submitted_orders_table_name: str = oomsdb.SUBMITTED_ORDERS_TABLE_NAME,
     accepted_orders_table_name: str = oomsdb.ACCEPTED_ORDERS_TABLE_NAME,
     current_positions_table_name: str = oomsdb.CURRENT_POSITIONS_TABLE_NAME,
+    poll_kwargs: Optional[Dict[str, Any]] = None,
 ) -> None:
     """
-    A coroutine that:
+    Mock the behavior of part of the actual implemented broker and of the
+    market.
 
-    - polls for submitted orders
-    - updates the accepted orders table
-    - updates the current positions table
+    This coroutine:
+    - polls a table of the DB for submitted orders
+    - updates the accepted orders DB table
+    - updates the current positions DB table
 
-    :param delay_to_accept_in_secs: how long to wait after the order is submitted
-        to update the accepted orders table
+    :param delay_to_accept_in_secs: delay after the order is submitted to update
+        the accepted orders table
+    :param delay_to_fill_in_secs: delay after the order is accepted to update the
+        position table with the filled positions
+    :param termination_condition: when to terminate polling the table of submitted
+        order.
+        - pd.timestamp: when this object should stop checking for orders. Be
+          careful since this can create deadlocks if this timestamp is set after
+          the broker stops submitting orders
+        - int: number of orders to accept before shut down
     """
     get_wall_clock_time = broker.market_data_interface.get_wall_clock_time
+    if poll_kwargs is None:
+        poll_kwargs = hasynci.get_poll_kwargs(get_wall_clock_time)
+    #
     target_list_id = 0
     while True:
-        if get_wall_clock_time() > end_timestamp:
+        wall_clock_time = get_wall_clock_time()
+        if isinstance(termination_condition, pd.Timestamp):
+            exit = wall_clock_time >= termination_condition
+        elif isinstance(termination_condition, int):
+            exit = target_list_id >= termination_condition
+        else:
+            raise ValueError(
+                "Invalid termination_condition=%s type=%s"
+                % (termination_condition, str(type(termination_condition)))
+            )
+        if exit:
+            _LOG.debug(
+                "Reached the end: "
+                + hprint.to_str(
+                    "target_list_id wall_clock_time termination_condition"
+                )
+            )
             break
         # Wait for orders to be written in `submitted_orders_table_name`.
         diff_num_rows = await hsql.wait_for_change_in_number_of_rows(
@@ -72,16 +103,15 @@ async def order_processor(
             "There are not enough new rows in df=\n%s",
             hprint.dataframe_to_str(df),
         )
-        # TODO(gp): For now we accept only one orderlist.
+        # TODO(gp): For now we accept only one order list.
         hdbg.dassert_eq(diff_num_rows, 1)
         file_name = df.tail(1).squeeze()["filename"]
-        hdbg.dassert_lt(0, delay_to_accept_in_secs)
-        await asyncio.sleep(delay_to_accept_in_secs)
         _LOG.debug("file_name=%s", file_name)
+        # Wait after the submission was parsed.
+        hdbg.dassert_lt(0, delay_to_accept_in_secs)
+        await hasynci.sleep(delay_to_accept_in_secs, get_wall_clock_time)
         # Write in `accepted_orders_table_name` to acknowledge the orders.
-        # NOTE: This is where we use `file_name`.
-        timestamp_db = get_wall_clock_time()
-        trade_date = timestamp_db.date()
+        trade_date = wall_clock_time.date()
         success = True
         txt = f"""
         strategyid,SAU1
@@ -89,8 +119,8 @@ async def order_processor(
         tradedate,{trade_date}
         instanceid,1
         filename,{file_name}
-        timestamp_processed,{timestamp_db}
-        timestamp_db,{timestamp_db}
+        timestamp_processed,{wall_clock_time}
+        timestamp_db,{wall_clock_time}
         target_count,1
         changed_count,0
         unchanged_count,0
@@ -101,26 +131,26 @@ async def order_processor(
         target_list_id += 1
         row = hsql.csv_to_series(txt, sep=",")
         hsql.execute_insert_query(db_connection, row, accepted_orders_table_name)
-        # Wait.
+        # Wait after the orders were accepted.
         hdbg.dassert_lt(0, delay_to_fill_in_secs)
-        await asyncio.sleep(delay_to_fill_in_secs)
+        await hasynci.sleep(delay_to_fill_in_secs, get_wall_clock_time)
         # Get the fills.
         _LOG.debug("Getting fills.")
-        fills = broker.get_fills(timestamp_db)
+        fills = broker.get_fills(wall_clock_time)
         _LOG.debug("Received %i fills", len(fills))
         # Update current positions based on fills.
         for fill in fills:
             id_ = fill.order.order_id
             trade_date = fill.timestamp.date()
-            timestamp_db = get_wall_clock_time()
+            wall_clock_time = get_wall_clock_time()
             asset_id = fill.order.asset_id
-            # TODO: query current positions table, then modify based on fills
+            # TODO(Paul): query current positions table, then modify based on fills.
             txt = f"""
             strategyid,SAU1
             account,paper
             id,{id_}
             tradedate,{trade_date}
-            timestamp_db,{timestamp_db}
+            timestamp_db,{wall_clock_time}
             asset_id,{asset_id}
             target_position,0
             current_position,0

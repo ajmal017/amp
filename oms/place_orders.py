@@ -249,11 +249,9 @@ async def place_orders(
             "\n%s",
             hprint.frame("# idx=%s next_timestamp=%s" % (idx, next_timestamp)),
         )
-        # TODO(gp): Synchronize here to avoid clock drift.
         # Wait until get_wall_clock_time() == timestamp.
         await hasynci.wait_until(next_timestamp, get_wall_clock_time)
         wall_clock_timestamp = get_wall_clock_time()
-        # wall_clock_timestamp = next_timestamp
         _LOG.debug("wall_clock_timestamp=%s", wall_clock_timestamp)
         #
         time = wall_clock_timestamp.time()
@@ -288,7 +286,6 @@ async def place_orders(
                 char1="#",
             ),
         )
-        # _update_portfolio(wall_clock_timestamp, portfolio, broker)
         portfolio.update_state()
         # Continue if we are outside of our trading window.
         if time < trading_start_time or time > trading_end_time:
