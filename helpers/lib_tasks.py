@@ -2582,11 +2582,14 @@ _COV_PYTEST_OPTS = [
     "--cov-report html",
     # "--cov-report annotate",
 ]
+
+
 _TEST_TIMEOUTS_IN_SECS = {
     "fast_tests": 5,
     "slow_tests": 30,
     "superslow_tests": 60 * 60,
 }
+
 
 _NUM_TIMEOUT_TEST_RERUNS = {
     "fast_tests": 2,
@@ -2608,36 +2611,35 @@ def run_blank_tests(ctx, stage="dev", version=""):  # type: ignore
     hsysinte.system(docker_cmd_, abort_on_error=False, suppress_output=False)
 
 
-def _select_tests_to_skip(uniform_test_list_name: str) -> str:
+def _select_tests_to_skip(test_list_name: str) -> str:
     """
     Generate text for pytest specifying which tests to deselect.
     """
-    if uniform_test_list_name == "fast_tests":
+    if test_list_name == "fast_tests":
         skipped_tests = "not slow and not superslow"
-    elif uniform_test_list_name == "slow_tests":
+    elif test_list_name == "slow_tests":
         skipped_tests = "slow and not superslow"
-    elif uniform_test_list_name == "superslow_tests":
+    elif test_list_name == "superslow_tests":
         skipped_tests = "not slow and superslow"
     else:
         raise ValueError(
-            f"Invalid `uniform_test_list_name`={uniform_test_list_name}"
+            f"Invalid `test_list_name`={test_list_name}"
         )
     return skipped_tests
 
 
 def _build_run_command_line(
-    uniform_test_list_name: str,
+    test_list_name: str,
     pytest_opts: str,
     skip_submodules: bool,
     coverage: bool,
     collect_only: bool,
     tee_to_file: bool,
-    # Different params than the `run_*_tests()`.
 ) -> str:
     """
     Build the pytest run command.
 
-    :param uniform_test_list_name: "fast_tests", "slow_tests" or
+    :param test_list_name: "fast_tests", "slow_tests" or
         "superslow_tests"
     The rest of params are the same as in `run_fast_tests()`.
 
@@ -2645,25 +2647,24 @@ def _build_run_command_line(
     passed by the user through `-p` (unless really necessary).
     """
     hdbg.dassert_in(
-        uniform_test_list_name,
+        test_list_name,
         _TEST_TIMEOUTS_IN_SECS,
-        "Invalid `uniform_test_list_name``='%s'",
-        uniform_test_list_name,
+        "Invalid test_list_name"
     )
     pytest_opts = pytest_opts or "."
     #
     pytest_opts_tmp = []
     if pytest_opts:
         pytest_opts_tmp.append(pytest_opts)
-    skipped_tests = _select_tests_to_skip(uniform_test_list_name)
+    skipped_tests = _select_tests_to_skip(test_list_name)
     pytest_opts_tmp.insert(0, f'-m "{skipped_tests}"')
-    timeout_in_sec = _TEST_TIMEOUTS_IN_SECS[uniform_test_list_name]
+    timeout_in_sec = _TEST_TIMEOUTS_IN_SECS[test_list_name]
     # Adding `timeout_func_only` is a workaround for
     # https://github.com/pytest-dev/pytest-rerunfailures/issues/99. Because of
     # it, we limit only run time, without setup and teardown time.
     pytest_opts_tmp.append("-o timeout_func_only=true")
     pytest_opts_tmp.append(f"--timeout {timeout_in_sec}")
-    num_reruns = _NUM_TIMEOUT_TEST_RERUNS[uniform_test_list_name]
+    num_reruns = _NUM_TIMEOUT_TEST_RERUNS[test_list_name]
     pytest_opts_tmp.append(
         f'--reruns {num_reruns} --only-rerun "Failed: Timeout"'
     )
@@ -2687,7 +2688,7 @@ def _build_run_command_line(
     pytest_opts = " ".join([po.rstrip().lstrip() for po in pytest_opts_tmp])
     cmd = f"pytest {pytest_opts}"
     if tee_to_file:
-        cmd += f" 2>&1 | tee tmp.pytest.{uniform_test_list_name}.log"
+        cmd += f" 2>&1 | tee tmp.pytest.{test_list_name}.log"
     return cmd
 
 

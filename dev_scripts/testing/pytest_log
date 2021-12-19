@@ -1,5 +1,5 @@
 #!/bin/bash
-file_name="tmp.pytest_script.log"
+file_name="tmp.pytest_log.log"
 cmd="pytest $* 2>&1 | tee $file_name"
 echo "> $cmd"
 eval $cmd
