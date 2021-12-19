@@ -28,28 +28,23 @@ import oms.portfolio as omportfo
 _LOG = logging.getLogger(__name__)
 
 
-def _mark_to_market(
+def _merge_predictions(
     wall_clock_timestamp: pd.Timestamp,
+    marked_to_market: pd.DataFrame,
     predictions: pd.Series,
-    portfolio: omportfo.AbstractPortfolio,
+    portfolio,
 ) -> pd.DataFrame:
     """
-    Return price, value of all assets in `portfolio` or for which we have a
-    prediction.
+    Merge marked_to_market dataframe with predictions.
 
     :return: dataframe with columns `asset_id`, `prediction`, `price`,
         `curr_num_shares`, `value`.
         - The dataframe is the outer join of all the held assets in `portfolio` and
           `predictions`
     """
-    _LOG.debug("# Mark portfolio to market at timestamp=%s", wall_clock_timestamp)
-    # Get the current holdings for all the assets including cash.
-    asset_id = None
-    holdings = portfolio.get_holdings(
-        wall_clock_timestamp, asset_id, exclude_cash=False
-    )
-    holdings.set_index("asset_id", drop=True, inplace=True)
-    _LOG.debug("holdings=\n%s", hprint.dataframe_to_str(holdings))
+    # TODO: price assets for which we have predictions but no holdings.
+    # TODO: after the merge, give cash a prediction of `1`
+
     # Prepare `predictions` for the merge.
     _LOG.debug(
         "Number of non-NaN predictions=`%i` at timestamp=`%s`",
@@ -61,20 +56,27 @@ def _mark_to_market(
         predictions.isna().sum(),
         wall_clock_timestamp,
     )
+    # TODO: Check for membership first.
+    predictions[portfolio.CASH_ID] = 1
     predictions = pd.DataFrame(predictions)
     predictions.columns = ["prediction"]
     predictions.index.name = "asset_id"
     _LOG.debug("predictions=\n%s", hprint.dataframe_to_str(predictions))
     # Merge current holdings and predictions.
-    merged_df = holdings.merge(
-        predictions, left_index=True, right_index=True, how="outer"
-    )
+    predictions = predictions.reset_index()
+    merged_df = marked_to_market.merge(predictions, on="asset_id", how="outer")
     _LOG.debug(
         "Number of NaNs in `curr_num_shares` post-merge is `%i` at timestamp=`%s`",
         merged_df["curr_num_shares"].isna().sum(),
         wall_clock_timestamp,
     )
     merged_df["curr_num_shares"].fillna(0.0, inplace=True)
+    merged_df["value"].fillna(0.0, inplace=True)
+    # TODO(Paul): Fix this!! Either have the portfolio use a universe, or else
+    #  price assets not held but for which we have a prediction.
+    merged_df["price"].fillna(100.0, inplace=True)
+    merged_df = merged_df.convert_dtypes()
+    _LOG.debug("merged_df=%s", merged_df)
     # Move `asset_id` from the index to a column.
     merged_df.reset_index(inplace=True)
     # Do not allow `asset_id` to be represented as a float.
@@ -86,16 +88,11 @@ def _mark_to_market(
     )
     _LOG.debug("after merge: merged_df=\n%s", hprint.dataframe_to_str(merged_df))
     # Mark to market.
-    merged_df = portfolio.mark_to_market(wall_clock_timestamp, merged_df)
     _LOG.debug("merged_df=\n%s", hprint.dataframe_to_str(merged_df))
     columns = ["prediction", "price", "curr_num_shares", "value"]
     hdbg.dassert_is_subset(columns, merged_df.columns)
-    _LOG.debug(
-        "Number of NaN prices=`%i` at timestamp=`%s`",
-        merged_df["price"].isna().sum(),
-        wall_clock_timestamp,
-    )
     merged_df[columns] = merged_df[columns].fillna(0.0)
+    _LOG.debug("merged_df=\n%s", hprint.dataframe_to_str(merged_df))
     return merged_df
 
 
@@ -136,18 +133,20 @@ def _compute_target_positions_in_shares(
     :param predictions: predictions indexed by `asset_id`
     :param portfolio: portfolio with current holdings
     """
-    hdbg.dassert_eq(portfolio.get_last_timestamp(), wall_clock_timestamp)
+    marked_to_market = portfolio.mark_to_market()
+    _LOG.debug("marked_to_market=%s", marked_to_market)
     if predictions.isna().sum() != 0:
         _LOG.debug(
             "Number of NaN predictions=`%i` at timestamp=`%s`",
             predictions.isna().sum(),
             wall_clock_timestamp,
         )
-    priced_holdings = _mark_to_market(
-        wall_clock_timestamp, predictions, portfolio
+    assets_and_predictions = _merge_predictions(
+        wall_clock_timestamp, marked_to_market, predictions, portfolio
     )
+    #
     df = ocalopti.compute_target_positions_in_cash(
-        priced_holdings, portfolio.CASH_ID
+        assets_and_predictions, portfolio.CASH_ID
     )
     # Round to nearest integer towards zero.
     # df["diff_num_shares"] = np.fix(df["target_trade"] / df["price"])
@@ -279,12 +278,11 @@ async def place_orders(
         _LOG.debug(
             "\n%s",
             hprint.frame(
-                "Updating portfolio state from fills: timestamp=%s"
+                "Marking portfolio to market: timestamp=%s"
                 % wall_clock_timestamp,
                 char1="#",
             ),
         )
-        portfolio.update_state()
         # Continue if we are outside of our trading window.
         if time < trading_start_time or time > trading_end_time:
             continue
@@ -296,6 +294,7 @@ async def place_orders(
                 char1="#",
             ),
         )
+        # await asyncio.sleep(1)
         target_positions = _compute_target_positions_in_shares(
             wall_clock_timestamp, predictions, portfolio
         )

@@ -242,7 +242,7 @@ class SimulatedBroker(AbstractBroker):
             return []
         # In our current execution model, we should ask about the orders that are
         # terminating.
-        hdbg.dassert_eq(min(timestamps), as_of_timestamp)
+        hdbg.dassert_lte(min(timestamps), as_of_timestamp)
         orders_to_execute = self._deadline_timestamp_to_orders[as_of_timestamp]
         _LOG.debug("Executing %d orders", len(orders_to_execute))
         # `as_of_timestamp` should match the end time of the orders.

@@ -1,227 +1,19 @@
 import asyncio
 import datetime
-import io
 import logging
 
 import pandas as pd
 
-import core.config as cconfig
 import helpers.hasyncio as hasynci
 import helpers.unit_test as hunitest
 import market_data.market_data_interface_example as mdmdinex
-import oms.broker_example as obroexam
 import oms.mr_market as omrmark
 import oms.oms_db as oomsdb
 import oms.place_orders as oplaorde
-import oms.portfolio as omportfo
 import oms.portfolio_example as oporexam
 import oms.test.oms_db_helper as omtodh
 
 _LOG = logging.getLogger(__name__)
-
-
-class TestMarkToMarket1(hunitest.TestCase):
-    def test1(self) -> None:
-        # Set up price interface components.
-        event_loop = None
-        db_txt = """
-start_datetime,end_datetime,timestamp_db,price,asset_id
-2000-01-01 09:30:00-05:00,2000-01-01 09:35:00-05:00,2000-01-01 09:35:00-05:00,107.73,101
-2000-01-01 09:30:00-05:00,2000-01-01 09:35:00-05:00,2000-01-01 09:35:00-05:00,93.25,202
-"""
-        df = pd.read_csv(
-            io.StringIO(db_txt),
-            parse_dates=["start_datetime", "end_datetime", "timestamp_db"],
-        )
-        # Build a ReplayedTimeMarketDataInterface.
-        initial_replayed_delay = 5
-        delay_in_secs = 0
-        sleep_in_secs = 30
-        time_out_in_secs = 60 * 5
-        initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
-        start_datetime = initial_timestamp
-        end_datetime = pd.Timestamp("2000-01-01 09:35:00-05:00")
-        (
-            market_data_interface,
-            get_wall_clock_time,
-        ) = mdmdinex.get_replayed_time_market_data_interface_example1(
-            event_loop,
-            initial_replayed_delay,
-            df,
-            delay_in_secs=delay_in_secs,
-            sleep_in_secs=sleep_in_secs,
-            time_out_in_secs=time_out_in_secs,
-        )
-        # Build a Broker.
-        broker = obroexam.get_simulated_broker_example1(
-            event_loop, market_data_interface=market_data_interface
-        )
-        # Initialize portfolio.
-        strategy_id = "str1"
-        account = "paper"
-        asset_id_col = "asset_id"
-        mark_to_market_col = "price"
-        timestamp_col = "end_datetime"
-        portfolio = omportfo.SimulatedPortfolio.from_cash(
-            strategy_id,
-            account,
-            market_data_interface,
-            get_wall_clock_time,
-            asset_id_col,
-            mark_to_market_col,
-            timestamp_col,
-            broker=broker,
-            initial_cash=1e6,
-            initial_timestamp=initial_timestamp,
-        )
-        # Initialize a prediction series.
-        predictions = pd.Series(
-            index=[101, 202], data=[0.3, -0.1], name="prediction"
-        )
-        # Mark to market.
-        actual = oplaorde._mark_to_market(
-            initial_timestamp, predictions, portfolio
-        )
-        txt = r"""
-asset_id,curr_num_shares,prediction,price,value
--1,1000000,0,1,1000000
-101,0.0,0.3,107.73,0.0
-202,0.0,-0.1,93.25,0.0
-"""
-        expected = pd.read_csv(
-            io.StringIO(txt),
-        )
-        # Set `asset_id` as index so numpy will type the (remaining) values
-        # correctly.
-        self.assert_dfs_close(
-            actual.set_index("asset_id"),
-            expected.set_index("asset_id"),
-            rtol=1e-5,
-            atol=1e-5,
-        )
-
-
-class TestOptimizeAndUpdate1(hunitest.TestCase):
-    def test1(self) -> None:
-        with hasynci.solipsism_context() as event_loop:
-            hasynci.run(self._test_coroutine(event_loop), event_loop=event_loop)
-
-    async def _test_coroutine(self, event_loop):
-        # Get price data.
-        db_txt = """
-start_datetime,end_datetime,timestamp_db,price,asset_id
-2000-01-01 09:30:00-05:00,2000-01-01 09:35:00-05:00,2000-01-01 09:35:00-05:00,107.73,101
-2000-01-01 09:30:00-05:00,2000-01-01 09:35:00-05:00,2000-01-01 09:35:00-05:00,93.25,202
-2000-01-01 09:35:00-05:00,2000-01-01 09:40:00-05:00,2000-01-01 09:40:00-05:00,108.73,101
-2000-01-01 09:35:00-05:00,2000-01-01 09:40:00-05:00,2000-01-01 09:40:00-05:00,93.13,202
-"""
-        db_df = pd.read_csv(
-            io.StringIO(db_txt),
-            parse_dates=["start_datetime", "end_datetime", "timestamp_db"],
-        )
-        db_df["start_datetime"] = db_df["start_datetime"].dt.tz_convert(
-            "America/New_York"
-        )
-        db_df["end_datetime"] = db_df["end_datetime"].dt.tz_convert(
-            "America/New_York"
-        )
-        db_df["timestamp_db"] = db_df["timestamp_db"].dt.tz_convert(
-            "America/New_York"
-        )
-        # Build a ReplayedTimeMarketDataInterface.
-        initial_replayed_delay = 5
-        delay_in_secs = 0
-        sleep_in_secs = 30
-        time_out_in_secs = 60 * 5
-        initial_timestamp = pd.Timestamp(
-            "2000-01-01 09:35:00-05:00", tz="America/New_York"
-        )
-        # TODO(gp): These params are not used.
-        start_datetime = initial_timestamp
-        end_datetime = pd.Timestamp(
-            "2000-01-01 09:40:00-05:00", tz="America/New_York"
-        )
-        (
-            market_data_interface,
-            get_wall_clock_time,
-        ) = mdmdinex.get_replayed_time_market_data_interface_example1(
-            event_loop,
-            initial_replayed_delay,
-            df=db_df,
-            delay_in_secs=delay_in_secs,
-            sleep_in_secs=sleep_in_secs,
-            time_out_in_secs=time_out_in_secs,
-        )
-        # Build a Broker.
-        broker = obroexam.get_simulated_broker_example1(
-            event_loop, market_data_interface=market_data_interface
-        )
-        # Initialize Portfolio.
-        strategy_id = "str1"
-        account = "paper"
-        asset_id_col = "asset_id"
-        mark_to_market_col = "price"
-        timestamp_col = "end_datetime"
-        portfolio = omportfo.SimulatedPortfolio.from_cash(
-            strategy_id,
-            account,
-            market_data_interface,
-            get_wall_clock_time,
-            asset_id_col,
-            mark_to_market_col,
-            timestamp_col,
-            broker=broker,
-            initial_cash=1e6,
-            initial_timestamp=initial_timestamp,
-        )
-        # Initialize a prediction series.
-        predictions = pd.Series(
-            index=[101, 202], data=[0.3, -0.1], name="prediction"
-        )
-        # Set up order config for 9:35 to 9:40.
-        end_timestamp = pd.Timestamp(
-            "2000-01-01 09:40:00-05:00", tz="America/New_York"
-        )
-        order_dict_ = {
-            "type_": "price@twap",
-            "creation_timestamp": initial_timestamp,
-            "start_timestamp": initial_timestamp,
-            "end_timestamp": end_timestamp,
-        }
-        order_config = cconfig.get_config_from_nested_dict(order_dict_)
-        # Compute target positions.
-        target_positions = oplaorde._compute_target_positions_in_shares(
-            initial_timestamp, predictions, portfolio
-        )
-        orders = oplaorde._generate_orders(
-            target_positions["diff_num_shares"], order_config
-        )
-        # Submit orders.
-        await broker.submit_orders(orders)
-        # Wait 5 minutes.
-        await asyncio.sleep(60 * 5)
-        portfolio.update_state()
-        actual = portfolio.get_characteristics(
-            pd.Timestamp("2000-01-01 09:40:00-05:00", tz="America/New_York")
-        )
-        # Check.
-        txt = r"""
-,2000-01-01 09:40:00-05:00
-net_asset_holdings,50728.36
-cash,949271.64
-net_wealth,1000000.00
-gross_exposure,100664.01
-leverage,0.1007
-"""
-        expected = pd.read_csv(
-            io.StringIO(txt),
-            index_col=0,
-        )
-        # The timestamp doesn't parse correctly from the CSV.
-        expected.columns = [
-            pd.Timestamp("2000-01-01 09:40:00-05:00", tz="America/New_York")
-        ]
-        self.assert_dfs_close(actual.to_frame(), expected, rtol=1e-2, atol=1e-2)
 
 
 class TestPlaceOrders1(hunitest.TestCase):
@@ -274,7 +66,15 @@ class TestPlaceOrders1(hunitest.TestCase):
             execution_mode,
             config,
         )
-        # TODO(Paul): Add a check of the output.
+        # TODO(Paul): Re-check the correctness after fixing the issue with
+        #  pricing assets not currently in the portfolio.
+        actual = portfolio.get_historical_holdings()
+        expected = r"""asset_id                         101         202            -1
+2000-01-01 09:30:00-05:00        NaN         NaN  1000000.000000
+2000-01-01 09:35:00-05:00        NaN         NaN  1000000.000000
+2000-01-01 09:40:00-05:00  76.923077  153.846154   769250.118513
+2000-01-01 09:45:00-05:00  -7.141889   21.425667   985761.256141"""
+        self.assert_equal(str(actual), expected, fuzzy_match=True)
 
 
 class TestMockedPlaceOrders1(omtodh.TestOmsDbHelper):
@@ -361,4 +161,12 @@ class TestMockedPlaceOrders1(omtodh.TestOmsDbHelper):
             execution_mode,
             config,
         )
-        # TODO(Paul): Add a check of the output.
+        # TODO(Paul): Re-check the correctness after fixing the issue with
+        #  pricing assets not currently in the portfolio.
+        portfolio.get_historical_holdings()
+        expected = r"""asset_id                         101         202            -1
+2000-01-01 09:30:00-05:00        NaN         NaN  1000000.000000
+2000-01-01 09:35:00-05:00        NaN         NaN  1000000.000000
+2000-01-01 09:40:00-05:00  76.923077  153.846154   769250.118513
+2000-01-01 09:45:00-05:00  -7.141889   21.425667   985761.256141"""
+        # self.assert_equal(str(actual), expected, fuzzy_match=True)
