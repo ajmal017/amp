@@ -3632,8 +3632,12 @@ def _get_workflow_table() -> htable.TableType:
 
 
 @task
-def gh_workflow_list(ctx, filter_by_branch="current_branch", filter_by_status="all",
-                     report_only_status=True):  # type: ignore
+def gh_workflow_list(
+    ctx,
+    filter_by_branch="current_branch",
+    filter_by_status="all",
+    report_only_status=True,
+):  # type: ignore
     """
     Report the status of the GH workflows.
 
@@ -3660,7 +3664,10 @@ def gh_workflow_list(ctx, filter_by_branch="current_branch", filter_by_status="a
         value = filter_by_status
         print(f"Filtering table by {field}={value}")
         table = table.filter_rows(field, value)
-    if filter_by_branch not in ("current_branch", "master") or not report_only_status:
+    if (
+        filter_by_branch not in ("current_branch", "master")
+        or not report_only_status
+    ):
         print(str(table))
         return
     # For each workflow find the last success.
@@ -3673,24 +3680,31 @@ def gh_workflow_list(ctx, filter_by_branch="current_branch", filter_by_status="a
         # Report the full status.
         print(table_tmp)
         # Find the first success.
-        status = table_tmp.get_column("status")[0]
-        if status == "success":
-            print(f"Workflow '{workflow}' for '{branch_name}' is ok")
-        elif status == "failure":
-            _LOG.error("Workflow '%s' for '%s' is broken", workflow, branch_name)
-            # Get the output of the broken run.
-            # > gh run view 1477484584 --log-failed
-            workload_id = table_tmp.get_column("id")[0]
-            log_file_name = f"tmp.failure.{workflow}.{branch_name}.txt"
-            log_file_name = log_file_name.replace(" ", "_").lower()
-            cmd = f"gh run view {workload_id} --log-failed >{log_file_name}"
-            hsysinte.system(cmd)
-            print(f"# Log is in '{log_file_name}'")
-            # Run_fast_tests  Run fast tests  2021-12-19T00:19:38.3394316Z FAILED data
-            cmd = rf"grep 'Z FAILED ' {log_file_name}"
-            hsysinte.system(cmd, suppress_output=False)
-        else:
-            raise ValueError(f"Invalid status='{status}'")
+        num_rows = table.size()[0]
+        for i in range(num_rows):
+            status = table_tmp.get_column("status")[i]
+            if status == "success":
+                print(f"Workflow '{workflow}' for '{branch_name}' is ok")
+                break
+            elif status == "failure":
+                _LOG.error("Workflow '%s' for '%s' is broken", workflow, branch_name)
+                # Get the output of the broken run.
+                # > gh run view 1477484584 --log-failed
+                workload_id = table_tmp.get_column("id")[i]
+                log_file_name = f"tmp.failure.{workflow}.{branch_name}.txt"
+                log_file_name = log_file_name.replace(" ", "_").lower()
+                cmd = f"gh run view {workload_id} --log-failed >{log_file_name}"
+                hsysinte.system(cmd)
+                print(f"# Log is in '{log_file_name}'")
+                # Run_fast_tests  Run fast tests  2021-12-19T00:19:38.3394316Z FAILED data
+                cmd = rf"grep 'Z FAILED ' {log_file_name}"
+                hsysinte.system(cmd, suppress_output=False)
+                break
+            elif status == "":
+                # It's in progress.
+                pass
+            else:
+                raise ValueError(f"Invalid status='{status}'")
 
 
 @task
@@ -3757,7 +3771,7 @@ def _get_repo_full_name_from_cmd(repo_short_name: str) -> Tuple[str, str]:
     return repo_full_name_with_host, ret_repo_short_name
 
 
-# #######################################################################
+# #############################################################################
 
 
 def _get_gh_issue_title(issue_id: int, repo_short_name: str) -> Tuple[str, str]:
@@ -3816,17 +3830,38 @@ def gh_issue_title(ctx, issue_id, repo_short_name="current", pbcopy=True):  # ty
     _to_pbcopy(msg, pbcopy)
 
 
-# TODO(gp): Add unit test for
-# i gh_create_pr --no-draft --body="Misc changes while adding unit tests"
+def _check_if_pr_exists(title: str) -> bool:
+    """
+    Return whether a PR exists or not.
+    """
+    # > gh pr diff AmpTask1955_Lint_20211219
+    # no pull requests found for branch "AmpTask1955_Lint_20211219"
+    cmd = f"gh pr diff {title}"
+    rc = hsysinte.system(cmd, abort_on_error=False)
+    pr_exists = rc == 0
+    return pr_exists
 
 
 @task
 def gh_create_pr(  # type: ignore
-    ctx, body="", draft=True, auto_merge=False, repo_short_name="current", title=""
+    ctx,
+    body="",
+    draft=True,
+    auto_merge=False,
+    repo_short_name="current",
+    title="",
 ):
     """
     Create a draft PR for the current branch in the corresponding
     repo_short_name.
+
+    ```
+    # To open a PR in the web browser
+    > gh pr view --web
+
+    # To see the status of the checks
+    > gh pr checks
+    ```
 
     :param body: the body of the PR
     :param draft: draft or ready-to-review PR
@@ -3848,25 +3883,28 @@ def gh_create_pr(  # type: ignore
         repo_full_name_with_host,
     )
     if auto_merge:
-        hdbg.dassert(not draft, "The PR can't be a draft in order to auto merge it")
-    # TODO(gp): Check whether the PR already exists.
-    # TODO(gp): Use _to_single_line_cmd
-    cmd = (
-        "gh pr create"
-        + f" --repo {repo_full_name_with_host}"
-        + (" --draft" if draft else "")
-        + f' --title "{title}"'
-        + f' --body "{body}"'
-    )
-    _run(ctx, cmd)
+        hdbg.dassert(
+            not draft, "The PR can't be a draft in order to auto merge it"
+        )
+    pr_exists = _check_if_pr_exists(title)
+    _LOG.debug(hprint.to_str("pr_exists"))
+    if pr_exists:
+        _LOG.warning("PR '%s' already exists: skipping creation", title)
+    else:
+        cmd = (
+            "gh pr create"
+            + f" --repo {repo_full_name_with_host}"
+            + (" --draft" if draft else "")
+            + f' --title "{title}"'
+            + f' --body "{body}"'
+        )
+        # TODO(gp): Use _to_single_line_cmd
+        _run(ctx, cmd)
     if auto_merge:
+        cmd = f"gh pr ready {title}"
+        _run(ctx, cmd)
         cmd = f"gh pr merge {title} --auto --delete-branch --squash"
         _run(ctx, cmd)
-    # TODO(gp): Capture the output of the command and save the info in a
-    #  github_current_pr_info:
-    # Warning: 22 uncommitted changes
-    # Creating pull request for AmpTask1329_Review_code_in_core_04 into master in alphamatic/amp
-    # https://github.com/alphamatic/amp/pull/1337
 
 
 # #############################################################################

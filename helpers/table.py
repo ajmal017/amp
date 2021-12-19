@@ -113,7 +113,7 @@ class Table:
 
     def get_column(self, column_name: str) -> List[Any]:
         """
-        Return the list of unique values for a row / field..
+        Return the list of unique values for a row / field.
         """
         hdbg.dassert_in(column_name, self._column_names)
         column_idx = self._col_to_idx[column_name]

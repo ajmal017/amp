@@ -72,7 +72,6 @@ status    | outcome | descr | workflow   |
 completed | failure | Lint  | Run_linter |
 completed | success | Lint  | Fast_tests |
 completed | success | Lint  | Slow_tests |
-size=(3, 4)
 """
         exp = exp.rstrip().lstrip()
         self.assert_equal(act, exp, fuzzy_match=False)
