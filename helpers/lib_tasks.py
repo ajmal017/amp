@@ -656,8 +656,8 @@ def git_last_commit_files(ctx, pbcopy=True):  # type: ignore
 @task
 def git_branch_files(ctx):  # type: ignore
     """
-    Report which files were added, changed, and modified in the current branch with
-    respect to `master`.
+    Report which files were added, changed, and modified in the current branch
+    with respect to `master`.
 
     This is a more detailed version of `i git_files --branch`.
     """
@@ -849,7 +849,7 @@ def git_branch_next_name(ctx):  # type: ignore
     Return a name derived from the branch so that the branch doesn't exist.
 
     E.g., `AmpTask1903_Implemented_system_Portfolio` ->
-        `AmpTask1903_Implemented_system_Portfolio_3`
+    `AmpTask1903_Implemented_system_Portfolio_3`
     """
     _report_task()
     _ = ctx
@@ -1029,7 +1029,8 @@ def integrate_create_branch(ctx, dir_name, dry_run=False):  # type: ignore
 
 def _get_src_dst_dirs(src_dir: str, dst_dir: str, subdir: str) -> Tuple[str, str]:
     """
-    Return the full path of `src_dir` and `dst_dir` assuming that
+    Return the full path of `src_dir` and `dst_dir` assuming that.
+
     - `src_dir` is the current dir
     - `dst_dir` is parallel dir to the current one
 
@@ -1138,10 +1139,11 @@ def integrate_copy_dirs(  # type: ignore
 @task
 def integrate_compare_branch_with_base(ctx, src_dir, dst_dir, subdir=""):  # type: ignore
     """
-    Compare the files modified in both the branches in src_dir and dst_dir to master
-    before this current branch was branched.
+    Compare the files modified in both the branches in src_dir and dst_dir to
+    master before this current branch was branched.
 
-    This is used to check what changes were made to files modified by both branches.
+    This is used to check what changes were made to files modified by
+    both branches.
     """
     _report_task()
     _ = ctx
@@ -3579,68 +3581,116 @@ def lint_create_branch(ctx, dry_run=False):  # type: ignore
 # #############################################################################
 
 
-@task
-def gh_workflow_list(ctx, branch="branch", status="all"):  # type: ignore
-    """
-    Report the status of the GH workflows in a branch.
-    """
-    _report_task(hprint.to_str("branch status"))
-    _ = ctx
-    #
-    cmd = "export NO_COLOR=1; gh run list"
-    # pylint: disable=line-too-long
-    # > gh run list
-    # ✓  Merge branch 'master' into AmpTask1251_ Slow tests  AmpTask1251_Update_GH_actions_for_amp  pull_request       788984377
-    # ✓  Merge branch 'master' into AmpTask1251_ Fast tests  AmpTask1251_Update_GH_actions_for_amp  pull_request       788984376
-    # X  Merge branch 'master' into AmpTask1251_ Run linter  AmpTask1251_Update_GH_actions_for_amp  pull_request       788984375
-    # X  Fix lint issue                          Fast tests  master                                 workflow_dispatch  788949955
-    # pylint: enable=line-too-long
-    if branch == "branch":
+def _get_branch_name(branch_mode: str) -> Optional[str]:
+    if branch_mode == "current_branch":
         branch_name = hgit.get_branch_name()
-    elif branch == "master":
+    elif branch_mode == "master":
         branch_name = "master"
-    elif branch == "all":
+    elif branch_mode == "all":
         branch_name = None
     else:
-        raise ValueError("Invalid mode='%s'" % branch)
-    # The output is tab separated. Parse it with csv and then filter.
+        raise ValueError("Invalid branch='%s'" % branch_mode)
+    return branch_name
+
+
+def _get_workflow_table() -> htable.TableType:
+    """
+    Get a table with the status of the GH workflow for the current repo.
+    """
+    # Get the workflow status from GH.
+    cmd = "export NO_COLOR=1; gh run list"
     _, txt = hsysinte.system_to_string(cmd)
     _LOG.debug(hprint.to_str("txt"))
-    # TODO(gp): This is a workaround for AmpTask1612.
+    # pylint: disable=line-too-long
+    # > gh run list
+    # STATUS  NAME                                                        WORKFLOW    BRANCH                                                EVENT              ID          ELAPSED  AGE
+    # X       Amp task1786 integrate 2021118 (#1857)                    Fast tests  master                                                push               1477484584  5m40s    23m
+    # ✓       Amp task1786 integrate 2021118 (#1857)                    Slow tests  master                                                push               1477484582  6m38s    23m
+    # X       Merge branch 'master' into AmpTask1786_Integrate_2021118  Fast tests  AmpTask1786_Integrate_2021118                         pull_request       1477445218  5m52s    34m
+    # pylint: enable=line-too-long
+    # The output is tab separated, so convert it into CSV.
     first_line = txt.split("\n")[0]
+    _LOG.debug("first_line=%s", first_line.replace("\t", ","))
     num_cols = len(first_line.split("\t"))
-    # STATUS            NAME        WORKFLOW  BRANCH        EVENT  ID   ELAPSED  AGE
-    # Speculative fix   Slow tests  AmpTa...  pull_request  1097983981  1m1s     7m
+    _LOG.debug(hprint.to_str("first_line num_cols"))
     cols = [
+        "completed",
         "status",
-        "outcome",
-        "descr",
+        "name",
         "workflow",
         "branch",
-        "trigger",
-        "time",
-        "workflow_id",
+        "event",
+        "id",
+        "elapsed",
+        "age",
     ]
-    hdbg.dassert_in(num_cols, (8, 9))
-    if num_cols == 9:
-        cols.append("age")
+    hdbg.dassert_eq(num_cols, len(cols))
+    # Build the table.
     table = htable.Table.from_text(cols, txt, delimiter="\t")
-    # table = [line for line in csv.reader(txt.split("\n"), delimiter="\t")]
     _LOG.debug(hprint.to_str("table"))
-    #
-    if branch != "all":
+    return table
+
+
+@task
+def gh_workflow_list(ctx, filter_by_branch="current_branch", filter_by_status="all",
+                     report_only_status=True):  # type: ignore
+    """
+    Report the status of the GH workflows.
+
+    :param filter_by_branch: name of the branch to check
+        - `current_branch` for the current Git branch
+        - `master` for master branch
+        - `all` for all branches
+    :param filter_by_status: filter table by the status of the workflow
+        - E.g., "failure", "success"
+    """
+    _report_task(hprint.to_str("filter_by_branch filter_by_status"))
+    _ = ctx
+    # Get the table.
+    table = _get_workflow_table()
+    # Filter table based on the branch.
+    if filter_by_branch != "all":
         field = "branch"
-        value = branch_name
-        _LOG.info("Filtering table by %s=%s", field, value)
+        value = _get_branch_name(filter_by_branch)
+        print(f"Filtering table by {field}={value}")
         table = table.filter_rows(field, value)
-    #
-    if status != "all":
+    # Filter table by the workflow status.
+    if filter_by_status != "all":
         field = "status"
-        value = status
-        _LOG.info("Filtering table by %s=%s", field, value)
+        value = filter_by_status
+        print(f"Filtering table by {field}={value}")
         table = table.filter_rows(field, value)
-    #
-    print(str(table))
+    if filter_by_branch not in ("current_branch", "master") or not report_only_status:
+        print(str(table))
+        return
+    # For each workflow find the last success.
+    branch_name = hgit.get_branch_name()
+    workflows = table.unique("workflow")
+    print(f"workflows={workflows}")
+    for workflow in workflows:
+        print(hprint.frame(workflow))
+        table_tmp = table.filter_rows("workflow", workflow)
+        # Report the full status.
+        print(table_tmp)
+        # Find the first success.
+        status = table_tmp.get_column("status")[0]
+        if status == "success":
+            print(f"Workflow '{workflow}' for '{branch_name}' is ok")
+        elif status == "failure":
+            _LOG.error("Workflow '%s' for '%s' is broken", workflow, branch_name)
+            # Get the output of the broken run.
+            # > gh run view 1477484584 --log-failed
+            workload_id = table_tmp.get_column("id")[0]
+            log_file_name = f"tmp.failure.{workflow}.{branch_name}.txt"
+            log_file_name = log_file_name.replace(" ", "_").lower()
+            cmd = f"gh run view {workload_id} --log-failed >{log_file_name}"
+            hsysinte.system(cmd)
+            print(f"# Log is in '{log_file_name}'")
+            # Run_fast_tests  Run fast tests  2021-12-19T00:19:38.3394316Z FAILED data
+            cmd = rf"grep 'Z FAILED ' {log_file_name}"
+            hsysinte.system(cmd, suppress_output=False)
+        else:
+            raise ValueError(f"Invalid status='{status}'")
 
 
 @task
@@ -3670,19 +3720,7 @@ def gh_workflow_run(ctx, branch="branch", workflows="all"):  # type: ignore
         cmd = f"gh workflow run {gh_test} --ref {branch_name}"
         _run(ctx, cmd)
     #
-    gh_workflow_list(ctx, branch=branch)
-
-
-# TODO(gp): Implement this.
-# pylint: disable=line-too-long
-# @task
-# def gh_workflow_passing(ctx, branch="branch", workflows="all"):  # type: ignore
-# For each workflow check if the last completed is success or failure
-# > gh run list | grep master | grep Fast
-# completed       success Fix broken log statement        Fast tests      master  schedule        2m20s   797849342
-# completed       success Fix broken log statement        Fast tests      master  push    2m7s    797789759
-# completed       success Another speculative fix for break       Fast tests      master  push    1m54s   797556212
-# pylint: enable=line-too-long
+    gh_workflow_list(ctx, filter_by_branch=branch)
 
 
 def _get_repo_full_name_from_cmd(repo_short_name: str) -> Tuple[str, str]:
@@ -3719,12 +3757,15 @@ def _get_repo_full_name_from_cmd(repo_short_name: str) -> Tuple[str, str]:
     return repo_full_name_with_host, ret_repo_short_name
 
 
+# #######################################################################
+
+
 def _get_gh_issue_title(issue_id: int, repo_short_name: str) -> Tuple[str, str]:
     """
     Get the title of a GitHub issue.
 
-    :param repo_short_name: `current` refer to the repo_short_name where we are, otherwise
-        a repo_short_name short name (e.g., "amp")
+    :param repo_short_name: `current` refer to the repo_short_name where we are,
+        otherwise a repo_short_name short name (e.g., "amp")
     """
     repo_full_name_with_host, repo_short_name = _get_repo_full_name_from_cmd(
         repo_short_name
@@ -3828,6 +3869,8 @@ def gh_create_pr(  # type: ignore
     # https://github.com/alphamatic/amp/pull/1337
 
 
+# #############################################################################
+# Fix permission
 # #############################################################################
 
 

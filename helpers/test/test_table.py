@@ -47,6 +47,8 @@ completed success Lint Slow_tests"""
         """
         self.assert_equal(act, exp, fuzzy_match=True)
 
+    # #########################################################################
+
     def test_repr1(self) -> None:
         table = self._get_table()
         act = repr(table)
@@ -74,6 +76,8 @@ size=(3, 4)
 """
         exp = exp.rstrip().lstrip()
         self.assert_equal(act, exp, fuzzy_match=False)
+
+    # #########################################################################
 
     def test_filter_table1(self) -> None:
         """
@@ -119,6 +123,24 @@ size=(0, 4)
         act = repr(table_filter)
         exp = repr(table)
         self.assert_equal(act, exp, fuzzy_match=False)
+
+    # #########################################################################
+
+    def test_unique1(self) -> None:
+        table = self._get_table()
+        #
+        act = table.unique("descr")
+        exp = ["Lint"]
+        self.assert_equal(str(act), str(exp), fuzzy_match=False)
+
+    def test_unique2(self) -> None:
+        table = self._get_table()
+        #
+        act = table.unique("workflow")
+        exp = ["Fast_tests", "Run_linter", "Slow_tests"]
+        self.assert_equal(str(act), str(exp), fuzzy_match=False)
+
+    # #########################################################################
 
     @staticmethod
     def _get_table() -> htable.Table:
