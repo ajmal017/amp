@@ -197,7 +197,7 @@ def is_amp() -> bool:
 
 
 # TODO(gp): Be consistent with submodule and sub-module in the code. Same for
-# supermodule.
+#  supermodule.
 def is_in_amp_as_submodule() -> bool:
     """
     Return whether we are in the `amp` repo and it's a sub-module, e.g., of
@@ -507,6 +507,11 @@ def _get_repo_config_code(super_module: bool = True) -> str:
 def execute_repo_config_code(code_to_execute: str) -> Any:
     """
     Execute code in `repo_config.py`.
+
+    E.g.,
+    ```
+    hgit.execute_repo_config_code("has_dind_support()")
+    ```
     """
     # Read the info from the current repo.
     code = _get_repo_config_code()
@@ -731,7 +736,14 @@ def get_amp_abs_path() -> str:
     """
     repo_sym_name = get_repo_full_name_from_client(super_module=False)
     _LOG.debug("repo_sym_name=%s", repo_sym_name)
-    if repo_sym_name == "alphamatic/amp":
+    repo_sym_names = ["alphamatic/amp"]
+    code = "get_extra_amp_repo_sym_name()"
+    try:
+        repo_sym_names.append(
+            execute_repo_config_code(code))
+    except NameError:
+        _LOG.debug("Can't execute the code '%s'", code)
+    if repo_sym_name in repo_sym_names:
         # If we are in the amp repo, then the git client root is the amp
         # directory.
         git_root = get_client_root(super_module=False)
