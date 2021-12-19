@@ -997,8 +997,7 @@ def _dassert_current_dir_matches(dir_name: str) -> None:
 def _dassert_is_integration_branch(dir_name: str) -> None:
     curr_branch = hgit.get_branch_name(dir_name=dir_name)
     hdbg.dassert_ne(curr_branch, "master")
-    hdbg.dassert(("_Integrate_" in curr_branch) or
-                 ("_Lint_" in curr_branch))
+    hdbg.dassert(("_Integrate_" in curr_branch) or ("_Lint_" in curr_branch))
 
 
 def _clean_both_integration_dirs(dir_name1: str, dir_name2: str) -> None:
@@ -1028,9 +1027,7 @@ def integrate_create_branch(ctx, dir_name, dry_run=False):  # type: ignore
     _run(ctx, cmd, dry_run=dry_run)
 
 
-def _get_src_dst_dirs(
-    src_dir: str, dst_dir: str, subdir: str
-) -> Tuple[str, str]:
+def _get_src_dst_dirs(src_dir: str, dst_dir: str, subdir: str) -> Tuple[str, str]:
     """
     Return the full path of `src_dir` and `dst_dir` assuming that
     - `src_dir` is the current dir
@@ -1052,11 +1049,15 @@ def _get_src_dst_dirs(
 
 @task
 def integrate_diff_dirs(  # type: ignore
-        ctx, src_dir="amp1", dst_dir="cmamp1", subdir="", use_linux_diff=False,
-        check_branches=True,
-        clean_branches=True,
-        dry_run=False,
-                        ):
+    ctx,
+    src_dir="amp1",
+    dst_dir="cmamp1",
+    subdir="",
+    use_linux_diff=False,
+    check_branches=True,
+    clean_branches=True,
+    dry_run=False,
+):
     """
     Integrate repos from dir `src_dir` to `dst_dir`.
 
@@ -1093,10 +1094,15 @@ def integrate_diff_dirs(  # type: ignore
 
 
 @task
-def integrate_copy_dirs(ctx, src_dir, dst_dir, subdir="",
-                        check_branches=True,
-                        clean_branches=True,
-                        dry_run=False):  # type: ignore
+def integrate_copy_dirs(  # type: ignore
+    ctx,
+    src_dir,
+    dst_dir,
+    subdir="",
+    check_branches=True,
+    clean_branches=True,
+    dry_run=False,
+):
     """
     Copy dir `subdir` from dir `src_dir` to `dst_dir`.
 
@@ -3411,8 +3417,11 @@ def lint(  # type: ignore
     """
     Lint files.
 
-    # To lint only a repo including `amp` but not `amp` itself:
     ```
+    # To ling all the files:
+    > i lint --dir-name . --only-format
+
+    # To lint only a repo including `amp` but not `amp` itself:
     > i lint --files="$(find . -name '*.py' -not -path './compute/*' -not -path './amp/*')"
     ```
 
@@ -3548,15 +3557,13 @@ def lint(  # type: ignore
 
 
 @task
-def lint_create_branches(ctx, dir_name, dry_run=False):  # type: ignore
+def lint_create_branch(ctx, dry_run=False):  # type: ignore
     """
     Create the branch for linting in the current dir.
 
     The dir needs to be specified to ensure the set-up is correct.
     """
     _report_task()
-    #
-    _dassert_current_dir_matches(dir_name)
     #
     date = datetime.datetime.now().date()
     date_as_str = date.strftime("%Y%m%d")
@@ -3774,7 +3781,7 @@ def gh_issue_title(ctx, issue_id, repo_short_name="current", pbcopy=True):  # ty
 
 @task
 def gh_create_pr(  # type: ignore
-    ctx, body="", draft=True, repo_short_name="current", title=""
+    ctx, body="", draft=True, auto_merge=False, repo_short_name="current", title=""
 ):
     """
     Create a draft PR for the current branch in the corresponding
@@ -3782,6 +3789,8 @@ def gh_create_pr(  # type: ignore
 
     :param body: the body of the PR
     :param draft: draft or ready-to-review PR
+    :param auto_merge: enable auto merging PR
+    :param title: title of the PR or the branch name, if title is empty
     """
     _report_task()
     branch_name = hgit.get_branch_name()
@@ -3797,6 +3806,8 @@ def gh_create_pr(  # type: ignore
         branch_name,
         repo_full_name_with_host,
     )
+    if auto_merge:
+        hdbg.dassert(not draft, "The PR can't be a draft in order to auto merge it")
     # TODO(gp): Check whether the PR already exists.
     # TODO(gp): Use _to_single_line_cmd
     cmd = (
@@ -3807,6 +3818,9 @@ def gh_create_pr(  # type: ignore
         + f' --body "{body}"'
     )
     _run(ctx, cmd)
+    if auto_merge:
+        cmd = f"gh pr merge {title} --auto --delete-branch --squash"
+        _run(ctx, cmd)
     # TODO(gp): Capture the output of the command and save the info in a
     #  github_current_pr_info:
     # Warning: 22 uncommitted changes
