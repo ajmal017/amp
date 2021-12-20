@@ -137,6 +137,7 @@ class AbstractBroker(abc.ABC):
         self._orders.extend(orders)
         await self._submit_orders(orders, wall_clock_timestamp, dry_run=dry_run)
 
+    # TODO(Paul): Make this abstract instead.
     def get_fills(self, as_of_timestamp: pd.Timestamp) -> List[Fill]:
         """
         Get fills for the orders that should have been executed by
@@ -168,6 +169,7 @@ class AbstractBroker(abc.ABC):
     ) -> None:
         ...
 
+    # TODO(Paul): Call `_get_fills_helper()` and make it concrete.
     @abc.abstractmethod
     def _get_fills(self, as_of_timestamp: pd.Timestamp) -> List[Fill]:
         ...

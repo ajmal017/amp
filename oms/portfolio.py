@@ -201,6 +201,8 @@ class AbstractPortfolio(abc.ABC):
           - Uses `market_data_interface` to price holdings
           - Computes portfolios statistics such as leverage, exposure, etc.
 
+        # TODO(Paul): Add a dataframe snippet.
+
         :return: dataframe with HOLDINGS and PRICE columns
         """
         # Update asset_holdings, cash.
@@ -723,6 +725,8 @@ class MockedPortfolio(AbstractPortfolio):
         query.append(f"SELECT * FROM {self._table_name}")
         wall_clock_timestamp = self._get_wall_clock_time()
         trade_date = wall_clock_timestamp.date()
+        # TODO(*): One row per asset_id/trade_date.
+        # TODO(Paul): We should be able to remove the snapshot_df filtering.
         query.append(
             f"WHERE account='{self._account}' AND tradedate='{trade_date}'"
         )

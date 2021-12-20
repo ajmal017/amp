@@ -140,9 +140,9 @@ class TestMockedPlaceOrders1(omtodh.TestOmsDbHelper):
         config = {}
         # Build predictions.
         index = [
+            pd.Timestamp("2000-01-01 09:35:00-05:00", tz="America/New_York"),
             pd.Timestamp("2000-01-01 09:40:00-05:00", tz="America/New_York"),
             pd.Timestamp("2000-01-01 09:45:00-05:00", tz="America/New_York"),
-            pd.Timestamp("2000-01-01 09:50:00-05:00", tz="America/New_York"),
         ]
         columns = [101, 202]
         data = [
@@ -169,10 +169,10 @@ class TestMockedPlaceOrders1(omtodh.TestOmsDbHelper):
         )
         # TODO(Paul): Re-check the correctness after fixing the issue with
         #  pricing assets not currently in the portfolio.
-        portfolio.get_historical_holdings()
+        actual = portfolio.get_historical_holdings()
         expected = r"""asset_id                         101         202            -1
 2000-01-01 09:30:00-05:00        NaN         NaN  1000000.000000
-2000-01-01 09:35:00-05:00        NaN         NaN  1000000.000000
-2000-01-01 09:40:00-05:00  76.923077  153.846154   769250.118513
-2000-01-01 09:45:00-05:00  -7.141889   21.425667   985761.256141"""
-        # self.assert_equal(str(actual), expected, fuzzy_match=True)
+2000-01-01 09:35:01-05:00        NaN         NaN  1000000.000000
+2000-01-01 09:40:01-05:00  76.923077  153.846154   769250.118513
+2000-01-01 09:45:01-05:00  -7.141889   21.425667   985761.256141"""
+        self.assert_equal(str(actual), expected, fuzzy_match=True)

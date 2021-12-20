@@ -159,28 +159,66 @@ async def order_processor(
         _LOG.debug("Received %i fills", len(fills))
         # Update current positions based on fills.
         for fill in fills:
-            asset_id = fill.order.asset_id
+            id_ = fill.order.order_id
             trade_date = fill.timestamp.date()
             wall_clock_time = get_wall_clock_time()
             asset_id = fill.order.asset_id
-            # TODO(Paul): query current positions table, then modify based on fills.
-            txt = f"""
-            strategyid,SAU1
-            account,candidate
-            id,{asset_id}
-            tradedate,{trade_date}
-            timestamp_db,{wall_clock_time}
-            asset_id,{asset_id}
-            target_position,0
-            current_position,0
-            open_quantity,0
-            net_cost,0
-            bod_position,0
-            bod_price,0
-            """
-            row = hsql.csv_to_series(txt, sep=",")
+            num_shares = fill.num_shares
+            cost = fill.price * fill.num_shares
+            # #################################################################
+            # Get the current positions for `asset_id`.
+            query = []
+            query.append(f"SELECT * FROM {current_positions_table_name}")
+            query.append(
+                f"WHERE account='candidate' AND tradedate='{trade_date}' AND asset_id={asset_id}"
+            )
+            query = "\n".join(query)
+            _LOG.debug("query=%s", query)
+            positions_df = hsql.execute_query_to_df(db_connection, query)
+            hdbg.dassert_lte(positions_df.shape[0], 1)
+            _LOG.debug("positions_df=%s", hprint.dataframe_to_str(positions_df))
+            # Delete the row from the positions table.
+            query = []
+            query.append(f"DELETE FROM {current_positions_table_name}")
+            query.append(
+                f"WHERE account='candidate' AND tradedate='{trade_date}' AND asset_id={asset_id}"
+            )
+            query = "\n".join(query)
+            _LOG.debug("query=%s", query)
+            deletions = hsql.execute_query(db_connection, query)
+            deletions = deletions or 0
+            _LOG.debug("Num deletions=%d", deletions)
+            # Update the row and insert into the positions table.
+            # TODO(Paul): Need to handle BOD.
+            if not positions_df.empty:
+                row = positions_df.squeeze()
+                hdbg.dassert_isinstance(row, pd.Series)
+                row["id"] = int(id_)
+                row["tradedate"] = trade_date
+                row["timestamp_db"] = wall_clock_time
+                row["current_position"] += num_shares
+                row["net_cost"] += cost
+                row["asset_id"] = int(row["asset_id"])
+            else:
+                txt = f"""
+                strategyid,SAU1
+                account,candidate
+                id,{id_}
+                tradedate,{trade_date}
+                timestamp_db,{wall_clock_time}
+                asset_id,{asset_id}
+                target_position,0
+                current_position,{num_shares}
+                open_quantity,0
+                net_cost,{cost}
+                bod_position,0
+                bod_price,0
+                """
+                row = hsql.csv_to_series(txt, sep=",")
             # TODO(*): we need to upsert the `asset_id` row rather than add
             #  a new row in general.
+            row = row.convert_dtypes()
+            _LOG.debug("Insert row is=%s", hprint.dataframe_to_str(row))
             hsql.execute_insert_query(
                 db_connection, row, current_positions_table_name
             )
