@@ -14,7 +14,7 @@ import dataflow.core.node as dtfcornode
 import dataflow.core.nodes.base as dtfconobas
 import dataflow.core.utils as dtfcorutil
 import helpers.dbg as hdbg
-import oms.place_orders as oplaorde
+import oms.process_forecasts as oprofore
 
 _LOG = logging.getLogger(__name__)
 
@@ -41,12 +41,12 @@ class ProcessForecasts(dtfconobas.FitPredictNode):
         self._process_forecasts_config = process_forecasts_config
 
     def fit(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
-        return self._place_trades(df_in, fit=True)
+        return self._process_forecasts(df_in, fit=True)
 
     def predict(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
-        return self._place_trades(df_in, fit=False)
+        return self._process_forecasts(df_in, fit=False)
 
-    def _place_trades(
+    def _process_forecasts(
         self, df: pd.DataFrame, fit: bool = True
     ) -> Dict[str, pd.DataFrame]:
         hdbg.dassert_in(self._prediction_col, df.columns)
@@ -57,7 +57,7 @@ class ProcessForecasts(dtfconobas.FitPredictNode):
         #  pred_col and vol_col.
         prediction_df = df[self._prediction_col]
         # Get the latest `df` index value.
-        oplaorde.place_orders(
+        oprofore.process_forecasts(
             prediction_df, self._execution_mode, self._process_forecasts_config
         )
         # Compute stats.

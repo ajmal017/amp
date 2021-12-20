@@ -1,10 +1,8 @@
 """
 Import as:
 
-import oms.place_orders as oplaorde
+import oms.process_forecasts as oprofore
 """
-
-# TODO(Paul): -> process_forecasts.py
 
 import asyncio
 import datetime
@@ -29,134 +27,7 @@ import oms.portfolio as omportfo
 _LOG = logging.getLogger(__name__)
 
 
-def _merge_predictions(
-    wall_clock_timestamp: pd.Timestamp,
-    marked_to_market: pd.DataFrame,
-    predictions: pd.Series,
-    portfolio,
-) -> pd.DataFrame:
-    """
-    Merge marked_to_market dataframe with predictions.
-
-    :return: dataframe with columns `asset_id`, `prediction`, `price`,
-        `curr_num_shares`, `value`.
-        - The dataframe is the outer join of all the held assets in `portfolio` and
-          `predictions`
-    """
-    # TODO: price assets for which we have predictions but no holdings.
-    # TODO: after the merge, give cash a prediction of `1`
-
-    # Prepare `predictions` for the merge.
-    _LOG.debug(
-        "Number of non-NaN predictions=`%i` at timestamp=`%s`",
-        predictions.count(),
-        wall_clock_timestamp,
-    )
-    _LOG.debug(
-        "Number of NaN predictions=`%i` at timestamp=`%s`",
-        predictions.isna().sum(),
-        wall_clock_timestamp,
-    )
-    # TODO: Check for membership first.
-    predictions[portfolio.CASH_ID] = 1
-    predictions = pd.DataFrame(predictions)
-    predictions.columns = ["prediction"]
-    predictions.index.name = "asset_id"
-    _LOG.debug("predictions=\n%s", hprint.dataframe_to_str(predictions))
-    # Merge current holdings and predictions.
-    predictions = predictions.reset_index()
-    merged_df = marked_to_market.merge(predictions, on="asset_id", how="outer")
-    _LOG.debug(
-        "Number of NaNs in `curr_num_shares` post-merge is `%i` at timestamp=`%s`",
-        merged_df["curr_num_shares"].isna().sum(),
-        wall_clock_timestamp,
-    )
-    merged_df["curr_num_shares"].fillna(0.0, inplace=True)
-    merged_df["value"].fillna(0.0, inplace=True)
-    # TODO(Paul): Fix this!! Either have the portfolio use a universe, or else
-    #  price assets not held but for which we have a prediction.
-    merged_df["price"].fillna(100.0, inplace=True)
-    merged_df = merged_df.convert_dtypes()
-    _LOG.debug("merged_df=%s", merged_df)
-    # Move `asset_id` from the index to a column.
-    merged_df.reset_index(inplace=True)
-    # Do not allow `asset_id` to be represented as a float.
-    merged_df["asset_id"] = merged_df["asset_id"].convert_dtypes(
-        infer_objects=False,
-        convert_string=False,
-        convert_boolean=False,
-        convert_floating=False,
-    )
-    _LOG.debug("after merge: merged_df=\n%s", hprint.dataframe_to_str(merged_df))
-    # Mark to market.
-    _LOG.debug("merged_df=\n%s", hprint.dataframe_to_str(merged_df))
-    columns = ["prediction", "price", "curr_num_shares", "value"]
-    hdbg.dassert_is_subset(columns, merged_df.columns)
-    merged_df[columns] = merged_df[columns].fillna(0.0)
-    _LOG.debug("merged_df=\n%s", hprint.dataframe_to_str(merged_df))
-    return merged_df
-
-
-def _generate_orders(
-    shares: pd.Series,
-    order_config: Dict[str, Any],
-) -> List[omorder.Order]:
-    """
-    Turn a series of asset_id / shares to trade into a list of orders.
-
-    :param shares: number of shares to trade, indexed by `asset_id`
-    :param order_config: common parameters used to initialize `Order`
-    :return: a list of nontrivial orders (i.e., no zero-share orders)
-    """
-    _LOG.debug("# Generate orders")
-    orders: List[omorder.Order] = []
-    for asset_id, shares_ in shares.iteritems():
-        if shares_ == 0.0:
-            # No need to place trades.
-            continue
-        order = omorder.Order(
-            asset_id=asset_id, num_shares=shares_, **order_config.to_dict()
-        )
-        _LOG.debug("order=%s", order.order_id)
-        orders.append(order)
-    return orders
-
-
-def _compute_target_positions_in_shares(
-    wall_clock_timestamp: pd.Timestamp,
-    predictions: pd.Series,
-    portfolio: omportfo.AbstractPortfolio,
-) -> pd.DataFrame:
-    """
-    Compute target holdings, generate orders, and update the portfolio.
-
-    :param wall_clock_timestamp: timestamp used for valuing holdings
-    :param predictions: predictions indexed by `asset_id`
-    :param portfolio: portfolio with current holdings
-    """
-    marked_to_market = portfolio.mark_to_market()
-    _LOG.debug("marked_to_market=%s", marked_to_market)
-    if predictions.isna().sum() != 0:
-        _LOG.debug(
-            "Number of NaN predictions=`%i` at timestamp=`%s`",
-            predictions.isna().sum(),
-            wall_clock_timestamp,
-        )
-    assets_and_predictions = _merge_predictions(
-        wall_clock_timestamp, marked_to_market, predictions, portfolio
-    )
-    #
-    df = ocalopti.compute_target_positions_in_cash(
-        assets_and_predictions, portfolio.CASH_ID
-    )
-    # Round to nearest integer towards zero.
-    # df["diff_num_shares"] = np.fix(df["target_trade"] / df["price"])
-    df["diff_num_shares"] = df["target_trade"] / df["price"]
-    return df
-
-
-# TODO(Paul): -> process_forecasts()
-async def place_orders(
+async def process_forecasts(
     prediction_df: pd.DataFrame,
     # volatility_df:
     execution_mode: str,
@@ -249,9 +120,10 @@ async def place_orders(
         )
         # Wait until get_wall_clock_time() == timestamp.
         await hasynci.wait_until(next_timestamp, get_wall_clock_time)
+        # Get the wall clock timestamp.
         wall_clock_timestamp = get_wall_clock_time()
         _LOG.debug("wall_clock_timestamp=%s", wall_clock_timestamp)
-        #
+        # Get the time of day of the wall clock timestamp.
         time = wall_clock_timestamp.time()
         if time < ath_start_time:
             _LOG.debug(
@@ -295,7 +167,9 @@ async def place_orders(
                 char1="#",
             ),
         )
+        # Wait 1 second to give all open orders sufficient time to close.
         await asyncio.sleep(1)
+        # Compute the target positions.
         target_positions = _compute_target_positions_in_shares(
             wall_clock_timestamp, predictions, portfolio
         )
@@ -328,3 +202,145 @@ async def place_orders(
             ),
         )
         await broker.submit_orders(orders)
+
+
+def _compute_target_positions_in_shares(
+    wall_clock_timestamp: pd.Timestamp,
+    predictions: pd.Series,
+    portfolio: omportfo.AbstractPortfolio,
+) -> pd.DataFrame:
+    """
+    Compute target holdings, generate orders, and update the portfolio.
+
+    :param wall_clock_timestamp: timestamp used for valuing holdings
+    :param predictions: predictions indexed by `asset_id`
+    :param portfolio: portfolio with current holdings
+    """
+    marked_to_market = portfolio.mark_to_market().set_index("asset_id")
+    # If there are predictions for assets not currently in `marked_to_market`,
+    # then attempt to price those assets and extend `marked_to_market`
+    # (imputing 0's for the holdings).
+    unpriced_assets = predictions.index.difference(marked_to_market.index)
+    if not unpriced_assets.empty:
+        prices = portfolio.price_assets(
+            wall_clock_timestamp, unpriced_assets.values
+        )
+        mtm_extension = pd.DataFrame(
+            index=unpriced_assets, columns=["price", "curr_num_shares", "value"]
+        )
+        mtm_extension["price"] = prices
+        mtm_extension.fillna(0.0)
+        mtm_extension.index.name = "asset_id"
+        marked_to_market = pd.concat([marked_to_market, mtm_extension], axis=0)
+    marked_to_market.reset_index(inplace=True)
+    _LOG.debug("marked_to_market=%s", marked_to_market)
+    if predictions.isna().sum() != 0:
+        _LOG.debug(
+            "Number of NaN predictions=`%i` at timestamp=`%s`",
+            predictions.isna().sum(),
+            wall_clock_timestamp,
+        )
+    # Combine the portfolio `marked_to_market` dataframe with the predictions.
+    assets_and_predictions = _merge_predictions(
+        wall_clock_timestamp, marked_to_market, predictions, portfolio
+    )
+    # Compute the target positions in cash (call the optimizer).
+    df = ocalopti.compute_target_positions_in_cash(
+        assets_and_predictions, portfolio.CASH_ID
+    )
+    # Convert the target positions from cash values to target share counts.
+    # Round to nearest integer towards zero.
+    # df["diff_num_shares"] = np.fix(df["target_trade"] / df["price"])
+    df["diff_num_shares"] = df["target_trade"] / df["price"]
+    return df
+
+
+def _merge_predictions(
+    wall_clock_timestamp: pd.Timestamp,
+    marked_to_market: pd.DataFrame,
+    predictions: pd.Series,
+    portfolio,
+) -> pd.DataFrame:
+    """
+    Merge marked_to_market dataframe with predictions.
+
+    :return: dataframe with columns `asset_id`, `prediction`, `price`,
+        `curr_num_shares`, `value`.
+        - The dataframe is the outer join of all the held assets in `portfolio` and
+          `predictions`
+    """
+    # TODO: after the merge, give cash a prediction of `1`
+    # Prepare `predictions` for the merge.
+    _LOG.debug(
+        "Number of non-NaN predictions=`%i` at timestamp=`%s`",
+        predictions.count(),
+        wall_clock_timestamp,
+    )
+    _LOG.debug(
+        "Number of NaN predictions=`%i` at timestamp=`%s`",
+        predictions.isna().sum(),
+        wall_clock_timestamp,
+    )
+    # TODO: Check for membership first.
+    predictions[portfolio.CASH_ID] = 1
+    predictions = pd.DataFrame(predictions)
+    predictions.columns = ["prediction"]
+    predictions.index.name = "asset_id"
+    _LOG.debug("predictions=\n%s", hprint.dataframe_to_str(predictions))
+    # Merge current holdings and predictions.
+    predictions = predictions.reset_index()
+    merged_df = marked_to_market.merge(predictions, on="asset_id", how="outer")
+    _LOG.debug(
+        "Number of NaNs in `curr_num_shares` post-merge is `%i` at timestamp=`%s`",
+        merged_df["curr_num_shares"].isna().sum(),
+        wall_clock_timestamp,
+    )
+    merged_df["curr_num_shares"].fillna(0.0, inplace=True)
+    merged_df["value"].fillna(0.0, inplace=True)
+    # TODO(Paul): Fix this!! Either have the portfolio use a universe, or else
+    #  price assets not held but for which we have a prediction.
+    merged_df["price"].fillna(100.0, inplace=True)
+    merged_df = merged_df.convert_dtypes()
+    _LOG.debug("merged_df=%s", merged_df)
+    # Move `asset_id` from the index to a column.
+    merged_df.reset_index(inplace=True)
+    # Do not allow `asset_id` to be represented as a float.
+    merged_df["asset_id"] = merged_df["asset_id"].convert_dtypes(
+        infer_objects=False,
+        convert_string=False,
+        convert_boolean=False,
+        convert_floating=False,
+    )
+    _LOG.debug("after merge: merged_df=\n%s", hprint.dataframe_to_str(merged_df))
+    # Mark to market.
+    _LOG.debug("merged_df=\n%s", hprint.dataframe_to_str(merged_df))
+    columns = ["prediction", "price", "curr_num_shares", "value"]
+    hdbg.dassert_is_subset(columns, merged_df.columns)
+    merged_df[columns] = merged_df[columns].fillna(0.0)
+    _LOG.debug("merged_df=\n%s", hprint.dataframe_to_str(merged_df))
+    return merged_df
+
+
+def _generate_orders(
+    shares: pd.Series,
+    order_config: Dict[str, Any],
+) -> List[omorder.Order]:
+    """
+    Turn a series of asset_id / shares to trade into a list of orders.
+
+    :param shares: number of shares to trade, indexed by `asset_id`
+    :param order_config: common parameters used to initialize `Order`
+    :return: a list of nontrivial orders (i.e., no zero-share orders)
+    """
+    _LOG.debug("# Generate orders")
+    orders: List[omorder.Order] = []
+    for asset_id, shares_ in shares.iteritems():
+        if shares_ == 0.0:
+            # No need to place trades.
+            continue
+        order = omorder.Order(
+            asset_id=asset_id, num_shares=shares_, **order_config.to_dict()
+        )
+        _LOG.debug("order=%s", order.order_id)
+        orders.append(order)
+    return orders

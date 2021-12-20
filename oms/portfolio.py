@@ -295,11 +295,18 @@ class AbstractPortfolio(abc.ABC):
         asset_values[AbstractPortfolio.CASH_ID] = cash
         return asset_values
 
-    def _price_assets_helper(
+    def price_assets(
         self,
         as_of_timestamp: pd.Timestamp,
         asset_ids: List[int],
     ) -> pd.Series:
+        """
+        Wraps `portfolio.market_data_interface` and packages output.
+
+        :param as_of_timestamp: as in `market_data_interface.get_data_at_timestamp()`
+        :param asset_ids: as in `market_data_interface.get_data_at_timestamp()`
+        :return: series of prices at `as_of_timestamp` indexed by asset_id
+        """
         price_df = self._market_data_interface.get_data_at_timestamp(
             as_of_timestamp, self._timestamp_col, asset_ids
         )
@@ -332,7 +339,7 @@ class AbstractPortfolio(abc.ABC):
                 columns=AbstractPortfolio.PRICE_COLS
             )
         else:
-            prices = self._price_assets_helper(as_of_timestamp, asset_ids_list)
+            prices = self.price_assets(as_of_timestamp, asset_ids_list)
             assets_marked_to_market = asset_ids * prices
             assets_marked_to_market.name = "value"
             assets_marked_to_market = pd.concat(

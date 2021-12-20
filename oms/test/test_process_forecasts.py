@@ -9,14 +9,14 @@ import helpers.unit_test as hunitest
 import market_data.market_data_interface_example as mdmdinex
 import oms.mr_market as omrmark
 import oms.oms_db as oomsdb
-import oms.place_orders as oplaorde
 import oms.portfolio_example as oporexam
+import oms.process_forecasts as oprofore
 import oms.test.oms_db_helper as omtodh
 
 _LOG = logging.getLogger(__name__)
 
 
-class TestSimulatedPlaceOrders1(hunitest.TestCase):
+class TestSimulatedProcessForecasts1(hunitest.TestCase):
     def test_initialization1(self) -> None:
         with hasynci.solipsism_context() as event_loop:
             hasynci.run(
@@ -27,7 +27,7 @@ class TestSimulatedPlaceOrders1(hunitest.TestCase):
         self, event_loop: asyncio.AbstractEventLoop
     ) -> None:
         """
-        Run `place_orders()` logic with a given prediction df to update a
+        Run `process_forecasts()` logic with a given prediction df to update a
         Portfolio.
         """
         config = {}
@@ -67,7 +67,7 @@ class TestSimulatedPlaceOrders1(hunitest.TestCase):
         config["trading_end_time"] = datetime.time(15, 55)
         # Run.
         execution_mode = "batch"
-        await oplaorde.place_orders(
+        await oprofore.process_forecasts(
             predictions,
             execution_mode,
             config,
@@ -75,15 +75,15 @@ class TestSimulatedPlaceOrders1(hunitest.TestCase):
         # TODO(Paul): Re-check the correctness after fixing the issue with
         #  pricing assets not currently in the portfolio.
         actual = portfolio.get_historical_holdings()
-        expected = r"""asset_id                         101         202            -1
-2000-01-01 09:30:00-05:00        NaN         NaN  1000000.000000
-2000-01-01 09:35:01-05:00        NaN         NaN  1000000.000000
-2000-01-01 09:40:01-05:00  76.923077  153.846154   769250.118513
-2000-01-01 09:45:01-05:00  -7.141889   21.425667   985761.256141"""
+        expected = r"""asset_id                        101        202            -1
+2000-01-01 09:30:00-05:00       NaN        NaN  1000000.000000
+2000-01-01 09:35:01-05:00       NaN        NaN  1000000.000000
+2000-01-01 09:40:01-05:00  7.689909  15.379818   976932.207284
+2000-01-01 09:45:01-05:00 -7.141466  21.424398   985720.044676"""
         self.assert_equal(str(actual), expected, fuzzy_match=True)
 
 
-class TestMockedPlaceOrders1(omtodh.TestOmsDbHelper):
+class TestMockedProcessForecasts1(omtodh.TestOmsDbHelper):
     def test_mocked_system1(self) -> None:
         with hasynci.solipsism_context() as event_loop:
             # Build a Portfolio.
@@ -92,16 +92,8 @@ class TestMockedPlaceOrders1(omtodh.TestOmsDbHelper):
             initial_timestamp = pd.Timestamp(
                 "2000-01-01 09:30:00-05:00", tz="America/New_York"
             )
-            # TODO(gp): Factor out in a single function.
-            oomsdb.create_accepted_orders_table(
-                self.connection, incremental=False
-            )
-            oomsdb.create_submitted_orders_table(
-                self.connection, incremental=False
-            )
-            oomsdb.create_current_positions_table(
-                self.connection, incremental=False, table_name=table_name
-            )
+            #
+            oomsdb.create_oms_tables(self.connection, incremental=False)
             #
             portfolio = oporexam.get_mocked_portfolio_example1(
                 event_loop,
@@ -134,7 +126,7 @@ class TestMockedPlaceOrders1(omtodh.TestOmsDbHelper):
         portfolio,
     ) -> None:
         """
-        Run place_orders() logic with a given prediction df to update a
+        Run process_forecasts() logic with a given prediction df to update a
         Portfolio.
         """
         config = {}
@@ -162,7 +154,7 @@ class TestMockedPlaceOrders1(omtodh.TestOmsDbHelper):
         config["trading_end_time"] = datetime.time(15, 55)
         # Run.
         execution_mode = "batch"
-        await oplaorde.place_orders(
+        await oprofore.process_forecasts(
             predictions,
             execution_mode,
             config,
@@ -170,9 +162,9 @@ class TestMockedPlaceOrders1(omtodh.TestOmsDbHelper):
         # TODO(Paul): Re-check the correctness after fixing the issue with
         #  pricing assets not currently in the portfolio.
         actual = portfolio.get_historical_holdings()
-        expected = r"""asset_id                         101         202            -1
-2000-01-01 09:30:00-05:00        NaN         NaN  1000000.000000
-2000-01-01 09:35:01-05:00        NaN         NaN  1000000.000000
-2000-01-01 09:40:01-05:00  76.923077  153.846154   769250.118513
-2000-01-01 09:45:01-05:00  -7.141889   21.425667   985761.256141"""
+        expected = r"""asset_id                        101        202            -1
+2000-01-01 09:30:00-05:00       NaN        NaN  1000000.000000
+2000-01-01 09:35:01-05:00       NaN        NaN  1000000.000000
+2000-01-01 09:40:01-05:00  7.689909  15.379818   976932.207284
+2000-01-01 09:45:01-05:00 -7.141466  21.424398   985720.044676"""
         self.assert_equal(str(actual), expected, fuzzy_match=True)
