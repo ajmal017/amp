@@ -219,7 +219,8 @@ class AbstractMarketDataInterface(abc.ABC):
             normalize_data,
             limit,
         )
-        _LOG.verb_debug("-> df=\n%s", hprint.dataframe_to_str(df))
+        df = self._remap_columns(df)
+        # _LOG.debug("-> df=\n%s", hprint.dataframe_to_str(df))
         return df
 
     def get_twap_price(

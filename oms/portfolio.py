@@ -50,6 +50,7 @@ class AbstractPortfolio(abc.ABC):
     # Columns required in a `holding_df`.
     HOLDINGS_COLS = ["asset_id", "curr_num_shares"]
 
+    # Columns that a dataframe with prices should have.
     PRICE_COLS = ["price", "value"]
 
     def __init__(
