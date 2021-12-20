@@ -6,6 +6,7 @@ import oms.mr_market as omrmark
 
 # TODO(gp): Not sure I get the joke of mr_market.py. Mean-reversion market?
 # map-reduce market?
+# https://en.wikipedia.org/wiki/Mr._Market
 # -> order_processor.py
 
 import logging
@@ -19,6 +20,7 @@ import helpers.printing as hprint
 import helpers.sql as hsql
 import oms.broker as ombroker
 import oms.oms_db as oomsdb
+import oms.order as omorder
 
 _LOG = logging.getLogger(__name__)
 
@@ -111,6 +113,7 @@ async def order_processor(
         # Wait after the submission was parsed.
         hdbg.dassert_lt(0, delay_to_accept_in_secs)
         await hasynci.sleep(delay_to_accept_in_secs, get_wall_clock_time)
+        wall_clock_time = get_wall_clock_time()
         # Write in `accepted_orders_table_name` to acknowledge the orders.
         trade_date = wall_clock_time.date()
         success = True
@@ -135,21 +138,36 @@ async def order_processor(
         # Wait after the orders were accepted.
         hdbg.dassert_lt(0, delay_to_fill_in_secs)
         await hasynci.sleep(delay_to_fill_in_secs, get_wall_clock_time)
+        # Wait until the max order deadline to return fills.
+        _LOG.debug("Executing query for unfilled submitted orders...")
+        query = f"""
+            SELECT filename, timestamp_db, orders_as_txt
+                FROM {submitted_orders_table_name}
+                ORDER BY timestamp_db"""
+        df = hsql.execute_query_to_df(db_connection, query)
+        _LOG.debug("df=\n%s", hprint.dataframe_to_str(df))
+        hdbg.dassert_eq(file_name, df.tail(1).squeeze()["filename"])
+        orders_as_txt = df.tail(1).squeeze()["orders_as_txt"]
+        orders = omorder.orders_from_string(orders_as_txt)
+        fulfillment_deadline = max([order.end_timestamp for order in orders])
+        _LOG.debug("Order fulfillment deadline=%s", fulfillment_deadline)
+        # TODO(Paul): Don't wait past the deadline.
+        await hasynci.wait_until(fulfillment_deadline, get_wall_clock_time)
         # Get the fills.
         _LOG.debug("Getting fills.")
-        fills = broker.get_fills(wall_clock_time)
+        fills = broker.get_fills(fulfillment_deadline)
         _LOG.debug("Received %i fills", len(fills))
         # Update current positions based on fills.
         for fill in fills:
-            id_ = fill.order.order_id
+            asset_id = fill.order.asset_id
             trade_date = fill.timestamp.date()
             wall_clock_time = get_wall_clock_time()
             asset_id = fill.order.asset_id
             # TODO(Paul): query current positions table, then modify based on fills.
             txt = f"""
             strategyid,SAU1
-            account,paper
-            id,{id_}
+            account,candidate
+            id,{asset_id}
             tradedate,{trade_date}
             timestamp_db,{wall_clock_time}
             asset_id,{asset_id}
@@ -161,6 +179,8 @@ async def order_processor(
             bod_price,0
             """
             row = hsql.csv_to_series(txt, sep=",")
+            # TODO(*): we need to upsert the `asset_id` row rather than add
+            #  a new row in general.
             hsql.execute_insert_query(
                 db_connection, row, current_positions_table_name
             )

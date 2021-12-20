@@ -243,23 +243,31 @@ class SimulatedBroker(AbstractBroker):
         # In our current execution model, we should ask about the orders that are
         # terminating.
         hdbg.dassert_lte(min(timestamps), as_of_timestamp)
-        orders_to_execute = self._deadline_timestamp_to_orders[as_of_timestamp]
+        executed_timestamps = []
+        orders_to_execute = []
+        for timestamp in timestamps:
+            if timestamp <= as_of_timestamp:
+                orders_to_execute.extend(
+                    self._deadline_timestamp_to_orders[timestamp]
+                )
+                executed_timestamps.append(timestamp)
         _LOG.debug("Executing %d orders", len(orders_to_execute))
         # `as_of_timestamp` should match the end time of the orders.
         for order in orders_to_execute:
-            hdbg.dassert_eq(as_of_timestamp, order.end_timestamp)
+            hdbg.dassert_lte(order.end_timestamp, as_of_timestamp)
         # "Execute" the orders.
         fills = []
         for order in orders_to_execute:
             # TODO(gp): Here there should be a programmable logic that decides
             #  how many shares are filled.
-            fills.extend(self._fully_fill(as_of_timestamp, order))
+            fills.extend(self._fully_fill(order.end_timestamp, order))
         self._fills.extend(fills)
         # Remove the orders that have been executed.
         _LOG.debug(
             "Removing orders from queue with deadline=`%s`", as_of_timestamp
         )
-        del self._deadline_timestamp_to_orders[as_of_timestamp]
+        for timestamp in executed_timestamps:
+            del self._deadline_timestamp_to_orders[timestamp]
         _LOG.debug("-> Returning fills:\n%s", str(fills))
         return fills
 
@@ -304,6 +312,12 @@ class MockedBroker(AbstractBroker):
         if poll_kwargs is None:
             poll_kwargs = hasynci.get_poll_kwargs(self._get_wall_clock_time)
         self._poll_kwargs = poll_kwargs
+        # Map a timestamp to the orders with that execution time deadline.
+        self._deadline_timestamp_to_orders: Dict[
+            pd.Timestamp, List[omorder.Order]
+        ] = collections.defaultdict(list)
+        # Track the fills for internal accounting.
+        self._fills: List[Fill] = []
 
     async def _submit_orders(
         self,
@@ -337,25 +351,83 @@ class MockedBroker(AbstractBroker):
             self._poll_kwargs,
         )
         _LOG.debug("Wait for accepted orders ... done")
-
-    def _get_fills(self, as_of_timestamp: pd.Timestamp) -> List[Fill]:
-        """
-        The reference system doesn't return fills but directly updates the
-        state of a table representing the current holdings.
-        """
-        latest_submission_timestamp = next(reversed(self._submissions))
-        latest_submission = self._submissions[latest_submission_timestamp]
-        orders_as_txt = latest_submission["orders_as_txt"]
-        orders = omorder.orders_from_string(orders_as_txt)
-        wall_clock_timestamp = self.market_data_interface.get_wall_clock_time()
-        fills = []
         for order in orders:
-            # TODO: get the price from the market data interface.
-            # price = self.market_data_interface.get_data_at_timestamp(
-            # )
-            fill = Fill(order, wall_clock_timestamp, order.num_shares, 100.0)
-            fills.append(fill)
+            self._deadline_timestamp_to_orders[order.end_timestamp].append(order)
+
+    # TODO(Paul): Delete this.
+    # def _get_fills(self, as_of_timestamp: pd.Timestamp) -> List[Fill]:
+    #     """
+    #     The reference system doesn't return fills but directly updates the
+    #     state of a table representing the current holdings.
+    #     """
+    #     timestamps = self._deadline_timestamp_to_orders.keys()
+    #     _LOG.debug("Timestamps of orders in queue: %s", timestamps)
+    #     if not timestamps:
+    #         return []
+    #     hdbg.dassert_eq(min(timestamps), as_of_timestamp)
+    #     orders_to_execute = self._deadline_timestamp_to_orders[as_of_timestamp]
+    #     _LOG.debug("Executing %d orders", len(orders_to_execute))
+    #     wall_clock_timestamp = self.market_data_interface.get_wall_clock_time()
+    #     fills = []
+    #     for order in orders_to_execute:
+    #         price = get_execution_price(self.market_data_interface, order)
+    #         fill = Fill(order, wall_clock_timestamp, order.num_shares, price)
+    #         fills.append(fill)
+    #     # Remove the orders that have been executed.
+    #     _LOG.debug(
+    #         "Removing orders from queue with deadline=`%s`", as_of_timestamp
+    #     )
+    #     del self._deadline_timestamp_to_orders[as_of_timestamp]
+    #     return fills
+
+    # TODO(Paul): This is copy-pasted from `SimulatedBroker`. Factor out the
+    #  logic.
+    def _get_fills(self, as_of_timestamp: pd.Timestamp) -> List[Fill]:
+        # We should always get the "next" orders, for this reason one should use
+        # a priority queue.
+        timestamps = self._deadline_timestamp_to_orders.keys()
+        _LOG.debug("Timestamps of orders in queue: %s", timestamps)
+        if not timestamps:
+            return []
+        # In our current execution model, we should ask about the orders that are
+        # terminating.
+        hdbg.dassert_lte(min(timestamps), as_of_timestamp)
+        executed_timestamps = []
+        orders_to_execute = []
+        for timestamp in timestamps:
+            if timestamp <= as_of_timestamp:
+                orders_to_execute.extend(
+                    self._deadline_timestamp_to_orders[timestamp]
+                )
+                executed_timestamps.append(timestamp)
+        _LOG.debug("Executing %d orders", len(orders_to_execute))
+        # `as_of_timestamp` should match the end time of the orders.
+        for order in orders_to_execute:
+            hdbg.dassert_lte(order.end_timestamp, as_of_timestamp)
+        # "Execute" the orders.
+        fills = []
+        for order in orders_to_execute:
+            # TODO(gp): Here there should be a programmable logic that decides
+            #  how many shares are filled.
+            fills.extend(self._fully_fill(order.end_timestamp, order))
+        self._fills.extend(fills)
+        # Remove the orders that have been executed.
+        _LOG.debug(
+            "Removing orders from queue with deadline=`%s`", as_of_timestamp
+        )
+        for timestamp in executed_timestamps:
+            del self._deadline_timestamp_to_orders[timestamp]
+        _LOG.debug("-> Returning fills:\n%s", str(fills))
         return fills
+
+    def _fully_fill(
+        self, wall_clock_timestamp: pd.Timestamp, order: omorder.Order
+    ) -> List[Fill]:
+        num_shares = order.num_shares
+        # TODO(Paul): We should move the logic here.
+        price = get_execution_price(self.market_data_interface, order)
+        fill = Fill(order, wall_clock_timestamp, num_shares, price)
+        return [fill]
 
 
 # #############################################################################

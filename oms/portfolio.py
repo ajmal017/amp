@@ -221,7 +221,7 @@ class AbstractPortfolio(abc.ABC):
         hdbg.dassert_eq(len(self._asset_holdings), len(self._statistics))
         #
         df = self.get_cached_mark_to_market()
-        _LOG.debug("df=%s", df)
+        _LOG.debug("mark_to_market_df=\n%s", hprint.dataframe_to_str(df))
         # Update the internal holdings_df.
         holdings_df = df[AbstractPortfolio.HOLDINGS_COLS]
         self._holdings_df = pd.concat([holdings_df, self._holdings_df])
@@ -305,6 +305,7 @@ class AbstractPortfolio(abc.ABC):
         hdbg.dassert_is_subset(columns, price_df.columns)
         price_df = price_df[columns]
         price_srs = price_df.set_index("asset_id")["price"]
+        hdbg.dassert(not price_srs.index.has_duplicates)
         return price_srs
 
     def _price_assets(
@@ -337,6 +338,7 @@ class AbstractPortfolio(abc.ABC):
             )
             assets_marked_to_market.columns = AbstractPortfolio.PRICE_COLS
         hdbg.dassert_isinstance(assets_marked_to_market, pd.DataFrame)
+        hdbg.dassert(not assets_marked_to_market.index.has_duplicates)
         # _sequential_insert(as_of_timestamp, prices, self._asset_prices)
         _sequential_insert(
             as_of_timestamp,
@@ -560,6 +562,7 @@ class SimulatedPortfolio(AbstractPortfolio):
                 holdings_diff, fill_value=0
             )
             new_cash += cash_diff
+        hdbg.dassert(not new_asset_holdings_srs.index.has_duplicates)
         _sequential_insert(
             wall_clock_timestamp, new_asset_holdings_srs, self._asset_holdings
         )
@@ -727,6 +730,10 @@ class MockedPortfolio(AbstractPortfolio):
         query = "\n".join(query)
         _LOG.debug("query=%s", query)
         snapshot_df = hsql.execute_query_to_df(self._db_connection, query)
+        if not snapshot_df.empty:
+            max_timestamp_db = snapshot_df["timestamp_db"].max()
+            filter_ = snapshot_df["timestamp_db"] == max_timestamp_db
+            snapshot_df = snapshot_df[filter_]
         # Update snapshot_df.
         # self._timestamp_to_snapshot_df[wall_clock_timestamp] = snapshot_df
         # snapshot_df looks like:
@@ -800,6 +807,7 @@ class MockedPortfolio(AbstractPortfolio):
         cost = current_net_cost - prev_net_cost
         hdbg.dassert(np.isfinite(cost), "cost=%s", cost)
         updated_cash = prev_cash - cost
+        _LOG.debug("updated_cash=%s", updated_cash)
         self._cash[wall_clock_timestamp] = updated_cash
         self._net_cost[wall_clock_timestamp] = current_net_cost
 

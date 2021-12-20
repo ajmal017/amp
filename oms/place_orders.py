@@ -6,6 +6,7 @@ import oms.place_orders as oplaorde
 
 # TODO(Paul): -> process_forecasts.py
 
+import asyncio
 import datetime
 import logging
 from typing import Any, Dict, List
@@ -294,7 +295,7 @@ async def place_orders(
                 char1="#",
             ),
         )
-        # await asyncio.sleep(1)
+        await asyncio.sleep(1)
         target_positions = _compute_target_positions_in_shares(
             wall_clock_timestamp, predictions, portfolio
         )

@@ -77,9 +77,9 @@ class TestPlaceOrders1(hunitest.TestCase):
         actual = portfolio.get_historical_holdings()
         expected = r"""asset_id                         101         202            -1
 2000-01-01 09:30:00-05:00        NaN         NaN  1000000.000000
-2000-01-01 09:35:00-05:00        NaN         NaN  1000000.000000
-2000-01-01 09:40:00-05:00  76.923077  153.846154   769250.118513
-2000-01-01 09:45:00-05:00  -7.141889   21.425667   985761.256141"""
+2000-01-01 09:35:01-05:00        NaN         NaN  1000000.000000
+2000-01-01 09:40:01-05:00  76.923077  153.846154   769250.118513
+2000-01-01 09:45:01-05:00  -7.141889   21.425667   985761.256141"""
         self.assert_equal(str(actual), expected, fuzzy_match=True)
 
 
@@ -117,13 +117,13 @@ class TestMockedPlaceOrders1(omtodh.TestOmsDbHelper):
             delay_to_accept_in_secs = 3
             delay_to_fill_in_secs = 10
             broker = portfolio.broker
-            end_timestamp = pd.Timestamp("2000-01-01 09:50:00-05:00")
+            termination_condition = 3
             order_processor = omrmark.order_processor(
                 db_connection,
                 delay_to_accept_in_secs,
                 delay_to_fill_in_secs,
                 broker,
-                end_timestamp,
+                termination_condition,
                 poll_kwargs=poll_kwargs,
             )
             coroutines = [self._test_mocked_system1(portfolio), order_processor]
