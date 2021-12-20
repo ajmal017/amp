@@ -34,7 +34,7 @@ class TestSimulatedBroker1(hunitest.TestCase):
         timestamp = pd.Timestamp(
             "2000-01-01 09:35:00-05:00", tz="America/New_York"
         )
-        fills = broker.get_fills(timestamp)
+        fills = broker.get_fills()
         self.assertEqual(len(fills), 1)
         actual = str(fills[0])
         expected = r"""Fill: asset_id=101 fill_id=0 timestamp=2000-01-01 09:35:00-05:00 num_shares=100.0 price=1000.3449750508295
@@ -53,7 +53,7 @@ class TestMockedBroker1(omtodh.TestOmsDbHelper):
         broker = obroexam.get_mocked_broker_example1(event_loop, self.connection)
         #
         order = oordexam.get_order_example1()
-        orders = [order]
+        [order]
         # await broker.submit_orders(orders)
         # Check fills.
         broker.get_fills

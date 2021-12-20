@@ -581,9 +581,7 @@ class SimulatedPortfolio(AbstractPortfolio):
         """
         _LOG.debug("")
         # Get the fills from the broker.
-        # TODO(gp): Ensure that this returns all the fills before
-        #  wall_clock_timestamp.
-        fills = self.broker.get_fills(wall_clock_timestamp)
+        fills = self.broker.get_fills()
         # Convert the fills into a `fills_df`.
         fill_rows = []
         for fill in fills:
@@ -725,8 +723,6 @@ class MockedPortfolio(AbstractPortfolio):
         query.append(f"SELECT * FROM {self._table_name}")
         wall_clock_timestamp = self._get_wall_clock_time()
         trade_date = wall_clock_timestamp.date()
-        # TODO(*): One row per asset_id/trade_date.
-        # TODO(Paul): We should be able to remove the snapshot_df filtering.
         query.append(
             f"WHERE account='{self._account}' AND tradedate='{trade_date}'"
         )
@@ -735,9 +731,7 @@ class MockedPortfolio(AbstractPortfolio):
         _LOG.debug("query=%s", query)
         snapshot_df = hsql.execute_query_to_df(self._db_connection, query)
         if not snapshot_df.empty:
-            max_timestamp_db = snapshot_df["timestamp_db"].max()
-            filter_ = snapshot_df["timestamp_db"] == max_timestamp_db
-            snapshot_df = snapshot_df[filter_]
+            hdbg.dassert(not snapshot_df["asset_id"].duplicated().any())
         # Update snapshot_df.
         # self._timestamp_to_snapshot_df[wall_clock_timestamp] = snapshot_df
         # snapshot_df looks like:
@@ -827,4 +821,6 @@ def _sequential_insert(
     if odict:
         last_key = next(reversed(odict))
         hdbg.dassert_lt(last_key, key)
+    # TODO(Paul): If `obj` is a series or dataframe, ensure that the index is
+    #  unique.
     odict[key] = obj

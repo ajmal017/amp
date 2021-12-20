@@ -16,7 +16,7 @@ import oms.test.oms_db_helper as omtodh
 _LOG = logging.getLogger(__name__)
 
 
-class TestPlaceOrders1(hunitest.TestCase):
+class TestSimulatedPlaceOrders1(hunitest.TestCase):
     def test_initialization1(self) -> None:
         with hasynci.solipsism_context() as event_loop:
             hasynci.run(

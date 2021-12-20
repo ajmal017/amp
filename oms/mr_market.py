@@ -155,7 +155,7 @@ async def order_processor(
         await hasynci.wait_until(fulfillment_deadline, get_wall_clock_time)
         # Get the fills.
         _LOG.debug("Getting fills.")
-        fills = broker.get_fills(fulfillment_deadline)
+        fills = broker.get_fills()
         _LOG.debug("Received %i fills", len(fills))
         # Update current positions based on fills.
         for fill in fills:
@@ -215,8 +215,6 @@ async def order_processor(
                 bod_price,0
                 """
                 row = hsql.csv_to_series(txt, sep=",")
-            # TODO(*): we need to upsert the `asset_id` row rather than add
-            #  a new row in general.
             row = row.convert_dtypes()
             _LOG.debug("Insert row is=%s", hprint.dataframe_to_str(row))
             hsql.execute_insert_query(
