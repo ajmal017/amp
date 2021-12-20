@@ -19,11 +19,17 @@ _LOG = logging.getLogger(__name__)
 class TestPlaceOrders1(hunitest.TestCase):
     def test_initialization1(self) -> None:
         with hasynci.solipsism_context() as event_loop:
-            hasynci.run(self._test_coroutine1(event_loop), event_loop=event_loop)
+            hasynci.run(
+                self._test_simulated_system1(event_loop), event_loop=event_loop
+            )
 
-    async def _test_coroutine1(
+    async def _test_simulated_system1(
         self, event_loop: asyncio.AbstractEventLoop
     ) -> None:
+        """
+        Run `place_orders()` logic with a given prediction df to update a
+        Portfolio.
+        """
         config = {}
         (
             market_data_interface,

@@ -111,7 +111,8 @@ def oms_docker_cmd(ctx, cmd):  # type: ignore
 # #############################################################################
 
 
-def _get_docker_up_cmd() -> str:
+# TODO(gp): Factor this out since common with im.
+def _get_docker_up_cmd(detach: bool) -> str:
     """
     Construct the command to bring up the `oms` service.
 
@@ -129,6 +130,9 @@ def _get_docker_up_cmd() -> str:
     cmd.append(f"--file {docker_compose_file_path}")
     # Add `down` command.
     cmd.append("up")
+    if detach:
+        # Enable detached mode.
+        cmd.append("-d")
     service = "oms_postgres_local"
     cmd.append(service)
     cmd = hlibtask._to_multi_line_cmd(cmd)
@@ -136,14 +140,15 @@ def _get_docker_up_cmd() -> str:
 
 
 @task
-def oms_docker_up(ctx):  # type: ignore
+def oms_docker_up(ctx, detach=False):  # type: ignore
     """
     Start oms container with Postgres inside.
 
     :param ctx: `context` object
+    :param detach: run containers in the background
     """
     # Get docker down command.
-    docker_clean_up_cmd = _get_docker_up_cmd()
+    docker_clean_up_cmd = _get_docker_up_cmd(detach)
     # Execute the command.
     hlibtask._run(ctx, docker_clean_up_cmd, pty=True)
 
