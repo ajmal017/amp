@@ -2699,7 +2699,7 @@ def _run_test_cmd(
     cmd: str,
     coverage: bool,
     collect_only: bool,
-    start_coverage_script: bool,
+    start_coverage_script,
     **ctx_run_kwargs: Any,
 ) -> int:
     """
@@ -2755,7 +2755,7 @@ def _run_tests(
     collect_only: bool,
     tee_to_file: bool,
     *,
-    start_coverage_script: bool = True,
+    start_coverage_script: bool = False,
     **ctx_run_kwargs: Any,
 ) -> int:
     """
@@ -2957,6 +2957,21 @@ def run_qa_tests(  # type: ignore
         msg = "QA tests failed"
         _LOG.error(msg)
         raise RuntimeError(msg)
+
+
+@task
+def run_coverage_report(ctx):
+    target_dir = "oms"
+    cmd = f"invoke run_fast_tests --coverage -p {target_dir}; cp .coverage .coverage_fast_tests"
+    _run(ctx, cmd)
+    cmd = f"invoke run_slow_tests --coverage -p {target_dir}; cp .coverage .coverage_slow_tests"
+    _run(ctx, cmd)
+    cmd = "coverage combine --keep .coverage_fast_tests .coverage_slow_tests"
+    cmd = 'coverage report --include="${target_dir}/*" --omit="*/test_*.py" --sort=Cover'
+    cmd = 'coverage html --include="${target_dir}/*" --omit="*/test_*.py"'
+    _run(ctx, cmd)
+    _run(ctx, cmd)
+    _run(ctx, cmd)
 
 
 # #############################################################################
