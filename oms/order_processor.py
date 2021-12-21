@@ -1,14 +1,11 @@
 """
 Import as:
 
-import oms.mr_market as omrmark
+import oms.order_processor as oordproc
 """
 
-# TODO(gp): Not sure I get the joke of mr_market.py. Mean-reversion market?
-# map-reduce market?
-# https://en.wikipedia.org/wiki/Mr._Market
-# -> order_processor.py
-
+import asyncio
+import collections
 import logging
 from typing import Any, Dict, Optional, Union
 
@@ -29,6 +26,7 @@ _LOG = logging.getLogger(__name__)
 # #############################################################################
 
 
+# TODO(Paul): Remove this wrapper.
 async def order_processor(
     db_connection: hsql.DbConnection,
     delay_to_accept_in_secs: float,
@@ -42,8 +40,7 @@ async def order_processor(
     poll_kwargs: Optional[Dict[str, Any]] = None,
 ) -> None:
     """
-    Mock the behavior of part of the actual implemented broker and of the
-    market.
+    Mock the behavior of part of the implemented broker and the market.
 
     This coroutine:
     - polls a table of the DB for submitted orders
@@ -61,43 +58,95 @@ async def order_processor(
           the broker stops submitting orders
         - int: number of orders to accept before shut down
     """
-    get_wall_clock_time = broker.market_data_interface.get_wall_clock_time
-    if poll_kwargs is None:
-        poll_kwargs = hasynci.get_poll_kwargs(get_wall_clock_time)
-    #
-    target_list_id = 0
-    while True:
-        wall_clock_time = get_wall_clock_time()
-        # Check whether we should exit or continue.
-        if isinstance(termination_condition, pd.Timestamp):
-            exit = wall_clock_time >= termination_condition
-        elif isinstance(termination_condition, int):
-            exit = target_list_id >= termination_condition
-        else:
-            raise ValueError(
-                "Invalid termination_condition=%s type=%s"
-                % (termination_condition, str(type(termination_condition)))
-            )
-        if exit:
-            _LOG.debug(
-                "Reached the end: "
-                + hprint.to_str(
-                    "target_list_id wall_clock_time termination_condition"
+    processor = OrderProcessor(
+        db_connection,
+        delay_to_accept_in_secs,
+        delay_to_fill_in_secs,
+        broker,
+        submitted_orders_table_name=submitted_orders_table_name,
+        accepted_orders_table_name=accepted_orders_table_name,
+        current_positions_table_name=current_positions_table_name,
+        poll_kwargs=poll_kwargs,
+    )
+    await processor.run_loop(termination_condition)
+
+
+class OrderProcessor:
+    def __init__(
+        self,
+        db_connection: hsql.DbConnection,
+        delay_to_accept_in_secs: float,
+        delay_to_fill_in_secs: float,
+        broker: ombroker.AbstractBroker,
+        *,
+        submitted_orders_table_name: str = oomsdb.SUBMITTED_ORDERS_TABLE_NAME,
+        accepted_orders_table_name: str = oomsdb.ACCEPTED_ORDERS_TABLE_NAME,
+        current_positions_table_name: str = oomsdb.CURRENT_POSITIONS_TABLE_NAME,
+        poll_kwargs: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        self._db_connection = db_connection
+        self._delay_to_accept_in_secs = delay_to_accept_in_secs
+        self._delay_to_fill_in_secs = delay_to_fill_in_secs
+        self._broker = broker
+        self._submitted_orders_table_name = submitted_orders_table_name
+        self._accepted_orders_table_name = accepted_orders_table_name
+        self._current_positions_table_name = current_positions_table_name
+        #
+        self._get_wall_clock_time = (
+            broker.market_data_interface.get_wall_clock_time
+        )
+        #
+        self._poll_kwargs = poll_kwargs or hasynci.get_poll_kwargs(
+            self._get_wall_clock_time
+        )
+        # TODO(Paul): `maxsize` chosen arbitrarily. Consider resizing.
+        self._orders = asyncio.Queue(maxsize=10)
+        self._processed_order_files = collections.OrderedDict
+        self._target_list_id = 0
+
+    async def run_loop(
+        self,
+        termination_condition: Union[pd.Timestamp, int],
+    ) -> None:
+        while True:
+            wall_clock_time = self._get_wall_clock_time()
+            target_list_id = self._target_list_id
+            # Check whether we should exit or continue.
+            if isinstance(termination_condition, pd.Timestamp):
+                exit = wall_clock_time >= termination_condition
+            elif isinstance(termination_condition, int):
+                exit = target_list_id >= termination_condition
+            else:
+                raise ValueError(
+                    "Invalid termination_condition=%s type=%s"
+                    % (termination_condition, str(type(termination_condition)))
                 )
-            )
-            break
+            if exit:
+                _LOG.debug(
+                    "Reached the end: "
+                    + hprint.to_str(
+                        "target_list_id wall_clock_time termination_condition"
+                    )
+                )
+                break
+            await self.enqueue_orders()
+            await self.dequeue_orders()
+
+    async def enqueue_orders(self) -> None:
         # Wait for orders to be written in `submitted_orders_table_name`.
         diff_num_rows = await hsql.wait_for_change_in_number_of_rows(
-            db_connection, submitted_orders_table_name, poll_kwargs
+            self._db_connection,
+            self._submitted_orders_table_name,
+            self._poll_kwargs,
         )
         _LOG.debug("diff_num_rows=%s", diff_num_rows)
         # Extract the latest file_name after order submission is complete.
         _LOG.debug("Executing query for submitted orders filename...")
         query = f"""
             SELECT filename, timestamp_db
-                FROM {submitted_orders_table_name}
+                FROM {self._submitted_orders_table_name}
                 ORDER BY timestamp_db"""
-        df = hsql.execute_query_to_df(db_connection, query)
+        df = hsql.execute_query_to_df(self._db_connection, query)
         _LOG.debug("df=\n%s", hprint.dataframe_to_str(df))
         hdbg.dassert_lte(
             diff_num_rows,
@@ -110,16 +159,18 @@ async def order_processor(
         hdbg.dassert_eq(diff_num_rows, 1)
         file_name = df.tail(1).squeeze()["filename"]
         _LOG.debug("file_name=%s", file_name)
-        # Wait after the submission was parsed.
-        hdbg.dassert_lt(0, delay_to_accept_in_secs)
-        await hasynci.sleep(delay_to_accept_in_secs, get_wall_clock_time)
-        wall_clock_time = get_wall_clock_time()
+        # Wait until the submission is parsed.
+        hdbg.dassert_lt(0, self._delay_to_accept_in_secs)
+        await hasynci.sleep(
+            self._delay_to_accept_in_secs, self._get_wall_clock_time
+        )
+        wall_clock_time = self._get_wall_clock_time()
         # Write in `accepted_orders_table_name` to acknowledge the orders.
         trade_date = wall_clock_time.date()
         success = True
         txt = f"""
         strategyid,SAU1
-        targetlistid,{target_list_id}
+        targetlistid,{self._target_list_id}
         tradedate,{trade_date}
         instanceid,1
         filename,{file_name}
@@ -132,30 +183,35 @@ async def order_processor(
         success,{success}
         reason,Foobar
         """
-        target_list_id += 1
         row = hsql.csv_to_series(txt, sep=",")
-        hsql.execute_insert_query(db_connection, row, accepted_orders_table_name)
-        # Wait after the orders were accepted.
-        hdbg.dassert_lt(0, delay_to_fill_in_secs)
-        await hasynci.sleep(delay_to_fill_in_secs, get_wall_clock_time)
-        # Wait until the max order deadline to return fills.
+        hsql.execute_insert_query(
+            self._db_connection, row, self._accepted_orders_table_name
+        )
+        self._target_list_id += 1
+        # Add the new orders to the internal queue.
         _LOG.debug("Executing query for unfilled submitted orders...")
         query = f"""
             SELECT filename, timestamp_db, orders_as_txt
-                FROM {submitted_orders_table_name}
+                FROM {self._submitted_orders_table_name}
                 ORDER BY timestamp_db"""
-        df = hsql.execute_query_to_df(db_connection, query)
+        df = hsql.execute_query_to_df(self._db_connection, query)
         _LOG.debug("df=\n%s", hprint.dataframe_to_str(df))
         hdbg.dassert_eq(file_name, df.tail(1).squeeze()["filename"])
         orders_as_txt = df.tail(1).squeeze()["orders_as_txt"]
         orders = omorder.orders_from_string(orders_as_txt)
+        self._orders.put_nowait(orders)
+
+    async def dequeue_orders(self) -> None:
+        orders = await self._orders.get()
+        get_wall_clock_time = (
+            self._broker.market_data_interface.get_wall_clock_time
+        )
         fulfillment_deadline = max([order.end_timestamp for order in orders])
         _LOG.debug("Order fulfillment deadline=%s", fulfillment_deadline)
-        # TODO(Paul): Don't wait past the deadline.
         await hasynci.wait_until(fulfillment_deadline, get_wall_clock_time)
         # Get the fills.
         _LOG.debug("Getting fills.")
-        fills = broker.get_fills()
+        fills = self._broker.get_fills()
         _LOG.debug("Received %i fills", len(fills))
         # Update current positions based on fills.
         for fill in fills:
@@ -168,26 +224,28 @@ async def order_processor(
             # #################################################################
             # Get the current positions for `asset_id`.
             query = []
-            query.append(f"SELECT * FROM {current_positions_table_name}")
+            query.append(f"SELECT * FROM {self._current_positions_table_name}")
             query.append(
                 f"WHERE account='candidate' AND tradedate='{trade_date}' AND asset_id={asset_id}"
             )
             query = "\n".join(query)
             _LOG.debug("query=%s", query)
-            positions_df = hsql.execute_query_to_df(db_connection, query)
+            positions_df = hsql.execute_query_to_df(self._db_connection, query)
             hdbg.dassert_lte(positions_df.shape[0], 1)
             _LOG.debug("positions_df=%s", hprint.dataframe_to_str(positions_df))
+            # #################################################################
             # Delete the row from the positions table.
             query = []
-            query.append(f"DELETE FROM {current_positions_table_name}")
+            query.append(f"DELETE FROM {self._current_positions_table_name}")
             query.append(
                 f"WHERE account='candidate' AND tradedate='{trade_date}' AND asset_id={asset_id}"
             )
             query = "\n".join(query)
             _LOG.debug("query=%s", query)
-            deletions = hsql.execute_query(db_connection, query)
+            deletions = hsql.execute_query(self._db_connection, query)
             deletions = deletions or 0
             _LOG.debug("Num deletions=%d", deletions)
+            # #################################################################
             # Update the row and insert into the positions table.
             # TODO(Paul): Need to handle BOD.
             if not positions_df.empty:
@@ -218,5 +276,5 @@ async def order_processor(
             row = row.convert_dtypes()
             _LOG.debug("Insert row is=%s", hprint.dataframe_to_str(row))
             hsql.execute_insert_query(
-                db_connection, row, current_positions_table_name
+                self._db_connection, row, self._current_positions_table_name
             )

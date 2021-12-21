@@ -153,7 +153,6 @@ class AbstractBroker(abc.ABC):
     ) -> None:
         ...
 
-    # TODO(Paul): Call `_get_fills_helper()` and make it concrete.
     def _get_fills_helper(self) -> List[Fill]:
         # We should always get the "next" orders, for this reason one should use
         # a priority queue.
@@ -165,16 +164,18 @@ class AbstractBroker(abc.ABC):
         # In our current execution model, we should ask about the orders that are
         # terminating.
         hdbg.dassert_lte(min(timestamps), wall_clock_timestamp)
-        executed_timestamps = []
+        orders_to_execute_timestamps = []
         orders_to_execute = []
         for timestamp in timestamps:
             if timestamp <= wall_clock_timestamp:
                 orders_to_execute.extend(
                     self._deadline_timestamp_to_orders[timestamp]
                 )
-                executed_timestamps.append(timestamp)
+                orders_to_execute_timestamps.append(timestamp)
         _LOG.debug("Executing %d orders", len(orders_to_execute))
-        # `as_of_timestamp` should match the end time of the orders.
+        # Ensure that no orders are included with `end_timestamp` greater
+        # than `wall_clock_timestamp`, e.g., assume that in general
+        # orders take their entire allotted window to fill.
         for order in orders_to_execute:
             hdbg.dassert_lte(order.end_timestamp, wall_clock_timestamp)
         # "Execute" the orders.
@@ -183,13 +184,14 @@ class AbstractBroker(abc.ABC):
             # TODO(gp): Here there should be a programmable logic that decides
             #  how many shares are filled.
             fills.extend(self._fully_fill(order.end_timestamp, order))
+        # NOTE: `self._fills` is not in `init()` in the abstract class.
         self._fills.extend(fills)
         # Remove the orders that have been executed.
         _LOG.debug(
             "Removing orders from queue with deadline earlier than=`%s`",
             wall_clock_timestamp,
         )
-        for timestamp in executed_timestamps:
+        for timestamp in orders_to_execute_timestamps:
             del self._deadline_timestamp_to_orders[timestamp]
         _LOG.debug("-> Returning fills:\n%s", str(fills))
         return fills
@@ -198,12 +200,14 @@ class AbstractBroker(abc.ABC):
         self, wall_clock_timestamp: pd.Timestamp, order: omorder.Order
     ) -> List[Fill]:
         num_shares = order.num_shares
-        # TODO(Paul): We should move the logic here.
+        # TODO(Paul): The function `get_execution_price()` should be
+        #  configurable.
         price = get_execution_price(self.market_data_interface, order)
         fill = Fill(order, wall_clock_timestamp, num_shares, price)
         return [fill]
 
-    def _log_order_submissions(self, orders) -> None:
+    def _log_order_submissions(self, orders: List[omorder.Order]) -> None:
+        hdbg.dassert_container_type(orders, list, omorder.Order)
         wall_clock_timestamp = self._get_wall_clock_time()
         _LOG.debug("wall_clock_timestamp=%s", wall_clock_timestamp)
         if self._orders:

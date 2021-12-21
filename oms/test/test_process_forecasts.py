@@ -7,8 +7,8 @@ import pandas as pd
 import helpers.hasyncio as hasynci
 import helpers.unit_test as hunitest
 import market_data.market_data_interface_example as mdmdinex
-import oms.mr_market as omrmark
 import oms.oms_db as oomsdb
+import oms.order_processor as oordproc
 import oms.portfolio_example as oporexam
 import oms.process_forecasts as oprofore
 import oms.test.oms_db_helper as omtodh
@@ -110,7 +110,7 @@ class TestMockedProcessForecasts1(omtodh.TestOmsDbHelper):
             delay_to_fill_in_secs = 10
             broker = portfolio.broker
             termination_condition = 3
-            order_processor = omrmark.order_processor(
+            order_processor = oordproc.order_processor(
                 db_connection,
                 delay_to_accept_in_secs,
                 delay_to_fill_in_secs,

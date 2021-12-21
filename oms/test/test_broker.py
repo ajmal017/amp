@@ -6,10 +6,10 @@ import helpers.hasyncio as hasynci
 import helpers.unit_test as hunitest
 import oms.broker as ombroker
 import oms.broker_example as obroexam
-import oms.mr_market as omrmark
 import oms.oms_db as oomsdb
 import oms.order as omorder
 import oms.order_example as oordexam
+import oms.order_processor as oordproc
 import oms.test.oms_db_helper as omtodh
 
 _LOG = logging.getLogger(__name__)
@@ -81,15 +81,13 @@ class TestMockedBroker1(omtodh.TestOmsDbHelper):
     ) -> None:
         delay_to_accept_in_secs = 2
         delay_to_fill_in_secs = 1
-        termination_condition = 1
-        order_processor = omrmark.order_processor(
+        order_processor = oordproc.OrderProcessor(
             self.connection,
             delay_to_accept_in_secs,
             delay_to_fill_in_secs,
             broker,
-            termination_condition,
         )
-        await order_processor
+        await order_processor.enqueue_orders()
 
     async def _broker_coroutine(
         self, broker: ombroker.MockedBroker, order

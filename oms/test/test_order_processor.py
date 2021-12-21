@@ -7,13 +7,13 @@ import helpers.datetime_ as hdateti
 import helpers.hasyncio as hasynci
 import oms.broker as ombroker
 import oms.broker_example as obroexam
-import oms.mr_market as omrmark
 import oms.oms_db as oomsdb
 import oms.order_example as oordexam
+import oms.order_processor as oordproc
 import oms.test.oms_db_helper as omtodh
 
 
-class TestMrMarketOrderProcessor1(omtodh.TestOmsDbHelper):
+class TestOrderProcessor1(omtodh.TestOmsDbHelper):
     def setUp(self) -> None:
         super().setUp()
         # Create OMS tables.
@@ -41,7 +41,7 @@ class TestMrMarketOrderProcessor1(omtodh.TestOmsDbHelper):
             # Build OrderProcessor.
             delay_to_accept_in_secs = 3
             delay_to_fill_in_secs = 10
-            order_processor = omrmark.order_processor(
+            order_processor = oordproc.order_processor(
                 self.connection,
                 delay_to_accept_in_secs,
                 delay_to_fill_in_secs,
