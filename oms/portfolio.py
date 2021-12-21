@@ -90,9 +90,7 @@ class AbstractPortfolio(abc.ABC):
         hdbg.dassert_issubclass(
             market_data_interface, mdmadain.AbstractMarketDataInterface
         )
-        # TODO(gp): Make it public. This is so we can pass it to other objects
-        #  downstream.
-        self._market_data_interface = market_data_interface
+        self.market_data_interface = market_data_interface
         self._get_wall_clock_time = get_wall_clock_time
         self._asset_id_col = asset_id_col
         self._mark_to_market_col = mark_to_market_col
@@ -303,13 +301,13 @@ class AbstractPortfolio(abc.ABC):
         asset_ids: List[int],
     ) -> pd.Series:
         """
-        Wraps `portfolio.market_data_interface` and packages output.
+        Wrap `portfolio.market_data_interface` and packages output.
 
         :param as_of_timestamp: as in `market_data_interface.get_data_at_timestamp()`
         :param asset_ids: as in `market_data_interface.get_data_at_timestamp()`
         :return: series of prices at `as_of_timestamp` indexed by asset_id
         """
-        price_df = self._market_data_interface.get_data_at_timestamp(
+        price_df = self.market_data_interface.get_data_at_timestamp(
             as_of_timestamp, self._timestamp_col, asset_ids
         )
         columns = [self._asset_id_col, self._mark_to_market_col]

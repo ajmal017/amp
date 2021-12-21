@@ -144,7 +144,7 @@ class TestMockedProcessForecasts1(omtodh.TestOmsDbHelper):
         ]
         predictions = pd.DataFrame(data, index=index, columns=columns)
         # TODO(gp): Remove mdi and broker since they are passed through Portfolio.
-        config["market_data_interface"] = portfolio._market_data_interface
+        config["market_data_interface"] = portfolio.market_data_interface
         config["portfolio"] = portfolio
         config["broker"] = portfolio.broker
         config["order_type"] = "price@twap"

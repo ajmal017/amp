@@ -62,13 +62,14 @@ class DagAdapter(dtfcorbuil.DagBuilder):
         return txt
 
     def get_config_template(self) -> cconfig.Config:
-        config = self.dag_builder.get_config_template()
+        config = self._dag_builder.get_config_template()
+        config.update(self._overriding_config)
         return config
 
     def _get_dag(
         self, config: cconfig.Config, mode: str = "strict"
     ) -> dtfcordag.DAG:
-        dag = self.dag_builder.get_dag(config, mode=mode)
+        dag = self._dag_builder.get_dag(config, mode=mode)
         # To append a node we need to assume that there is a single sink node.
         tail_nid = dag.get_unique_sink()
         for stage, node in self._nodes_to_append:

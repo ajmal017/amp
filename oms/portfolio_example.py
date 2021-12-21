@@ -28,10 +28,11 @@ def get_simulated_portfolio_example1(
     broker = obroexam.get_simulated_broker_example1(
         event_loop, market_data_interface=market_data_interface
     )
+    market_data_interface = broker.market_data_interface
     # Build SimulatedPortfolio.
     strategy_id = "st1"
     account = "paper"
-    get_wall_clock_time = broker.market_data_interface.get_wall_clock_time
+    get_wall_clock_time = market_data_interface.get_wall_clock_time
     asset_id_column = "asset_id"
     mark_to_market_col = "price"
     timestamp_col = "end_datetime"

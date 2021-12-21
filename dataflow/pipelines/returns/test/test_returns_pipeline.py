@@ -93,7 +93,7 @@ class TestReturnsBuilder(hunitest.TestCase):
 # #############################################################################
 
 
-class TestRealtimeDagAdapter1(hunitest.TestCase):
+class TestDagAdapter2(hunitest.TestCase):
 
     def testMvnReturnsBuilder1(self) -> None:
         """

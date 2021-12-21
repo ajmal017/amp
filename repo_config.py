@@ -34,7 +34,16 @@ def run_docker_as_root() -> bool:
     """
     Return whether Docker should be run with root user.
     """
-    return True
+    res = True
+    if os.environ.get("CI", False):
+        # Running as user in GH action we get an error:
+        # ```
+        # /home/.config/gh/config.yml: permission denied
+        # ```
+        # see https://github.com/alphamatic/amp/issues/1864
+        # We run as root.
+        res = True
+    return res
 
 
 def has_dind_support() -> bool:
