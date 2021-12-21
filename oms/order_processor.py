@@ -21,57 +21,17 @@ import oms.order as omorder
 
 _LOG = logging.getLogger(__name__)
 
-# #############################################################################
-# Order processor
-# #############################################################################
 
-
-# TODO(Paul): Remove this wrapper.
-async def order_processor(
-    db_connection: hsql.DbConnection,
-    delay_to_accept_in_secs: float,
-    delay_to_fill_in_secs: float,
-    broker: ombroker.AbstractBroker,
-    termination_condition: Union[pd.Timestamp, int],
-    *,
-    submitted_orders_table_name: str = oomsdb.SUBMITTED_ORDERS_TABLE_NAME,
-    accepted_orders_table_name: str = oomsdb.ACCEPTED_ORDERS_TABLE_NAME,
-    current_positions_table_name: str = oomsdb.CURRENT_POSITIONS_TABLE_NAME,
-    poll_kwargs: Optional[Dict[str, Any]] = None,
-) -> None:
+class OrderProcessor:
     """
     Mock the behavior of part of the implemented broker and the market.
 
-    This coroutine:
+    This class:
     - polls a table of the DB for submitted orders
     - updates the accepted orders DB table
     - updates the current positions DB table
-
-    :param delay_to_accept_in_secs: delay after the order is submitted to update
-        the accepted orders table
-    :param delay_to_fill_in_secs: delay after the order is accepted to update the
-        position table with the filled positions
-    :param termination_condition: when to terminate polling the table of submitted
-        order.
-        - pd.timestamp: when this object should stop checking for orders. Be
-          careful since this can create deadlocks if this timestamp is set after
-          the broker stops submitting orders
-        - int: number of orders to accept before shut down
     """
-    processor = OrderProcessor(
-        db_connection,
-        delay_to_accept_in_secs,
-        delay_to_fill_in_secs,
-        broker,
-        submitted_orders_table_name=submitted_orders_table_name,
-        accepted_orders_table_name=accepted_orders_table_name,
-        current_positions_table_name=current_positions_table_name,
-        poll_kwargs=poll_kwargs,
-    )
-    await processor.run_loop(termination_condition)
 
-
-class OrderProcessor:
     def __init__(
         self,
         db_connection: hsql.DbConnection,
@@ -84,6 +44,16 @@ class OrderProcessor:
         current_positions_table_name: str = oomsdb.CURRENT_POSITIONS_TABLE_NAME,
         poll_kwargs: Optional[Dict[str, Any]] = None,
     ) -> None:
+        """
+        Constructor.
+
+        :param delay_to_accept_in_secs: delay after the order is submitted to update
+            the accepted orders table
+        :param delay_to_fill_in_secs: delay after the order is accepted to update the
+            position table with the filled positions
+        :param delay_to_accept_in_secs:
+        :param delay_to_fill_in_secs:
+        """
         self._db_connection = db_connection
         self._delay_to_accept_in_secs = delay_to_accept_in_secs
         self._delay_to_fill_in_secs = delay_to_fill_in_secs
@@ -99,8 +69,10 @@ class OrderProcessor:
         self._poll_kwargs = poll_kwargs or hasynci.get_poll_kwargs(
             self._get_wall_clock_time
         )
-        # TODO(Paul): `maxsize` chosen arbitrarily. Consider resizing.
-        self._orders = asyncio.Queue(maxsize=10)
+        # NOTE: In our current execution model, at most one order should be in
+        #  this queue at any given time. If we change our execution model, then
+        #  we may need to resize the queue.
+        self._orders = asyncio.Queue(maxsize=1)
         self._processed_order_files = collections.OrderedDict
         self._target_list_id = 0
 
@@ -108,6 +80,16 @@ class OrderProcessor:
         self,
         termination_condition: Union[pd.Timestamp, int],
     ) -> None:
+        """
+        Run the order processing loop.
+
+        :param termination_condition: when to terminate polling the table of submitted
+            orders.
+            - pd.timestamp: when this object should stop checking for orders. Be
+              careful since this can create deadlocks if this timestamp is set after
+              the broker stops submitting orders.
+            - int: number of orders to accept before shut down
+        """
         while True:
             wall_clock_time = self._get_wall_clock_time()
             target_list_id = self._target_list_id
@@ -133,6 +115,9 @@ class OrderProcessor:
             await self.dequeue_orders()
 
     async def enqueue_orders(self) -> None:
+        """
+        Poll for submitted orders, accept, and enqueue.
+        """
         # Wait for orders to be written in `submitted_orders_table_name`.
         diff_num_rows = await hsql.wait_for_change_in_number_of_rows(
             self._db_connection,
@@ -202,12 +187,16 @@ class OrderProcessor:
         self._orders.put_nowait(orders)
 
     async def dequeue_orders(self) -> None:
+        """
+        Dequeue orders and fill.
+        """
         orders = await self._orders.get()
         get_wall_clock_time = (
             self._broker.market_data_interface.get_wall_clock_time
         )
         fulfillment_deadline = max([order.end_timestamp for order in orders])
         _LOG.debug("Order fulfillment deadline=%s", fulfillment_deadline)
+        # Wait until the order fulfillment deadline to return fill.
         await hasynci.wait_until(fulfillment_deadline, get_wall_clock_time)
         # Get the fills.
         _LOG.debug("Getting fills.")

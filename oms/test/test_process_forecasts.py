@@ -110,15 +110,20 @@ class TestMockedProcessForecasts1(omtodh.TestOmsDbHelper):
             delay_to_fill_in_secs = 10
             broker = portfolio.broker
             termination_condition = 3
-            order_processor = oordproc.order_processor(
+            order_processor = oordproc.OrderProcessor(
                 db_connection,
                 delay_to_accept_in_secs,
                 delay_to_fill_in_secs,
                 broker,
-                termination_condition,
                 poll_kwargs=poll_kwargs,
             )
-            coroutines = [self._test_mocked_system1(portfolio), order_processor]
+            order_processor_coroutine = order_processor.run_loop(
+                termination_condition
+            )
+            coroutines = [
+                self._test_mocked_system1(portfolio),
+                order_processor_coroutine,
+            ]
             hasynci.run(asyncio.gather(*coroutines), event_loop=event_loop)
 
     async def _test_mocked_system1(
