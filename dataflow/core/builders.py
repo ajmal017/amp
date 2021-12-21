@@ -58,6 +58,26 @@ class DagBuilder(abc.ABC):
             )
             self._nid_prefix += "/"
 
+    def __str__(self) -> str:
+        txt = []
+        txt.append(f"nid_prefix={self._nid_prefix}")
+        #
+        txt.append("get_config_template=")
+        config_template = self.get_config_template()
+        config_as_str = str(config_template)
+        txt.append(hprint.indent(config_as_str, 2))
+        #
+        txt.append("dag=")
+        # We can't validate the DAG since we are not filling all the dummies in the
+        # config template.
+        validate = False
+        dag = self.get_dag(config_template, validate=validate)
+        dag_as_str = repr(dag)
+        txt.append(hprint.indent(dag_as_str, 2))
+        #
+        txt = "\n".join(txt)
+        return txt
+
     @property
     def nid_prefix(self) -> str:
         return self._nid_prefix
@@ -85,43 +105,8 @@ class DagBuilder(abc.ABC):
         """
         dag = self._get_dag(config, mode=mode)
         if validate:
-            self.validate_config_and_dag(config, dag)
+            self._validate_config_and_dag(config, dag)
         return dag
-
-    def __str__(self) -> str:
-        txt = []
-        txt.append(f"nid_prefix={self._nid_prefix}")
-        #
-        txt.append("get_config_template=")
-        config_template = self.get_config_template()
-        config_as_str = str(config_template)
-        txt.append(hprint.indent(config_as_str, 2))
-        #
-        txt.append("dag=")
-        # We can't validate the DAG since we are not filling all the dummies in the
-        # config template.
-        validate = False
-        dag = self.get_dag(config_template, validate=validate)
-        dag_as_str = repr(dag)
-        txt.append(hprint.indent(dag_as_str, 2))
-        #
-        txt = "\n".join(txt)
-        return txt
-
-    @staticmethod
-    def validate_config_and_dag(
-        config: cconfig.Config, dag: dtfcordag.DAG
-    ) -> None:
-        """
-        Implement sanity-checks for the provided config and a DAG.
-
-        - Raises if `config` has a DUMMY value
-        - Raises if `config` has an entry for a node that is not in the DAG
-        """
-        hdbg.dassert(cconfig.check_no_dummy_values(config))
-        for key in config.to_dict().keys():
-            # This raises if the node does not exist.
-            dag.get_node(key)
 
     @property
     def methods(self) -> List[str]:
@@ -143,6 +128,21 @@ class DagBuilder(abc.ABC):
         """
         _ = self, config
         return None
+
+    @staticmethod
+    def _validate_config_and_dag(
+        config: cconfig.Config, dag: dtfcordag.DAG
+    ) -> None:
+        """
+        Implement sanity-checks for the provided config and a DAG.
+
+        - Raises if `config` has a DUMMY value
+        - Raises if `config` has an entry for a node that is not in the DAG
+        """
+        hdbg.dassert(cconfig.check_no_dummy_values(config))
+        for key in config.to_dict().keys():
+            # This raises if the node does not exist.
+            dag.get_node(key)
 
     @abc.abstractmethod
     def _get_dag(self, config: cconfig.Config, mode: str = "strict"):

@@ -31,9 +31,9 @@ class AbstractPortfolio(abc.ABC):
     Store holdings over time, e.g., many shares of each asset are owned at any
     time.
 
-    Cash is treated as any other asset to keep code uniform. The tables
-    are indexed by knowledge time, i.e., when this information became
-    known by this object.
+    Cash is treated as any other asset to keep code uniform. The tables are
+    indexed by knowledge time, i.e., when this information became known by this
+    object.
     """
 
     # ID of asset representing cash.
@@ -100,15 +100,15 @@ class AbstractPortfolio(abc.ABC):
         #
         self._validate_initial_holdings_df(holdings_df)
         self._holdings_df = holdings_df
-        # At each call to `mark_to_market`, we capture `wall_clock_time` and
+        # At each call to `mark_to_market()`, we capture `wall_clock_time` and
         # perform a sequence of updates to the following dictionaries.
-        # timestamp to pd.Series of holdings in shares (indexed by asset_id).
+        # - timestamp to pd.Series of holdings in shares (indexed by asset_id).
         self._asset_holdings = collections.OrderedDict()
-        # timestamp to pd.DataFrame of price, value (indexed by asset_id).
+        # - timestamp to pd.DataFrame of price, value (indexed by asset_id).
         self._assets_marked_to_market = collections.OrderedDict()
-        # timestamp to float
+        # - timestamp to float.
         self._cash = collections.OrderedDict()
-        # timestamp to pd.Series of statistics
+        # - timestamp to pd.Series of statistics.
         self._statistics = collections.OrderedDict()
         # We initialize the collection of dictionaries from `holdings_df`.
         initial_timestamp = holdings_df.index[0]
@@ -216,6 +216,7 @@ class AbstractPortfolio(abc.ABC):
         # Perform sanity-checks.
         # These four dictionaries should have the same keys. Here we check that
         # they have the same length.
+        # TODO(Paul): Check keys instead of length.
         hdbg.dassert_eq(
             len(self._asset_holdings), len(self._assets_marked_to_market)
         )
@@ -241,7 +242,7 @@ class AbstractPortfolio(abc.ABC):
         # Get latest timestamp available.
         timestamp = next(reversed(self._asset_holdings))
         _LOG.debug("Retrieving holdings at timestamp=%s", timestamp)
-        # Create a holdings_df with assets and cash.
+        # Create a `holdings_df` with assets and cash.
         holdings_df = self._asset_holdings[timestamp].reset_index()
         cash_df = AbstractPortfolio._create_holdings_df_from_cash(
             self._cash[timestamp], timestamp
@@ -295,6 +296,7 @@ class AbstractPortfolio(abc.ABC):
         asset_values[AbstractPortfolio.CASH_ID] = cash
         return asset_values
 
+    # TODO(gp): -> _get_price_assets_helper?
     def price_assets(
         self,
         as_of_timestamp: pd.Timestamp,
@@ -317,13 +319,14 @@ class AbstractPortfolio(abc.ABC):
         hdbg.dassert(not price_srs.index.has_duplicates)
         return price_srs
 
+    # TODO(gp): -> _get_price_assets?
     def _price_assets(
         self,
         as_of_timestamp: pd.Timestamp,
         asset_ids: pd.Series,
     ) -> None:
         """
-        Accesses the underlying market_data_interface to price assets.
+        Access the underlying market_data_interface to price assets.
 
         :param as_of_timestamp: timestamp to forward to `market_data_interface`
         :param asset_ids: series of share counts indexed by asset id
@@ -357,7 +360,7 @@ class AbstractPortfolio(abc.ABC):
 
     def _compute_statistics(self) -> None:
         """
-        Computes various portfolio statistics using latest holdings and prices.
+        Compute various portfolio statistics using latest holdings and prices.
 
         Return asset/cash values, net wealth, exposure, and leverage for
         the portfolio at a given timestamp.
@@ -822,8 +825,13 @@ def _sequential_insert(
     obj: Any,
     odict: Dict[pd.Timestamp, Any],
 ) -> None:
-    hdbg.dassert_isinstance(odict, collections.OrderedDict)
+    """
+    Insert `(key, obj)` in `odict` ensuring that keys are in increasing order.
+
+    Assume that `odict` is a dict maintaining the insertion order of the keys.
+    """
     hdbg.dassert_isinstance(key, pd.Timestamp)
+    hdbg.dassert_isinstance(odict, collections.OrderedDict)
     # Ensure that timestamps are inserted in increasing order.
     if odict:
         last_key = next(reversed(odict))
