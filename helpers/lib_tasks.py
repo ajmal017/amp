@@ -2966,11 +2966,12 @@ def run_coverage_report(ctx):
     _run(ctx, cmd)
     cmd = f"invoke run_slow_tests --coverage -p {target_dir}; cp .coverage .coverage_slow_tests"
     _run(ctx, cmd)
-    cmd = "coverage combine --keep .coverage_fast_tests .coverage_slow_tests"
-    cmd = 'coverage report --include="${target_dir}/*" --omit="*/test_*.py" --sort=Cover'
-    cmd = 'coverage html --include="${target_dir}/*" --omit="*/test_*.py"'
-    _run(ctx, cmd)
-    _run(ctx, cmd)
+    cmd = []
+    cmd.append("coverage combine --keep .coverage_fast_tests .coverage_slow_tests")
+    cmd.append('coverage report --include="${target_dir}/*" --omit="*/test_*.py" --sort=Cover')
+    cmd.append('coverage html --include="${target_dir}/*" --omit="*/test_*.py"')
+    cmd = " && ".join(cmd)
+    cmd = "invoke docker_bash --cmd '%s'" % cmd
     _run(ctx, cmd)
 
 

@@ -25,9 +25,7 @@ class ArmaReturnsBuilder(dtfcorbuil.DagBuilder):
 
     def get_config_template(self) -> cconfig.Config:
         """
-        Return a reference configuration.
-
-        :return: reference config
+        Same as abstract method.
         """
         config = cconfig.get_config_from_nested_dict(
             {
@@ -93,12 +91,7 @@ class ArmaReturnsBuilder(dtfcorbuil.DagBuilder):
         self, config: cconfig.Config, mode: str = "strict"
     ) -> dtfcordag.DAG:
         """
-        Generate pipeline DAG.
-
-        :param config: config object used to configure DAG
-        :param mode: "strict" (e.g., for production) or "loose" (e.g., for
-            interactive jupyter notebooks)
-        :return: initialized DAG
+        Same as abstract method.
         """
         dag = dtfcordag.DAG(mode=mode)
         _LOG.debug("%s", config)
@@ -163,6 +156,10 @@ class ArmaReturnsBuilder(dtfcorbuil.DagBuilder):
 
 
 class MvnReturnsBuilder(dtfcorbuil.DagBuilder):
+    """
+    Pipeline for generating filtered returns from an Multivariate Normal process.
+    """
+
     def get_config_template(self) -> cconfig.Config:
         config = cconfig.get_config_from_nested_dict(
             {

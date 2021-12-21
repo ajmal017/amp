@@ -4,8 +4,9 @@ Import as:
 import dataflow.core.dag as dtfcordag
 """
 import itertools
+import json
 import logging
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import networkx as networ
 from tqdm.autonotebook import tqdm
@@ -66,6 +67,73 @@ class DAG:
     @property
     def dag(self) -> networ.DiGraph:
         return self._dag
+
+    def __str__(self) -> str:
+        """
+        Return a short representation for user.
+
+        E.g.,
+        ```
+        name=None
+        mode=strict
+        nodes=[('n1', {'stage': <dataflow.core.node.Node object at 0x>})]
+        edges=[]
+        ```
+        """
+        txt = []
+        txt.append(f"name={self._name}")
+        txt.append(f"mode={self._mode}")
+        txt.append("nodes=" + str(self.dag.nodes(data=True)))
+        txt.append("edges=" + str(self.dag.edges(data=True)))
+        return "\n".join(txt)
+
+    def __repr__(self) -> str:
+        """
+        Return a detailed representation for debugging.
+
+        E.g.,
+        ```
+        name=None
+        mode=strict
+        json=
+          {
+              "directed": true,
+              ...
+              "nodes": [
+                  {
+                      "id": "n1",
+                      "stage": "Node"
+                  }
+              ]
+          }
+        ```
+        """
+        txt = []
+        txt.append(f"name={self._name}")
+        txt.append(f"mode={self._mode}")
+        txt.append("json=")
+        txt.append(hprint.indent(self._to_json(), 2))
+        return "\n".join(txt)
+
+    def _to_json(self) -> str:
+        # Get internal networkx representation of the DAG.
+        graph: networ.classes.digraph.DiGraph = self.dag
+        nld = networ.readwrite.json_graph.node_link_data(graph)
+        # Remove stages names from `node_link_data` dictionary since they refer to
+        # `Node` objects, which are not JSON serializable.
+        # E.g., `nld` looks like:
+        #   {'directed': True,
+        #    'graph': {},
+        #    'links': [],
+        #    'multigraph': False,
+        #    'nodes': [{'id': 'n1',
+        #               'stage': <dataflow.core.Node object at 0x...>}]}
+        nld = nld.copy()
+        for data in nld["nodes"]:
+            data["stage"] = data["stage"].__class__.__name__
+        # Print as JSON.
+        json_nld = json.dumps(nld, indent=4, sort_keys=True)
+        return json_nld
 
     # TODO(*): Should we force to always have a name? So mypy can perform more
     #  checks.
