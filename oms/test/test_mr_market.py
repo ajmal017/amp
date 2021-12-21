@@ -20,7 +20,7 @@ class TestMrMarketOrderProcessor1(omtodh.TestOmsDbHelper):
         oomsdb.create_oms_tables(self.connection, incremental=False)
 
     def tearDown(self) -> None:
-        # Create OMS tables.
+        # Remove the OMS tables.
         oomsdb.remove_oms_tables(self.connection)
         super().tearDown()
 
