@@ -162,10 +162,24 @@ class DagBuilder(abc.ABC):
     ) -> str:
         """
         Append `node` to the DAG after the node `tail_nid`.
+
+        A typical use of this function is like:
+        ```
+        tail_nid = None
+        tail_nid = dag.append(tail_nid, node_1)
+        ...
+        tail_nid = dag.append(tail_nid, node_n)
+        _ = tail_nid
+        ```
+
+        :param tail_nid: the nid of the node to append to. If `None` add only
+            without appending. This allows a pattern like:
         """
+        # _LOG.debug("dag before appending=\n%s", str(dag))
         dag.add_node(node)
         if tail_nid is not None:
             dag.connect(tail_nid, node.nid)
+        # _LOG.debug("dag after appending=\n%s", str(dag))
         nid = node.nid
         nid = cast(str, nid)
         return nid

@@ -1,8 +1,10 @@
 import logging
+import os
 
 import pandas as pd
 
 import dataflow.core.builders_example as dtfcobuexa
+import dataflow.core.visualization as dtfcorvisu
 import dataflow.system.real_time_dag_adapter as dtfsrtdaad
 import helpers.printing as hprint
 import helpers.unit_test as hunitest
@@ -22,17 +24,28 @@ class TestRealtimeDagAdapter1(hunitest.TestCase):
         """
         txt = []
         # Build a DagBuilder.
-        dag_builder = dtfcobuexa.MvnReturnsBuilder()
-        txt.append("dag_builder=")
+        dag_builder = dtfcobuexa.ReturnsBuilder()
+        txt.append(hprint.frame("dag_builder"))
         txt.append(hprint.indent(str(dag_builder)))
         # Build a Portfolio.
         event_loop = None
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
-        portfolio = oporexam.get_simulated_portfolio_example1(event_loop, initial_timestamp)
+        portfolio = oporexam.get_simulated_portfolio_example1(
+            event_loop, initial_timestamp
+        )
         # Build a DagAdapter.
         dag_adapter = dtfsrtdaad.RealTimeDagAdapter(dag_builder, portfolio)
-        txt.append("dag_adapter=")
+        txt.append(hprint.frame("dag_adapter"))
         txt.append(hprint.indent(str(dag_adapter)))
+        # Compute the final DAG.
+        config = dag_adapter.get_config_template()
+        _LOG.debug("config=\n%s", config)
+        dag = dag_adapter.get_dag(config)
+        #
+        file_name = os.path.join(self.get_scratch_space(), "dag.png")
+        dtfcorvisu.draw_to_file(dag, file_name)
+        txt.append(hprint.frame("final dag"))
+        txt.append(str(dag))
         # Check.
         txt = "\n".join(txt)
         self.check_string(txt, purify_text=True)

@@ -11,8 +11,9 @@ import pandas as pd
 import core.config as cconfig
 import dataflow.core.builders as dtfcorbuil
 import dataflow.core.dag_adapter as dtfcodaada
-import oms.portfolio as omportfo
 import dataflow.system.dataflow_sink_nodes as dtfsdtfsino
+import dataflow.system.dataflow_source_nodes as dtfsdtfsono
+import oms.portfolio as omportfo
 
 
 class RealTimeDagAdapter(dtfcodaada.DagAdapter):
@@ -67,10 +68,17 @@ class RealTimeDagAdapter(dtfcodaada.DagAdapter):
                 "2000-01-01 16:40:00-05:00", tz="America/New_York"
             ).time(),
         }
+        # Insert a node.
+        nodes_to_insert = []
+        stage = "load_prices"
+        node_ctor = dtfsdtfsono.data_source_node_factory
+        nodes_to_insert.append((stage, node_ctor))
         # Append a ProcessForecastNode node.
         nodes_to_append = []
         stage = "process_forecasts"
         node_ctor = dtfsdtfsino.ProcessForecasts
         nodes_to_append.append((stage, node_ctor))
         #
-        super().__init__(dag_builder, overriding_config, nodes_to_append)
+        super().__init__(
+            dag_builder, overriding_config, nodes_to_insert, nodes_to_append
+        )

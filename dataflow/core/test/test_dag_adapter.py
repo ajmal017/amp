@@ -1,14 +1,20 @@
 import logging
+from typing import Any, Dict, List
 
 import numpy as np
 import pandas as pd
 
 import core.config as cconfig
+import dataflow.core.builders as dtfcorbuil
 import dataflow.core.builders_example as dtfcobuexa
+import dataflow.core.dag as dtfcordag
 import dataflow.core.dag_adapter as dtfcodaada
+import dataflow.core.node as dtfcornode
 import dataflow.core.nodes.sinks as dtfconosin
 import dataflow.core.nodes.sources as dtfconosou
 import dataflow.core.runners as dtfcorrunn
+import dataflow.pipelines.returns.pipeline as dtfpirepip
+import dataflow.system.dataflow_source_nodes as dtfsdtfsono
 import helpers.printing as hprint
 import helpers.unit_test as hunitest
 
@@ -36,12 +42,64 @@ def _get_data() -> pd.DataFrame:
 
 
 class TestDagAdapter1(hunitest.TestCase):
+    def helper(
+        self,
+        dag_builder: dtfcorbuil.DagBuilder,
+        overriding_config: Dict[str, Any],
+        nodes_to_insert: List[dtfcornode.Node],
+        nodes_to_append: List[dtfcornode.Node],
+    ) -> None:
+        txt = []
+        # Build the `DagAdapter`.
+        txt.append(hprint.frame("dag_builder"))
+        txt.append(str(dag_builder))
+        #
+        dag_adapter = dtfcodaada.DagAdapter(
+            dag_builder, overriding_config, nodes_to_insert, nodes_to_append
+        )
+        txt.append(hprint.frame("dag_adapter"))
+        txt.append(str(dag_adapter))
+        # Compute the final DAG.
+        config = dag_adapter.get_config_template()
+        _LOG.debug("config=\n%s", config)
+        dag = dag_adapter.get_dag(config)
+        txt.append(hprint.frame("final dag"))
+        txt.append(str(dag))
+        # Check.
+        txt = "\n".join(txt)
+        self.check_string(txt, purify_text=True)
+
     def test1(self) -> None:
         """
         Adapt a DAG injecting a data source and appending a `WriteDf` node.
         """
-        txt = []
+        overriding_config = cconfig.Config()
+        # Configure a `DataSourceNode`.
+        overriding_config["load_prices"] = {
+            "source_node_name": "DataLoader",
+            "source_node_kwargs": {"func": lambda x: x},
+        }
+        overriding_config["write_df"] = {
+            "dir_name": "here",
+        }
+        # Do not insert any node.
+        nodes_to_insert = []
+        # Append a `WriteDf` node.
+        nodes_to_append = []
+        stage = "write_df"
+        node_ctor = dtfconosin.WriteDf
+        nodes_to_append.append((stage, node_ctor))
         #
+        dag_builder = dtfcobuexa.DagBuilderExample1()
+        # Check.
+        self.helper(
+            dag_builder, overriding_config, nodes_to_insert, nodes_to_append
+        )
+
+    def test2(self) -> None:
+        """
+        Adapt a DAG inserting a node.
+        """
         overriding_config = cconfig.Config()
         # Configure a `DataSourceNode`.
         overriding_config["load_prices"] = {
@@ -50,21 +108,16 @@ class TestDagAdapter1(hunitest.TestCase):
                 "func": _get_data,
             },
         }
-        # Append a `WriteDf` node.
+        # Insert one node.
+        nodes_to_insert = []
+        stage = "load_prices"
+        node_ctor = dtfsdtfsono.data_source_node_factory
+        nodes_to_insert.append((stage, node_ctor))
+        # Do not append any node.
         nodes_to_append = []
-        stage = "write_df"
-        node_ctor = dtfconosin.WriteDf
-        nodes_to_append.append((stage, node_ctor))
-        # Build the `DagAdapter`.
-        dag_builder = dtfcobuexa.ArmaReturnsBuilder()
-        txt.append("dag_builder=")
-        txt.append(hprint.indent(str(dag_builder)))
         #
-        dag_adapter = dtfcodaada.DagAdapter(
-            dag_builder, overriding_config, nodes_to_append
-        )
-        txt.append("dag_adapter=")
-        txt.append(hprint.indent(str(dag_adapter)))
+        dag_builder = dtfcobuexa.ReturnsBuilder()
         # Check.
-        txt = "\n".join(txt)
-        self.check_string(txt)
+        self.helper(
+            dag_builder, overriding_config, nodes_to_insert, nodes_to_append
+        )

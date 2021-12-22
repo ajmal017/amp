@@ -1,36 +1,30 @@
-dag_builder=
+################################################################################
+dag_builder
+################################################################################
   nid_prefix=
   get_config_template=
-    load_prices:
-      frequency: T
-      start_date: 2010-01-04 09:30:00
-      end_date: 2010-01-14 16:05:00
-      dim: 4
-      target_volatility: 0.25
-      seed: 247
-    filter_ath:
+    rets/filter_ath:
       col_mode: replace_all
       transformer_kwargs:
         start_time: 09:30:00
         end_time: 16:00:00
-    resample:
-      in_col_groups: [('close',), ('volume',)]
-      out_col_group: ()
-      transformer_kwargs:
+    rets/resample:
+      func_kwargs:
         rule: 5T
-        resampling_groups: [({'close': 'close'}, 'last', {}), ({'close': 'twap'}, 'mean', {}), ({'volume': 'volume'}, 'sum', {'min_count': 1})]
+        resampling_groups: [({'close': 'twap'}, 'mean', {})]
         vwap_groups: [('close', 'volume', 'vwap')]
-      reindex_like_input: False
-      join_output_with_input: False
-    compute_ret_0:
-      in_col_groups: [('close',), ('vwap',), ('twap',)]
-      out_col_group: ()
+    rets/compute_ret_0:
+      cols: ['twap', 'vwap']
+      col_mode: merge_all
       transformer_kwargs:
-        mode: log_rets
-      col_mapping:
-        close: close.ret_0
-        vwap: vwap.ret_0
-        twap: twap.ret_0
+        mode: pct_change
+    rets/model_volatility:
+      cols: ['vwap_ret_0']
+      steps_ahead: 2
+      nan_mode: leave_unchanged
+    rets/clip:
+      cols: ['vwap_ret_0_vol_adj']
+      col_mode: replace_selected
   dag=
     name=None
     mode=strict
@@ -41,83 +35,86 @@ dag_builder=
           "links": [
               {
                   "df_in": "df_out",
-                  "source": "load_prices",
-                  "target": "filter_weekends"
+                  "source": "rets/filter_weekends",
+                  "target": "rets/filter_ath"
               },
               {
                   "df_in": "df_out",
-                  "source": "filter_weekends",
-                  "target": "filter_ath"
+                  "source": "rets/filter_ath",
+                  "target": "rets/resample"
               },
               {
                   "df_in": "df_out",
-                  "source": "filter_ath",
-                  "target": "resample"
+                  "source": "rets/resample",
+                  "target": "rets/compute_ret_0"
               },
               {
                   "df_in": "df_out",
-                  "source": "resample",
-                  "target": "compute_ret_0"
+                  "source": "rets/compute_ret_0",
+                  "target": "rets/model_volatility"
+              },
+              {
+                  "df_in": "df_out",
+                  "source": "rets/model_volatility",
+                  "target": "rets/clip"
               }
           ],
           "multigraph": false,
           "nodes": [
               {
-                  "id": "load_prices",
-                  "stage": "MultivariateNormalGenerator"
-              },
-              {
-                  "id": "filter_weekends",
+                  "id": "rets/filter_weekends",
                   "stage": "ColumnTransformer"
               },
               {
-                  "id": "filter_ath",
+                  "id": "rets/filter_ath",
                   "stage": "ColumnTransformer"
               },
               {
-                  "id": "resample",
-                  "stage": "GroupedColDfToDfTransformer"
+                  "id": "rets/resample",
+                  "stage": "FunctionWrapper"
               },
               {
-                  "id": "compute_ret_0",
-                  "stage": "GroupedColDfToDfTransformer"
+                  "id": "rets/compute_ret_0",
+                  "stage": "ColumnTransformer"
+              },
+              {
+                  "id": "rets/model_volatility",
+                  "stage": "VolatilityModel"
+              },
+              {
+                  "id": "rets/clip",
+                  "stage": "ColumnTransformer"
               }
           ]
       }
-dag_adapter=
+################################################################################
+dag_adapter
+################################################################################
   dag_builder=
     nid_prefix=
     get_config_template=
-      load_prices:
-        frequency: T
-        start_date: 2010-01-04 09:30:00
-        end_date: 2010-01-14 16:05:00
-        dim: 4
-        target_volatility: 0.25
-        seed: 247
-      filter_ath:
+      rets/filter_ath:
         col_mode: replace_all
         transformer_kwargs:
           start_time: 09:30:00
           end_time: 16:00:00
-      resample:
-        in_col_groups: [('close',), ('volume',)]
-        out_col_group: ()
-        transformer_kwargs:
+      rets/resample:
+        func_kwargs:
           rule: 5T
-          resampling_groups: [({'close': 'close'}, 'last', {}), ({'close': 'twap'}, 'mean', {}), ({'volume': 'volume'}, 'sum', {'min_count': 1})]
+          resampling_groups: [({'close': 'twap'}, 'mean', {})]
           vwap_groups: [('close', 'volume', 'vwap')]
-        reindex_like_input: False
-        join_output_with_input: False
-      compute_ret_0:
-        in_col_groups: [('close',), ('vwap',), ('twap',)]
-        out_col_group: ()
+      rets/compute_ret_0:
+        cols: ['twap', 'vwap']
+        col_mode: merge_all
         transformer_kwargs:
-          mode: log_rets
-        col_mapping:
-          close: close.ret_0
-          vwap: vwap.ret_0
-          twap: twap.ret_0
+          mode: pct_change
+      rets/model_volatility:
+        cols: ['vwap_ret_0']
+        steps_ahead: 2
+        nan_mode: leave_unchanged
+      rets/clip:
+        cols: ['vwap_ret_0_vol_adj']
+        col_mode: replace_selected
     dag=
       name=None
       mode=strict
@@ -128,51 +125,69 @@ dag_adapter=
             "links": [
                 {
                     "df_in": "df_out",
-                    "source": "load_prices",
-                    "target": "filter_weekends"
+                    "source": "rets/filter_weekends",
+                    "target": "rets/filter_ath"
                 },
                 {
                     "df_in": "df_out",
-                    "source": "filter_weekends",
-                    "target": "filter_ath"
+                    "source": "rets/filter_ath",
+                    "target": "rets/resample"
                 },
                 {
                     "df_in": "df_out",
-                    "source": "filter_ath",
-                    "target": "resample"
+                    "source": "rets/resample",
+                    "target": "rets/compute_ret_0"
                 },
                 {
                     "df_in": "df_out",
-                    "source": "resample",
-                    "target": "compute_ret_0"
+                    "source": "rets/compute_ret_0",
+                    "target": "rets/model_volatility"
+                },
+                {
+                    "df_in": "df_out",
+                    "source": "rets/model_volatility",
+                    "target": "rets/clip"
                 }
             ],
             "multigraph": false,
             "nodes": [
                 {
-                    "id": "load_prices",
-                    "stage": "MultivariateNormalGenerator"
-                },
-                {
-                    "id": "filter_weekends",
+                    "id": "rets/filter_weekends",
                     "stage": "ColumnTransformer"
                 },
                 {
-                    "id": "filter_ath",
+                    "id": "rets/filter_ath",
                     "stage": "ColumnTransformer"
                 },
                 {
-                    "id": "resample",
-                    "stage": "GroupedColDfToDfTransformer"
+                    "id": "rets/resample",
+                    "stage": "FunctionWrapper"
                 },
                 {
-                    "id": "compute_ret_0",
-                    "stage": "GroupedColDfToDfTransformer"
+                    "id": "rets/compute_ret_0",
+                    "stage": "ColumnTransformer"
+                },
+                {
+                    "id": "rets/model_volatility",
+                    "stage": "VolatilityModel"
+                },
+                {
+                    "id": "rets/clip",
+                    "stage": "ColumnTransformer"
                 }
             ]
         }
   overriding_config=
     load_prices: {'source_node_name': 'RealTimeDataSource', 'source_node_kwargs': {'market_data_interface': <market_data.market_data_interface.ReplayedTimeMarketDataInterface object>, 'period': 'last_5mins', 'asset_id_col': 'asset_id', 'multiindex_output': True}}
     process_forecasts: {'prediction_col': 'close', 'execution_mode': 'real_time', 'process_forecasts_config': {'market_data_interface': <market_data.market_data_interface.ReplayedTimeMarketDataInterface object at 0x>, 'portfolio': <oms.portfolio.SimulatedPortfolio object>, 'order_type': 'price@twap', 'ath_start_time': datetime.time(9, 30), 'trading_start_time': datetime.time(9, 30), 'ath_end_time': datetime.time(16, 40), 'trading_end_time': datetime.time(16, 40)}}
+  nodes_to_insert=
+    ('load_prices', <function data_source_node_factory at 0x>)
   nodes_to_append=
     ('process_forecasts', <class 'dataflow.system.dataflow_sink_nodes.ProcessForecasts'>)
+################################################################################
+final dag
+################################################################################
+name=None
+mode=strict
+nodes=[('rets/filter_weekends', {'stage': <dataflow.core.nodes.transformers.ColumnTransformer object at 0x>}), ('rets/filter_ath', {'stage': <dataflow.core.nodes.transformers.ColumnTransformer object at 0x>}), ('rets/resample', {'stage': <dataflow.core.nodes.transformers.FunctionWrapper object at 0x>}), ('rets/compute_ret_0', {'stage': <dataflow.core.nodes.transformers.ColumnTransformer object at 0x>}), ('rets/model_volatility', {'stage': <dataflow.core.nodes.volatility_models.VolatilityModel object at 0x>}), ('rets/clip', {'stage': <dataflow.core.nodes.transformers.ColumnTransformer object at 0x>}), ('load_prices', {'stage': <dataflow.system.dataflow_source_nodes.RealTimeDataSource object at 0x>}), ('process_forecasts', {'stage': <dataflow.system.dataflow_sink_nodes.ProcessForecasts object at 0x>})]
+edges=[('rets/filter_weekends', 'rets/filter_ath', {'df_in': 'df_out'}), ('rets/filter_ath', 'rets/resample', {'df_in': 'df_out'}), ('rets/resample', 'rets/compute_ret_0', {'df_in': 'df_out'}), ('rets/compute_ret_0', 'rets/model_volatility', {'df_in': 'df_out'}), ('rets/model_volatility', 'rets/clip', {'df_in': 'df_out'}), ('rets/clip', 'process_forecasts', {'df_in': 'df_out'}), ('load_prices', 'rets/filter_weekends', {'df_in': 'df_out'})]

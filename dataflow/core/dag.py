@@ -61,13 +61,6 @@ class DAG:
         )
         self._mode = mode
 
-    # TODO(gp): A bit confusing since other classes have `dag / get_dag` method that
-    #  returns a DAG. Also the code does `dag.dag`. Maybe -> `nx_dag()` to say that
-    #  we are extracting the networkx data structures.
-    @property
-    def dag(self) -> networ.DiGraph:
-        return self._dag
-
     def __str__(self) -> str:
         """
         Return a short representation for user.
@@ -115,25 +108,12 @@ class DAG:
         txt.append(hprint.indent(self._to_json(), 2))
         return "\n".join(txt)
 
-    def _to_json(self) -> str:
-        # Get internal networkx representation of the DAG.
-        graph: networ.classes.digraph.DiGraph = self.dag
-        nld = networ.readwrite.json_graph.node_link_data(graph)
-        # Remove stages names from `node_link_data` dictionary since they refer to
-        # `Node` objects, which are not JSON serializable.
-        # E.g., `nld` looks like:
-        #   {'directed': True,
-        #    'graph': {},
-        #    'links': [],
-        #    'multigraph': False,
-        #    'nodes': [{'id': 'n1',
-        #               'stage': <dataflow.core.Node object at 0x...>}]}
-        nld = nld.copy()
-        for data in nld["nodes"]:
-            data["stage"] = data["stage"].__class__.__name__
-        # Print as JSON.
-        json_nld = json.dumps(nld, indent=4, sort_keys=True)
-        return json_nld
+    # TODO(gp): A bit confusing since other classes have `dag / get_dag` method that
+    #  returns a DAG. Also the code does `dag.dag`. Maybe -> `nx_dag()` to say that
+    #  we are extracting the networkx data structures.
+    @property
+    def dag(self) -> networ.DiGraph:
+        return self._dag
 
     # TODO(*): Should we force to always have a name? So mypy can perform more
     #  checks.
@@ -286,6 +266,19 @@ class DAG:
                 sources.append(nid)
         return sources
 
+    def get_unique_source(self) -> dtfcornode.NodeId:
+        """
+        Return the only source node, asserting if there is more than one.
+        """
+        sources = self.get_sources()
+        hdbg.dassert_eq(
+            len(sources),
+            1,
+            "There is more than one sink node %s in DAG",
+            str(sources),
+        )
+        return sources[0]
+
     def get_sinks(self) -> List[dtfcornode.NodeId]:
         """
         :return: list of nid's of sink nodes
@@ -355,6 +348,26 @@ class DAG:
             self._run_node(n, method)
         node = self.get_node(nid)
         return node.get_outputs(method)
+
+    def _to_json(self) -> str:
+        # Get internal networkx representation of the DAG.
+        graph: networ.classes.digraph.DiGraph = self.dag
+        nld = networ.readwrite.json_graph.node_link_data(graph)
+        # Remove stages names from `node_link_data` dictionary since they refer to
+        # `Node` objects, which are not JSON serializable.
+        # E.g., `nld` looks like:
+        #   {'directed': True,
+        #    'graph': {},
+        #    'links': [],
+        #    'multigraph': False,
+        #    'nodes': [{'id': 'n1',
+        #               'stage': <dataflow.core.Node object at 0x...>}]}
+        nld = nld.copy()
+        for data in nld["nodes"]:
+            data["stage"] = data["stage"].__class__.__name__
+        # Print as JSON.
+        json_nld = json.dumps(nld, indent=4, sort_keys=True)
+        return json_nld
 
     def _run_node(
         self, nid: dtfcornode.NodeId, method: dtfcornode.Method
