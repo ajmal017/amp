@@ -24,10 +24,12 @@ class TestRealtimeDagAdapter1(hunitest.TestCase):
         """
         txt = []
         # Build a DagBuilder.
+        # TODO(Paul): Replace this with `MvnReturnsBuilder()`.
         dag_builder = dtfcobuexa.ReturnsBuilder()
         txt.append(hprint.frame("dag_builder"))
         txt.append(hprint.indent(str(dag_builder)))
         # Build a Portfolio.
+        # TODO(Paul): Use a nontrivial event loop.
         event_loop = None
         initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
         portfolio = oporexam.get_simulated_portfolio_example1(

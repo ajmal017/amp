@@ -106,6 +106,7 @@ class AbstractBroker(abc.ABC):
         account: str,
         market_data_interface: mdmadain.AbstractMarketDataInterface,
         get_wall_clock_time: hdateti.GetWallClockTime,
+        column_remap: Optional[Dict[str, str]] = None,
     ) -> None:
         self._strategy_id = strategy_id
         self._account = account
@@ -120,6 +121,7 @@ class AbstractBroker(abc.ABC):
         # Track the orders for internal accounting.
         # pd.Timestamp -> List[Order]
         self._orders = collections.OrderedDict()
+        self._column_remap = column_remap
 
     async def submit_orders(
         self,
@@ -202,7 +204,7 @@ class AbstractBroker(abc.ABC):
         num_shares = order.num_shares
         # TODO(Paul): The function `get_execution_price()` should be
         #  configurable.
-        price = get_execution_price(self.market_data_interface, order)
+        price = get_execution_price(self.market_data_interface, order, self._column_remap)
         fill = Fill(order, wall_clock_timestamp, num_shares, price)
         return [fill]
 

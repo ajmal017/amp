@@ -1,12 +1,5 @@
 nid_prefix=
 get_config_template=
-  load_prices:
-    frequency: T
-    start_date: 2010-01-04 09:30:00
-    end_date: 2010-01-14 16:05:00
-    dim: 4
-    target_volatility: 0.25
-    seed: 247
   filter_ath:
     col_mode: replace_all
     transformer_kwargs:
@@ -40,11 +33,6 @@ dag=
         "links": [
             {
                 "df_in": "df_out",
-                "source": "load_prices",
-                "target": "filter_weekends"
-            },
-            {
-                "df_in": "df_out",
                 "source": "filter_weekends",
                 "target": "filter_ath"
             },
@@ -61,10 +49,6 @@ dag=
         ],
         "multigraph": false,
         "nodes": [
-            {
-                "id": "load_prices",
-                "stage": "MultivariateNormalGenerator"
-            },
             {
                 "id": "filter_weekends",
                 "stage": "ColumnTransformer"

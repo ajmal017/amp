@@ -18,8 +18,6 @@ import helpers.hasyncio as hasynci
 import helpers.hpandas as hpandas
 import helpers.htqdm as htqdm
 import helpers.printing as hprint
-import market_data.market_data_interface as mdmadain
-import oms.broker as ombroker
 import oms.call_optimizer as ocalopti
 import oms.order as omorder
 import oms.portfolio as omportfo
@@ -51,7 +49,6 @@ async def process_forecasts(
         - `real_time`: place the trades only for the last prediction as in a
            real-time set-up
     :param config:
-        - `market_data_interface`: the interface to get price data
         - `pred_column`: the column in the df from the DAG containing the predictions
            for all the assets
         - `mark_column`: the column from the MarketDataInterface to mark holdings to
@@ -61,40 +58,34 @@ async def process_forecasts(
     :return: updated portfolio
     """
     _LOG.info("predictions_df=\n%s", prediction_df)
-    # Check the config.
-    # - Check `market_data_interface`.
-    market_data_interface = config["market_data_interface"]
-    hdbg.dassert_issubclass(
-        market_data_interface, mdmadain.AbstractMarketDataInterface
-    )
-    # - Check `portfolio`.
-    portfolio = config["portfolio"]
-    hdbg.dassert_issubclass(portfolio, omportfo.AbstractPortfolio)
-    # - Check `broker`.
-    broker = config["broker"]
-    hdbg.dassert_isinstance(broker, ombroker.AbstractBroker)
-    # - Check `order_type`
-    order_type = config["order_type"]
-    # The `Order` class knows the valid order types.
-    hdbg.dassert_isinstance(order_type, str)
-    # - Check `predictions_df`.
+    # Check `predictions_df`.
     hdbg.dassert_isinstance(prediction_df, pd.DataFrame)
     hpandas.dassert_index_is_datetime(prediction_df)
     hpandas.dassert_strictly_increasing_index(prediction_df)
+    # Extract the objects from the config.
+    def _get_object_from_config(key: str, expected_type: type) -> Any:
+        hdbg.dassert_in(key, config)
+        obj = config[key]
+        hdbg.dassert_issubclass(obj, expected_type)
+        return obj
+
+    portfolio = _get_object_from_config("portfolio", omportfo.AbstractPortfolio)
+    market_data_interface = portfolio.market_data_interface
+    order_type = _get_object_from_config("order_type", str)
+    order_duration = _get_object_from_config("order_duration", int)
     # TODO(Paul): Add a check for ATH start/end.
-    ath_start_time = config["ath_start_time"]
-    hdbg.dassert_isinstance(ath_start_time, datetime.time)
+    ath_start_time = _get_object_from_config("ath_start_time", datetime.time)
     #
-    trading_start_time = config["trading_start_time"]
-    hdbg.dassert_isinstance(trading_start_time, datetime.time)
+    trading_start_time = _get_object_from_config(
+        "trading_start_time", datetime.time
+    )
     hdbg.dassert_lte(ath_start_time, trading_start_time)
     #
-    ath_end_time = config["ath_end_time"]
-    hdbg.dassert_isinstance(ath_end_time, datetime.time)
-    #
-    trading_end_time = config["trading_end_time"]
-    hdbg.dassert_isinstance(trading_end_time, datetime.time)
+    ath_end_time = _get_object_from_config("ath_end_time", datetime.time)
+    trading_end_time = _get_object_from_config("trading_end_time", datetime.time)
     hdbg.dassert_lte(trading_end_time, ath_end_time)
+    # We should not have anything left in the config that we didn't extract.
+    # hdbg.dassert(not config, "config=%s", str(config))
     #
     if execution_mode == "real_time":
         prediction_df = prediction_df.tail(1)
@@ -105,7 +96,7 @@ async def process_forecasts(
     _LOG.debug("predictions_df=%s\n%s", str(prediction_df.shape), prediction_df)
     _LOG.debug("predictions_df.index=%s", str(prediction_df.index))
     # Cache a variable used many times.
-    offset_5min = pd.DateOffset(minutes=5)
+    offset_min = pd.DateOffset(minutes=order_duration)
     #
     get_wall_clock_time = market_data_interface.get_wall_clock_time
     tqdm_out = htqdm.TqdmToLogger(_LOG, level=logging.INFO)
@@ -146,7 +137,7 @@ async def process_forecasts(
         #         continue
         # Enter position between now and the next 5 mins.
         timestamp_start = wall_clock_timestamp
-        timestamp_end = wall_clock_timestamp + offset_5min
+        timestamp_end = wall_clock_timestamp + offset_min
         # Update `portfolio` based on last fills and market movement.
         _LOG.debug(
             "\n%s",
@@ -201,7 +192,9 @@ async def process_forecasts(
                 char1="#",
             ),
         )
-        await broker.submit_orders(orders)
+        if orders:
+            broker = portfolio.broker
+            await broker.submit_orders(orders)
 
 
 def _compute_target_positions_in_shares(

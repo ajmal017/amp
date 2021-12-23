@@ -31,9 +31,9 @@ class AbstractPortfolio(abc.ABC):
     Store holdings over time, e.g., many shares of each asset are owned at any
     time.
 
-    Cash is treated as any other asset to keep code uniform. The tables are
-    indexed by knowledge time, i.e., when this information became known by this
-    object.
+    Cash is treated as any other asset to keep code uniform. The tables
+    are indexed by knowledge time, i.e., when this information became
+    known by this object.
     """
 
     # ID of asset representing cash.
@@ -313,7 +313,8 @@ class AbstractPortfolio(abc.ABC):
         columns = [self._asset_id_col, self._mark_to_market_col]
         hdbg.dassert_is_subset(columns, price_df.columns)
         price_df = price_df[columns]
-        price_srs = price_df.set_index("asset_id")["price"]
+        price_srs = price_df.set_index("asset_id")[self._mark_to_market_col]
+        price_srs.name = "price"
         hdbg.dassert(not price_srs.index.has_duplicates)
         return price_srs
 
@@ -520,6 +521,8 @@ class SimulatedPortfolio(AbstractPortfolio):
         self,
         *args: Any,
         # In Python parameters after *args are always keywords-only.
+        # TODO(gp): Looks like a broker is needed for all the implementation. So
+        #  move it up.
         broker: ombroker.SimulatedBroker,
     ):
         """
@@ -826,7 +829,8 @@ def _sequential_insert(
     """
     Insert `(key, obj)` in `odict` ensuring that keys are in increasing order.
 
-    Assume that `odict` is a dict maintaining the insertion order of the keys.
+    Assume that `odict` is a dict maintaining the insertion order of the
+    keys.
     """
     hdbg.dassert_isinstance(key, pd.Timestamp)
     hdbg.dassert_isinstance(odict, collections.OrderedDict)

@@ -62,6 +62,7 @@ def get_mocked_portfolio_example1(
     initial_timestamp: pd.Timestamp,
     *,
     market_data_interface: Optional[mdmadain.AbstractMarketDataInterface] = None,
+    mark_to_market_col: str = "price",
 ) -> omportfo.MockedPortfolio:
     # Build MockedBroker.
     broker = obroexam.get_mocked_broker_example1(
@@ -73,7 +74,6 @@ def get_mocked_portfolio_example1(
     market_data_interface = broker.market_data_interface
     get_wall_clock_time = market_data_interface.get_wall_clock_time
     asset_id_column = "asset_id"
-    mark_to_market_col = "price"
     timestamp_col = "end_datetime"
     initial_cash = 1e6
     portfolio = omportfo.MockedPortfolio.from_cash(

@@ -15,6 +15,7 @@ import dataflow.core.builders as dtfcorbuil
 import dataflow.core.node as dtfcornode
 import dataflow.core.result_bundle as dtfcorebun
 import dataflow.core.runners as dtfcorrunn
+import dataflow.system.dataflow_sink_nodes as dtfsdtfsino
 import dataflow.system.dataflow_source_nodes as dtfsdtfsono
 import helpers.dbg as hdbg
 import helpers.printing as hprint
@@ -116,6 +117,17 @@ class RealTimeDagRunner(dtfcorrunn._AbstractDagRunner):
                 await node.wait_for_latest_data()
                 _LOG.debug("Waiting on node '%s': done", str(nid))
         _LOG.debug("Waiting for real-time nodes to be ready: done")
-        #
+        # Execute the DAG.
         df_out, info = self._run_dag_helper(method)
+        # Wait for the sinks to have completed.
+        # TODO(gp): Find ProcessForecast. We can also create an abstract class
+        #  AwaitableNode with a `wait()` method and then wait on all the
+        #  sources and sinks that are awaitable.
+        nid = self.dag.get_unique_sink()
+        node = self.dag.get_node(nid)
+        _LOG.debug("Waiting on node '%s' ...", str(nid))
+        if isinstance(node, dtfsdtfsino.ProcessForecasts):
+            await node.process_forecasts()
+        _LOG.debug("Waiting on node '%s': done", str(nid))
+        #
         return self._to_result_bundle(method, df_out, info)

@@ -4,7 +4,6 @@ Import as:
 import dataflow.system.real_time_dag_adapter as dtfsrtdaad
 """
 
-from typing import Any, Dict, List
 
 import pandas as pd
 
@@ -18,7 +17,8 @@ import oms.portfolio as omportfo
 
 class RealTimeDagAdapter(dtfcodaada.DagAdapter):
     """
-    Adapt a DAG builder to true RT execution by injecting the needed real-time nodes.
+    Adapt a DAG builder to true RT execution by injecting the needed real-time
+    nodes.
     """
 
     # TODO(gp): Expose more parameters as needed.
@@ -55,6 +55,7 @@ class RealTimeDagAdapter(dtfcodaada.DagAdapter):
             "market_data_interface": market_data_interface,
             "portfolio": portfolio,
             "order_type": order_type,
+            "order_duration": 5,
             "ath_start_time": pd.Timestamp(
                 "2000-01-01 09:30:00-05:00", tz="America/New_York"
             ).time(),

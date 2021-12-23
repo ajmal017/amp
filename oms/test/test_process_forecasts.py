@@ -57,10 +57,9 @@ class TestSimulatedProcessForecasts1(hunitest.TestCase):
             initial_timestamp,
             market_data_interface=market_data_interface,
         )
-        config["market_data_interface"] = market_data_interface
         config["portfolio"] = portfolio
-        config["broker"] = portfolio.broker
         config["order_type"] = "price@twap"
+        config["order_duration"] = 5
         config["ath_start_time"] = datetime.time(9, 30)
         config["trading_start_time"] = datetime.time(9, 35)
         config["ath_end_time"] = datetime.time(16, 00)
@@ -148,11 +147,9 @@ class TestMockedProcessForecasts1(omtodh.TestOmsDbHelper):
             [-0.3, 0.0],
         ]
         predictions = pd.DataFrame(data, index=index, columns=columns)
-        # TODO(gp): Remove mdi and broker since they are passed through Portfolio.
-        config["market_data_interface"] = portfolio.market_data_interface
         config["portfolio"] = portfolio
-        config["broker"] = portfolio.broker
         config["order_type"] = "price@twap"
+        config["order_duration"] = 5
         config["ath_start_time"] = datetime.time(9, 30)
         config["trading_start_time"] = datetime.time(9, 35)
         config["ath_end_time"] = datetime.time(16, 00)

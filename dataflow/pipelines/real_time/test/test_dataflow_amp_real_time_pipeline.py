@@ -2,7 +2,6 @@ import asyncio
 import logging
 
 import pandas as pd
-import pytest
 
 import core.config as cconfig
 import core.real_time_example as cretiexa
@@ -188,9 +187,9 @@ class TestRealTimePipelineWithOms1(hunitest.TestCase):
             # Populate place trades.
             order_type = "price@twap"
             config["process_forecasts"]["process_forecasts_config"] = {
-                "market_data_interface": market_data_interface,
                 "portfolio": portfolio,
                 "order_type": order_type,
+                "order_duration": 1,
                 "ath_start_time": pd.Timestamp(
                     "2000-01-01 09:30:00-05:00", tz="America/New_York"
                 ).time(),
@@ -277,7 +276,6 @@ class TestRealTimePipelineWithOms1(hunitest.TestCase):
 # #############################################################################
 
 
-@pytest.mark.skip("AmpTask1946 Run the RT pipeline with MockedBroker/Portfolio")
 class TestRealTimeMvnReturnsWithOms1(otodh.TestOmsDbHelper):
     """
     Run `MvnReturns` pipeline in real-time with mocked OMS objects.
@@ -289,10 +287,10 @@ class TestRealTimeMvnReturnsWithOms1(otodh.TestOmsDbHelper):
         Create a dataframe with the data for a `MarketDataInterface`.
         """
         start_datetime = pd.Timestamp(
-            "2000-01-01 09:30:00-05:00", tz="America/New_York"
+            "2000-01-03 09:30:00-05:00", tz="America/New_York"
         )
         end_datetime = pd.Timestamp(
-            "2000-01-01 10:30:00-05:00", tz="America/New_York"
+            "2000-01-03 10:30:00-05:00", tz="America/New_York"
         )
         # Run the node to get the df out.
         node_config = {
@@ -339,7 +337,7 @@ class TestRealTimeMvnReturnsWithOms1(otodh.TestOmsDbHelper):
         db_connection = self.connection
         table_name = oomsdb.CURRENT_POSITIONS_TABLE_NAME
         initial_timestamp = pd.Timestamp(
-            "2000-01-01 09:30:00-05:00", tz="America/New_York"
+            "2000-01-03 09:30:00-05:00", tz="America/New_York"
         )
         portfolio = oporexam.get_mocked_portfolio_example1(
             event_loop,
@@ -347,7 +345,15 @@ class TestRealTimeMvnReturnsWithOms1(otodh.TestOmsDbHelper):
             table_name,
             initial_timestamp,
             market_data_interface=market_data_interface,
+            mark_to_market_col="close",
         )
+        # TODO(Paul): Set this more systematically.
+        portfolio.broker._column_remap = {
+            "bid": "bid",
+            "ask": "ask",
+            "midpoint": "midpoint",
+            "price": "close",
+        }
         return portfolio
 
     def get_order_processor(
@@ -359,7 +365,7 @@ class TestRealTimeMvnReturnsWithOms1(otodh.TestOmsDbHelper):
         # order_processor_poll_kwargs["sleep_in_secs"] = 1
         # Since orders should come every 5 mins we give it a buffer of 5 extra
         # mins.
-        order_processor_poll_kwargs["timeout_in_secs"] = 60 * 10
+        order_processor_poll_kwargs["timeout_in_secs"] = 60 * 20
         delay_to_accept_in_secs = 3
         delay_to_fill_in_secs = 10
         broker = portfolio.broker
@@ -380,7 +386,7 @@ class TestRealTimeMvnReturnsWithOms1(otodh.TestOmsDbHelper):
             market_data_interface = self.get_market_data_interface(event_loop)
             portfolio = self.get_portfolio(event_loop, market_data_interface)
             # Create the real-time DAG.
-            base_dag_builder = dtfcobuexa.ReturnsBuilder()
+            base_dag_builder = dtfcobuexa.MvnReturnsBuilder()
             dag_builder = dtfsrtdaad.RealTimeDagAdapter(
                 base_dag_builder, portfolio
             )
@@ -402,7 +408,7 @@ class TestRealTimeMvnReturnsWithOms1(otodh.TestOmsDbHelper):
             }
             # Build OrderProcessor.
             order_processor = self.get_order_processor(portfolio)
-            termination_condition = pd.Timestamp("2000-01-01 09:50:00-05:00")
+            termination_condition = pd.Timestamp("2000-01-03 09:45:00-05:00")
             order_processor_coroutine = order_processor.run_loop(
                 termination_condition
             )

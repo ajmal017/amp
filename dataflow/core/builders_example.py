@@ -14,6 +14,8 @@ import dataflow.core.dag as dtfcordag
 import dataflow.core.nodes.sources as dtfconosou
 import dataflow.core.nodes.transformers as dtfconotra
 import dataflow.core.nodes.volatility_models as dtfcnovomo
+
+# TODO(*): Remove the forbidden import!
 import dataflow.system.dataflow_source_nodes as dtfsdtfsono
 
 _LOG = logging.getLogger(__name__)
@@ -51,6 +53,7 @@ class DagBuilderExample1(dtfcorbuil.DagBuilder):
         # # Read data.
         stage = "load_prices"
         nid = self._get_nid(stage)
+        # TDOO: Do not use this node in `core`.
         node = dtfsdtfsono.data_source_node_factory(nid, **config[nid].to_dict())
         tail_nid = self._append(dag, tail_nid, node)
         #
@@ -320,21 +323,13 @@ class ArmaReturnsBuilder(dtfcorbuil.DagBuilder):
 
 class MvnReturnsBuilder(dtfcorbuil.DagBuilder):
     """
-    Pipeline for generating filtered returns from an Multivariate Normal process.
+    Pipeline for generating filtered returns from an Multivariate Normal
+    process.
     """
 
     def get_config_template(self) -> cconfig.Config:
         config = cconfig.get_config_from_nested_dict(
             {
-                # Load Multivariate Normal prices for testing.
-                self._get_nid("load_prices"): {
-                    "frequency": "T",
-                    "start_date": "2010-01-04 09:30:00",
-                    "end_date": "2010-01-14 16:05:00",
-                    "dim": 4,
-                    "target_volatility": 0.25,
-                    "seed": 247,
-                },
                 self._get_nid("filter_ath"): {
                     "col_mode": "replace_all",
                     "transformer_kwargs": {
@@ -404,12 +399,6 @@ class MvnReturnsBuilder(dtfcorbuil.DagBuilder):
         """
         dag = dtfcordag.DAG(mode=mode)
         _LOG.debug("%s", config)
-        stage = "load_prices"
-        nid = self._get_nid(stage)
-        node = dtfconosou.MultivariateNormalGenerator(
-            nid, **config[nid].to_dict()
-        )
-        tail_nid = self._append(dag, None, node)
         #
         stage = "filter_weekends"
         nid = self._get_nid(stage)
@@ -418,7 +407,7 @@ class MvnReturnsBuilder(dtfcorbuil.DagBuilder):
             transformer_func=cofinanc.set_weekends_to_nan,
             col_mode="replace_all",
         )
-        tail_nid = self._append(dag, tail_nid, node)
+        tail_nid = self._append(dag, None, node)
         #
         stage = "filter_ath"
         nid = self._get_nid(stage)
