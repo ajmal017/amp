@@ -1716,9 +1716,13 @@ def _get_docker_cmd(
     # - Handle the user.
     # Based on AmpTask1864 it seems that we need to use root in the CI to be
     # able to log in GH touching $HOME/.config/gh.
+    as_user_from_cmd_line = as_user
     as_root = hgit.execute_repo_config_code("run_docker_as_root()")
-    as_user = as_user and not as_root
-    _LOG.debug("as_root=%s as_user=%s", as_root, as_user)
+    as_user = as_user_from_cmd_line
+    if as_root:
+        as_user = False
+    _LOG.debug("as_user_from_cmd_line=%s as_root=%s -> as_user=%s",
+            as_user_from_cmd_line, as_root, as_user)
     if as_user:
         docker_cmd_.append(
             r"""
