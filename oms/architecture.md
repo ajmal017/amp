@@ -31,11 +31,17 @@
 
 - Objects need to use `get_wall_clock_time()` to get the "actual" time
   - We don't want to pass `wall_clock_timestamp` because this is dangerous
-  - It is difficult to enforce no future peeking because one object tells
-    another what time is it, there is no way to double check
-  - It's ok to ask for a view of the world as of `as_of_timestamp`, but then the
-    queried object needs to check that there is no future peeking by using
+    - It is difficult to enforce that there is no future peeking when one object
+      tells another what time it is, since there is no way for the second object
+      to double check that the wall clock time is accurate
+  - We pass `wall_clock_timestamp` only when one "action" happens atomically but
+    it is split in multiple functions that need to all share this information.
+    This approach should be the exception to the rule of calling
     `get_wall_clock_time()`
+
+- It's ok to ask for a view of the world as of `as_of_timestamp`, but then the
+  queried object needs to check that there is no future peeking by using
+  `get_wall_clock_time()`
 
 - Objects might need to get `event_loop`
   - TODO(gp): Clean it up so that we pass event loop all the times and event
