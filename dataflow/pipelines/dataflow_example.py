@@ -11,7 +11,7 @@ import logging
 import pandas as pd
 
 import core.config as cconfig
-import dataflow as dtf
+import dataflow.core as dtf
 import dataflow.system.sink_nodes as dtfsysinod
 import dataflow.system.source_nodes as dtfsysonod
 import helpers.unit_test as hunitest

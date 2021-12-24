@@ -11,7 +11,7 @@ import core.config as cconfig
 import core.features as cofeatur
 import core.finance as cofinanc
 import core.signal_processing as csigproc
-import dataflow as dtf
+import dataflow.core as dtf
 import dataflow.system.source_nodes as dtfsysonod
 
 _LOG = logging.getLogger(__name__)

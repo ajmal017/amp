@@ -9,10 +9,7 @@ from typing import Any, Dict, List, Optional
 
 import core.config as cconfig
 import core.real_time as creatime
-import dataflow.core.builders as dtfcorbuil
-import dataflow.core.node as dtfcornode
-import dataflow.core.result_bundle as dtfcorebun
-import dataflow.core.runners as dtfcorrunn
+import dataflow.core as dtfcore
 import dataflow.system.sink_nodes as dtfsysinod
 import dataflow.system.source_nodes as dtfsysonod
 import helpers.dbg as hdbg
@@ -21,7 +18,7 @@ import helpers.printing as hprint
 _LOG = logging.getLogger(__name__)
 
 
-class RealTimeDagRunner(dtfcorrunn._AbstractDagRunner):
+class RealTimeDagRunner(dtfcore.AbstractDagRunner):
     """
     Run a DAG in true or simulated real-time.
 
@@ -36,7 +33,7 @@ class RealTimeDagRunner(dtfcorrunn._AbstractDagRunner):
     def __init__(
         self,
         config: cconfig.Config,
-        dag_builder: dtfcorbuil.DagBuilder,
+        dag_builder: dtfcore.DagBuilder,
         fit_state: cconfig.Config,
         execute_rt_loop_kwargs: Dict[str, Any],
         dst_dir: str,
@@ -50,7 +47,7 @@ class RealTimeDagRunner(dtfcorrunn._AbstractDagRunner):
         # Store information about the real-time execution.
         self._events: creatime.Events = []
 
-    async def predict(self) -> List[dtfcorebun.ResultBundle]:
+    async def predict(self) -> List[dtfcore.ResultBundle]:
         """
         Execute the DAG for all the events.
 
@@ -62,7 +59,7 @@ class RealTimeDagRunner(dtfcorrunn._AbstractDagRunner):
         ]
         return result_bundles
 
-    async def predict_at_datetime(self) -> dtfcorebun.ResultBundle:
+    async def predict_at_datetime(self) -> dtfcore.ResultBundle:
         """
         Predict every time there is a real-time event.
 
@@ -83,7 +80,7 @@ class RealTimeDagRunner(dtfcorrunn._AbstractDagRunner):
         return self._events
 
     def compute_run_signature(
-        self, result_bundles: List[dtfcorebun.ResultBundle]
+        self, result_bundles: List[dtfcore.ResultBundle]
     ) -> str:
         """
         Compute a signature of an execution in terms of `ResultBundles` and
@@ -101,9 +98,7 @@ class RealTimeDagRunner(dtfcorrunn._AbstractDagRunner):
         ret = "\n".join(ret)
         return ret
 
-    async def _run_dag(
-        self, method: dtfcornode.Method
-    ) -> dtfcorebun.ResultBundle:
+    async def _run_dag(self, method: dtfcore.Method) -> dtfcore.ResultBundle:
         # Wait until all the real-time source nodes are ready to compute.
         _LOG.debug("Waiting for real-time nodes to be ready ...")
         sources = self.dag.get_sources()

@@ -8,14 +8,13 @@ import dataflow.system.real_time_dag_adapter as dtfsrtdaad
 import pandas as pd
 
 import core.config as cconfig
-import dataflow.core.builders as dtfcorbuil
-import dataflow.core.dag_adapter as dtfcodaada
+import dataflow.core as dtfcore
 import dataflow.system.sink_nodes as dtfsysinod
 import dataflow.system.source_nodes as dtfsysonod
 import oms.portfolio as omportfo
 
 
-class RealTimeDagAdapter(dtfcodaada.DagAdapter):
+class RealTimeDagAdapter(dtfcore.DagAdapter):
     """
     Adapt a DAG builder to RT execution by injecting real-time nodes.
     """
@@ -23,7 +22,7 @@ class RealTimeDagAdapter(dtfcodaada.DagAdapter):
     # TODO(gp): Expose more parameters as needed.
     def __init__(
         self,
-        dag_builder: dtfcorbuil.DagBuilder,
+        dag_builder: dtfcore.DagBuilder,
         portfolio: omportfo.AbstractPortfolio,
     ):
         market_data_interface = portfolio.market_data_interface

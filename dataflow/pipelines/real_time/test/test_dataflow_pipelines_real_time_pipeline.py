@@ -5,7 +5,7 @@ import pandas as pd
 
 import core.config as cconfig
 import core.real_time_example as cretiexa
-import dataflow as dtf
+import dataflow.core as dtf
 import dataflow.core.builders_example as dtfcobuexa
 import dataflow.pipelines.dataflow_example as dtfpidtfexa
 import dataflow.pipelines.returns.pipeline as dtfpirepip

@@ -9,7 +9,7 @@ import logging
 
 import core.config as cconfig
 import core.finance as cofinanc
-import dataflow as dtf
+import dataflow.core as dtf
 import dataflow.system.source_nodes as dtfsysonod
 import helpers.dbg as hdbg
 

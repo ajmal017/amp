@@ -12,9 +12,9 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import pandas as pd
 
 import core.finance as cofinanc
-import dataflow.core.node as dtfcornode
-import dataflow.core.nodes.base as dtfconobas
-import dataflow.core.nodes.sources as dtfconosou
+import dataflow.core as dtfcornode
+import dataflow.core as dtfconobas
+import dataflow.core as dtfconosou
 import helpers.datetime_ as hdateti
 import helpers.dbg as hdbg
 import helpers.printing as hprint

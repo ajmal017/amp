@@ -1,7 +1,7 @@
 import logging
 
 import core.config as cconfig
-import dataflow as dtf
+import dataflow.core as dtf
 import dataflow.pipelines.features.pipeline as dtfpifepip
 import helpers.unit_test as hunitest
 

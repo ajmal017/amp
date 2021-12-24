@@ -3,8 +3,8 @@ import os
 
 import pandas as pd
 
-import dataflow.core.builders_example as dtfcobuexa
-import dataflow.core.visualization as dtfcorvisu
+import dataflow.core as dtfcobuexa
+import dataflow.core as dtfcorvisu
 import dataflow.system.real_time_dag_adapter as dtfsrtdaad
 import helpers.printing as hprint
 import helpers.unit_test as hunitest

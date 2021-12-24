@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 import core.config as cconfig
-import dataflow as dtf
+import dataflow.core as dtf
 import dataflow.pipelines.returns.pipeline as dtfpirepip
 import dataflow.system.source_nodes as dtfsysonod
 import helpers.printing as hprint
