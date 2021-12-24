@@ -5,12 +5,10 @@ import pandas as pd
 
 import core.config as cconfig
 import core.real_time_example as cretiexa
-import dataflow.core as dtf
-import dataflow.core.builders_example as dtfcobuexa
+import dataflow.core as dtfcore
 import dataflow.pipelines.dataflow_example as dtfpidtfexa
 import dataflow.pipelines.returns.pipeline as dtfpirepip
-import dataflow.system.real_time_dag_adapter as dtfsrtdaad
-import dataflow.system.real_time_dag_runner as dtfsrtdaru
+import dataflow.system as dtfsys
 import helpers.hasyncio as hasynci
 import helpers.printing as hprint
 import helpers.unit_test as hunitest
@@ -88,7 +86,7 @@ class TestRealTimeReturnPipeline1(hunitest.TestCase):
                 "dst_dir": None,
             }
             # Run.
-            dag_runner = dtfsrtdaru.RealTimeDagRunner(**dag_runner_kwargs)
+            dag_runner = dtfsys.RealTimeDagRunner(**dag_runner_kwargs)
             result_bundles = hasynci.run(
                 dag_runner.predict(), event_loop=event_loop
             )
@@ -219,7 +217,7 @@ class TestRealTimePipelineWithOms1(hunitest.TestCase):
                 "dst_dir": None,
             }
             # Run.
-            dag_runner = dtfsrtdaru.RealTimeDagRunner(**dag_runner_kwargs)
+            dag_runner = dtfsys.RealTimeDagRunner(**dag_runner_kwargs)
             result_bundles = hasynci.run(
                 dag_runner.predict(), event_loop=event_loop
             )
@@ -301,7 +299,7 @@ class TestRealTimeMvnReturnsWithOms1(otodh.TestOmsDbHelper):
             "target_volatility": 0.25,
             "seed": 247,
         }
-        node = dtf.MultivariateNormalGenerator("fake", **node_config)
+        node = dtfcore.MultivariateNormalGenerator("fake", **node_config)
         df = node.fit()["df_out"]
         df = df.swaplevel(i=0, j=1, axis=1)
         df = df["MN0"]
@@ -386,10 +384,8 @@ class TestRealTimeMvnReturnsWithOms1(otodh.TestOmsDbHelper):
             market_data_interface = self.get_market_data_interface(event_loop)
             portfolio = self.get_portfolio(event_loop, market_data_interface)
             # Create the real-time DAG.
-            base_dag_builder = dtfcobuexa.MvnReturnsBuilder()
-            dag_builder = dtfsrtdaad.RealTimeDagAdapter(
-                base_dag_builder, portfolio
-            )
+            base_dag_builder = dtfcore.MvnReturnsBuilder()
+            dag_builder = dtfsys.RealTimeDagAdapter(base_dag_builder, portfolio)
             _LOG.debug("dag_builder=\n%s", dag_builder)
             config = dag_builder.get_config_template()
             # Set up the event loop.
@@ -413,7 +409,7 @@ class TestRealTimeMvnReturnsWithOms1(otodh.TestOmsDbHelper):
                 termination_condition
             )
             # Run.
-            dag_runner = dtfsrtdaru.RealTimeDagRunner(**dag_runner_kwargs)
+            dag_runner = dtfsys.RealTimeDagRunner(**dag_runner_kwargs)
             coroutines = [dag_runner.predict(), order_processor_coroutine]
             result_bundles = hasynci.run(
                 asyncio.gather(*coroutines), event_loop=event_loop
