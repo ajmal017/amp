@@ -1029,7 +1029,7 @@ def integrate_create_branch(ctx, dir_name, dry_run=False):  # type: ignore
 
 def _get_src_dst_dirs(src_dir: str, dst_dir: str, subdir: str) -> Tuple[str, str]:
     """
-    Return the full path of `src_dir` and `dst_dir` assuming that.
+    Return the full path of `src_dir` and `dst_dir` assuming that:
 
     - `src_dir` is the current dir
     - `dst_dir` is parallel dir to the current one
@@ -1134,6 +1134,55 @@ def integrate_copy_dirs(  # type: ignore
         rsync_opts = "--delete -a"
         cmd = f"rsync {rsync_opts} {src_dir}/ {dst_dir}"
     _run(ctx, cmd)
+
+
+@task
+def integrate_files_since_last_integration(ctx, subdir=""):  # type: ignore
+    """
+    Return the list of files modified since the last integration.
+    """
+    _report_task()
+    _ = ctx
+    # Find the hash of all integration commits.
+    cmd = (
+        "git log --date=local --oneline --date-order | grep AmpTask1786_Integrate"
+    )
+    _, txt = hsysinte.system_to_string(cmd)
+    _LOG.debug("integration commits=\n%s", txt)
+    txt = txt.split("\n")
+    # > git log --date=local --oneline --date-order | grep AmpTask1786_Integrate
+    # 72a1a101 AmpTask1786_Integrate_20211218 (#1975)
+    # 2acfd6d7 AmpTask1786_Integrate_20211214 (#1950)
+    # 318ab0ff AmpTask1786_Integrate_20211210 (#1933)
+    hdbg.dassert_lte(1, len(txt))
+    print("# last_integration: '%s'" % txt[0])
+    last_integration_hash = txt[0].split()[0]
+    _LOG.debug(hprint.to_str("last_integration_hash"))
+    # Find the first commit after the commit with the last integration.
+    cmd = f"git log --oneline --reverse --ancestry-path {last_integration_hash}^..master"
+    _, txt = hsysinte.system_to_string(cmd)
+    _LOG.debug("commits after last integration=\n%s", txt)
+    txt = txt.split("\n")
+    # > git log --oneline --reverse --ancestry-path 72a1a101^..master
+    # 72a1a101 AmpTask1786_Integrate_20211218 (#1975)
+    # 90e90353 AmpTask1955_Lint_20211218 (#1976)
+    # 4a2b45c6 AmpTask1858_Implement_buildmeister_workflows_in_invoke (#1860)
+    hdbg.dassert_lte(2, len(txt))
+    first_commit_hash = txt[1].split()[0]
+    print("# first_commit: '%s'" % txt[1])
+    _LOG.debug(hprint.to_str("first_commit_hash"))
+    # Find all the modified files.
+    cmd = f"git diff --name-only {first_commit_hash}..HEAD"
+    _, txt = hsysinte.system_to_string(cmd)
+    _LOG.debug("files modified since the integration=\n%s", txt)
+    files = txt.split("\n")
+    if subdir:
+        filtered_files = []
+        for file in files:
+            if files.startswith(subdir):
+                filtered_files.append(file)
+        files = filtered_files
+    print("\n".join(files))
 
 
 @task
@@ -1721,8 +1770,12 @@ def _get_docker_cmd(
     as_user = as_user_from_cmd_line
     if as_root:
         as_user = False
-    _LOG.debug("as_user_from_cmd_line=%s as_root=%s -> as_user=%s",
-            as_user_from_cmd_line, as_root, as_user)
+    _LOG.debug(
+        "as_user_from_cmd_line=%s as_root=%s -> as_user=%s",
+        as_user_from_cmd_line,
+        as_root,
+        as_user,
+    )
     if as_user:
         docker_cmd_.append(
             r"""
@@ -2626,9 +2679,7 @@ def _select_tests_to_skip(test_list_name: str) -> str:
     elif test_list_name == "superslow_tests":
         skipped_tests = "not slow and superslow"
     else:
-        raise ValueError(
-            f"Invalid `test_list_name`={test_list_name}"
-        )
+        raise ValueError(f"Invalid `test_list_name`={test_list_name}")
     return skipped_tests
 
 
@@ -2651,9 +2702,7 @@ def _build_run_command_line(
     passed by the user through `-p` (unless really necessary).
     """
     hdbg.dassert_in(
-        test_list_name,
-        _TEST_TIMEOUTS_IN_SECS,
-        "Invalid test_list_name"
+        test_list_name, _TEST_TIMEOUTS_IN_SECS, "Invalid test_list_name"
     )
     pytest_opts = pytest_opts or "."
     #
@@ -2703,7 +2752,7 @@ def _run_test_cmd(
     cmd: str,
     coverage: bool,
     collect_only: bool,
-    start_coverage_script,
+    start_coverage_script: bool,
     **ctx_run_kwargs: Any,
 ) -> int:
     """
@@ -2971,8 +3020,12 @@ def run_coverage_report(ctx):
     cmd = f"invoke run_slow_tests --coverage -p {target_dir}; cp .coverage .coverage_slow_tests"
     _run(ctx, cmd)
     cmd = []
-    cmd.append("coverage combine --keep .coverage_fast_tests .coverage_slow_tests")
-    cmd.append('coverage report --include="${target_dir}/*" --omit="*/test_*.py" --sort=Cover')
+    cmd.append(
+        "coverage combine --keep .coverage_fast_tests .coverage_slow_tests"
+    )
+    cmd.append(
+        'coverage report --include="${target_dir}/*" --omit="*/test_*.py" --sort=Cover'
+    )
     cmd.append('coverage html --include="${target_dir}/*" --omit="*/test_*.py"')
     cmd = " && ".join(cmd)
     cmd = "invoke docker_bash --cmd '%s'" % cmd
@@ -3441,7 +3494,7 @@ def lint(  # type: ignore
     Lint files.
 
     ```
-    # To ling all the files:
+    # To lint all the files:
     > i lint --dir-name . --only-format
 
     # To lint only a repo including `amp` but not `amp` itself:
@@ -3708,7 +3761,9 @@ def gh_workflow_list(
                 print(f"Workflow '{workflow}' for '{branch_name}' is ok")
                 break
             elif status == "failure":
-                _LOG.error("Workflow '%s' for '%s' is broken", workflow, branch_name)
+                _LOG.error(
+                    "Workflow '%s' for '%s' is broken", workflow, branch_name
+                )
                 # Get the output of the broken run.
                 # > gh run view 1477484584 --log-failed
                 workload_id = table_tmp.get_column("id")[i]

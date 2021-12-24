@@ -320,7 +320,7 @@ class TestDryRunTasks2(_LibTasksTestCase, _CheckDryRunTestCase):
     @pytest.mark.skipif(not hgit.is_amp(), reason="Only run in amp")
     def test_gh_workflow_list(self) -> None:
         _gh_login()
-        target = "gh_workflow_list(ctx, 'master')"
+        target = "gh_workflow_list(ctx, filter_by_branch='master')"
         self._check_output(target)
 
     # This is an action with side effects so we can't test it.
@@ -542,7 +542,7 @@ class TestLibTasksGetDockerCmd1(_LibTasksTestCase):
             print_docker_config=print_docker_config,
         )
         exp = r"""
-        IMAGE=*****/amp_test:dev-1.0.0 \
+        IMAGE=$AM_ECR_BASE_PATH/amp_test:dev-1.0.0 \
             docker-compose \
             --file $GIT_ROOT/devops/compose/docker-compose.yml --file $GIT_ROOT/devops/compose/docker-compose_as_submodule.yml \
             --env-file devops/env/default.env \
@@ -573,7 +573,7 @@ class TestLibTasksGetDockerCmd1(_LibTasksTestCase):
             print_docker_config=print_docker_config,
         )
         exp = r"""
-        IMAGE=*****/amp_test:local \
+        IMAGE=$AM_ECR_BASE_PATH/amp_test:local \
             docker-compose \
             --file $GIT_ROOT/devops/compose/docker-compose.yml --file $GIT_ROOT/devops/compose/docker-compose_as_submodule.yml \
             --env-file devops/env/default.env \
@@ -606,7 +606,7 @@ class TestLibTasksGetDockerCmd1(_LibTasksTestCase):
             print_docker_config=print_docker_config,
         )
         exp = r"""
-        IMAGE=*****/amp_test:local-1.0.0 \
+        IMAGE=$AM_ECR_BASE_PATH/amp_test:local-1.0.0 \
         PORT=9999 \
         SKIP_RUN=1 \
             docker-compose \
@@ -639,7 +639,7 @@ class TestLibTasksGetDockerCmd1(_LibTasksTestCase):
             print_docker_config=print_docker_config,
         )
         exp = r"""
-        IMAGE=*****/amp_test:dev-1.0.0 \
+        IMAGE=$AM_ECR_BASE_PATH/amp_test:dev-1.0.0 \
             docker-compose \
             --file $GIT_ROOT/devops/compose/docker-compose.yml \
             --env-file devops/env/default.env \
@@ -669,7 +669,7 @@ class TestLibTasksGetDockerCmd1(_LibTasksTestCase):
             print_docker_config=print_docker_config,
         )
         exp = r"""
-        IMAGE=*****/amp_test:dev \
+        IMAGE=$AM_ECR_BASE_PATH/amp_test:dev \
         PORT=9999 \
             docker-compose \
             --file $GIT_ROOT/devops/compose/docker-compose.yml --file $GIT_ROOT/devops/compose/docker-compose_as_submodule.yml \

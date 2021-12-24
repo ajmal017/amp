@@ -220,7 +220,7 @@ class AbstractMarketDataInterface(abc.ABC):
             limit,
         )
         df = self._remap_columns(df)
-        # _LOG.debug("-> df=\n%s", hprint.dataframe_to_str(df))
+        _LOG.verb_debug("-> df=\n%s", hprint.dataframe_to_str(df))
         return df
 
     def get_twap_price(
@@ -436,9 +436,15 @@ class AbstractMarketDataInterface(abc.ABC):
         ...
 
     def _remap_columns(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Remap column names with provided mapping.
+
+        :param df: input dataframe
+        :return: dataframe with remapped column names
+        """
         if self._column_remap:
             hpandas.dassert_valid_remap(df.columns.tolist(), self._column_remap)
-            df.rename(columns=self._column_remap, inplace=True)
+            df = df.rename(columns=self._column_remap)
         return df
 
     @staticmethod

@@ -100,12 +100,27 @@ def _save_chunk(config: Dict[str, str], **kwargs: Dict[str, Any]):
             _LOG.debug("after df=\n%s", hprint.dataframe_to_str(df.head(3)))
         else:
             hdbg.dfatal(f"Invalid transform_func='{transform_func}'")
-        hparque.save_pq_by_asset(config["asset_col_name"], df, config["dst_dir"])
+        # Get partition arguments.
+        dst_dir = config["dst_dir"]
+        asset_col_name = config["asset_col_name"]
+        # Add date partition columns to the dataframe.
+        hparque.add_date_partition_cols(df, partition_mode="day")
+        # Partition and write dataset.
+        partition_cols = ["year", "month", "day", asset_col_name]
+        hparque.partition_dataset(df, partition_cols, dst_dir)
 
 
 # TODO(gp): We might want to use a config to pass a set of params related to each
 #  other (e.g., transform_func, asset_col_name, ...)
 def _run(args: argparse.Namespace) -> None:
+    # We assume that the destination dir doesn't exist, so we don't override data.
+    dst_dir = args.dst_dir
+    # TODO(Nikola): Conflict with parallel incremental. Use one for all?
+    if not args.no_incremental:
+        # In not incremental mode the dir should already be there.
+        hdbg.dassert_not_exists(dst_dir)
+    hio.create_dir(dst_dir, incremental=False)
+
     tasks = []
     # Convert the files one at the time.
     # TODO(Nikola): Pick chunk by chunk, not all files.
@@ -200,14 +215,6 @@ def _parse() -> argparse.ArgumentParser:
 def _main(parser: argparse.ArgumentParser) -> None:
     args = parser.parse_args()
     hdbg.init_logger(verbosity=args.log_level, use_exec_path=True)
-    # We assume that the destination dir doesn't exist so we don't override data.
-    dst_dir = args.dst_dir
-    # TODO(Nikola): Conflict with parallel incremental. Use one for all?
-    if not args.no_incremental:
-        # In not incremental mode the dir should already be there.
-        hdbg.dassert_not_exists(dst_dir)
-    hio.create_dir(dst_dir, incremental=False)
-    #
     _run(args)
 
 
