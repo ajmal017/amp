@@ -1660,6 +1660,20 @@ def get_image(
     return image
 
 
+def _run_docker_as_user(as_user_from_cmd_line: bool) -> bool:
+    as_root = hgit.execute_repo_config_code("run_docker_as_root()")
+    as_user = as_user_from_cmd_line
+    if as_root:
+        as_user = False
+    _LOG.debug(
+        "as_user_from_cmd_line=%s as_root=%s -> as_user=%s",
+        as_user_from_cmd_line,
+        as_root,
+        as_user,
+    )
+    return as_user
+
+
 def _get_docker_cmd(
     base_image: str,
     stage: str,
@@ -1763,19 +1777,7 @@ def _get_docker_cmd(
         --rm"""
     )
     # - Handle the user.
-    # Based on AmpTask1864 it seems that we need to use root in the CI to be
-    # able to log in GH touching $HOME/.config/gh.
-    as_user_from_cmd_line = as_user
-    as_root = hgit.execute_repo_config_code("run_docker_as_root()")
-    as_user = as_user_from_cmd_line
-    if as_root:
-        as_user = False
-    _LOG.debug(
-        "as_user_from_cmd_line=%s as_root=%s -> as_user=%s",
-        as_user_from_cmd_line,
-        as_root,
-        as_user,
-    )
+    as_user = _run_docker_as_user(as_user)
     if as_user:
         docker_cmd_.append(
             r"""
@@ -3597,6 +3599,7 @@ def lint(  # type: ignore
             return
         files_as_str = " ".join(files_as_list)
         phases = phases.split(" ")
+        as_user = _run_docker_as_user(as_user)
         for phase in phases:
             # Prepare the command line.
             precommit_opts = [
