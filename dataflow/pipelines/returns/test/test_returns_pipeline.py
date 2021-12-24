@@ -7,13 +7,8 @@ import pytest
 
 import core.config as cconfig
 import dataflow as dtf
-import dataflow.core.builders_example as dtfcobuexa
-import dataflow.core.dag_adapter as dtfcodaada
-import dataflow.core.runners as dtfcorrunn
-import dataflow.core.visualization as dtfcorvisu
 import dataflow.pipelines.returns.pipeline as dtfpirepip
-import dataflow.system.dataflow_sink_nodes as dtfsdtfsino
-import dataflow.system.dataflow_source_nodes as dtfsdtfsono
+import dataflow.system.source_nodes as dtfsysonod
 import helpers.printing as hprint
 import helpers.unit_test as hunitest
 
@@ -58,7 +53,7 @@ class TestReturnsBuilder(hunitest.TestCase):
     @pytest.mark.slow
     def test_futures1(self) -> None:
         source_node_kwargs = {
-            "func": dtfsdtfsono.load_kibot_data,
+            "func": dtfsysonod.load_kibot_data,
             "func_kwargs": {
                 "frequency": "T",
                 "contract_type": "continuous",

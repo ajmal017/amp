@@ -10,7 +10,7 @@ import logging
 import core.config as cconfig
 import core.finance as cofinanc
 import dataflow as dtf
-import dataflow.system.dataflow_source_nodes as dtfsdtfsono
+import dataflow.system.source_nodes as dtfsysonod
 import helpers.dbg as hdbg
 
 _LOG = logging.getLogger(__name__)
@@ -106,7 +106,7 @@ class ReturnsPipeline(dtf.DagBuilder):
         # Read data.
         stage = "load_prices"
         nid = self._get_nid(stage)
-        node = dtfsdtfsono.data_source_node_factory(nid, **config[nid].to_dict())
+        node = dtfsysonod.data_source_node_factory(nid, **config[nid].to_dict())
         tail_nid = self._append(dag, tail_nid, node)
         # Set weekends to NaN.
         stage = "filter_weekends"

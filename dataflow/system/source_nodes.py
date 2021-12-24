@@ -1,7 +1,7 @@
 """
 Import as:
 
-import dataflow.system.dataflow_source_nodes as dtfsdtfsono
+import dataflow.system.source_nodes as dtfsysonod
 """
 
 # TODO(gp): -> source_nodes.py

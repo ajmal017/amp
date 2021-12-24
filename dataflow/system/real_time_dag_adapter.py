@@ -10,15 +10,14 @@ import pandas as pd
 import core.config as cconfig
 import dataflow.core.builders as dtfcorbuil
 import dataflow.core.dag_adapter as dtfcodaada
-import dataflow.system.dataflow_sink_nodes as dtfsdtfsino
-import dataflow.system.dataflow_source_nodes as dtfsdtfsono
+import dataflow.system.sink_nodes as dtfsysinod
+import dataflow.system.source_nodes as dtfsysonod
 import oms.portfolio as omportfo
 
 
 class RealTimeDagAdapter(dtfcodaada.DagAdapter):
     """
-    Adapt a DAG builder to true RT execution by injecting the needed real-time
-    nodes.
+    Adapt a DAG builder to RT execution by injecting real-time nodes.
     """
 
     # TODO(gp): Expose more parameters as needed.
@@ -72,12 +71,12 @@ class RealTimeDagAdapter(dtfcodaada.DagAdapter):
         # Insert a node.
         nodes_to_insert = []
         stage = "load_prices"
-        node_ctor = dtfsdtfsono.data_source_node_factory
+        node_ctor = dtfsysonod.data_source_node_factory
         nodes_to_insert.append((stage, node_ctor))
         # Append a ProcessForecastNode node.
         nodes_to_append = []
         stage = "process_forecasts"
-        node_ctor = dtfsdtfsino.ProcessForecasts
+        node_ctor = dtfsysinod.ProcessForecasts
         nodes_to_append.append((stage, node_ctor))
         #
         super().__init__(

@@ -16,7 +16,7 @@ import dataflow.core.nodes.transformers as dtfconotra
 import dataflow.core.nodes.volatility_models as dtfcnovomo
 
 # TODO(*): Remove the forbidden import!
-import dataflow.system.dataflow_source_nodes as dtfsdtfsono
+import dataflow.system.source_nodes as dtfsysonod
 
 _LOG = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ class DagBuilderExample1(dtfcorbuil.DagBuilder):
         stage = "load_prices"
         nid = self._get_nid(stage)
         # TDOO: Do not use this node in `core`.
-        node = dtfsdtfsono.data_source_node_factory(nid, **config[nid].to_dict())
+        node = dtfsysonod.data_source_node_factory(nid, **config[nid].to_dict())
         tail_nid = self._append(dag, tail_nid, node)
         #
         _ = tail_nid

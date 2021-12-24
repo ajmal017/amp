@@ -12,7 +12,7 @@ import core.features as cofeatur
 import core.finance as cofinanc
 import core.signal_processing as csigproc
 import dataflow as dtf
-import dataflow.system.dataflow_source_nodes as dtfsdtfsono
+import dataflow.system.source_nodes as dtfsysonod
 
 _LOG = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ class FeaturePipeline(dtf.DagBuilder):
         #
         stage = "load_data"
         nid = self._get_nid(stage)
-        node = dtfsdtfsono.data_source_node_factory(nid, **config[nid].to_dict())
+        node = dtfsysonod.data_source_node_factory(nid, **config[nid].to_dict())
         tail_nid = self._append(dag, tail_nid, node)
         #
         stage = "filter_weekends"

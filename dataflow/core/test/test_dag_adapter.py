@@ -9,7 +9,9 @@ import dataflow.core.builders_example as dtfcobuexa
 import dataflow.core.dag_adapter as dtfcodaada
 import dataflow.core.node as dtfcornode
 import dataflow.core.nodes.sinks as dtfconosin
-import dataflow.system.dataflow_source_nodes as dtfsdtfsono
+
+# TODO(gp): Remove forbidden import.
+import dataflow.system.source_nodes as dtfsysonod
 import helpers.printing as hprint
 import helpers.unit_test as hunitest
 
@@ -106,7 +108,7 @@ class TestDagAdapter1(hunitest.TestCase):
         # Insert one node.
         nodes_to_insert = []
         stage = "load_prices"
-        node_ctor = dtfsdtfsono.data_source_node_factory
+        node_ctor = dtfsysonod.data_source_node_factory
         nodes_to_insert.append((stage, node_ctor))
         # Do not append any node.
         nodes_to_append = []

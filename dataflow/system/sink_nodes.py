@@ -1,7 +1,7 @@
 """
 Import as:
 
-import dataflow.system.dataflow_sink_nodes as dtfsdtfsino
+import dataflow.system.sink_nodes as dtfsysinod
 """
 
 # TODO(gp): -> sink_nodes.py

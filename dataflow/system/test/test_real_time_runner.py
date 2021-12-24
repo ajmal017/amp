@@ -11,7 +11,7 @@ import dataflow.core.builders_example as dtfcobuexa
 import dataflow.core.dag_adapter as dtfcodaada
 import dataflow.core.nodes.sources as dtfconosou
 import dataflow.core.result_bundle as dtfcorebun
-import dataflow.system.real_time_runner as dtfsretiru
+import dataflow.system.real_time_dag_runner as dtfsrtdaru
 import helpers.datetime_ as hdateti
 import helpers.hasyncio as hasynci
 import helpers.unit_test as hunitest
@@ -102,7 +102,7 @@ class TestRealTimeDagRunner1(hunitest.TestCase):
             get_wall_clock_time, grid_time_in_secs, event_loop=event_loop
         )
         # Run.
-        dag_runner = dtfsretiru.RealTimeDagRunner(**dag_runner_kwargs)
+        dag_runner = dtfsrtdaru.RealTimeDagRunner(**dag_runner_kwargs)
         result_bundles = hasynci.run(dag_runner.predict(), event_loop=event_loop)
         events = dag_runner.events
         #

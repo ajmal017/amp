@@ -12,8 +12,8 @@ import pandas as pd
 
 import core.config as cconfig
 import dataflow as dtf
-import dataflow.system.dataflow_sink_nodes as dtfsdtfsino
-import dataflow.system.dataflow_source_nodes as dtfsdtfsono
+import dataflow.system.sink_nodes as dtfsysinod
+import dataflow.system.source_nodes as dtfsysonod
 import helpers.unit_test as hunitest
 
 _LOG = logging.getLogger(__name__)
@@ -96,7 +96,7 @@ class _NaivePipeline(dtf.DagBuilder):
         # Get data.
         stage = "get_data"
         nid = self._get_nid(stage)
-        node = dtfsdtfsono.data_source_node_factory(nid, **config[nid].to_dict())
+        node = dtfsysonod.data_source_node_factory(nid, **config[nid].to_dict())
         tail_nid = self._append(dag, tail_nid, node)
         # Process data.
         stage = "process_data"
@@ -109,7 +109,7 @@ class _NaivePipeline(dtf.DagBuilder):
         # Process forecasts.
         stage = "process_forecasts"
         nid = self._get_nid(stage)
-        node = dtfsdtfsino.ProcessForecasts(
+        node = dtfsysinod.ProcessForecasts(
             nid,
             **config[nid].to_dict(),
         )

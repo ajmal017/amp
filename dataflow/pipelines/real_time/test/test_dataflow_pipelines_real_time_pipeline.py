@@ -10,7 +10,7 @@ import dataflow.core.builders_example as dtfcobuexa
 import dataflow.pipelines.dataflow_example as dtfpidtfexa
 import dataflow.pipelines.returns.pipeline as dtfpirepip
 import dataflow.system.real_time_dag_adapter as dtfsrtdaad
-import dataflow.system.real_time_runner as dtfsretiru
+import dataflow.system.real_time_dag_runner as dtfsrtdaru
 import helpers.hasyncio as hasynci
 import helpers.printing as hprint
 import helpers.unit_test as hunitest
@@ -88,7 +88,7 @@ class TestRealTimeReturnPipeline1(hunitest.TestCase):
                 "dst_dir": None,
             }
             # Run.
-            dag_runner = dtfsretiru.RealTimeDagRunner(**dag_runner_kwargs)
+            dag_runner = dtfsrtdaru.RealTimeDagRunner(**dag_runner_kwargs)
             result_bundles = hasynci.run(
                 dag_runner.predict(), event_loop=event_loop
             )
@@ -219,7 +219,7 @@ class TestRealTimePipelineWithOms1(hunitest.TestCase):
                 "dst_dir": None,
             }
             # Run.
-            dag_runner = dtfsretiru.RealTimeDagRunner(**dag_runner_kwargs)
+            dag_runner = dtfsrtdaru.RealTimeDagRunner(**dag_runner_kwargs)
             result_bundles = hasynci.run(
                 dag_runner.predict(), event_loop=event_loop
             )
@@ -413,7 +413,7 @@ class TestRealTimeMvnReturnsWithOms1(otodh.TestOmsDbHelper):
                 termination_condition
             )
             # Run.
-            dag_runner = dtfsretiru.RealTimeDagRunner(**dag_runner_kwargs)
+            dag_runner = dtfsrtdaru.RealTimeDagRunner(**dag_runner_kwargs)
             coroutines = [dag_runner.predict(), order_processor_coroutine]
             result_bundles = hasynci.run(
                 asyncio.gather(*coroutines), event_loop=event_loop
