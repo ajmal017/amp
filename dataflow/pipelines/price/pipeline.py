@@ -10,7 +10,7 @@ import logging
 import core.config as cconfig
 import core.finance as cofinanc
 import dataflow as dtf
-import dataflow.system.dataflow_source_nodes as dtfsdtfsono
+import dataflow.system.source_nodes as dtfsysonod
 import helpers.dbg as hdbg
 
 _LOG = logging.getLogger(__name__)
