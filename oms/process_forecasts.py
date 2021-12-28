@@ -181,7 +181,7 @@ async def process_forecasts(
         }
         order_config = cconfig.get_config_from_nested_dict(order_dict_)
         orders = _generate_orders(
-            target_positions["diff_num_shares"], order_config
+            target_positions[["curr_num_shares", "diff_num_shares"]], order_config
         )
         # Submit orders.
         _LOG.debug(
@@ -315,24 +315,33 @@ def _merge_predictions(
 
 
 def _generate_orders(
-    shares: pd.Series,
+    shares_df: pd.DataFrame,
     order_config: Dict[str, Any],
 ) -> List[omorder.Order]:
     """
     Turn a series of asset_id / shares to trade into a list of orders.
 
-    :param shares: number of shares to trade, indexed by `asset_id`
+    :param shares_df: TODO
+        number of shares to trade, indexed by `asset_id`
     :param order_config: common parameters used to initialize `Order`
     :return: a list of nontrivial orders (i.e., no zero-share orders)
     """
     _LOG.debug("# Generate orders")
+    hdbg.dassert_is_subset(
+        ("curr_num_shares", "diff_num_shares"), shares_df.columns
+    )
     orders: List[omorder.Order] = []
-    for asset_id, shares_ in shares.iteritems():
-        if shares_ == 0.0:
+    for asset_id, shares_row in shares_df.iterrows():
+        curr_num_shares = shares_row["curr_num_shares"]
+        diff_num_shares = shares_row["diff_num_shares"]
+        if diff_num_shares == 0.0:
             # No need to place trades.
             continue
         order = omorder.Order(
-            asset_id=asset_id, num_shares=shares_, **order_config.to_dict()
+            asset_id=asset_id,
+            curr_num_shares=curr_num_shares,
+            diff_num_shares=diff_num_shares,
+            **order_config.to_dict(),
         )
         _LOG.debug("order=%s", order.order_id)
         orders.append(order)
