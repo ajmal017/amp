@@ -102,6 +102,8 @@ async def process_forecasts(
     tqdm_out = htqdm.TqdmToLogger(_LOG, level=logging.INFO)
     num_rows = len(prediction_df)
     iter_ = enumerate(prediction_df.iterrows())
+    # TODO(gp): next_timestamp -> timestamp (it's the timestamp where the
+    #  the order should begin)
     for idx, (next_timestamp, predictions) in tqdm(
         iter_, total=num_rows, file=tqdm_out
     ):
