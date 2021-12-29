@@ -14,6 +14,30 @@ import helpers.printing as hprint
 _LOG = logging.getLogger(__name__)
 
 
+def to_series(df: pd.DataFrame) -> pd.Series:
+    """
+    Convert a pd.DataFrame with a single column into a pd.Series.
+
+    The problem is that empty df or df with a single row are not converted
+    correctly to a pd.Series.
+    """
+    # See https://stackoverflow.com/questions/33246771
+    hdbg.dassert_isinstance(df, pd.DataFrame)
+    hdbg.dassert_eq(df.shape[1], 1, "df=%s doesn't have a single column", df)
+    if df.empty:
+        srs = pd.Series()
+    elif df.shape[0] > 1:
+        srs = df.squeeze()
+    else:
+        srs = pd.Series(df.iloc[0, 0], index=[df.index.values[0]])
+        srs.name = df.index.name
+    hdbg.dassert_isinstance(srs, pd.Series)
+    return srs
+
+
+# ##############################################################################
+
+
 def _get_index(obj: Union[pd.Index, pd.DataFrame, pd.Series]) -> pd.Index:
     if isinstance(obj, pd.Index):
         index = obj

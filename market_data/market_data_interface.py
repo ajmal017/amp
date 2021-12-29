@@ -324,6 +324,37 @@ class AbstractMarketDataInterface(abc.ABC):
         _LOG.verb_debug("-> ret=%s", ret)
         return ret
 
+    def get_last_price(
+        self,
+        col_name: str,
+        asset_ids: List[int],
+    ) -> pd.Series:
+        """
+        Get last price for `asset_ids` using column `col_name` (e.g., "close")
+        """
+        last_end_time = self.get_last_end_time()
+        _LOG.info("last_end_time=%s", last_end_time)
+        # TODO(gp): This is not super robust.
+        if False:
+            # For debugging.
+            df = self.get_data(period="last_5mins")
+            _LOG.info("df=\n%s", hprintin.dataframe_to_str(df))
+        # Get the data.
+        start_time = last_end_time - pd.Timedelta(minutes=1)
+        df = self.get_data_at_timestamp(
+            start_time,
+            self._start_time_col_name,
+            asset_ids,
+        )
+        # Convert the df of data into a series.
+        hdbg.dassert_in(col_name, df.columns)
+        last_price = df[[col_name, self._asset_id_col]]
+        last_price.set_index(self._asset_id_col, inplace=True)
+        last_price_srs = hpandas.to_series(last_price)
+        hdbg.dassert_isinstance(last_price_srs, pd.Series)
+        # TODO(gp): Print if there are nans.
+        return last_price_srs
+
     @abc.abstractmethod
     def should_be_online(self, wall_clock_time: pd.Timestamp) -> bool:
         """
@@ -367,8 +398,8 @@ class AbstractMarketDataInterface(abc.ABC):
         self,
     ) -> Tuple[pd.Timestamp, pd.Timestamp, int]:
         """
-        Wait until the bar with `end_time` == `wall_clock_time` is present in the
-        RT DB.
+        Wait until the bar with `end_time` == `wall_clock_time` is present in
+        the RT DB.
 
         :return:
             - start_sampling_time: timestamp when the sampling started
@@ -852,10 +883,10 @@ class ReplayedTimeMarketDataInterface(AbstractMarketDataInterface):
             hdbg.dassert_is_subset(self._columns, df_tmp.columns)
             df_tmp = df_tmp[self._columns]
         # # Handle `period`.
+        hdbg.dassert_in(ts_col_name, df_tmp.columns)
         # TODO(gp): This is inefficient. Make it faster by binary search.
         if start_ts is not None:
             _LOG.verb_debug("start_ts=%s", start_ts)
-            hdbg.dassert_in(ts_col_name, df_tmp)
             tss = df_tmp[ts_col_name]
             _LOG.verb_debug("tss=\n%s", hprint.dataframe_to_str(tss))
             if left_close:
@@ -866,7 +897,6 @@ class ReplayedTimeMarketDataInterface(AbstractMarketDataInterface):
             df_tmp = df_tmp[mask]
         if end_ts is not None:
             # _LOG.debug("end_ts=%s", end_ts)
-            hdbg.dassert_in(ts_col_name, df_tmp)
             tss = df_tmp[ts_col_name]
             _LOG.verb_debug("tss=\n%s", hprint.dataframe_to_str(tss))
             if right_close:
@@ -878,7 +908,7 @@ class ReplayedTimeMarketDataInterface(AbstractMarketDataInterface):
         # Handle `asset_ids`
         _LOG.verb_debug("before df_tmp=\n%s", hprint.dataframe_to_str(df_tmp))
         if asset_ids is not None:
-            hdbg.dassert_in(self._asset_id_col, df_tmp)
+            hdbg.dassert_in(self._asset_id_col, df_tmp.columns)
             mask = df_tmp[self._asset_id_col].isin(set(asset_ids))
             df_tmp = df_tmp[mask]
         _LOG.verb_debug("after df_tmp=\n%s", hprint.dataframe_to_str(df_tmp))
@@ -896,6 +926,8 @@ class ReplayedTimeMarketDataInterface(AbstractMarketDataInterface):
         # We need to find the last timestamp before the current time. We use
         # `last_week` but could also use all the data since we don't call the
         # DB.
+        # TODO(gp): SELECT MAX(start_time) instead of getting all the data
+        #  and then find the max and use `start_time`
         period = "last_week"
         df = self.get_data(period)
         _LOG.debug(hprint.df_to_short_str("after get_data", df))

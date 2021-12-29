@@ -49,6 +49,12 @@ class Fill:
         num_shares: float,
         price: float,
     ):
+        """
+        Constructor.
+
+        :param num_shares: it's the number of shares that are filled, with
+            respect to `diff_num_shares` in Order
+        """
         self._fill_id = self._get_next_fill_id()
         # Pointer to the order.
         self.order = order
