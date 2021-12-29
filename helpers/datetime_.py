@@ -221,6 +221,9 @@ def get_ET_tz() -> datetime.tzinfo:
     Return the US Eastern Time timezone.
     """
     # TODO(Grisha): -> `US/Eastern`?
+    # It appears that "America/New_York" is to be preferred over "US/Eastern".
+    # https://www.iana.org/time-zones
+    # https://en.wikipedia.org/wiki/Tz_database
     return pytz.timezone("America/New_York")
 
 

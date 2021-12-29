@@ -36,7 +36,9 @@ class TestRealtimeDagAdapter1(hunitest.TestCase):
             event_loop, initial_timestamp
         )
         # Build a DagAdapter.
-        dag_adapter = dtfsrtdaad.RealTimeDagAdapter(dag_builder, portfolio)
+        dag_adapter = dtfsrtdaad.RealTimeDagAdapter(
+            dag_builder, portfolio, "close"
+        )
         txt.append(hprint.frame("dag_adapter"))
         txt.append(hprint.indent(str(dag_adapter)))
         # Compute the final DAG.

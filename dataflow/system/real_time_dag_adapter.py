@@ -24,6 +24,7 @@ class RealTimeDagAdapter(dtfcore.DagAdapter):
         self,
         dag_builder: dtfcore.DagBuilder,
         portfolio: omportfo.AbstractPortfolio,
+        prediction_col: str,
     ):
         market_data_interface = portfolio.market_data_interface
         #
@@ -43,7 +44,7 @@ class RealTimeDagAdapter(dtfcore.DagAdapter):
         # Configure a ProcessForecast node.
         order_type = "price@twap"
         overriding_config["process_forecasts"] = {
-            "prediction_col": "close",
+            "prediction_col": prediction_col,
             "execution_mode": "real_time",
             "process_forecasts_config": {},
         }

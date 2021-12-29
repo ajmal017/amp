@@ -194,7 +194,10 @@ async def process_forecasts(
         )
         if orders:
             broker = portfolio.broker
+            _LOG.debug("Event: awaiting broker.submit_orders()...")
             await broker.submit_orders(orders)
+            _LOG.debug("Event: awaiting broker.submit_orders() done.")
+    _LOG.debug("Event: exiting process_forecasts() for loop.")
 
 
 def _compute_target_positions_in_shares(
@@ -288,11 +291,6 @@ def _merge_predictions(
         merged_df["curr_num_shares"].isna().sum(),
         wall_clock_timestamp,
     )
-    merged_df["curr_num_shares"].fillna(0.0, inplace=True)
-    merged_df["value"].fillna(0.0, inplace=True)
-    # TODO(Paul): Fix this!! Either have the portfolio use a universe, or else
-    #  price assets not held but for which we have a prediction.
-    merged_df["price"].fillna(100.0, inplace=True)
     merged_df = merged_df.convert_dtypes()
     _LOG.debug("merged_df=%s", merged_df)
     # Move `asset_id` from the index to a column.
