@@ -17,6 +17,8 @@ import helpers.hpandas as hpandas
 
 _LOG = logging.getLogger(__name__)
 
+# TODO(gp): Move to symbol.py or full_symbol.py
+
 # Store information about an exchange and a symbol (e.g., `binance::BTC_USDT`).
 # Note that information about the vendor is carried in the `ImClient` itself,
 # i.e. using `CcxtImClient` serves data from CCXT.

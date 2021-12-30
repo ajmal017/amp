@@ -90,6 +90,7 @@ class MarketDataInterface(mdmadain.AbstractMarketDataInterface):
             # Convert data to the format required by `process_data()`.
             market_data = market_data.reset_index()
             market_data = market_data.rename(columns={"index": "end_ts"})
+            hdbg.dassert_is_subset(("start_ts", "end_ts"), market_data.columns)
             market_data["start_ts"] = market_data["end_ts"] - pd.Timedelta(
                 minutes=1
             )

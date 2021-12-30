@@ -892,9 +892,14 @@ def git_branch_copy(ctx, new_branch_name="", use_patch=False):  # type: ignore
 
 
 @task
-def git_branch_diff_with_base(ctx, diff_type="", subdir=""):  # type: ignore
+def git_branch_diff_with_base(  # type: ignore
+        ctx, diff_type="", subdir="", dry_run=False):
     """
     Diff files of the current branch with master at the branching point.
+
+    :param diff_type: files to diff using git `--diff-filter` options
+    :param subdir: subdir to consider for diffing, instead of `.`
+    :param dry_run: execute diffing script or not
     """
     _ = ctx
     # This branch is not master.
@@ -966,6 +971,8 @@ def git_branch_diff_with_base(ctx, diff_type="", subdir=""):  # type: ignore
     script_file_name = "./tmp.vimdiff_branch_with_base.sh"
     hsysinte.create_executable_script(script_file_name, script_txt)
     print(f"# To diff against the base run:\n> {script_file_name}")
+    if not dry_run:
+        _run(ctx, script_file_name, pty=True)
 
 
 # TODO(gp): Add the following scripts:
@@ -2430,16 +2437,22 @@ def _find_test_files(
     return file_names
 
 
-def _find_test_class(class_name: str, file_names: List[str]) -> List[str]:
+# TODO(gp): -> find_class since it works also for any class.
+def _find_test_class(
+    class_name: str, file_names: List[str], exact_match: bool = False
+) -> List[str]:
     """
     Find test file containing `class_name` and report it in pytest format.
 
     E.g., for "TestLibTasksRunTests1" return
     "test/test_lib_tasks.py::TestLibTasksRunTests1"
+
+    :param exact_match: find an exact match or an approximate where `class_name`
+        is included in the class name
     """
     # > jackpy TestLibTasksRunTests1
     # test/test_lib_tasks.py:60:class TestLibTasksRunTests1(hut.TestCase):
-    regex = r"^\s*class\s+(%s)\(" % re.escape(class_name)
+    regex = r"^\s*class\s+(\S+)\s*\("
     _LOG.debug("regex='%s'", regex)
     res: List[str] = []
     # Scan all the files.
@@ -2454,9 +2467,14 @@ def _find_test_class(class_name: str, file_names: List[str]) -> List[str]:
             if m:
                 found_class_name = m.group(1)
                 _LOG.debug("  %s:%d -> %s", line, i, found_class_name)
-                res_tmp = f"{file_name}::{found_class_name}"
-                _LOG.debug("res_tmp=%s", res_tmp)
-                res.append(res_tmp)
+                if exact_match:
+                    found = found_class_name == class_name
+                else:
+                    found = class_name in found_class_name
+                if found:
+                    res_tmp = f"{file_name}::{found_class_name}"
+                    _LOG.debug("-> res_tmp=%s", res_tmp)
+                    res.append(res_tmp)
     res = sorted(list(set(res)))
     return res
 
@@ -2484,8 +2502,10 @@ def _to_pbcopy(txt: str, pbcopy: bool) -> None:
 
 
 # TODO(gp): Extend this to accept only the test method.
+# TODO(gp): Have a single `find` command with multiple options to search for different
+#  things, e.g., class names, test names, pytest_mark, ...
 @task
-def find_test_class(ctx, class_name, dir_name=".", pbcopy=True):  # type: ignore
+def find_test_class(ctx, class_name, dir_name=".", pbcopy=True, exact_match=False):  # type: ignore
     """
     Report test files containing `class_name` in a format compatible with
     pytest.
@@ -2498,7 +2518,7 @@ def find_test_class(ctx, class_name, dir_name=".", pbcopy=True):  # type: ignore
     hdbg.dassert(class_name != "", "You need to specify a class name")
     _ = ctx
     file_names = _find_test_files(dir_name)
-    res = _find_test_class(class_name, file_names)
+    res = _find_test_class(class_name, file_names, exact_match)
     res = " ".join(res)
     # Print or copy to clipboard.
     _to_pbcopy(res, pbcopy)
@@ -2543,18 +2563,21 @@ def _find_test_decorator(decorator_name: str, file_names: List[str]) -> List[str
 
 
 @task
-def find_test_decorator(ctx, decorator_name="", dir_name="."):  # type: ignore
+def find_test_decorator(
+    ctx, decorator_name="", dir_name=".", exact_match=False
+):  # type: ignore
     """
     Report test files containing `class_name` in pytest format.
 
-    :param class_name: the class to search
+    :param decorator_name: the decorator to search
     :param dir_name: the dir from which to search
+    :param exact_match:
     """
     _report_task()
     _ = ctx
     hdbg.dassert_ne(decorator_name, "", "You need to specify a decorator name")
     file_names = _find_test_files(dir_name)
-    res = _find_test_class(decorator_name, file_names)
+    res = _find_test_decorator(decorator_name, file_names, exact_match)
     res = " ".join(res)
     print(res)
 

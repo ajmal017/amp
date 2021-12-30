@@ -30,6 +30,9 @@ _LATEST_DATA_SNAPSHOT = "20210924"
 _DATA_TYPES = ["ohlcv"]
 
 
+# #############################################################################
+
+
 class AbstractCcxtClient(imvcdcli.AbstractImClient, abc.ABC):
     """
     Abstract interface for CCXT client.
@@ -367,6 +370,9 @@ class AbstractCcxtFileSystemClient(AbstractCcxtClient, abc.ABC):
         return data
 
 
+# #############################################################################
+
+
 class CcxtCsvFileSystemClient(AbstractCcxtFileSystemClient):
     """
     CCXT client for data stored as CSV from local or S3 filesystem.
@@ -405,6 +411,9 @@ class CcxtCsvFileSystemClient(AbstractCcxtFileSystemClient):
             end_ts = hdateti.convert_timestamp_to_unix_epoch(end_ts)
             data = data[data["timestamp"] < end_ts]
         return data
+
+
+# #############################################################################
 
 
 class CcxtParquetFileSystemClient(AbstractCcxtFileSystemClient):
