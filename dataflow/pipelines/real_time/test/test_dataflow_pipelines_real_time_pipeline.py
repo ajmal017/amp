@@ -508,9 +508,7 @@ class TestRealTimeMvnReturnsWithOms2(otodh.TestOmsDbHelper):
         )
         return order_processor
 
-    # TODO(Paul): Debug. The portfolio_df_str is unexpected.
-    @pytest.mark.skip("#2007: Disable until process_forecasts.py refactoring is done.")
-    @pytest.mark.slow("~13 seconds")
+    @pytest.mark.slow("~18 seconds")
     def test1(self) -> None:
         # Clean the DB tables.
         oomsdb.create_oms_tables(self.connection, incremental=False)
