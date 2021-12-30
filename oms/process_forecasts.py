@@ -226,6 +226,8 @@ def _compute_target_positions_in_shares(
         mtm_extension = pd.DataFrame(
             index=unpriced_assets, columns=["price", "curr_num_shares", "value"]
         )
+        # TODO(Paul): Debug so that we can uncomment this assertion.
+        # hdbg.dassert_eq(len(unpriced_assets), len(prices))
         mtm_extension["price"] = prices
         mtm_extension.fillna(0.0)
         mtm_extension.index.name = "asset_id"

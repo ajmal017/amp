@@ -316,7 +316,8 @@ class AbstractPortfolio(abc.ABC):
         columns = [self._asset_id_col, self._mark_to_market_col]
         hdbg.dassert_is_subset(columns, price_df.columns)
         price_df = price_df[columns]
-        price_srs = price_df.set_index("asset_id")[self._mark_to_market_col]
+        price_srs = price_df.set_index(self._asset_id_col)[self._mark_to_market_col]
+        price_srs.index.name = "asset_id"
         price_srs.name = "price"
         hdbg.dassert(not price_srs.index.has_duplicates)
         return price_srs
