@@ -9,6 +9,7 @@ import datetime
 import logging
 from typing import Any, Dict, List
 
+import numpy as np
 import pandas as pd
 from tqdm.autonotebook import tqdm
 
@@ -97,24 +98,19 @@ async def process_forecasts(
         raise ValueError(f"Unrecognized execution mode='{execution_mode}'")
     _LOG.debug("predictions_df=%s\n%s", str(prediction_df.shape), prediction_df)
     _LOG.debug("predictions_df.index=%s", str(prediction_df.index))
-    # Cache a variable used many times.
-    offset_min = pd.DateOffset(minutes=order_duration)
-    #
     get_wall_clock_time = market_data_interface.get_wall_clock_time
     tqdm_out = htqdm.TqdmToLogger(_LOG, level=logging.INFO)
     num_rows = len(prediction_df)
     iter_ = enumerate(prediction_df.iterrows())
-    # TODO(gp): next_timestamp -> timestamp (it's the timestamp where the
-    #  the order should begin)
-    for idx, (next_timestamp, predictions) in tqdm(
+    for idx, (timestamp, predictions) in tqdm(
         iter_, total=num_rows, file=tqdm_out
     ):
         _LOG.debug(
             "\n%s",
-            hprint.frame("# idx=%s next_timestamp=%s" % (idx, next_timestamp)),
+            hprint.frame("# idx=%s timestamp=%s" % (idx, timestamp)),
         )
         # Wait until get_wall_clock_time() == timestamp.
-        await hasynci.wait_until(next_timestamp, get_wall_clock_time)
+        await hasynci.wait_until(timestamp, get_wall_clock_time)
         # Get the wall clock timestamp.
         wall_clock_timestamp = get_wall_clock_time()
         _LOG.debug("wall_clock_timestamp=%s", wall_clock_timestamp)
@@ -141,6 +137,7 @@ async def process_forecasts(
         #         continue
         # Enter position between now and the next 5 mins.
         timestamp_start = wall_clock_timestamp
+        offset_min = pd.DateOffset(minutes=order_duration)
         timestamp_end = wall_clock_timestamp + offset_min
         # Update `portfolio` based on last fills and market movement.
         _LOG.debug(
@@ -338,6 +335,14 @@ def _generate_orders(
     for asset_id, shares_row in shares_df.iterrows():
         curr_num_shares = shares_row["curr_num_shares"]
         diff_num_shares = shares_row["diff_num_shares"]
+        hdbg.dassert(
+            np.isfinite(curr_num_shares).all(),
+            "All curr_num_share values must be finite.",
+        )
+        hdbg.dassert(
+            np.isfinite(diff_num_shares).all(),
+            "All diff_num_share values must be finite.",
+        )
         if diff_num_shares == 0.0:
             # No need to place trades.
             continue
