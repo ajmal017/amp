@@ -137,7 +137,20 @@ class AbstractPortfolio(abc.ABC):
         Return the state of the Portfolio in terms of the holdings as a string.
         """
         act = []
-        act.append("# holdings=\n%s" % hprint.dataframe_to_str(self._holdings_df))
+        act.append(
+            "# historical holdings=\n%s"
+            % hprint.dataframe_to_str(self.get_historical_holdings())
+        )
+        act.append(
+            "# historical holdings marked to market=\n%s"
+            % hprint.dataframe_to_str(
+                self.get_historical_holdings_marked_to_market()
+            )
+        )
+        act.append(
+            "# historical statistics=\n%s"
+            % hprint.dataframe_to_str(self.get_historical_statistics())
+        )
         act = "\n".join(act)
         return act
 

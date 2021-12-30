@@ -436,8 +436,7 @@ class TestRealTimeMvnReturnsWithOms1(otodh.TestOmsDbHelper):
             result_bundles_as_str = "\n".join(map(str, result_bundles))
             actual.append("result_bundles=\n%s" % result_bundles_as_str)
             #
-            holdings_df_str = hprint.dataframe_to_str(portfolio.get_historical_holdings())
-            actual.append("holdings_df_str=\n%s" % holdings_df_str)
+            actual.append("portfolio=\n%s" % str(portfolio))
             #
             actual = "\n".join(map(str, actual))
             self.check_string(actual)
@@ -587,8 +586,7 @@ class TestRealTimeMvnReturnsWithOms2(otodh.TestOmsDbHelper):
             result_df_str = "\n".join(result_df_str)
             actual.append("result_df_str=\n%s" % result_df_str)
             #
-            holdings_df_str = hprint.dataframe_to_str(portfolio.get_historical_holdings())
-            actual.append("holdings_df_str=\n%s" % holdings_df_str)
+            actual.append("portfolio=\n%s" % str(portfolio))
             #
             actual = "\n".join(map(str, actual))
             self.check_string(actual)

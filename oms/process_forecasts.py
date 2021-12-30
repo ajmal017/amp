@@ -198,6 +198,7 @@ async def process_forecasts(
             _LOG.debug("Event: awaiting broker.submit_orders()...")
             await broker.submit_orders(orders)
             _LOG.debug("Event: awaiting broker.submit_orders() done.")
+        _LOG.debug("portfolio=\n%s" % str(portfolio))
     _LOG.debug("Event: exiting process_forecasts() for loop.")
 
 
@@ -223,20 +224,14 @@ def _compute_target_positions_in_shares(
         mtm_extension = pd.DataFrame(
             index=unpriced_assets, columns=["price", "curr_num_shares", "value"]
         )
-        # TODO(Paul): Debug so that we can uncomment this assertion.
-        # hdbg.dassert_eq(len(unpriced_assets), len(prices))
+        hdbg.dassert_eq(len(unpriced_assets), len(prices))
         mtm_extension["price"] = prices
-        mtm_extension.fillna(0.0)
         mtm_extension.index.name = "asset_id"
         marked_to_market = pd.concat([marked_to_market, mtm_extension], axis=0)
     marked_to_market.reset_index(inplace=True)
-    _LOG.debug("marked_to_market=%s", marked_to_market)
-    if predictions.isna().sum() != 0:
-        _LOG.debug(
-            "Number of NaN predictions=`%i` at timestamp=`%s`",
-            predictions.isna().sum(),
-            wall_clock_timestamp,
-        )
+    _LOG.debug(
+        "marked_to_market df=\h%s", hprint.dataframe_to_str(marked_to_market)
+    )
     # Combine the portfolio `marked_to_market` dataframe with the predictions.
     assets_and_predictions = _merge_predictions(
         wall_clock_timestamp, marked_to_market, predictions, portfolio
@@ -266,7 +261,6 @@ def _merge_predictions(
         - The dataframe is the outer join of all the held assets in `portfolio` and
           `predictions`
     """
-    # TODO: after the merge, give cash a prediction of `1`
     # Prepare `predictions` for the merge.
     _LOG.debug(
         "Number of non-NaN predictions=`%i` at timestamp=`%s`",
@@ -278,14 +272,17 @@ def _merge_predictions(
         predictions.isna().sum(),
         wall_clock_timestamp,
     )
-    # TODO: Check for membership first.
+    # Ensure that `predictions` does not already include the cash id.
+    hdbg.dassert_not_in(portfolio.CASH_ID, predictions.index)
+    # Set the "prediction" for cash to 1. This is for the optimizer.
     predictions[portfolio.CASH_ID] = 1
     predictions = pd.DataFrame(predictions)
+    # Format the predictions dataframe.
     predictions.columns = ["prediction"]
     predictions.index.name = "asset_id"
+    predictions = predictions.reset_index()
     _LOG.debug("predictions=\n%s", hprint.dataframe_to_str(predictions))
     # Merge current holdings and predictions.
-    predictions = predictions.reset_index()
     merged_df = marked_to_market.merge(predictions, on="asset_id", how="outer")
     _LOG.debug(
         "Number of NaNs in `curr_num_shares` post-merge is `%i` at timestamp=`%s`",
@@ -293,9 +290,6 @@ def _merge_predictions(
         wall_clock_timestamp,
     )
     merged_df = merged_df.convert_dtypes()
-    _LOG.debug("merged_df=%s", merged_df)
-    # Move `asset_id` from the index to a column.
-    merged_df.reset_index(inplace=True)
     # Do not allow `asset_id` to be represented as a float.
     merged_df["asset_id"] = merged_df["asset_id"].convert_dtypes(
         infer_objects=False,
@@ -303,7 +297,7 @@ def _merge_predictions(
         convert_boolean=False,
         convert_floating=False,
     )
-    _LOG.debug("after merge: merged_df=\n%s", hprint.dataframe_to_str(merged_df))
+    _LOG.debug("After merge: merged_df=\n%s", hprint.dataframe_to_str(merged_df))
     # Mark to market.
     _LOG.debug("merged_df=\n%s", hprint.dataframe_to_str(merged_df))
     columns = ["prediction", "price", "curr_num_shares", "value"]
