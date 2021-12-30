@@ -133,6 +133,8 @@ def resample_index(index: pd.DatetimeIndex, frequency: str) -> pd.DatetimeIndex:
     hdbg.dassert(index.is_unique, msg="Index must have only unique values")
     min_date = index.min()
     max_date = index.max()
+    # TODO(gp): Preserve the index name.
+    #index_name = index.name
     resampled_index = pd.date_range(
         start=min_date,
         end=max_date,
@@ -156,6 +158,7 @@ def resample_index(index: pd.DatetimeIndex, frequency: str) -> pd.DatetimeIndex:
         )
     else:
         _LOG.info("Index length=%s has not changed", len(index))
+    #resampled_index.name = index_name
     return resampled_index
 
 
@@ -168,8 +171,11 @@ def resample_df(df: pd.DataFrame, frequency: str) -> pd.DataFrame:
     :return: resampled `DataFrame`
     """
     hdbg.dassert_isinstance(df, pd.DataFrame)
+    # TODO(gp): Preserve the index name.
+    index_name = df.index.name
     resampled_index = resample_index(df.index, frequency)
     df_reindex = df.reindex(resampled_index)
+    #df_reindex.index.name = index_name
     return df_reindex
 
 

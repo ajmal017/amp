@@ -1252,19 +1252,27 @@ def integrate_compare_branch_with_base(ctx, src_dir, dst_dir, subdir=""):  # typ
 # #############################################################################
 
 
+def _get_docker_exec(sudo: bool) -> str:
+    docker_exec = "docker"
+    if sudo:
+        docker_exec = "sudo " + docker_exec
+    return docker_exec
+
+
 @task
-def docker_images_ls_repo(ctx):  # type: ignore
+def docker_images_ls_repo(ctx, sudo=False):  # type: ignore
     """
     List images in the logged in repo_short_name.
     """
     _report_task()
     docker_login(ctx)
     ecr_base_path = get_default_param("ECR_BASE_PATH")
-    _run(ctx, f"docker image ls {ecr_base_path}")
+    docker_exec = _get_docker_exec(sudo)
+    _run(ctx, f"{docker_exec} image ls {ecr_base_path}")
 
 
 @task
-def docker_ps(ctx):  # type: ignore
+def docker_ps(ctx, sudo=False):  # type: ignore
     # pylint: disable=line-too-long
     """
     List all the running containers.
@@ -1282,14 +1290,16 @@ def docker_ps(ctx):  # type: ignore
         + r"\t{{.RunningFor}}\t{{.Status}}\t{{.Ports}}"
         + r'\t{{.Label "com.docker.compose.service"}}'
     )
-    cmd = f"docker ps --format='{fmt}'"
+    docker_exec = _get_docker_exec(sudo)
+    cmd = f"{docker_exec} ps --format='{fmt}'"
     cmd = _to_single_line_cmd(cmd)
     _run(ctx, cmd)
 
 
-def _get_last_container_id() -> str:
+def _get_last_container_id(sudo: bool) -> str:
+    docker_exec = _get_docker_exec(sudo)
     # Get the last started container.
-    cmd = "docker ps -l | grep -v 'CONTAINER ID'"
+    cmd = f"{docker_exec} ps -l | grep -v 'CONTAINER ID'"
     # CONTAINER ID   IMAGE          COMMAND                  CREATED
     # 90897241b31a   eeb33fe1880a   "/bin/sh -c '/bin/ba…"   34 hours ago ...
     _, txt = hsysinte.system_to_one_line(cmd)
@@ -1301,7 +1311,9 @@ def _get_last_container_id() -> str:
 
 @task
 def docker_stats(  # type: ignore
-    ctx, all=False  # pylint: disable=redefined-builtin
+    ctx,
+    all=False,  # pylint: disable=redefined-builtin
+    sudo=False,
 ):
     # pylint: disable=line-too-long
     """
@@ -1322,13 +1334,14 @@ def docker_stats(  # type: ignore
         r"table {{.ID}}\t{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}"
         + r"\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}\t{{.PIDs}}"
     )
-    cmd = f"docker stats --no-stream --format='{fmt}'"
+    docker_exec = _get_docker_exec(sudo)
+    cmd = f"{docker_exec} stats --no-stream --format='{fmt}'"
     _, txt = hsysinte.system_to_string(cmd)
     if all:
         output = txt
     else:
         # Get the id of the last started container.
-        container_id = _get_last_container_id()
+        container_id = _get_last_container_id(sudo)
         print(f"Last container id={container_id}")
         # Parse the output looking for the given container.
         txt = txt.split("\n")
@@ -1349,23 +1362,31 @@ def docker_stats(  # type: ignore
 
 @task
 def docker_kill(  # type: ignore
-    ctx, all=False  # pylint: disable=redefined-builtin
+    ctx,
+    all=False,  # pylint: disable=redefined-builtin
+    sudo=False,
 ):
     """
     Kill the last Docker container started.
 
     :param all: kill all the containers (be careful!)
+    :param sudo: use sudo for the Docker commands
     """
     _report_task(hprint.to_str("all"))
-    # TODO(gp): Ask if we are sure and add a --just-do-it option.
+
+    docker_exec = _get_docker_exec(sudo)
     # Last container.
     opts = "-l"
     if all:
+        _LOG.warning("Killing all the containers")
+        # TODO(gp): Ask if we are sure and add a --just-do-it option.
         opts = "-a"
     # Print the containers that will be terminated.
-    _run(ctx, f"docker ps {opts}")
+    cmd = f"{docker_exec} ps {opts}"
+    _run(ctx, cmd)
     # Kill.
-    _run(ctx, f"docker rm -f $(docker ps {opts} -q)")
+    cmd = f"{docker_exec} rm -f $({docker_exec} ps {opts} -q)"
+    _run(ctx, cmd)
 
 
 # docker system prune
