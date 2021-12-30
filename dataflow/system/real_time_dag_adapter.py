@@ -45,6 +45,7 @@ class RealTimeDagAdapter(dtfcore.DagAdapter):
         order_type = "price@twap"
         overriding_config["process_forecasts"] = {
             "prediction_col": prediction_col,
+            "portfolio": portfolio,
             "execution_mode": "real_time",
             "process_forecasts_config": {},
         }
@@ -52,7 +53,6 @@ class RealTimeDagAdapter(dtfcore.DagAdapter):
         # want to show a `Config` created with multiple pieces.
         overriding_config["process_forecasts"]["process_forecasts_config"] = {
             "market_data_interface": market_data_interface,
-            "portfolio": portfolio,
             "order_type": order_type,
             "order_duration": 5,
             "ath_start_time": pd.Timestamp(

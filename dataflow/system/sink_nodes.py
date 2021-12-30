@@ -15,6 +15,7 @@ import pandas as pd
 import dataflow.core as dtfcore
 import helpers.dbg as hdbg
 import helpers.printing as hprint
+import oms.portfolio as omportfo
 import oms.process_forecasts as oprofore
 
 _LOG = logging.getLogger(__name__)
@@ -29,6 +30,7 @@ class ProcessForecasts(dtfcore.FitPredictNode):
         self,
         nid: dtfcore.NodeId,
         prediction_col: str,
+        portfolio: omportfo.AbstractPortfolio,
         execution_mode: bool,
         process_forecasts_config: Dict[str, Any],
     ) -> None:
@@ -38,6 +40,7 @@ class ProcessForecasts(dtfcore.FitPredictNode):
         super().__init__(nid)
         hdbg.dassert_in(execution_mode, ("batch", "real_time"))
         self._prediction_col = prediction_col
+        self._portfolio = portfolio
         self._execution_mode = execution_mode
         self._process_forecasts_config = process_forecasts_config
 
@@ -51,6 +54,7 @@ class ProcessForecasts(dtfcore.FitPredictNode):
         # Get the latest `df` index value.
         await oprofore.process_forecasts(
             self._prediction_df,
+            self._portfolio,
             self._execution_mode,
             self._process_forecasts_config,
         )

@@ -28,6 +28,7 @@ _LOG = logging.getLogger(__name__)
 async def process_forecasts(
     prediction_df: pd.DataFrame,
     # volatility_df:
+    portfolio: omportfo.AbstractPortfolio,
     execution_mode: str,
     config: Dict[str, Any],
 ) -> None:
@@ -62,6 +63,8 @@ async def process_forecasts(
     hdbg.dassert_isinstance(prediction_df, pd.DataFrame)
     hpandas.dassert_index_is_datetime(prediction_df)
     hpandas.dassert_strictly_increasing_index(prediction_df)
+    # Check `portfolio`.
+    hdbg.dassert_isinstance(portfolio, omportfo.AbstractPortfolio)
     # Extract the objects from the config.
     def _get_object_from_config(key: str, expected_type: type) -> Any:
         hdbg.dassert_in(key, config)
@@ -69,7 +72,6 @@ async def process_forecasts(
         hdbg.dassert_issubclass(obj, expected_type)
         return obj
 
-    portfolio = _get_object_from_config("portfolio", omportfo.AbstractPortfolio)
     market_data_interface = portfolio.market_data_interface
     order_type = _get_object_from_config("order_type", str)
     order_duration = _get_object_from_config("order_duration", int)

@@ -185,8 +185,8 @@ class TestRealTimePipelineWithOms1(hunitest.TestCase):
             )
             # Populate place trades.
             order_type = "price@twap"
+            config["process_forecasts", "portfolio"] = portfolio
             config["process_forecasts"]["process_forecasts_config"] = {
-                "portfolio": portfolio,
                 "order_type": order_type,
                 "order_duration": 1,
                 "ath_start_time": pd.Timestamp(
