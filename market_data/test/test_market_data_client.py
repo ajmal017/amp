@@ -19,7 +19,7 @@ class TestGetDataForInterval(hunitest.TestCase):
         """
         # Initialize the `IM` client.
         test_dir = os.path.join(
-            hgit.get_client_root(False),
+            hgit.get_amp_abs_path(),
             "im_v2/ccxt/data/client/test/test_data",
         )
         ccxt_file_client = imvcdclcl.CcxtCsvFileSystemClient(
