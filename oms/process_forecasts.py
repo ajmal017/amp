@@ -73,7 +73,6 @@ async def process_forecasts(
         hdbg.dassert_issubclass(obj, expected_type)
         return obj
 
-    market_data_interface = portfolio.market_data_interface
     order_type = _get_object_from_config("order_type", str)
     order_duration = _get_object_from_config("order_duration", int)
     # TODO(Paul): Add a check for ATH start/end.
@@ -98,9 +97,11 @@ async def process_forecasts(
         raise ValueError(f"Unrecognized execution mode='{execution_mode}'")
     _LOG.debug("predictions_df=%s\n%s", str(prediction_df.shape), prediction_df)
     _LOG.debug("predictions_df.index=%s", str(prediction_df.index))
+    market_data_interface = portfolio.market_data_interface
     get_wall_clock_time = market_data_interface.get_wall_clock_time
     tqdm_out = htqdm.TqdmToLogger(_LOG, level=logging.INFO)
     num_rows = len(prediction_df)
+    _LOG.debug("Number of rows in `prediction_df`=%d", num_rows)
     iter_ = enumerate(prediction_df.iterrows())
     for idx, (timestamp, predictions) in tqdm(
         iter_, total=num_rows, file=tqdm_out
@@ -130,41 +131,28 @@ async def process_forecasts(
                 ath_end_time,
             )
             continue
+        # Continue if we are outside of our trading window.
+        if time < trading_start_time or time > trading_end_time:
+            continue
         # if execution_mode == "batch":
         #     if idx == len(predictions_df) - 1:
         #         # For the last timestamp we only need to mark to market, but not post
         #         # any more orders.
         #         continue
-        # Enter position between now and the next 5 mins.
-        timestamp_start = wall_clock_timestamp
-        offset_min = pd.DateOffset(minutes=order_duration)
-        timestamp_end = wall_clock_timestamp + offset_min
-        # Update `portfolio` based on last fills and market movement.
-        _LOG.debug(
-            "\n%s",
-            hprint.frame(
-                "Marking portfolio to market: timestamp=%s"
-                % wall_clock_timestamp,
-                char1="#",
-            ),
-        )
-        # Continue if we are outside of our trading window.
-        if time < trading_start_time or time > trading_end_time:
-            continue
-        # Compute target positions
+        # Wait 1 second to give all open orders sufficient time to close.
+        await asyncio.sleep(1)
+        # Compute the target positions.
         _LOG.debug(
             "\n%s",
             hprint.frame(
                 "Computing target positions: timestamp=%s" % wall_clock_timestamp,
                 char1="#",
-            ),
+                ),
         )
-        # Wait 1 second to give all open orders sufficient time to close.
-        await asyncio.sleep(1)
-        # Compute the target positions.
         target_positions = _compute_target_positions_in_shares(
             wall_clock_timestamp, predictions, portfolio
         )
+        # Generate orders from target positions.
         _LOG.debug(
             "\n%s",
             hprint.frame(
@@ -172,8 +160,12 @@ async def process_forecasts(
                 char1="#",
             ),
         )
-        # Create an config for `Order`. This requires timestamps and so is
+        # Enter position between now and the next `order_duration` minutes.
+        # Create a config for `Order`. This requires timestamps and so is
         # inside the loop.
+        timestamp_start = wall_clock_timestamp
+        offset_min = pd.DateOffset(minutes=order_duration)
+        timestamp_end = wall_clock_timestamp + offset_min
         order_dict_ = {
             "type_": order_type,
             "creation_timestamp": wall_clock_timestamp,
@@ -198,6 +190,8 @@ async def process_forecasts(
             _LOG.debug("Event: awaiting broker.submit_orders()...")
             await broker.submit_orders(orders)
             _LOG.debug("Event: awaiting broker.submit_orders() done.")
+        else:
+            _LOG.debug("No orders to submit to broker.")
         _LOG.debug("portfolio=\n%s" % str(portfolio))
     _LOG.debug("Event: exiting process_forecasts() for loop.")
 
@@ -220,6 +214,10 @@ def _compute_target_positions_in_shares(
     # (imputing 0's for the holdings).
     unpriced_assets = predictions.index.difference(marked_to_market.index)
     if not unpriced_assets.empty:
+        _LOG.debug(
+            "Unpriced assets by id=\n%s",
+            "\n".join(map(str, unpriced_assets.to_list())),
+        )
         prices = portfolio.price_assets(unpriced_assets.values)
         mtm_extension = pd.DataFrame(
             index=unpriced_assets, columns=["price", "curr_num_shares", "value"]
@@ -230,7 +228,7 @@ def _compute_target_positions_in_shares(
         marked_to_market = pd.concat([marked_to_market, mtm_extension], axis=0)
     marked_to_market.reset_index(inplace=True)
     _LOG.debug(
-        "marked_to_market df=\h%s", hprint.dataframe_to_str(marked_to_market)
+        "marked_to_market dataframe=\n%s" % hprint.dataframe_to_str(marked_to_market)
     )
     # Combine the portfolio `marked_to_market` dataframe with the predictions.
     assets_and_predictions = _merge_predictions(
