@@ -332,6 +332,7 @@ class AbstractMarketDataInterface(abc.ABC):
         """
         Get last price for `asset_ids` using column `col_name` (e.g., "close")
         """
+        # TODO(*): Use a to-be-written `get_last_start_time()` instead.
         last_end_time = self.get_last_end_time()
         _LOG.info("last_end_time=%s", last_end_time)
         # TODO(gp): This is not super robust.
@@ -340,6 +341,7 @@ class AbstractMarketDataInterface(abc.ABC):
             df = self.get_data(period="last_5mins")
             _LOG.info("df=\n%s", hprintin.dataframe_to_str(df))
         # Get the data.
+        # TODO(*): Remove the hard-coded 1-minute.
         start_time = last_end_time - pd.Timedelta(minutes=1)
         df = self.get_data_at_timestamp(
             start_time,
@@ -352,6 +354,8 @@ class AbstractMarketDataInterface(abc.ABC):
         last_price.set_index(self._asset_id_col, inplace=True)
         last_price_srs = hpandas.to_series(last_price)
         hdbg.dassert_isinstance(last_price_srs, pd.Series)
+        last_price_srs.index.name = self._asset_id_col
+        last_price_srs.name = col_name
         # TODO(gp): Print if there are nans.
         return last_price_srs
 

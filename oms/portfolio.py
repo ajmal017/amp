@@ -101,6 +101,7 @@ class AbstractPortfolio(abc.ABC):
         self._holdings_df = holdings_df
         # Get the initial timestamp from the `holdings_df`.
         initial_timestamp = holdings_df.index[0]
+        # initial_timestamp = get_wall_clock_time()
         self._initial_timestamp = initial_timestamp
         # At each call to `mark_to_market()`, we capture `wall_clock_time` and
         # perform a sequence of updates to the following dictionaries.
@@ -127,7 +128,7 @@ class AbstractPortfolio(abc.ABC):
         # - timestamp to pd.Series of statistics.
         self._statistics = collections.OrderedDict()
         # Price the assets at the initial timestamp.
-        self._price_assets(initial_timestamp, asset_holdings)
+        self._price_assets(asset_holdings)
         # Compute the initial portfolio statistics.
         self._compute_statistics()
 
@@ -211,7 +212,7 @@ class AbstractPortfolio(abc.ABC):
         # Get the latest timestamp.
         ts = next(reversed(self._asset_holdings))
         # Price the assets.
-        self._price_assets(ts, self._asset_holdings[ts])
+        self._price_assets(self._asset_holdings[ts])
         # Calculate statistics.
         self._compute_statistics()
         # Perform sanity-checks.
@@ -299,28 +300,22 @@ class AbstractPortfolio(abc.ABC):
 
     def price_assets(
         self,
-        # TODO(gp): Do we need this?
-        as_of_timestamp: pd.Timestamp,
         asset_ids: List[int],
     ) -> pd.Series:
         """
         Wrap `portfolio.market_data_interface` and packages output.
 
-        :param as_of_timestamp: as in `market_data_interface.get_data_at_timestamp()`
         :param asset_ids: as in `market_data_interface.get_data_at_timestamp()`
         :return: series of prices at `as_of_timestamp` indexed by asset_id
         """
-        price_df = self.market_data_interface.get_data_at_timestamp(
-            as_of_timestamp, self._timestamp_col, asset_ids
+        prices = self.market_data_interface.get_last_price(
+            self._mark_to_market_col, asset_ids
         )
-        columns = [self._asset_id_col, self._mark_to_market_col]
-        hdbg.dassert_is_subset(columns, price_df.columns)
-        price_df = price_df[columns]
-        price_srs = price_df.set_index(self._asset_id_col)[self._mark_to_market_col]
-        price_srs.index.name = "asset_id"
-        price_srs.name = "price"
-        hdbg.dassert(not price_srs.index.has_duplicates)
-        return price_srs
+        hdbg.dassert_eq(self._mark_to_market_col, prices.name)
+        prices.index.name = "asset_id"
+        prices.name = "price"
+        hdbg.dassert(not prices.index.has_duplicates)
+        return prices
 
     @abc.abstractmethod
     def _observe_holdings(
@@ -331,21 +326,17 @@ class AbstractPortfolio(abc.ABC):
         """
         ...
 
-    # TODO(gp): -> _get_price_assets?
     def _price_assets(
         self,
-        # TODO(gp): Do we need this?
-        as_of_timestamp: pd.Timestamp,
         asset_ids: pd.Series,
     ) -> None:
         """
         Access the underlying market_data_interface to price assets.
 
-        :param as_of_timestamp: timestamp to forward to `market_data_interface`
         :param asset_ids: series of share counts indexed by asset id
         :return: series of asset values
         """
-        # as_of_timestamp, asset_holdings = next(reversed(self._asset_holdings))
+        as_of_timestamp = next(reversed(self._asset_holdings))
         hdbg.dassert_isinstance(asset_ids, pd.Series)
         asset_ids_list = asset_ids.index.to_list()
         # TODO(*): Get the market as-of timestamp.
@@ -357,7 +348,7 @@ class AbstractPortfolio(abc.ABC):
         else:
             # TODO(gp): A bit weird that we are calling the public method from the
             # private.
-            prices = self.price_assets(as_of_timestamp, asset_ids_list)
+            prices = self.price_assets(asset_ids_list)
             assets_marked_to_market = asset_ids * prices
             assets_marked_to_market.name = "value"
             assets_marked_to_market = pd.concat(

@@ -219,9 +219,7 @@ def _compute_target_positions_in_shares(
     # (imputing 0's for the holdings).
     unpriced_assets = predictions.index.difference(marked_to_market.index)
     if not unpriced_assets.empty:
-        prices = portfolio.price_assets(
-            wall_clock_timestamp, unpriced_assets.values
-        )
+        prices = portfolio.price_assets(unpriced_assets.values)
         mtm_extension = pd.DataFrame(
             index=unpriced_assets, columns=["price", "curr_num_shares", "value"]
         )
