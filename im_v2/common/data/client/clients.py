@@ -351,16 +351,13 @@ class ImClientReadingMultipleSymbols(AbstractImClient, abc.ABC):
         """
         Same as the abstract class.
         """
-        """
-        Same as the method in the parent class.
-        """
         _LOG.debug(
             hprint.to_str(
                 "full_symbols start_ts end_ts full_symbol_col_name kwargs"
             )
         )
         df = self._read_data_for_multiple_symbols(
-            full_symbols, normalize, start_ts, end_ts, **kwargs
+            full_symbols, start_ts, end_ts, full_symbol_col_name, **kwargs
         )
         df = self._apply_vendor_normalization(df)
         return df
@@ -369,9 +366,9 @@ class ImClientReadingMultipleSymbols(AbstractImClient, abc.ABC):
     def _read_data_for_multiple_symbols(
         self,
         full_symbols: List[FullSymbol],
-        normalize: bool,
         start_ts: Optional[pd.Timestamp],
         end_ts: Optional[pd.Timestamp],
+        full_symbol_col_name: str,
         **kwargs: Dict[str, Any],
     ) -> pd.DataFrame:
         """

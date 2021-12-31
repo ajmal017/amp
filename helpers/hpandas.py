@@ -276,7 +276,7 @@ def trim_df(
         hdateti.dassert_tz_compatible(start_ts, end_ts)
     use_index = False
     if ts_col_name is None:
-        hdateti.dassert_tz_compatible(df.index.values[0], start_ts)
+        # hdateti.dassert_tz_compatible(df.index.values[0], start_ts)
         # TODO(gp): Use binary search if there is an index.
         # hdbg.dassert_is_not(df.index.name, None, "The index needs to have a name")
         if df.index.name is None:
@@ -287,7 +287,7 @@ def trim_df(
         use_index = True
     # TODO(gp): This is inefficient. Make it faster by binary search, if ordered.
     hdbg.dassert_in(ts_col_name, df.columns)
-    hdateti.dassert_tz_compatible(df[ts_col_name].values[0], start_ts)
+    # hdateti.dassert_tz_compatible(df[ts_col_name].values[0], start_ts)
     # Filter based on start_ts.
     if start_ts is not None:
         _LOG.verb_debug("start_ts=%s", start_ts)
