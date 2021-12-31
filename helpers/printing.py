@@ -10,7 +10,7 @@ import logging
 import re
 import sys
 import tempfile
-from typing import Any, Dict, Iterable, List, Match, Optional, cast
+from typing import Any, Callable, Dict, Iterable, List, Match, Optional, cast
 
 import helpers.dbg as hdbg
 
@@ -409,7 +409,7 @@ def log_frame(
 # TODO(gp): This can be injected in `hlogger.py` and then controlled through
 #  command line, e.g., `-v VERBOSE`. We should be able to tweak the verbosity
 #  of each module independently.
-def install_log_verb_debug(logger: logging.Logger, *, verbose: bool) -> None:
+def install_log_verb_debug(logger: logging.Logger, *, verbose: bool) -> Callable:
     """
     Create in a module a _LOG.verb_debug() that can be disabled in a centralized
     way.
@@ -435,7 +435,6 @@ def install_log_verb_debug(logger: logging.Logger, *, verbose: bool) -> None:
         if verbose:
             logger.debug(*args, **kwargs)
 
-    logger.verb_debug = _verb_debug
     return _verb_debug
 
 

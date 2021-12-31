@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
 
+import helpers.datetime_ as hdateti
 import helpers.dbg as hdbg
 import helpers.printing as hprint
 
@@ -41,7 +42,7 @@ def to_series(df: pd.DataFrame) -> pd.Series:
     return srs
 
 
-# ##############################################################################
+# #############################################################################
 
 
 def _get_index(obj: Union[pd.Index, pd.DataFrame, pd.Series]) -> pd.Index:
@@ -134,7 +135,7 @@ def resample_index(index: pd.DatetimeIndex, frequency: str) -> pd.DatetimeIndex:
     min_date = index.min()
     max_date = index.max()
     # TODO(gp): Preserve the index name.
-    #index_name = index.name
+    # index_name = index.name
     resampled_index = pd.date_range(
         start=min_date,
         end=max_date,
@@ -158,7 +159,7 @@ def resample_index(index: pd.DatetimeIndex, frequency: str) -> pd.DatetimeIndex:
         )
     else:
         _LOG.info("Index length=%s has not changed", len(index))
-    #resampled_index.name = index_name
+    # resampled_index.name = index_name
     return resampled_index
 
 
@@ -171,11 +172,11 @@ def resample_df(df: pd.DataFrame, frequency: str) -> pd.DataFrame:
     :return: resampled `DataFrame`
     """
     hdbg.dassert_isinstance(df, pd.DataFrame)
-    # TODO(gp): Preserve the index name.
+    # Preserve the index name.
     index_name = df.index.name
     resampled_index = resample_index(df.index, frequency)
     df_reindex = df.reindex(resampled_index)
-    #df_reindex.index.name = index_name
+    df_reindex.index.name = index_name
     return df_reindex
 
 
@@ -268,15 +269,25 @@ def trim_df(
         - E.g., [start_ts, end_ts), or (start_ts, end_ts]
     """
     _LOG.debug("df=\n%s", hprint.dataframe_to_str(df))
+    _LOG.debug(
+        hprint.to_str("ts_col_name start_ts end_ts left_close right_close")
+    )
+    if start_ts is not None and end_ts is not None:
+        hdateti.dassert_tz_compatible(start_ts, end_ts)
     use_index = False
     if ts_col_name is None:
-        # TODO(gp): Use binary search.
-        hdbg.dassert_is_not(df.index.name, None, "The index needs to have a name")
+        hdateti.dassert_tz_compatible(df.index.values[0], start_ts)
+        # TODO(gp): Use binary search if there is an index.
+        # hdbg.dassert_is_not(df.index.name, None, "The index needs to have a name")
+        if df.index.name is None:
+            _LOG.debug("The df has no index\n%s", hprint.dataframe_to_str(df))
+            df.index.name = "index"
         ts_col_name = df.index.name
         df = df.reset_index()
         use_index = True
     # TODO(gp): This is inefficient. Make it faster by binary search, if ordered.
     hdbg.dassert_in(ts_col_name, df.columns)
+    hdateti.dassert_tz_compatible(df[ts_col_name].values[0], start_ts)
     # Filter based on start_ts.
     if start_ts is not None:
         _LOG.verb_debug("start_ts=%s", start_ts)

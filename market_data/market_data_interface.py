@@ -38,18 +38,22 @@ class AbstractMarketDataInterface(abc.ABC):
     Implement an interface to an historical / real-time source of price data.
 
     Responsibilities:
-    - Delegate to a data backend in AbstractImClient to retrieve historical
+    - Delegate to a data backend in `AbstractImClient` to retrieve historical
       and real-time data
+    - Model data in terms of interval `start_timestamp`, `end_timestamp`
+        - `AbstractImClient` models data in terms of end timestamp of the interval
     - Implement RT behaviors (e.g, `is_last_bar_available`, wall_clock, ...)
-        - TODO(gp): Maybe move them in IM too?
+    - Implement knowledge time and delay
+        - `AbstractImClient` doesn't have this view of the data
     - Stitch together different data representations (e.g., historical / RT)
       using multiple IM backends
     - Remap columns to connect data backends to consumers
-    - Implement some market related transformations (e.g., TWAP)
+    - Implement some market related transformations (e.g., `get_twap_price()`,
+      `get_last_price()`)
 
     Non-responsibilities:
-    - In general don't access data directly but rely on an AbstractImClient object
-      to retrieve the data from different backends
+    - In general do not access data directly but rely on `AbstractImClient`
+      objects to retrieve the data from different backends
 
     All the timestamps in the interface are in ET timezone.
     - TODO(gp): Maybe UTC with the possibility of a switch to enforce certain

@@ -182,6 +182,10 @@ def dassert_tz_compatible(
     )
 
 
+# TODO(gp): Replace this check with compatibility between series vs scalar.
+# def dassert_srs_tz_compatible(
+# def dassert_srs_has_tz
+# def dassert_srs_is_tz_naive
 def dassert_tz_compatible_timestamp_with_df(
     datetime_: StrictDatetime,
     df: pd.DataFrame,
