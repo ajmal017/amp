@@ -892,24 +892,14 @@ def git_branch_copy(ctx, new_branch_name="", use_patch=False):  # type: ignore
     _run(ctx, cmd)
 
 
-@task
-def git_branch_diff_with_base(  # type: ignore
-    ctx, diff_type="", subdir="", dry_run=False
-):
-    """
-    Diff files of the current branch with master at the branching point.
-
-    :param diff_type: files to diff using git `--diff-filter` options
-    :param subdir: subdir to consider for diffing, instead of `.`
-    :param dry_run: execute diffing script or not
-    """
-    _ = ctx
-    # This branch is not master.
+def _git_diff_with_branch(ctx: Any, hash_: str,
+                          tag: str,
+                          dir_name: str,
+                          diff_type: str, subdir: str, dry_run: bool
+                          ) -> None:
+    # Check that this branch is not master.
     curr_branch_name = hgit.get_branch_name()
     hdbg.dassert_ne(curr_branch_name, "master")
-    # Get the branching point.
-    dir_name = "."
-    hash_ = hgit.get_branch_hash(dir_name=dir_name)
     # Get the modified files.
     cmd = []
     cmd.append("git diff")
@@ -922,6 +912,9 @@ def git_branch_diff_with_base(  # type: ignore
     )
     files = sorted(files)
     print("files=%s\n%s" % (len(files), "\n".join(files)))
+    # Create the dir storing all the files to compare.
+    dst_dir = f"./tmp.{tag}"
+    hio.create_dir(dst_dir, incremental=False)
     # Retrieve the original file and create the diff command.
     script_txt = []
     for branch_file in files:
@@ -940,11 +933,11 @@ def git_branch_diff_with_base(  # type: ignore
             right_file = branch_file
         else:
             right_file = "/dev/null"
-        #
-        tmp_file = branch_file.replace(".py", ".base.py")
         # Flatten the file dirs: e.g.,
         # dataflow/core/nodes/test/test_volatility_models.base.py
-        tmp_file = "tmp." + tmp_file.replace("/", "_")
+        tmp_file = branch_file
+        tmp_file = tmp_file.replace("/", "_")
+        tmp_file = os.path.join(dst_dir, tmp_file)
         _LOG.debug(
             "branch_file='%s' exists in branch -> master_file='%s'",
             branch_file,
@@ -970,11 +963,54 @@ def git_branch_diff_with_base(  # type: ignore
     print(hprint.frame("Diffing script"))
     print(script_txt)
     # Save the script to compare.
-    script_file_name = "./tmp.vimdiff_branch_with_base.sh"
+    script_file_name = f"./tmp.vimdiff_branch_with_{tag}.sh"
     hsysinte.create_executable_script(script_file_name, script_txt)
-    print(f"# To diff against the base run:\n> {script_file_name}")
+    print(f"# To diff against {tag} run:\n> {script_file_name}")
     if not dry_run:
         _run(ctx, script_file_name, pty=True)
+
+@task
+def git_branch_diff_with_base(  # type: ignore
+    ctx, diff_type="", subdir="", dry_run=False
+):
+    """
+    Diff files of the current branch with master at the branching point.
+
+    :param diff_type: files to diff using git `--diff-filter` options
+    :param subdir: subdir to consider for diffing, instead of `.`
+    :param dry_run: execute diffing script or not
+    """
+    # Get the branching point.
+    dir_name = "."
+    hash_ = hgit.get_branch_hash(dir_name=dir_name)
+    #
+    tag = "base"
+    _git_diff_with_branch(ctx, hash_,
+                          tag,
+                          dir_name,
+                          diff_type, subdir, dry_run
+                          )
+
+
+@task
+def git_branch_diff_with_master(  # type: ignore
+        ctx, diff_type="", subdir="", dry_run=False
+):
+    """
+    Diff files of the current branch with origin/master.
+
+    :param diff_type: files to diff using git `--diff-filter` options
+    :param subdir: subdir to consider for diffing, instead of `.`
+    :param dry_run: execute diffing script or not
+    """
+    dir_name = "."
+    hash_ = "origin/master"
+    tag = "origin_master"
+    _git_diff_with_branch(ctx, hash_,
+                          tag,
+                          dir_name,
+                          diff_type, subdir, dry_run
+                          )
 
 
 # TODO(gp): Add the following scripts:

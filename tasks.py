@@ -44,6 +44,7 @@ from helpers.lib_tasks import (  # noqa: F401  # pylint: disable=unused-import
     git_add_all_untracked,
     git_branch_copy,
     git_branch_diff_with_base,
+    git_branch_diff_with_master,
     git_branch_files,
     git_branch_next_name,
     git_clean,
