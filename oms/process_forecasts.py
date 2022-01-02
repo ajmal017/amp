@@ -54,7 +54,7 @@ async def process_forecasts(
         - `pred_column`: the column in the df from the DAG containing the predictions
            for all the assets
         - `mark_column`: the column from the MarketDataInterface to mark holdings to
-          market
+           market
         - `portfolio`: object used to store positions
         - `locates`: object used to access short locates
     :return: updated portfolio
@@ -113,6 +113,12 @@ async def process_forecasts(
             hprint.frame("# idx=%s timestamp=%s" % (idx, timestamp)),
         )
         # Wait until get_wall_clock_time() == timestamp.
+        # TODO(gp): For execution_mode == "real_time" we should impose a
+        # constraint like:
+        #   wall_clock_time <= prev_timestamp + order duration = next_timestamp
+        # E.g., it's 10:21:51, we computed the forecast for [10:20, 10:25] bar
+        # As long as it's before 10:25 we want to place the order. If it's later
+        # either assert or log it as a problem.
         await hasynci.wait_until(timestamp, get_wall_clock_time)
         # Get the wall clock timestamp.
         wall_clock_timestamp = get_wall_clock_time()
