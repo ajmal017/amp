@@ -111,7 +111,8 @@ def dassert_valid_remap(to_remap: List[str], remap_dict: Dict[str, str]) -> None
     hdbg.dassert_isinstance(to_remap, list)
     hdbg.dassert_isinstance(remap_dict, dict)
     # All the rows / columns to remap, should exist.
-    hdbg.dassert_is_subset(remap_dict.keys(), to_remap)
+    hdbg.dassert_is_subset(remap_dict.keys(), to_remap,
+            "Keys to remap should be a subset of existing columns")
     # The mapping is invertible.
     hdbg.dassert_no_duplicates(remap_dict.keys())
     hdbg.dassert_no_duplicates(remap_dict.values())

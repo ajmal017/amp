@@ -158,6 +158,8 @@ class AbstractMarketDataInterface(abc.ABC):
             normalize_data=normalize_data,
             limit=limit,
         )
+        # We don't need to remap columns since `get_data_for_interval()` has already
+        # done it.
         _LOG.verb_debug("-> df=\n%s", hprint.dataframe_to_str(df))
         return df
 
@@ -186,6 +188,8 @@ class AbstractMarketDataInterface(abc.ABC):
             asset_ids,
             normalize_data=normalize_data,
         )
+        # We don't need to remap columns since `get_data_for_interval()` has already
+        # done it.
         _LOG.verb_debug("-> df=\n%s", hprint.dataframe_to_str(df))
         return df
 
@@ -265,6 +269,8 @@ class AbstractMarketDataInterface(abc.ABC):
             normalize_data=True,
             limit=None,
         )
+        # We don't need to remap columns since `get_data_for_interval()` has already
+        # done it.
         hdbg.dassert_in(column, prices.columns)
         prices = prices[column]
         # Compute the mean value.
