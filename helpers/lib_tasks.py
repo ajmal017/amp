@@ -4114,7 +4114,7 @@ def gh_workflow_list(
             if status == "success":
                 print(f"Workflow '{workflow}' for '{branch_name}' is ok")
                 break
-            elif status == "failure":
+            elif status in ("failure", "startup_failure", "cancelled"):
                 _LOG.error(
                     "Workflow '%s' for '%s' is broken", workflow, branch_name
                 )
@@ -4138,13 +4138,13 @@ def gh_workflow_list(
 
 
 @task
-def gh_workflow_run(ctx, branch="branch", workflows="all"):  # type: ignore
+def gh_workflow_run(ctx, branch="current_branch", workflows="all"):  # type: ignore
     """
     Run GH workflows in a branch.
     """
     _report_task(hprint.to_str("branch workflows"))
     # Get the branch name.
-    if branch == "branch":
+    if branch == "current_branch":
         branch_name = hgit.get_branch_name()
     elif branch == "master":
         branch_name = "master"
@@ -4163,8 +4163,6 @@ def gh_workflow_run(ctx, branch="branch", workflows="all"):  # type: ignore
         # gh workflow run fast_tests.yml --ref AmpTask1251_Update_GH_actions_for_amp
         cmd = f"gh workflow run {gh_test} --ref {branch_name}"
         _run(ctx, cmd)
-    #
-    gh_workflow_list(ctx, filter_by_branch=branch)
 
 
 def _get_repo_full_name_from_cmd(repo_short_name: str) -> Tuple[str, str]:
