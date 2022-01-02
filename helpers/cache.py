@@ -25,7 +25,7 @@ import helpers.introspection as hintros
 import helpers.io_ as hio
 import helpers.printing as hprint
 import helpers.s3 as hs3
-import helpers.system_interaction as hsyinte
+import helpers.system_interaction as hsysinte
 import helpers.timer as htimer
 
 _LOG = logging.getLogger(__name__)
