@@ -78,6 +78,7 @@ def construct_full_symbol(exchange: str, symbol: str) -> FullSymbol:
 # #############################################################################
 
 
+# TODO(gp): -> ImClient
 class AbstractImClient(abc.ABC):
     """
     Retrieve market data for different vendors from different backends.
@@ -98,9 +99,15 @@ class AbstractImClient(abc.ABC):
         **kwargs: Dict[str, Any],
     ) -> pd.DataFrame:
         """
-        Read data in [start_ts, end_ts) for the symbols `FullSymbols`.
+        Read data in `[start_ts, end_ts)` for the symbols `FullSymbols`.
 
-        # TODO: Add example of the data
+        ```
+                                  full_symbol     close     volume
+                  timestamp
+        2021-07-26 13:42:00  binance:BTC_USDT  47063.51  29.403690
+        2021-07-26 13:43:00  binance:BTC_USDT  46946.30  58.246946
+        2021-07-26 13:44:00  binance:BTC_USDT  46895.39  81.264098
+        ```
 
         :param full_symbols: list of full symbols, e.g.
             `['binance::BTC_USDT', 'kucoin::ETH_USDT']`

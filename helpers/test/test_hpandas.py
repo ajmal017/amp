@@ -12,7 +12,6 @@ _LOG = logging.getLogger(__name__)
 
 
 class Test_to_series1(hunitest.TestCase):
-
     def helper(self, n: int, exp: str) -> None:
         vals = list(range(n))
         df = pd.DataFrame([vals], columns=[f"a{i}" for i in vals])

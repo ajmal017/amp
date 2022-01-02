@@ -297,9 +297,9 @@ class Test_Traceback1(hunitest.TestCase):
     #   File "pandas/_libs/hashtable_class_helper.pxi", line 5198, in pandas._libs.hashtable.PyObjectHashTable.get_item
     #   File "pandas/_libs/hashtable_class_helper.pxi", line 5206, in pandas._libs.hashtable.PyObjectHashTable.get_item
     # KeyError: 'end_ts'
-    # 
+    #
     # The above exception was the direct cause of the following exception:
-    # 
+    #
     # Traceback (most recent call last):
     #   File "/app/amp/market_data/test/test_market_data_client.py", line 46, in test1
     #     data = market_data_client.get_data_for_interval(

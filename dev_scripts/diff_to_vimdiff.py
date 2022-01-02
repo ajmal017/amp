@@ -231,8 +231,8 @@ def _parse_diff_output(
         cmd = "./%s" % output_file
         print("Run script with:\n> " + cmd)
         #
-        cmd = "kill -kill $(ps -ef | grep %s | awk '{print $2 }')" % output_file
-        print("# To kill the script run:\n> " + cmd)
+        # cmd = "kill -kill $(ps -ef | grep %s | awk '{print $2 }')" % output_file
+        # print("# To kill the script run:\n> " + cmd)
 
 
 # #############################################################################
@@ -266,7 +266,7 @@ def _parse() -> argparse.ArgumentParser:
         "-o",
         "--output_file",
         action="store",
-        default="tmp.diff_file_differences.sh",
+        default="tmp.diff_to_vimdiff.sh",
         help="Output file. Don't specify anything for stdout",
     )
     parser.add_argument(
