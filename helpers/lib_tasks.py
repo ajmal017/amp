@@ -4092,7 +4092,7 @@ def gh_workflow_list(
                 print(f"# Log is in '{log_file_name}'")
                 # Run_fast_tests  Run fast tests  2021-12-19T00:19:38.3394316Z FAILED data
                 cmd = rf"grep 'Z FAILED ' {log_file_name}"
-                hsysinte.system(cmd, suppress_output=False)
+                hsysinte.system(cmd, suppress_output=False, abort_on_error=False)
                 break
             elif status == "":
                 # It's in progress.
