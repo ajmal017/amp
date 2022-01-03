@@ -105,7 +105,6 @@ async def process_forecasts(
     iter_ = enumerate(prediction_df.iterrows())
     # `timestamp` is the time when the forecast is available and in the current
     #  setup is also when the order should begin.
-    offset_min = pd.DateOffset(minutes=order_duration)
     for idx, (timestamp, predictions) in tqdm(
         iter_, total=num_rows, file=tqdm_out
     ):
@@ -113,20 +112,17 @@ async def process_forecasts(
             "\n%s",
             hprint.frame("# idx=%s timestamp=%s" % (idx, timestamp)),
         )
+        # Wait until get_wall_clock_time() == timestamp.
+        # TODO(gp): For execution_mode == "real_time" we should impose a
+        # constraint like:
+        #   wall_clock_time <= prev_timestamp + order duration = next_timestamp
+        # E.g., it's 10:21:51, we computed the forecast for [10:20, 10:25] bar
+        # As long as it's before 10:25 we want to place the order. If it's later
+        # either assert or log it as a problem.
+        await hasynci.wait_until(timestamp, get_wall_clock_time)
         # Get the wall clock timestamp.
         wall_clock_timestamp = get_wall_clock_time()
         _LOG.debug("wall_clock_timestamp=%s", wall_clock_timestamp)
-        # Wait until get_wall_clock_time() == timestamp.
-        if wall_clock_timestamp > timestamp:
-            # TODO(gp): For execution_mode == "real_time" we should impose a
-            # constraint like:
-            #   wall_clock_time <= prev_timestamp + order duration = next_timestamp
-            # E.g., it's 10:21:51, we computed the forecast for [10:20, 10:25] bar
-            # As long as it's before 10:25 we want to place the order. If it's later
-            # either assert or log it as a problem.
-            hdbg.dassert_lte(wall_clock_timestamp, timestamp + offset_min)
-        else:
-            await hasynci.wait_until(timestamp, get_wall_clock_time)
         # Get the time of day of the wall clock timestamp.
         time = wall_clock_timestamp.time()
         if time < ath_start_time:
@@ -178,6 +174,7 @@ async def process_forecasts(
         # Create a config for `Order`. This requires timestamps and so is
         # inside the loop.
         timestamp_start = wall_clock_timestamp
+        offset_min = pd.DateOffset(minutes=order_duration)
         timestamp_end = wall_clock_timestamp + offset_min
         order_dict_ = {
             "type_": order_type,
@@ -257,9 +254,6 @@ def _compute_target_positions_in_shares(
     return df
 
 
-# TODO(gp): Pass the universe to the Portfolio.
-
-
 def _merge_predictions(
     marked_to_market: pd.DataFrame,
     predictions: pd.Series,
@@ -320,18 +314,10 @@ def _generate_orders(
     :return: a list of nontrivial orders (i.e., no zero-share orders)
     """
     _LOG.debug("# Generate orders")
-    _LOG.debug("shares_df=\n%s",
-               hprint.dataframe_to_str(shares_df))
     hdbg.dassert_is_subset(
         ("curr_num_shares", "diff_num_shares"), shares_df.columns
     )
     orders: List[omorder.Order] = []
-    # TODO(gp): We should filter by Portfolio.universe somewhere before we ask
-    #  for prices.
-    #shares_df.loc["diff_num_shares", :] = shares_df["diff_num_shares"].fillna(0.0)
-    #shares_df["diff_num_shares"].fillna(0.0, inplace=True)
-    _LOG.debug("shares_df=\n%s",
-               hprint.dataframe_to_str(shares_df))
     for asset_id, shares_row in shares_df.iterrows():
         curr_num_shares = shares_row["curr_num_shares"]
         diff_num_shares = shares_row["diff_num_shares"]
@@ -339,14 +325,9 @@ def _generate_orders(
             np.isfinite(curr_num_shares).all(),
             "All curr_num_share values must be finite.",
         )
-        #_LOG.debug("diff_num_shares=")
-        # TODO(gp): Change it to scalar assertion.
-        if not np.isfinite(diff_num_shares):
-            diff_num_shares = 0
         hdbg.dassert(
             np.isfinite(diff_num_shares).all(),
-            "All diff_num_share values must be finite:\n%s",
-            hprint.dataframe_to_str(diff_num_shares)
+            "All diff_num_share values must be finite.",
         )
         if diff_num_shares == 0.0:
             # No need to place trades.
