@@ -47,7 +47,6 @@ class RealTimeDagAdapter(dtfcore.DagAdapter):
         overriding_config["process_forecasts"] = {
             "prediction_col": prediction_col,
             "portfolio": portfolio,
-            "execution_mode": "real_time",
             "process_forecasts_config": {},
         }
         # We could also write the `process_forecasts_config` key directly but we
@@ -68,6 +67,7 @@ class RealTimeDagAdapter(dtfcore.DagAdapter):
             "trading_end_time": pd.Timestamp(
                 "2000-01-01 16:40:00-05:00", tz="America/New_York"
             ).time(),
+            "execution_mode": "real_time",
         }
         # Insert a node.
         nodes_to_insert = []

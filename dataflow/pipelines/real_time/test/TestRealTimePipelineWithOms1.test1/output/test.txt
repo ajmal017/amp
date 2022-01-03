@@ -15,8 +15,7 @@ config:
     func: <function _NaivePipeline.get_config_template.<locals>._process_data>
   process_forecasts:
     prediction_col: price
-    execution_mode: real_time
-    process_forecasts_config: {'order_type': 'price@twap', 'order_duration': 1, 'ath_start_time': datetime.time(9, 30), 'trading_start_time': datetime.time(9, 30), 'ath_end_time': datetime.time(16, 40), 'trading_end_time': datetime.time(16, 40)}
+    process_forecasts_config: {'order_type': 'price@twap', 'order_duration': 1, 'ath_start_time': datetime.time(9, 30), 'trading_start_time': datetime.time(9, 30), 'ath_end_time': datetime.time(16, 40), 'trading_end_time': datetime.time(16, 40), 'execution_mode': 'real_time'}
     portfolio: # historical holdings=
     asset_id                        1000           -1   
     2000-01-01 09:30:00-05:00        NaN  1000000.000000
@@ -101,8 +100,7 @@ config:
     func: <function _NaivePipeline.get_config_template.<locals>._process_data>
   process_forecasts:
     prediction_col: price
-    execution_mode: real_time
-    process_forecasts_config: {'order_type': 'price@twap', 'order_duration': 1, 'ath_start_time': datetime.time(9, 30), 'trading_start_time': datetime.time(9, 30), 'ath_end_time': datetime.time(16, 40), 'trading_end_time': datetime.time(16, 40)}
+    process_forecasts_config: {'order_type': 'price@twap', 'order_duration': 1, 'ath_start_time': datetime.time(9, 30), 'trading_start_time': datetime.time(9, 30), 'ath_end_time': datetime.time(16, 40), 'trading_end_time': datetime.time(16, 40), 'execution_mode': 'real_time'}
     portfolio: # historical holdings=
     asset_id                        1000           -1   
     2000-01-01 09:30:00-05:00        NaN  1000000.000000
@@ -195,8 +193,7 @@ config:
     func: <function _NaivePipeline.get_config_template.<locals>._process_data>
   process_forecasts:
     prediction_col: price
-    execution_mode: real_time
-    process_forecasts_config: {'order_type': 'price@twap', 'order_duration': 1, 'ath_start_time': datetime.time(9, 30), 'trading_start_time': datetime.time(9, 30), 'ath_end_time': datetime.time(16, 40), 'trading_end_time': datetime.time(16, 40)}
+    process_forecasts_config: {'order_type': 'price@twap', 'order_duration': 1, 'ath_start_time': datetime.time(9, 30), 'trading_start_time': datetime.time(9, 30), 'ath_end_time': datetime.time(16, 40), 'trading_end_time': datetime.time(16, 40), 'execution_mode': 'real_time'}
     portfolio: # historical holdings=
     asset_id                        1000           -1   
     2000-01-01 09:30:00-05:00        NaN  1000000.000000

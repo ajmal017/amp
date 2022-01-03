@@ -31,17 +31,14 @@ class ProcessForecasts(dtfcore.FitPredictNode):
         nid: dtfcore.NodeId,
         prediction_col: str,
         portfolio: omportfo.AbstractPortfolio,
-        execution_mode: bool,
         process_forecasts_config: Dict[str, Any],
     ) -> None:
         """
         Parameters have the same meaning as in `process_forecasts()`.
         """
         super().__init__(nid)
-        hdbg.dassert_in(execution_mode, ("batch", "real_time"))
         self._prediction_col = prediction_col
         self._portfolio = portfolio
-        self._execution_mode = execution_mode
         self._process_forecasts_config = process_forecasts_config
 
     def fit(self, df_in: pd.DataFrame) -> Dict[str, pd.DataFrame]:
@@ -55,7 +52,6 @@ class ProcessForecasts(dtfcore.FitPredictNode):
         await oprofore.process_forecasts(
             self._prediction_df,
             self._portfolio,
-            self._execution_mode,
             self._process_forecasts_config,
         )
 

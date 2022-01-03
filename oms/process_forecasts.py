@@ -30,7 +30,7 @@ async def process_forecasts(
     prediction_df: pd.DataFrame,
     # volatility_df:
     portfolio: omportfo.AbstractPortfolio,
-    execution_mode: str,
+    # TODO(Paul): Add `log_dir` for logging.
     config: Dict[str, Any],
 ) -> None:
     """
@@ -45,19 +45,12 @@ async def process_forecasts(
 
     :param prediction_df: a dataframe indexed by timestamps with one column for the
         predictions for each asset
-    :param execution_mode:
-        - `batch`: place the trades for all the predictions (used in historical
-           mode)
-        - `real_time`: place the trades only for the last prediction as in a
-           real-time set-up
+    :param portfolio: initialized `Portfolio` object
     :param config:
-        - `pred_column`: the column in the df from the DAG containing the predictions
-           for all the assets
-        - `mark_column`: the column from the MarketDataInterface to mark holdings to
-           market
-        - `portfolio`: object used to store positions
-        - `locates`: object used to access short locates
-    :return: updated portfolio
+        - `execution_mode`:
+            - `batch`: place the trades for all the predictions (used in historical
+               mode)
+            - `real_time`: place the trades only for the last prediction as in a
     """
     _LOG.info("predictions_df=\n%s", prediction_df)
     # Check `predictions_df`.
@@ -86,6 +79,10 @@ async def process_forecasts(
     ath_end_time = _get_object_from_config("ath_end_time", datetime.time)
     trading_end_time = _get_object_from_config("trading_end_time", datetime.time)
     hdbg.dassert_lte(trading_end_time, ath_end_time)
+    #
+    execution_mode = _get_object_from_config("execution_mode", str)
+    #
+    log_dir = config.get("log_dir", None)
     # We should not have anything left in the config that we didn't extract.
     # hdbg.dassert(not config, "config=%s", str(config))
     #
@@ -105,6 +102,7 @@ async def process_forecasts(
     iter_ = enumerate(prediction_df.iterrows())
     # `timestamp` is the time when the forecast is available and in the current
     #  setup is also when the order should begin.
+    offset_min = pd.DateOffset(minutes=order_duration)
     for idx, (timestamp, predictions) in tqdm(
         iter_, total=num_rows, file=tqdm_out
     ):
@@ -113,13 +111,13 @@ async def process_forecasts(
             hprint.frame("# idx=%s timestamp=%s" % (idx, timestamp)),
         )
         # Wait until get_wall_clock_time() == timestamp.
-        # TODO(gp): For execution_mode == "real_time" we should impose a
-        # constraint like:
-        #   wall_clock_time <= prev_timestamp + order duration = next_timestamp
-        # E.g., it's 10:21:51, we computed the forecast for [10:20, 10:25] bar
-        # As long as it's before 10:25 we want to place the order. If it's later
-        # either assert or log it as a problem.
-        await hasynci.wait_until(timestamp, get_wall_clock_time)
+        if get_wall_clock_time() > timestamp:
+            # E.g., it's 10:21:51, we computed the forecast for [10:20, 10:25]
+            # bar. As long as it's before 10:25, we want to place the order. If
+            # it's later, either assert or log it as a problem.
+            hdbg.dassert_lte(get_wall_clock_time(), timestamp + offset_min)
+        else:
+            await hasynci.wait_until(timestamp, get_wall_clock_time)
         # Get the wall clock timestamp.
         wall_clock_timestamp = get_wall_clock_time()
         _LOG.debug("wall_clock_timestamp=%s", wall_clock_timestamp)
@@ -174,7 +172,6 @@ async def process_forecasts(
         # Create a config for `Order`. This requires timestamps and so is
         # inside the loop.
         timestamp_start = wall_clock_timestamp
-        offset_min = pd.DateOffset(minutes=order_duration)
         timestamp_end = wall_clock_timestamp + offset_min
         order_dict_ = {
             "type_": order_type,
@@ -203,6 +200,8 @@ async def process_forecasts(
         else:
             _LOG.debug("No orders to submit to broker.")
         _LOG.debug("portfolio=\n%s" % str(portfolio))
+        if log_dir:
+            portfolio.log_state(log_dir)
     _LOG.debug("Event: exiting process_forecasts() for loop.")
 
 
@@ -322,13 +321,16 @@ def _generate_orders(
         curr_num_shares = shares_row["curr_num_shares"]
         diff_num_shares = shares_row["diff_num_shares"]
         hdbg.dassert(
-            np.isfinite(curr_num_shares).all(),
-            "All curr_num_share values must be finite.",
+            np.isfinite(curr_num_shares),
+            "The curr_num_share value must be finite.",
         )
-        hdbg.dassert(
-            np.isfinite(diff_num_shares).all(),
-            "All diff_num_share values must be finite.",
-        )
+        if not np.isfinite(diff_num_shares):
+            _LOG.debug(
+                "`diff_num_shares`=%f for `asset_id`=%i",
+                diff_num_shares,
+                asset_id,
+            )
+            diff_num_shares = 0.0
         if diff_num_shares == 0.0:
             # No need to place trades.
             continue

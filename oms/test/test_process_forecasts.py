@@ -63,12 +63,11 @@ class TestSimulatedProcessForecasts1(hunitest.TestCase):
         config["trading_start_time"] = datetime.time(9, 35)
         config["ath_end_time"] = datetime.time(16, 00)
         config["trading_end_time"] = datetime.time(15, 55)
+        config["execution_mode"] = "batch"
         # Run.
-        execution_mode = "batch"
         await oprofore.process_forecasts(
             predictions,
             portfolio,
-            execution_mode,
             config,
         )
         # TODO(Paul): Re-check the correctness after fixing the issue with
@@ -153,12 +152,11 @@ class TestMockedProcessForecasts1(omtodh.TestOmsDbHelper):
         config["trading_start_time"] = datetime.time(9, 35)
         config["ath_end_time"] = datetime.time(16, 00)
         config["trading_end_time"] = datetime.time(15, 55)
+        config["execution_mode"] = "batch"
         # Run.
-        execution_mode = "batch"
         await oprofore.process_forecasts(
             predictions,
             portfolio,
-            execution_mode,
             config,
         )
         # TODO(Paul): Re-check the correctness after fixing the issue with

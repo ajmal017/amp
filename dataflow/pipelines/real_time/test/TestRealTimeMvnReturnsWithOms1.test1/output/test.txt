@@ -54,7 +54,6 @@ result_bundles=
     2000-01-03 09:30:01-05:00            0.000000  1000000.00000  1000000.000000        0.000000  0.000000
     2000-01-03 09:35:01-05:00            0.000000  1000000.00000  1000000.000000        0.000000  0.000000
     2000-01-03 09:40:01-05:00        49979.934222   950003.83233   999983.766551    49979.934222  0.049981
-    execution_mode: real_time
     process_forecasts_config:
       market_data_interface: <market_data.market_data_interface.ReplayedTimeMarketDataInterface object>
       order_type: price@twap
@@ -63,6 +62,7 @@ result_bundles=
       trading_start_time: 09:30:00
       ath_end_time: 16:40:00
       trading_end_time: 16:40:00
+      execution_mode: real_time
 result_nid: process_forecasts
 method: predict
 result_df:                           close.ret_0 twap.ret_0 vwap.ret_0 close twap volume  \
@@ -214,7 +214,6 @@ class: ResultBundle, config:
     2000-01-03 09:30:01-05:00            0.000000  1000000.00000  1000000.000000        0.000000  0.000000
     2000-01-03 09:35:01-05:00            0.000000  1000000.00000  1000000.000000        0.000000  0.000000
     2000-01-03 09:40:01-05:00        49979.934222   950003.83233   999983.766551    49979.934222  0.049981
-    execution_mode: real_time
     process_forecasts_config:
       market_data_interface: <market_data.market_data_interface.ReplayedTimeMarketDataInterface object>
       order_type: price@twap
@@ -223,6 +222,7 @@ class: ResultBundle, config:
       trading_start_time: 09:30:00
       ath_end_time: 16:40:00
       trading_end_time: 16:40:00
+      execution_mode: real_time
 result_nid: process_forecasts
 method: predict
 result_df:                           close.ret_0 twap.ret_0 vwap.ret_0     close  \
@@ -376,7 +376,6 @@ class: ResultBundle, config:
     2000-01-03 09:30:01-05:00            0.000000  1000000.00000  1000000.000000        0.000000  0.000000
     2000-01-03 09:35:01-05:00            0.000000  1000000.00000  1000000.000000        0.000000  0.000000
     2000-01-03 09:40:01-05:00        49979.934222   950003.83233   999983.766551    49979.934222  0.049981
-    execution_mode: real_time
     process_forecasts_config:
       market_data_interface: <market_data.market_data_interface.ReplayedTimeMarketDataInterface object>
       order_type: price@twap
@@ -385,6 +384,7 @@ class: ResultBundle, config:
       trading_start_time: 09:30:00
       ath_end_time: 16:40:00
       trading_end_time: 16:40:00
+      execution_mode: real_time
 result_nid: process_forecasts
 method: predict
 result_df:                           close.ret_0 twap.ret_0 vwap.ret_0     close  \

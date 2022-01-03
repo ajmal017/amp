@@ -74,7 +74,6 @@ class _NaivePipeline(dtfcore.DagBuilder):
             # Place trades.
             self._get_nid("process_forecasts"): {
                 "prediction_col": "price",
-                "execution_mode": "real_time",
                 "process_forecasts_config": {},
             },
         }

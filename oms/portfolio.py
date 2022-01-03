@@ -6,6 +6,7 @@ import oms.portfolio as omportfo
 import abc
 import collections
 import logging
+import os
 from typing import Any, Dict, List, Optional
 
 import numpy as np
@@ -14,6 +15,7 @@ import pandas as pd
 import helpers.datetime_ as hdateti
 import helpers.dbg as hdbg
 import helpers.hasyncio as hasynci
+import helpers.io_ as hio
 import helpers.printing as hprint
 import helpers.sql as hsql
 import market_data.market_data_interface as mdmadain
@@ -310,6 +312,30 @@ class AbstractPortfolio(abc.ABC):
         cash = pd.Series(self._cash)
         asset_values[AbstractPortfolio.CASH_ID] = cash
         return asset_values
+
+    def log_state(self, log_dir: str) -> None:
+        hdbg.dassert(log_dir, "Must specify `log_dir` to log state.")
+        #
+        wall_clock_time = self._get_wall_clock_time()
+        filename = str(wall_clock_time) + ".csv"
+        filename = filename.replace(" ", "_")
+        #
+        holdings_df = self.get_historical_holdings()
+        holdings_filename = os.path.join(log_dir, "holdings", filename)
+        hio.create_enclosing_dir(holdings_filename, incremental=True)
+        holdings_df.to_csv(holdings_filename)
+        #
+        holdings_mtm = self.get_historical_holdings_marked_to_market()
+        holdings_mtm_filename = os.path.join(
+            log_dir, "holdings_marked_to_market", filename
+        )
+        hio.create_enclosing_dir(holdings_mtm_filename, incremental=True)
+        holdings_mtm.to_csv(holdings_mtm_filename)
+        #
+        stats = self.get_historical_statistics()
+        stats_filename = os.path.join(log_dir, "statistics", filename)
+        hio.create_enclosing_dir(stats_filename, incremental=True)
+        stats.to_csv(stats_filename)
 
     def price_assets(
         self,

@@ -205,7 +205,7 @@ class TestRealTimePipelineWithOms1(hunitest.TestCase):
                 "trading_end_time": pd.Timestamp(
                     "2000-01-01 16:40:00-05:00", tz="America/New_York"
                 ).time(),
-                #
+                "execution_mode": "real_time",
             }
             # Set up the event loop.
             sleep_interval_in_secs = 60 * 5
