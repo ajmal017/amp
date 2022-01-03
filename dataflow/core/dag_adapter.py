@@ -78,6 +78,7 @@ class DagAdapter(dtfcorbuil.DagBuilder):
     def _get_dag(
         self, config: cconfig.Config, mode: str = "strict"
     ) -> dtfcordag.DAG:
+        _LOG.debug("# config=\n%s", str(config))
         # Remove the nodes that are in config
         nested_config_template = self._dag_builder.get_config_template()
         config_diff = cconfig.Config()

@@ -62,7 +62,7 @@ class WriteDf(dtfconobas.FitPredictNode):
             #  official documentation.
             file_name = f"{epoch}.pq"
             file_name = os.path.join(self._dir_name, file_name)
-            hdbg.dassert_not_exists(file_name)
+            #hdbg.dassert_not_exists(file_name)
             # Write the file.
             # TODO(Paul): Maybe allow the node to configure the log level.
             hparque.to_parquet(df, file_name, log_level=logging.DEBUG)
