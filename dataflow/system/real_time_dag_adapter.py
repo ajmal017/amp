@@ -25,16 +25,17 @@ class RealTimeDagAdapter(dtfcore.DagAdapter):
         dag_builder: dtfcore.DagBuilder,
         portfolio: omportfo.AbstractPortfolio,
         prediction_col: str,
+        period: str,
+        asset_id_col: str,
     ):
         market_data_interface = portfolio.market_data_interface
         #
         overriding_config = cconfig.Config()
         # Configure a DataSourceNode.
-        period = "last_5mins"
         source_node_kwargs = {
             "market_data_interface": market_data_interface,
             "period": period,
-            "asset_id_col": "asset_id",
+            "asset_id_col": asset_id_col,
             "multiindex_output": True,
         }
         overriding_config["load_prices"] = {

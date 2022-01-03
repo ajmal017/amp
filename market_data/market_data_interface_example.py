@@ -362,6 +362,7 @@ def get_replayed_time_market_data_interface_example3(
 
 def get_replayed_time_market_data_interface_example4(
     event_loop: asyncio.AbstractEventLoop,
+    initial_replayed_delay: int = 0,
 ) -> Tuple[mdmadain.ReplayedTimeMarketDataInterface, hdateti.GetWallClockTime]:
     """
     Build a ReplayedTimeMarketDataInterface:
@@ -380,7 +381,6 @@ def get_replayed_time_market_data_interface_example4(
     df = generate_random_bars(start_datetime, end_datetime, asset_ids)
     _LOG.debug("df=%s", hprint.dataframe_to_str(df))
     # Build a `ReplayedTimeMarketDataInterface`.
-    initial_replayed_delay = 0
     delay_in_secs = 0
     sleep_in_secs = 30
     time_out_in_secs = 60 * 5

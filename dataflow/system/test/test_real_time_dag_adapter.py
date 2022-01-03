@@ -36,7 +36,11 @@ class TestRealtimeDagAdapter1(hunitest.TestCase):
         )
         # Build a DagAdapter.
         dag_adapter = dtfsrtdaad.RealTimeDagAdapter(
-            dag_builder, portfolio, "close"
+            dag_builder,
+            portfolio,
+            "close",
+            "last_5mins",
+            "asset_id",
         )
         txt.append(hprint.frame("dag_adapter"))
         txt.append(hprint.indent(str(dag_adapter)))
