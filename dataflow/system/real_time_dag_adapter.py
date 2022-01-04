@@ -26,6 +26,7 @@ class RealTimeDagAdapter(dtfcore.DagAdapter):
         dag_builder: dtfcore.DagBuilder,
         portfolio: omportfo.AbstractPortfolio,
         prediction_col: str,
+        volatility_col: str,
         period: str,
         asset_id_col: str,
         log_dir: Optional[str] = None,
@@ -48,6 +49,7 @@ class RealTimeDagAdapter(dtfcore.DagAdapter):
         order_type = "price@twap"
         overriding_config["process_forecasts"] = {
             "prediction_col": prediction_col,
+            "volatility_col": volatility_col,
             "portfolio": portfolio,
             "process_forecasts_config": {},
         }

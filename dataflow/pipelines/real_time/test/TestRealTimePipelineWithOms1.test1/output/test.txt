@@ -15,6 +15,7 @@ config:
     func: <function _NaivePipeline.get_config_template.<locals>._process_data>
   process_forecasts:
     prediction_col: price
+    volatility_col: price
     process_forecasts_config: {'order_type': 'price@twap', 'order_duration': 1, 'ath_start_time': datetime.time(9, 30), 'trading_start_time': datetime.time(9, 30), 'ath_end_time': datetime.time(16, 40), 'trading_end_time': datetime.time(16, 40), 'execution_mode': 'real_time'}
     portfolio: # historical holdings=
     asset_id                        1000           -1   
@@ -100,6 +101,7 @@ config:
     func: <function _NaivePipeline.get_config_template.<locals>._process_data>
   process_forecasts:
     prediction_col: price
+    volatility_col: price
     process_forecasts_config: {'order_type': 'price@twap', 'order_duration': 1, 'ath_start_time': datetime.time(9, 30), 'trading_start_time': datetime.time(9, 30), 'ath_end_time': datetime.time(16, 40), 'trading_end_time': datetime.time(16, 40), 'execution_mode': 'real_time'}
     portfolio: # historical holdings=
     asset_id                        1000           -1   
@@ -193,6 +195,7 @@ config:
     func: <function _NaivePipeline.get_config_template.<locals>._process_data>
   process_forecasts:
     prediction_col: price
+    volatility_col: price
     process_forecasts_config: {'order_type': 'price@twap', 'order_duration': 1, 'ath_start_time': datetime.time(9, 30), 'trading_start_time': datetime.time(9, 30), 'ath_end_time': datetime.time(16, 40), 'trading_end_time': datetime.time(16, 40), 'execution_mode': 'real_time'}
     portfolio: # historical holdings=
     asset_id                        1000           -1   

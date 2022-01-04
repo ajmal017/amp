@@ -42,12 +42,18 @@ class TestSimulatedProcessForecasts1(hunitest.TestCase):
             pd.Timestamp("2000-01-01 09:45:00-05:00", tz="America/New_York"),
         ]
         columns = [101, 202]
-        data = [
+        prediction_data = [
             [0.1, 0.2],
             [-0.1, 0.3],
             [-0.3, 0.0],
         ]
-        predictions = pd.DataFrame(data, index=index, columns=columns)
+        predictions = pd.DataFrame(prediction_data, index=index, columns=columns)
+        volatility_data = [
+            [1, 1],
+            [1, 1],
+            [1, 1],
+        ]
+        volatility = pd.DataFrame(volatility_data, index=index, columns=columns)
         # Build a Portfolio.
         initial_timestamp = pd.Timestamp(
             "2000-01-01 09:30:00-05:00", tz="America/New_York"
@@ -67,6 +73,7 @@ class TestSimulatedProcessForecasts1(hunitest.TestCase):
         # Run.
         await oprofore.process_forecasts(
             predictions,
+            volatility,
             portfolio,
             config,
         )
@@ -140,12 +147,18 @@ class TestMockedProcessForecasts1(omtodh.TestOmsDbHelper):
             pd.Timestamp("2000-01-01 09:45:00-05:00", tz="America/New_York"),
         ]
         columns = [101, 202]
-        data = [
+        prediction_data = [
             [0.1, 0.2],
             [-0.1, 0.3],
             [-0.3, 0.0],
         ]
-        predictions = pd.DataFrame(data, index=index, columns=columns)
+        predictions = pd.DataFrame(prediction_data, index=index, columns=columns)
+        volatility_data = [
+            [1, 1],
+            [1, 1],
+            [1, 1],
+        ]
+        volatility = pd.DataFrame(volatility_data, index=index, columns=columns)
         config["order_type"] = "price@twap"
         config["order_duration"] = 5
         config["ath_start_time"] = datetime.time(9, 30)
@@ -156,6 +169,7 @@ class TestMockedProcessForecasts1(omtodh.TestOmsDbHelper):
         # Run.
         await oprofore.process_forecasts(
             predictions,
+            volatility,
             portfolio,
             config,
         )

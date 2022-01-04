@@ -394,6 +394,7 @@ class TestRealTimeMvnReturnsWithOms1(otodh.TestOmsDbHelper):
                 base_dag_builder,
                 portfolio,
                 "close",
+                "close",
                 "last_5mins",
                 "asset_id",
             )
@@ -528,6 +529,7 @@ class TestRealTimeMvnReturnsWithOms2(otodh.TestOmsDbHelper):
             dag_builder = dtfsys.RealTimeDagAdapter(
                 base_dag_builder,
                 portfolio,
+                "close.ret_0",
                 "close.ret_0",
                 "last_5mins",
                 "asset_id",

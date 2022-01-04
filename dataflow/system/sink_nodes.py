@@ -30,6 +30,7 @@ class ProcessForecasts(dtfcore.FitPredictNode):
         self,
         nid: dtfcore.NodeId,
         prediction_col: str,
+        volatility_col: str,
         portfolio: omportfo.AbstractPortfolio,
         process_forecasts_config: Dict[str, Any],
     ) -> None:
@@ -38,6 +39,7 @@ class ProcessForecasts(dtfcore.FitPredictNode):
         """
         super().__init__(nid)
         self._prediction_col = prediction_col
+        self._volatility_col = volatility_col
         self._portfolio = portfolio
         self._process_forecasts_config = process_forecasts_config
 
@@ -51,6 +53,7 @@ class ProcessForecasts(dtfcore.FitPredictNode):
         # Get the latest `df` index value.
         await oprofore.process_forecasts(
             self._prediction_df,
+            self._volatility_df,
             self._portfolio,
             self._process_forecasts_config,
         )
@@ -67,6 +70,10 @@ class ProcessForecasts(dtfcore.FitPredictNode):
         prediction_df = df[self._prediction_col]
         self._prediction_df = prediction_df
         _LOG.debug("prediction_df=\n%s", hprint.dataframe_to_str(prediction_df))
+        #
+        volatility_df = df[self._volatility_col]
+        self._volatility_df = volatility_df
+        _LOG.debug("volatility_df=\n%s", hprint.dataframe_to_str(volatility_df))
         # Compute stats.
         info = collections.OrderedDict()
         info["df_out_info"] = dtfcore.get_df_info_as_string(df)

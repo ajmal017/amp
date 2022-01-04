@@ -39,6 +39,7 @@ class TestRealtimeDagAdapter1(hunitest.TestCase):
             dag_builder,
             portfolio,
             "close",
+            "close",
             "last_5mins",
             "asset_id",
         )

@@ -29,7 +29,7 @@ _LOG = logging.getLogger(__name__)
 
 async def process_forecasts(
     prediction_df: pd.DataFrame,
-    # volatility_df: pd.DataFrame,
+    volatility_df: pd.DataFrame,
     portfolio: omportfo.AbstractPortfolio,
     config: Dict[str, Any],
 ) -> None:
@@ -59,11 +59,11 @@ async def process_forecasts(
     hpandas.dassert_index_is_datetime(prediction_df)
     hpandas.dassert_strictly_increasing_index(prediction_df)
     # Check `volatility_df`.
-    # hdbg.dassert_isinstance(volatility_df, pd.DataFrame)
-    # hpandas.dassert_index_is_datetime(volatility_df)
-    # hpandas.dassert_strictly_increasing_index(volatility_df)
+    hdbg.dassert_isinstance(volatility_df, pd.DataFrame)
+    hpandas.dassert_index_is_datetime(volatility_df)
+    hpandas.dassert_strictly_increasing_index(volatility_df)
     # Check index compatibility.
-    # hdbg.dassert(prediction_df.index.equals(volatility_df.index))
+    hdbg.dassert(prediction_df.index.equals(volatility_df.index))
     # Check `portfolio`.
     hdbg.dassert_isinstance(portfolio, omportfo.AbstractPortfolio)
     # Extract the objects from the config.
@@ -171,8 +171,8 @@ async def process_forecasts(
                 char1="#",
             ),
         )
-        # volatility = volatility_df.loc[idx]
-        volatility = pd.Series()
+        volatility = volatility_df.loc[timestamp]
+        # volatility = pd.Series(1, index=predictions.index)
         orders = forecast_processor.generate_orders(predictions, volatility)
         await forecast_processor.submit_orders(orders)
     _LOG.debug("Event: exiting process_forecasts() for loop.")
@@ -257,17 +257,53 @@ class ForecastProcessor:
         :param predictions: predictions indexed by `asset_id`
         :param portfolio: portfolio with current holdings
         """
-        # hdbg.dassert(predictions.index.equals(volatility.index))
+        assets_and_predictions = self._prepare_data_for_optimizer(
+            predictions, volatility
+        )
+        # Compute the target positions in cash (call the optimizer).
+        df = ocalopti.compute_target_positions_in_cash(
+            assets_and_predictions, self._portfolio.CASH_ID
+        )
+        # Convert the target positions from cash values to target share counts.
+        # Round to nearest integer towards zero.
+        # df["diff_num_shares"] = np.fix(df["target_trade"] / df["price"])
+        df["diff_num_shares"] = df["target_trade"] / df["price"]
+        return df
+
+    def _prepare_data_for_optimizer(
+        self,
+        predictions: pd.Series,
+        volatility: pd.Series,
+    ) -> pd.DataFrame:
+        hdbg.dassert(
+            predictions.index.equals(volatility.index),
+            "`predictions` and `volatility` have mismatched indices of asset ids",
+        )
+        marked_to_market = self._get_extended_marked_to_market_df(predictions)
+        # Combine the portfolio `marked_to_market` dataframe with the predictions.
+        df_for_optimizer = self._merge_predictions(
+            marked_to_market, predictions, volatility
+        )
+        return df_for_optimizer
+
+    def _get_extended_marked_to_market_df(
+        self,
+        predictions: pd.Series,
+    ) -> pd.DataFrame:
+        """
+        Get portfolio `mark_to_market()` df and extend to all predictions.
+
+        If the portfolio is initialized with the trading universe, then this
+        should be a no-op.
+
+        :param predictions: predictions indexed by `asset_id`
+        :return:
+        """
         marked_to_market = self._portfolio.mark_to_market().set_index("asset_id")
         # If there are predictions for assets not currently in `marked_to_market`,
         # then attempt to price those assets and extend `marked_to_market`
         # (imputing 0's for the holdings).
         unpriced_assets = predictions.index.difference(marked_to_market.index)
-        # Impute average volatility for holdings in portfolio with no prediction.
-        # idx = predictions.index.union(marked_to_market.index)
-        # mean_volatility = volatility.mean()
-        # volatility = volatility.reindex(idx).fillna(mean_volatility)
-        _ = volatility
         if not unpriced_assets.empty:
             _LOG.debug(
                 "Unpriced assets by id=\n%s",
@@ -289,65 +325,117 @@ class ForecastProcessor:
             "marked_to_market dataframe=\n%s"
             % hprint.dataframe_to_str(marked_to_market)
         )
-        # Combine the portfolio `marked_to_market` dataframe with the predictions.
-        assets_and_predictions = self._merge_predictions(
-            marked_to_market, predictions
-        )
-        # Compute the target positions in cash (call the optimizer).
-        df = ocalopti.compute_target_positions_in_cash(
-            assets_and_predictions, self._portfolio.CASH_ID
-        )
-        # Convert the target positions from cash values to target share counts.
-        # Round to nearest integer towards zero.
-        # df["diff_num_shares"] = np.fix(df["target_trade"] / df["price"])
-        df["diff_num_shares"] = df["target_trade"] / df["price"]
-        return df
+        return marked_to_market
 
-    def _merge_predictions(
-        self,
-        marked_to_market: pd.DataFrame,
-        predictions: pd.Series,
+    def _normalize_predictions_srs(
+        self, predictions: pd.Series, index: pd.DatetimeIndex
     ) -> pd.DataFrame:
         """
-        Merge marked_to_market dataframe with predictions.
+        Normalize predictions with `index`, NaN-filling, and transforming to a
+        series.
 
-        :return: dataframe with columns `asset_id`, `prediction`, `price`,
-            `curr_num_shares`, `value`.
-            - The dataframe is the outer join of all the held assets in `portfolio` and
-              `predictions`
+        :param predictions:
+        :param index:
+        :return:
         """
-        # Prepare `predictions` for the merge.
-        _LOG.debug("Number of non-NaN predictions=`%i`", predictions.count())
-        _LOG.debug("Number of NaN predictions=`%i`", predictions.isna().sum())
+        _LOG.debug("Number of predictions=%i", predictions.size)
+        _LOG.debug("Number of non-NaN predictions=%i", predictions.count())
+        _LOG.debug("Number of NaN predictions=%i", predictions.isna().sum())
         # Ensure that `predictions` does not already include the cash id.
         hdbg.dassert_not_in(self._portfolio.CASH_ID, predictions.index)
+        # Ensure that `index` includes `predictions.index`.
+        hdbg.dassert(predictions.index.difference(index).empty)
+        # Extend `predictions` to `index`.
+        predictions = predictions.reindex(index)
         # Set the "prediction" for cash to 1. This is for the optimizer.
         predictions[self._portfolio.CASH_ID] = 1
+        # Impute zero for NaNs.
+        predictions = predictions.fillna(0.0)
+        # Convert to a dataframe.
         predictions = pd.DataFrame(predictions)
         # Format the predictions dataframe.
         predictions.columns = ["prediction"]
         predictions.index.name = "asset_id"
         predictions = predictions.reset_index()
         _LOG.debug("predictions=\n%s", hprint.dataframe_to_str(predictions))
+        return predictions
+
+    def _normalize_volatility_srs(
+        self, volatility: pd.Series, index: pd.DatetimeIndex
+    ) -> pd.DataFrame:
+        """
+        Normalize predictions with `index`, NaN-filling, and transforming to a
+        series.
+
+        :param volatility:
+        :param index:
+        :return:
+        """
+        # TODO(Paul): Factor out common part with predictions normalization.
+        _LOG.debug("Number of volatility forecasts=%i", volatility.size)
+        _LOG.debug(
+            "Number of non-NaN volatility forecasts=%i", volatility.count()
+        )
+        _LOG.debug(
+            "Number of NaN volatility forecasts=%i", volatility.isna().sum()
+        )
+        # Ensure that `predictions` does not already include the cash id.
+        hdbg.dassert_not_in(self._portfolio.CASH_ID, volatility.index)
+        # Ensure that `index` includes `volatility.index`.
+        hdbg.dassert(volatility.index.difference(index).empty)
+        # Extend `volatility` to `index`.
+        volatility = volatility.reindex(index)
+        # Compute average volatility.
+        mean_volatility = volatility.mean()
+        # Set the "volatility" for cash to 1. This is for the optimizer.
+        volatility[self._portfolio.CASH_ID] = 0
+        # Impute mean volatility.
+        volatility = volatility.fillna(mean_volatility)
+        # Convert to a dataframe.
+        volatility = pd.DataFrame(volatility)
+        # Format the predictions dataframe.
+        volatility.columns = ["volatility"]
+        volatility.index.name = "asset_id"
+        volatility = volatility.reset_index()
+        _LOG.debug("volatility=\n%s", hprint.dataframe_to_str(volatility))
+        return volatility
+
+    def _merge_predictions(
+        self,
+        marked_to_market: pd.DataFrame,
+        predictions: pd.Series,
+        volatility: pd.Series,
+    ) -> pd.DataFrame:
+        """
+        Merge marked_to_market dataframe with predictions and volatility.
+
+        :return: dataframe with columns `asset_id`, `prediction`, `price`,
+            `curr_num_shares`, `value`.
+            - The dataframe is the outer join of all the held assets in `portfolio` and
+              `predictions`
+        """
+        # `predictions` and `volatility` should have exactly the same index.
+        hdbg.dassert(predictions.index.equals(volatility.index))
+        # The portfolio may have grandfathered holdings for which there is no
+        # prediction.
+        idx = predictions.index.union(marked_to_market.index)
+        predictions = self._normalize_predictions_srs(predictions, idx)
+        volatility = self._normalize_volatility_srs(volatility, idx)
         # Merge current holdings and predictions.
         merged_df = marked_to_market.merge(
             predictions, on="asset_id", how="outer"
+        )
+        merged_df = merged_df.merge(
+            volatility,
+            on="asset_id",
+            how="outer",
         )
         _LOG.debug(
             "Number of NaNs in `curr_num_shares` post-merge=`%i`",
             merged_df["curr_num_shares"].isna().sum(),
         )
         merged_df = merged_df.convert_dtypes()
-        # Do not allow `asset_id` to be represented as a float.
-        merged_df["asset_id"] = merged_df["asset_id"].convert_dtypes(
-            infer_objects=False,
-            convert_string=False,
-            convert_boolean=False,
-            convert_floating=False,
-        )
-        columns = ["prediction", "price", "curr_num_shares", "value"]
-        hdbg.dassert_is_subset(columns, merged_df.columns)
-        merged_df[columns] = merged_df[columns].fillna(0.0)
+        merged_df = merged_df.fillna(0.0)
         _LOG.debug(
             "After merge: merged_df=\n%s", hprint.dataframe_to_str(merged_df)
         )

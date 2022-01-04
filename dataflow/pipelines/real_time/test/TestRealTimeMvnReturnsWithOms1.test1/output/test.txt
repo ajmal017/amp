@@ -36,6 +36,7 @@ result_bundles=
       multiindex_output: True
   process_forecasts:
     prediction_col: close
+    volatility_col: close
     portfolio: # historical holdings=
     asset_id                            101           -1  
     2000-01-03 09:30:00-05:00           NaN  1000000.00000
@@ -197,6 +198,7 @@ class: ResultBundle, config:
       multiindex_output: True
   process_forecasts:
     prediction_col: close
+    volatility_col: close
     portfolio: # historical holdings=
     asset_id                            101           -1  
     2000-01-03 09:30:00-05:00           NaN  1000000.00000
@@ -360,6 +362,7 @@ class: ResultBundle, config:
       multiindex_output: True
   process_forecasts:
     prediction_col: close
+    volatility_col: close
     portfolio: # historical holdings=
     asset_id                            101           -1  
     2000-01-03 09:30:00-05:00           NaN  1000000.00000
