@@ -8,7 +8,7 @@ import asyncio
 import datetime
 import logging
 import os
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -29,7 +29,7 @@ _LOG = logging.getLogger(__name__)
 
 async def process_forecasts(
     prediction_df: pd.DataFrame,
-    # volatility_df:
+    # volatility_df: pd.DataFrame,
     portfolio: omportfo.AbstractPortfolio,
     config: Dict[str, Any],
 ) -> None:
@@ -58,6 +58,12 @@ async def process_forecasts(
     hdbg.dassert_isinstance(prediction_df, pd.DataFrame)
     hpandas.dassert_index_is_datetime(prediction_df)
     hpandas.dassert_strictly_increasing_index(prediction_df)
+    # Check `volatility_df`.
+    # hdbg.dassert_isinstance(volatility_df, pd.DataFrame)
+    # hpandas.dassert_index_is_datetime(volatility_df)
+    # hpandas.dassert_strictly_increasing_index(volatility_df)
+    # Check index compatibility.
+    # hdbg.dassert(prediction_df.index.equals(volatility_df.index))
     # Check `portfolio`.
     hdbg.dassert_isinstance(portfolio, omportfo.AbstractPortfolio)
     # Extract the objects from the config.
@@ -69,6 +75,12 @@ async def process_forecasts(
 
     order_type = _get_object_from_config("order_type", str)
     order_duration = _get_object_from_config("order_duration", int)
+    order_config = cconfig.get_config_from_nested_dict(
+        {
+            "order_type": order_type,
+            "order_duration": order_duration,
+        }
+    )
     # TODO(Paul): Add a check for ATH start/end.
     ath_start_time = _get_object_from_config("ath_start_time", datetime.time)
     #
@@ -104,6 +116,7 @@ async def process_forecasts(
     # `timestamp` is the time when the forecast is available and in the current
     #  setup is also when the order should begin.
     offset_min = pd.DateOffset(minutes=order_duration)
+    forecast_processor = ForecastProcessor(portfolio, order_config, log_dir)
     for idx, (timestamp, predictions) in tqdm(
         iter_, total=num_rows, file=tqdm_out
     ):
@@ -158,9 +171,43 @@ async def process_forecasts(
                 char1="#",
             ),
         )
-        target_positions = _compute_target_positions_in_shares(
-            predictions, portfolio
+        # volatility = volatility_df.loc[idx]
+        volatility = pd.Series()
+        orders = forecast_processor.generate_orders(predictions, volatility)
+        await forecast_processor.submit_orders(orders)
+    _LOG.debug("Event: exiting process_forecasts() for loop.")
+
+
+class ForecastProcessor:
+    def __init__(
+        self,
+        portfolio: omportfo.AbstractPortfolio,
+        order_config: cconfig.Config,
+        log_dir: Optional[str] = None,
+    ) -> None:
+        self._portfolio = portfolio
+        self._get_wall_clock_time = (
+            portfolio.market_data_interface.get_wall_clock_time
         )
+        self._order_config = order_config
+        # TODO(Paul): process config with checks.
+        self._order_type = self._order_config["order_type"]
+        self._order_duration = self._order_config["order_duration"]
+        self._offset_min = pd.DateOffset(minutes=self._order_duration)
+        #
+        self._log_dir = log_dir
+
+    def generate_orders(
+        self,
+        predictions: pd.Series,
+        volatility: pd.Series,
+    ) -> None:
+        target_positions = self._compute_target_positions_in_shares(
+            predictions, volatility
+        )
+        # Get the wall clock timestamp.
+        wall_clock_timestamp = self._get_wall_clock_time()
+        _LOG.debug("wall_clock_timestamp=%s", wall_clock_timestamp)
         # Generate orders from target positions.
         _LOG.debug(
             "\n%s",
@@ -173,175 +220,181 @@ async def process_forecasts(
         # Create a config for `Order`. This requires timestamps and so is
         # inside the loop.
         timestamp_start = wall_clock_timestamp
-        timestamp_end = wall_clock_timestamp + offset_min
+        timestamp_end = wall_clock_timestamp + self._offset_min
         order_dict_ = {
-            "type_": order_type,
+            "type_": self._order_type,
             "creation_timestamp": wall_clock_timestamp,
             "start_timestamp": timestamp_start,
             "end_timestamp": timestamp_end,
         }
         order_config = cconfig.get_config_from_nested_dict(order_dict_)
-        orders = _generate_orders(
+        orders = self._generate_orders(
             target_positions[["curr_num_shares", "diff_num_shares"]], order_config
         )
+        return orders
+
+    async def submit_orders(self, orders):
         # Submit orders.
-        _LOG.debug(
-            "\n%s",
-            hprint.frame(
-                "Submitting orders to broker: timestamp=%s"
-                % wall_clock_timestamp,
-                char1="#",
-            ),
-        )
         if orders:
-            broker = portfolio.broker
+            broker = self._portfolio.broker
             _LOG.debug("Event: awaiting broker.submit_orders()...")
             await broker.submit_orders(orders)
             _LOG.debug("Event: awaiting broker.submit_orders() done.")
         else:
             _LOG.debug("No orders to submit to broker.")
-        _LOG.debug("portfolio=\n%s" % str(portfolio))
-        if log_dir:
-            portfolio.log_state(os.path.join(log_dir, "portfolio"))
-    _LOG.debug("Event: exiting process_forecasts() for loop.")
+        _LOG.debug("portfolio=\n%s" % str(self._portfolio))
+        if self._log_dir:
+            self._portfolio.log_state(os.path.join(self._log_dir, "portfolio"))
 
+    def _compute_target_positions_in_shares(
+        self,
+        predictions: pd.Series,
+        volatility: pd.Series,
+    ) -> pd.DataFrame:
+        """
+        Compute target holdings in shares.
 
-def _compute_target_positions_in_shares(
-    predictions: pd.Series,
-    portfolio: omportfo.AbstractPortfolio,
-) -> pd.DataFrame:
-    """
-    Compute target holdings, generate orders, and update the portfolio.
-
-    :param predictions: predictions indexed by `asset_id`
-    :param portfolio: portfolio with current holdings
-    """
-    marked_to_market = portfolio.mark_to_market().set_index("asset_id")
-    # If there are predictions for assets not currently in `marked_to_market`,
-    # then attempt to price those assets and extend `marked_to_market`
-    # (imputing 0's for the holdings).
-    unpriced_assets = predictions.index.difference(marked_to_market.index)
-    if not unpriced_assets.empty:
-        _LOG.debug(
-            "Unpriced assets by id=\n%s",
-            "\n".join(map(str, unpriced_assets.to_list())),
-        )
-        prices = portfolio.price_assets(unpriced_assets.values)
-        mtm_extension = pd.DataFrame(
-            index=unpriced_assets, columns=["price", "curr_num_shares", "value"]
-        )
-        hdbg.dassert_eq(len(unpriced_assets), len(prices))
-        mtm_extension["price"] = prices
-        mtm_extension.index.name = "asset_id"
-        marked_to_market = pd.concat([marked_to_market, mtm_extension], axis=0)
-    marked_to_market.reset_index(inplace=True)
-    _LOG.debug(
-        "marked_to_market dataframe=\n%s"
-        % hprint.dataframe_to_str(marked_to_market)
-    )
-    # Combine the portfolio `marked_to_market` dataframe with the predictions.
-    assets_and_predictions = _merge_predictions(
-        marked_to_market, predictions, portfolio
-    )
-    # Compute the target positions in cash (call the optimizer).
-    df = ocalopti.compute_target_positions_in_cash(
-        assets_and_predictions, portfolio.CASH_ID
-    )
-    # Convert the target positions from cash values to target share counts.
-    # Round to nearest integer towards zero.
-    # df["diff_num_shares"] = np.fix(df["target_trade"] / df["price"])
-    df["diff_num_shares"] = df["target_trade"] / df["price"]
-    return df
-
-
-def _merge_predictions(
-    marked_to_market: pd.DataFrame,
-    predictions: pd.Series,
-    portfolio,
-) -> pd.DataFrame:
-    """
-    Merge marked_to_market dataframe with predictions.
-
-    :return: dataframe with columns `asset_id`, `prediction`, `price`,
-        `curr_num_shares`, `value`.
-        - The dataframe is the outer join of all the held assets in `portfolio` and
-          `predictions`
-    """
-    # Prepare `predictions` for the merge.
-    _LOG.debug("Number of non-NaN predictions=`%i`", predictions.count())
-    _LOG.debug("Number of NaN predictions=`%i`", predictions.isna().sum())
-    # Ensure that `predictions` does not already include the cash id.
-    hdbg.dassert_not_in(portfolio.CASH_ID, predictions.index)
-    # Set the "prediction" for cash to 1. This is for the optimizer.
-    predictions[portfolio.CASH_ID] = 1
-    predictions = pd.DataFrame(predictions)
-    # Format the predictions dataframe.
-    predictions.columns = ["prediction"]
-    predictions.index.name = "asset_id"
-    predictions = predictions.reset_index()
-    _LOG.debug("predictions=\n%s", hprint.dataframe_to_str(predictions))
-    # Merge current holdings and predictions.
-    merged_df = marked_to_market.merge(predictions, on="asset_id", how="outer")
-    _LOG.debug(
-        "Number of NaNs in `curr_num_shares` post-merge=`%i`",
-        merged_df["curr_num_shares"].isna().sum(),
-    )
-    merged_df = merged_df.convert_dtypes()
-    # Do not allow `asset_id` to be represented as a float.
-    merged_df["asset_id"] = merged_df["asset_id"].convert_dtypes(
-        infer_objects=False,
-        convert_string=False,
-        convert_boolean=False,
-        convert_floating=False,
-    )
-    columns = ["prediction", "price", "curr_num_shares", "value"]
-    hdbg.dassert_is_subset(columns, merged_df.columns)
-    merged_df[columns] = merged_df[columns].fillna(0.0)
-    _LOG.debug("After merge: merged_df=\n%s", hprint.dataframe_to_str(merged_df))
-    return merged_df
-
-
-def _generate_orders(
-    shares_df: pd.DataFrame,
-    order_config: Dict[str, Any],
-) -> List[omorder.Order]:
-    """
-    Turn a series of asset_id / shares to trade into a list of orders.
-
-    :param shares_df: dataframe indexed by `asset_id`. Contains columns
-        `curr_num_shares` and `diff_num_shares`. May contain zero rows.
-    :param order_config: common parameters used to initialize `Order`
-    :return: a list of nontrivial orders (i.e., no zero-share orders)
-    """
-    _LOG.debug("# Generate orders")
-    hdbg.dassert_is_subset(
-        ("curr_num_shares", "diff_num_shares"), shares_df.columns
-    )
-    orders: List[omorder.Order] = []
-    for asset_id, shares_row in shares_df.iterrows():
-        curr_num_shares = shares_row["curr_num_shares"]
-        diff_num_shares = shares_row["diff_num_shares"]
-        hdbg.dassert(
-            np.isfinite(curr_num_shares),
-            "The curr_num_share value must be finite.",
-        )
-        if not np.isfinite(diff_num_shares):
+        :param predictions: predictions indexed by `asset_id`
+        :param portfolio: portfolio with current holdings
+        """
+        # hdbg.dassert(predictions.index.equals(volatility.index))
+        marked_to_market = self._portfolio.mark_to_market().set_index("asset_id")
+        # If there are predictions for assets not currently in `marked_to_market`,
+        # then attempt to price those assets and extend `marked_to_market`
+        # (imputing 0's for the holdings).
+        unpriced_assets = predictions.index.difference(marked_to_market.index)
+        # Impute average volatility for holdings in portfolio with no prediction.
+        # idx = predictions.index.union(marked_to_market.index)
+        # mean_volatility = volatility.mean()
+        # volatility = volatility.reindex(idx).fillna(mean_volatility)
+        _ = volatility
+        if not unpriced_assets.empty:
             _LOG.debug(
-                "`diff_num_shares`=%f for `asset_id`=%i",
-                diff_num_shares,
-                asset_id,
+                "Unpriced assets by id=\n%s",
+                "\n".join(map(str, unpriced_assets.to_list())),
             )
-            diff_num_shares = 0.0
-        if diff_num_shares == 0.0:
-            # No need to place trades.
-            continue
-        order = omorder.Order(
-            asset_id=asset_id,
-            curr_num_shares=curr_num_shares,
-            diff_num_shares=diff_num_shares,
-            **order_config.to_dict(),
+            prices = self._portfolio.price_assets(unpriced_assets.values)
+            mtm_extension = pd.DataFrame(
+                index=unpriced_assets,
+                columns=["price", "curr_num_shares", "value"],
+            )
+            hdbg.dassert_eq(len(unpriced_assets), len(prices))
+            mtm_extension["price"] = prices
+            mtm_extension.index.name = "asset_id"
+            marked_to_market = pd.concat(
+                [marked_to_market, mtm_extension], axis=0
+            )
+        marked_to_market.reset_index(inplace=True)
+        _LOG.debug(
+            "marked_to_market dataframe=\n%s"
+            % hprint.dataframe_to_str(marked_to_market)
         )
-        _LOG.debug("order=%s", order.order_id)
-        orders.append(order)
-    _LOG.debug("Number of orders generated=%i", len(orders))
-    return orders
+        # Combine the portfolio `marked_to_market` dataframe with the predictions.
+        assets_and_predictions = self._merge_predictions(
+            marked_to_market, predictions
+        )
+        # Compute the target positions in cash (call the optimizer).
+        df = ocalopti.compute_target_positions_in_cash(
+            assets_and_predictions, self._portfolio.CASH_ID
+        )
+        # Convert the target positions from cash values to target share counts.
+        # Round to nearest integer towards zero.
+        # df["diff_num_shares"] = np.fix(df["target_trade"] / df["price"])
+        df["diff_num_shares"] = df["target_trade"] / df["price"]
+        return df
+
+    def _merge_predictions(
+        self,
+        marked_to_market: pd.DataFrame,
+        predictions: pd.Series,
+    ) -> pd.DataFrame:
+        """
+        Merge marked_to_market dataframe with predictions.
+
+        :return: dataframe with columns `asset_id`, `prediction`, `price`,
+            `curr_num_shares`, `value`.
+            - The dataframe is the outer join of all the held assets in `portfolio` and
+              `predictions`
+        """
+        # Prepare `predictions` for the merge.
+        _LOG.debug("Number of non-NaN predictions=`%i`", predictions.count())
+        _LOG.debug("Number of NaN predictions=`%i`", predictions.isna().sum())
+        # Ensure that `predictions` does not already include the cash id.
+        hdbg.dassert_not_in(self._portfolio.CASH_ID, predictions.index)
+        # Set the "prediction" for cash to 1. This is for the optimizer.
+        predictions[self._portfolio.CASH_ID] = 1
+        predictions = pd.DataFrame(predictions)
+        # Format the predictions dataframe.
+        predictions.columns = ["prediction"]
+        predictions.index.name = "asset_id"
+        predictions = predictions.reset_index()
+        _LOG.debug("predictions=\n%s", hprint.dataframe_to_str(predictions))
+        # Merge current holdings and predictions.
+        merged_df = marked_to_market.merge(
+            predictions, on="asset_id", how="outer"
+        )
+        _LOG.debug(
+            "Number of NaNs in `curr_num_shares` post-merge=`%i`",
+            merged_df["curr_num_shares"].isna().sum(),
+        )
+        merged_df = merged_df.convert_dtypes()
+        # Do not allow `asset_id` to be represented as a float.
+        merged_df["asset_id"] = merged_df["asset_id"].convert_dtypes(
+            infer_objects=False,
+            convert_string=False,
+            convert_boolean=False,
+            convert_floating=False,
+        )
+        columns = ["prediction", "price", "curr_num_shares", "value"]
+        hdbg.dassert_is_subset(columns, merged_df.columns)
+        merged_df[columns] = merged_df[columns].fillna(0.0)
+        _LOG.debug(
+            "After merge: merged_df=\n%s", hprint.dataframe_to_str(merged_df)
+        )
+        return merged_df
+
+    @staticmethod
+    def _generate_orders(
+        shares_df: pd.DataFrame,
+        order_config: Dict[str, Any],
+    ) -> List[omorder.Order]:
+        """
+        Turn a series of asset_id / shares to trade into a list of orders.
+
+        :param shares_df: dataframe indexed by `asset_id`. Contains columns
+            `curr_num_shares` and `diff_num_shares`. May contain zero rows.
+        :param order_config: common parameters used to initialize `Order`
+        :return: a list of nontrivial orders (i.e., no zero-share orders)
+        """
+        _LOG.debug("# Generate orders")
+        hdbg.dassert_is_subset(
+            ("curr_num_shares", "diff_num_shares"), shares_df.columns
+        )
+        orders: List[omorder.Order] = []
+        for asset_id, shares_row in shares_df.iterrows():
+            curr_num_shares = shares_row["curr_num_shares"]
+            diff_num_shares = shares_row["diff_num_shares"]
+            hdbg.dassert(
+                np.isfinite(curr_num_shares),
+                "The curr_num_share value must be finite.",
+            )
+            if not np.isfinite(diff_num_shares):
+                _LOG.debug(
+                    "`diff_num_shares`=%f for `asset_id`=%i",
+                    diff_num_shares,
+                    asset_id,
+                )
+                diff_num_shares = 0.0
+            if diff_num_shares == 0.0:
+                # No need to place trades.
+                continue
+            order = omorder.Order(
+                asset_id=asset_id,
+                curr_num_shares=curr_num_shares,
+                diff_num_shares=diff_num_shares,
+                **order_config.to_dict(),
+            )
+            _LOG.debug("order=%s", order.order_id)
+            orders.append(order)
+        _LOG.debug("Number of orders generated=%i", len(orders))
+        return orders
