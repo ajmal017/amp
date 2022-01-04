@@ -387,6 +387,8 @@ class ForecastProcessor:
         volatility = volatility.reindex(index)
         # Compute average volatility.
         mean_volatility = volatility.mean()
+        if not np.isfinite(mean_volatility):
+            mean_volatility = 1.0
         # Set the "volatility" for cash to 1. This is for the optimizer.
         volatility[self._portfolio.CASH_ID] = 0
         # Impute mean volatility.
