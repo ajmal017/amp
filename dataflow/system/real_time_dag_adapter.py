@@ -4,6 +4,7 @@ Import as:
 import dataflow.system.real_time_dag_adapter as dtfsrtdaad
 """
 
+from typing import Optional
 
 import pandas as pd
 
@@ -27,6 +28,7 @@ class RealTimeDagAdapter(dtfcore.DagAdapter):
         prediction_col: str,
         period: str,
         asset_id_col: str,
+        log_dir: Optional[str] = None,
     ):
         market_data_interface = portfolio.market_data_interface
         #
@@ -68,6 +70,7 @@ class RealTimeDagAdapter(dtfcore.DagAdapter):
                 "2000-01-01 16:40:00-05:00", tz="America/New_York"
             ).time(),
             "execution_mode": "real_time",
+            "log_dir": log_dir,
         }
         # Insert a node.
         nodes_to_insert = []

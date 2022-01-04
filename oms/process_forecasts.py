@@ -7,6 +7,7 @@ import oms.process_forecasts as oprofore
 import asyncio
 import datetime
 import logging
+import os
 from typing import Any, Dict, List
 
 import numpy as np
@@ -30,7 +31,6 @@ async def process_forecasts(
     prediction_df: pd.DataFrame,
     # volatility_df:
     portfolio: omportfo.AbstractPortfolio,
-    # TODO(Paul): Add `log_dir` for logging.
     config: Dict[str, Any],
 ) -> None:
     """
@@ -51,6 +51,7 @@ async def process_forecasts(
             - `batch`: place the trades for all the predictions (used in historical
                mode)
             - `real_time`: place the trades only for the last prediction as in a
+        - `log_dir`: directory for logging state
     """
     _LOG.info("predictions_df=\n%s", prediction_df)
     # Check `predictions_df`.
@@ -201,7 +202,7 @@ async def process_forecasts(
             _LOG.debug("No orders to submit to broker.")
         _LOG.debug("portfolio=\n%s" % str(portfolio))
         if log_dir:
-            portfolio.log_state(log_dir)
+            portfolio.log_state(os.path.join(log_dir, "portfolio"))
     _LOG.debug("Event: exiting process_forecasts() for loop.")
 
 
