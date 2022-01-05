@@ -20,6 +20,7 @@ import helpers.dbg as hdbg
 import helpers.hasyncio as hasynci
 import helpers.hpandas as hpandas
 import helpers.htqdm as htqdm
+import helpers.io_ as hio
 import helpers.printing as hprint
 import oms.call_optimizer as ocalopti
 import oms.order as omorder
@@ -223,6 +224,30 @@ class ForecastProcessor:
         act = "\n".join(act)
         return act
 
+    def log_state(self) -> None:
+        hdbg.dassert(self._log_dir, "Must specify `log_dir` to log state.")
+        #
+        wall_clock_time = self._get_wall_clock_time()
+        wall_clock_time_str = wall_clock_time.strftime("%Y%m%d_%H%M%S")
+        filename = f"{wall_clock_time_str}.csv"
+        #
+        if self._target_positions:
+            last_key = next(reversed(self._target_positions))
+            last_target_positions = self._target_positions[last_key]
+            last_target_positions_filename = os.path.join(
+                self._log_dir, "target_positions", filename
+            )
+            hio.create_enclosing_dir(
+                last_target_positions_filename, incremental=True
+            )
+            last_target_positions.to_csv(last_target_positions_filename)
+        if self._orders:
+            last_key = next(reversed(self._orders))
+            last_orders = self._orders[last_key]
+            last_orders_filename = os.path.join(self._log_dir, "orders", filename)
+            hio.create_enclosing_dir(last_orders_filename, incremental=True)
+            hio.to_file(last_orders_filename, last_orders)
+
     def generate_orders(
         self,
         predictions: pd.Series,
@@ -275,6 +300,7 @@ class ForecastProcessor:
             _LOG.debug("No orders to submit to broker.")
         _LOG.debug("portfolio=\n%s" % str(self._portfolio))
         if self._log_dir:
+            self.log_state()
             self._portfolio.log_state(os.path.join(self._log_dir, "portfolio"))
 
     def _compute_target_positions_in_shares(

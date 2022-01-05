@@ -317,8 +317,8 @@ class AbstractPortfolio(abc.ABC):
         hdbg.dassert(log_dir, "Must specify `log_dir` to log state.")
         #
         wall_clock_time = self._get_wall_clock_time()
-        filename = str(wall_clock_time) + ".csv"
-        filename = filename.replace(" ", "_")
+        wall_clock_time_str = wall_clock_time.strftime("%Y%m%d_%H%M%S")
+        filename = f"{wall_clock_time_str}.csv"
         #
         holdings_df = self.get_historical_holdings()
         holdings_filename = os.path.join(log_dir, "holdings", filename)
