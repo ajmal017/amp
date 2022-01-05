@@ -367,6 +367,7 @@ def log(logger: logging.Logger, verbosity: int, *vals: Any) -> None:
         logger.log(verbosity, fstring, vals)
 
 
+# TODO(gp): Replace calls to `_LOG.debug("\n%s", hprint.frame(...)` with this.
 def log_frame(
     logger: logging.Logger,
     fstring: str,

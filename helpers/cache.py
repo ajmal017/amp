@@ -551,7 +551,9 @@ class _Cached:
         # https://github.com/joblib/joblib/tree/master/joblib/_store_backends.py
         func_path = self._get_function_specific_code_path()
         # Archive old code.
-        new_func_path = func_path + "." + hdateti.get_timestamp(tz="ET")
+        new_func_path = (
+            func_path + "." + hdateti.get_current_timestamp_as_string(tz="ET")
+        )
         _LOG.debug("new_func_path='%s'", new_func_path)
         # Get the store backend.
         cache_type = "disk"

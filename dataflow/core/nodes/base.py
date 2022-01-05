@@ -37,7 +37,8 @@ class FitPredictNode(dtfcornode.Node, abc.ABC):
     method's invocation.
     """
 
-    # Represent the output of a `FitPredictNode`, mapping an output name to a dataframe.
+    # Represent the output of a `FitPredictNode`, mapping an output name to a
+    # dataframe.
     NodeOutput = Dict[str, pd.DataFrame]
 
     # Represent the state of a `Node`, mapping a
@@ -102,6 +103,9 @@ class FitPredictNode(dtfcornode.Node, abc.ABC):
         self._info[method] = copy.copy(values)
 
 
+# #############################################################################
+
+
 # TODO(gp): -> AbstractDataSource?
 class DataSource(FitPredictNode, abc.ABC):
     """
@@ -112,6 +116,8 @@ class DataSource(FitPredictNode, abc.ABC):
     time (e.g., from a passed DataFrame, reading from a file). This node implements
     the interface of `FitPredictNode` allowing to filter data for fitting and
     predicting based on intervals.
+
+    Fit and predict intervals are interpreted as `[a, b]`.
     """
 
     def __init__(
@@ -127,7 +133,8 @@ class DataSource(FitPredictNode, abc.ABC):
         for output in outputs:
             hdbg.dassert_ne(output, "")
         super().__init__(nid, inputs=[], outputs=outputs)
-        # This data is initialized by the derived classes depending on their semantics.
+        # This data is initialized by the derived classes depending on their
+        # semantics.
         self.df: Optional[pd.DataFrame] = None
         self._fit_intervals: Optional[List[Tuple[Any, Any]]] = None
         self._predict_intervals: Optional[List[Tuple[Any, Any]]] = None
@@ -220,6 +227,9 @@ class DataSource(FitPredictNode, abc.ABC):
             hdbg.dassert_eq(len(interval), 2)
             if interval[0] is not None and interval[1] is not None:
                 hdbg.dassert_lte(interval[0], interval[1])
+
+
+# #############################################################################
 
 
 class Transformer(FitPredictNode, abc.ABC):

@@ -21,6 +21,7 @@ import helpers.hpandas as hpandas
 import helpers.printing as hprint
 import helpers.s3 as hs3
 import helpers.sql as hsql
+import helpers.timer as htimer
 
 _LOG = logging.getLogger(__name__)
 
@@ -32,12 +33,14 @@ _LOG.verb_debug = hprint.install_log_verb_debug(_LOG, verbose=False)
 # AbstractMarketDataInterface
 # #############################################################################
 
+# TODO(gp): -> abstract_market_data.py
+
 
 class AbstractMarketDataInterface(abc.ABC):
     """
     Implement an interface to an historical / real-time source of price data.
 
-    Responsibilities:
+    # Responsibilities:
     - Delegate to a data backend in `AbstractImClient` to retrieve historical
       and real-time data
     - Model data in terms of interval `start_timestamp`, `end_timestamp`
@@ -51,14 +54,62 @@ class AbstractMarketDataInterface(abc.ABC):
     - Implement some market related transformations (e.g., `get_twap_price()`,
       `get_last_price()`)
 
-    Non-responsibilities:
+    # Non-responsibilities:
     - In general do not access data directly but rely on `AbstractImClient`
       objects to retrieve the data from different backends
+
+    # Handling of `asset_ids`
+    - Different implementation backing an `MarketDataInterface` are possible, e.g.,
+      - stateless, i.e., the caller needs to specify the requested `asset_ids`
+        - In this case the universe is provided by `MarketDataInterface`
+      - stateful, i.e., the back end is initialized with the desired universe of
+        assets and then `MarketDataInterface` just propagates or subsets the universe
+
+    - For these reasons, assets are selected at 3 different points:
+    1) `AbstractMarketDataInterface` allows to specify or subset the assets through
+        `asset_ids` through the constructor
+    1) Derived classes / backends specify the assets returned
+       - E.g., a concrete implementation backed by a DB can stream the data for
+         its entire available universe
+    3) Certain class methods allow to query data for a specific asset or subset of
+       assets
+    - For each stage, a value of `None` means no filtering
+
+    # Handling of filtering by time
+    - Clients might want to query data using different interval types (namely [a, b),
+      [a, b], (a, b], (a, b)) and by filtering on either the `start_ts` or `end_ts`
+    - For this reason, this class supports all these different ways of providing data
+
+    # Data format
+    The data from this class is available in two formats:
+
+    1) Native data (as delivered by the derived class):
+        - indexed with a progressive index
+        - with asset, start_time, end_time, knowledge_time
+    ```
+      asset_id           start_time             end_time     close   volume
+    idx
+      0  17085  2021-07-26 13:41:00  2021-07-26 13:42:00  148.8600   400176
+      1  17085  2021-07-26 13:30:00  2021-07-26 13:31:00  148.5300  1407725
+      2  17085  2021-07-26 13:31:00  2021-07-26 13:32:00  148.0999   473869
+    ```
+
+    2) Normalized data:
+        - indexed by the column that corresponds to `end_time`
+        - suitable to DataFlow computation
+    ```
+                            asset_id                start_time    close   volume
+    end_time
+    2021-07-20 09:31:00-04:00  17085 2021-07-20 09:30:00-04:00  143.990  1524506
+    2021-07-20 09:32:00-04:00  17085 2021-07-20 09:31:00-04:00  143.310   586654
+    2021-07-20 09:33:00-04:00  17085 2021-07-20 09:32:00-04:00  143.535   667639
+    ```
     """
 
     def __init__(
         self,
         asset_id_col: str,
+        # TODO(gp): This should be first and also potentially be None.
         asset_ids: List[Any],
         # TODO(gp): These are before the remapping.
         # TODO(gp): -> start_timestamp_col
@@ -67,7 +118,8 @@ class AbstractMarketDataInterface(abc.ABC):
         columns: Optional[List[str]],
         get_wall_clock_time: hdateti.GetWallClockTime,
         *,
-        # TODO(Dan): Converge on timezone `America/New_York` vs `US/Eastern` CMTask #217.
+        # TODO(Dan): Converge on timezone `America/New_York` vs `US/Eastern` (see
+        #  CMTask217).
         timezone: str = "America/New_York",
         sleep_in_secs: float = 1.0,
         time_out_in_secs: int = 60 * 2,
@@ -76,17 +128,22 @@ class AbstractMarketDataInterface(abc.ABC):
         """
         Constructor.
 
-        :param asset_id_col: the name of the column used to select the
-            asset ids
-        :param asset_ids: asset_ids to keep
-        :param start_time_col_name: the column with the start_time
-        :param end_time_col_name: the column with the end_time
-        :param columns: columns to return
-        :param get_wall_clock_time, speed_up_factor: like in `ReplayedTime`
-        :param timezone: timezone to convert normalized output dates to
+        The (input) name of the columns delivered by the derived classes is set
+        through `asset_id_col`, `start_time_col_name`, `end_time_col_name`.
+        The (output) name of the columns after the normalization can be changed
+        through `column_remap`.
+
+        :param asset_id_col: the name of the column used to select the asset ids
+        :param asset_ids: as described in the class docstring
+        :param start_time_col_name: the name of the column storing the `start_time`
+        :param end_time_col_name: the name of the column storing the `end_time`
+        :param columns: columns to return. `None` means all available
+        :param get_wall_clock_time: the wall clock
+        :param timezone: timezone to convert normalized output timestamps to
         :param sleep_in_secs, time_out_in_secs: sample every `sleep_in_secs`
             seconds waiting up to `time_out_in_secs` seconds
-        :param column_remap: dict of columns to remap or `None`
+        :param column_remap: dict of columns to remap the output data or `None` for
+            no remapping
         """
         _LOG.debug("")
         self._asset_id_col = asset_id_col
@@ -94,15 +151,17 @@ class AbstractMarketDataInterface(abc.ABC):
         self._start_time_col_name = start_time_col_name
         self._end_time_col_name = end_time_col_name
         self._columns = columns
+        #
         hdbg.dassert_isinstance(get_wall_clock_time, Callable)
         self.get_wall_clock_time = get_wall_clock_time
         #
         hdbg.dassert_lt(0, sleep_in_secs)
         self._sleep_in_secs = sleep_in_secs
         #
-        self._column_remap = column_remap
         self._timezone = timezone
+        self._column_remap = column_remap
         # Compute the max number of iterations.
+        hdbg.dassert_lt(0, time_out_in_secs)
         max_iterations = int(time_out_in_secs / sleep_in_secs)
         hdbg.dassert_lte(1, max_iterations)
         self._max_iterations = max_iterations
@@ -113,33 +172,16 @@ class AbstractMarketDataInterface(abc.ABC):
         self,
         period: str,
         *,
+        # TODO(gp): -> normalize
         normalize_data: bool = True,
         # TODO(gp): Not sure limit is really needed. We could move it to the DB
         #  implementation.
         limit: Optional[int] = None,
     ) -> pd.DataFrame:
         """
-        Get data for the real-time execution where we need a certain amount of
-        data since the current timestamp.
+        Get an amount of data `period` in the past before the current timestamp.
 
-        Without normalization, the returned df is the raw data from the DB and
-        could look like:
-        ```
-               id           start_time             end_time     close   volume
-        idx  7085  2021-07-26 13:40:00  2021-07-26 13:41:00  149.0250   575024
-          0  7085  2021-07-26 13:41:00  2021-07-26 13:42:00  148.8600   400176
-          1  7085  2021-07-26 13:30:00  2021-07-26 13:31:00  148.5300  1407725
-          2  7085  2021-07-26 13:31:00  2021-07-26 13:32:00  148.0999   473869
-        ```
-
-        After normalization, the returned df looks like:
-        ```
-                                     id          start_time    close   volume
-        end_time
-        2021-07-20 09:31:00-04:00  7085 2021-07-20 09:30:00  143.990  1524506
-        2021-07-20 09:32:00-04:00  7085 2021-07-20 09:31:00  143.310   586654
-        2021-07-20 09:33:00-04:00  7085 2021-07-20 09:32:00  143.535   667639
-        ```
+        This is used during real-time execution to evaluate a model.
         """
         # Handle `period`.
         _LOG.verb_debug(hprint.to_str("period"))
@@ -175,9 +217,10 @@ class AbstractMarketDataInterface(abc.ABC):
         Return price data at a specific timestamp.
 
         :param ts_col_name: the name of the column (before the remapping) to filter
-            on
+            on and use as index
         :param ts: the timestamp to filter on
         :param asset_ids: list of asset ids to filter on. `None` for all asset ids.
+        :param normalize: normalize the data
         """
         start_ts = ts - pd.Timedelta(1, unit="s")
         end_ts = ts + pd.Timedelta(1, unit="s")
@@ -206,7 +249,7 @@ class AbstractMarketDataInterface(abc.ABC):
         limit: Optional[int] = None,
     ) -> pd.DataFrame:
         """
-        Return price data in [start_ts, end_ts).
+        Return price data for an interval with `start_ts` and `end_ts` boundaries.
 
         All the `get_data_*` functions should go through this function since
         it is in charge of converting the data to the right timezone and
@@ -218,9 +261,14 @@ class AbstractMarketDataInterface(abc.ABC):
         :param left_close, right_close: represent the type of interval
             - E.g., [start_ts, end_ts), or (start_ts, end_ts]
         """
+        # Resolve the asset ids.
+        if asset_ids is None:
+            asset_ids = self._asset_ids
+        # Check the requested interval.
         if start_ts is not None and end_ts is not None:
             # TODO(gp): This should be function of right_close and left_close.
             hdbg.dassert_lt(start_ts, end_ts)
+        # Delegate to the derived classes to retrieve the data.
         df = self._get_data(
             start_ts,
             end_ts,
@@ -231,6 +279,13 @@ class AbstractMarketDataInterface(abc.ABC):
             normalize_data,
             limit,
         )
+        # If the assets were specified, check that the returned data doesn't contain
+        # data that we didn't request.
+        if asset_ids is not None:
+            hdbg.dassert_is_subset(df[self._asset_id_col].unique(), asset_ids)
+        # TODO(gp): If asset_ids was specified but the backend has a universe
+        #  specified already, we might need to apply a filter by asset_ids.
+        # TODO(gp): Check data with respect to start_ts, end_ts.
         if normalize_data:
             # Convert start and end timestamps to `self._timezone` if data is
             # normalized.
@@ -240,6 +295,7 @@ class AbstractMarketDataInterface(abc.ABC):
         _LOG.verb_debug("-> df=\n%s", hprint.dataframe_to_str(df))
         return df
 
+    # TODO(gp): To make the interface symmetric this method should accept `asset_ids`.
     def get_twap_price(
         self,
         start_ts: pd.Timestamp,
@@ -285,7 +341,7 @@ class AbstractMarketDataInterface(abc.ABC):
         )
         return price
 
-    # TODO(gp): -> _normalize_bar_data?
+    # TODO(gp): -> _normalize?
     def process_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Transform df from real-time DB into data similar to the historical TAQ
@@ -465,6 +521,8 @@ class AbstractMarketDataInterface(abc.ABC):
         )
         return start_sampling_time, end_sampling_time, num_iter
 
+    # /////////////////////////////////////////////////////////////////////////////
+
     @abc.abstractmethod
     def _get_last_end_time(self) -> Optional[pd.Timestamp]:
         ...
@@ -511,6 +569,7 @@ class AbstractMarketDataInterface(abc.ABC):
             df = df.rename(columns=self._column_remap)
         return df
 
+    # TODO(gp): -> _convert_timestamps_to_timezone
     def _convert_dates_to_timezone(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Convert start and end timestamps to the specified timezone.
@@ -533,7 +592,7 @@ class AbstractMarketDataInterface(abc.ABC):
         period: str, wall_clock_time: pd.Timestamp
     ) -> Optional[pd.Timestamp]:
         """
-        Return the start time corresponding to getting the desired `period` of
+        Return the start time corresponding to returning the desired `period` of
         time.
 
         E.g., if the df looks like:
@@ -547,7 +606,7 @@ class AbstractMarketDataInterface(abc.ABC):
         3  09:33     09:34    09:34   0.655907  1000
         4  09:34     09:35    09:35   0.311925  1000
         ```
-        and `wall_clock_time=09:34` the last minute should be
+        and `wall_clock_time=09:34` the last minute should be:
         ```
            start_datetime           last_price    id
                      end_datetime
@@ -837,6 +896,7 @@ class SqlMarketDataInterface(AbstractMarketDataInterface):
 # ReplayedTimeMarketDataInterface
 # #############################################################################
 
+# TODO(gp): -> replayed_time_market_data.py
 
 # TODO(gp): This should have a delay and / or we should use timestamp_db.
 class ReplayedTimeMarketDataInterface(AbstractMarketDataInterface):
@@ -889,6 +949,7 @@ class ReplayedTimeMarketDataInterface(AbstractMarketDataInterface):
     def should_be_online(self, wall_clock_time: pd.Timestamp) -> bool:
         return True
 
+    # TODO(gp): Remove this.
     def process_data(self, df: pd.DataFrame) -> pd.DataFrame:
         _LOG.verb_debug("")
         # Sort in increasing time order and reindex.
@@ -932,9 +993,10 @@ class ReplayedTimeMarketDataInterface(AbstractMarketDataInterface):
         if self._columns is not None:
             hdbg.dassert_is_subset(self._columns, df_tmp.columns)
             df_tmp = df_tmp[self._columns]
-        # # Handle `period`.
+        # Handle `period`.
         hdbg.dassert_in(ts_col_name, df_tmp.columns)
         # TODO(gp): This is inefficient. Make it faster by binary search.
+        # TODO(gp): Use trim_df.
         if start_ts is not None:
             _LOG.verb_debug("start_ts=%s", start_ts)
             tss = df_tmp[ts_col_name]
@@ -994,25 +1056,32 @@ class ReplayedTimeMarketDataInterface(AbstractMarketDataInterface):
 # #############################################################################
 
 
-def save_raw_data(
-    rtdbi: AbstractMarketDataInterface,
+def save_market_data(
+    market_data: AbstractMarketDataInterface,
     file_name: str,
     period: str,
-    limit: int,
+    limit: Optional[int],
 ) -> None:
     """
-    Save a few days worth of bar data from the RT DB to a file.
+    Save data without normalization from a `MarketDataInterface` to a CSV file.
+
+    Data is saved without normalization since we want to save it in the same format
+    that a derived class is delivering it to the
+
+    E.g.,
+    ```
+                start_time             end_time   egid   close   volume          timestamp_db
+    0  2021-12-31 20:41:00  2021-12-31 20:42:00  16878  294.81   70273    2021-12-31 20:42:06
+    1  2021-12-31 20:41:00  2021-12-31 20:42:00  16187  398.89   115650   2021-12-31 20:42:06
+    2  2021-12-31 20:41:00  2021-12-31 20:42:00  15794  3345.04  6331     2021-12-31 20:42:06
+    3  2021-12-31 20:41:00  2021-12-31 20:42:00  14592  337.75   26750    2021-12-31 20:42:06
+    ```
     """
     normalize_data = False
-    # Around 3 days.
-    _LOG.info("Querying DB ...")
-    rt_df = rtdbi.get_data(period, normalize_data=normalize_data, limit=limit)
-    _LOG.info("Querying DB done")
-    print("rt_df.shape=%s" % str(rt_df.shape))
-    print("# head")
-    display(rt_df.head(2))
-    print("# tail")
-    display(rt_df.tail(2))
+    with htimer.TimedScope(logging.DEBUG, "market_data.get_data"):
+        rt_df = market_data.get_data(
+            period, normalize_data=normalize_data, limit=limit
+        )
     #
     _LOG.info("Saving ...")
     compression = None
@@ -1022,7 +1091,7 @@ def save_raw_data(
     _LOG.info("Saving done")
 
 
-def read_data_from_file(
+def load_market_data(
     file_name: str,
     aws_profile: Optional[str] = None,
     **kwargs: Dict[str, Any],

@@ -1050,7 +1050,7 @@ def git_stash_push(
 
     user_name = hsysinte.get_user_name()
     server_name = hsysinte.get_server_name()
-    timestamp = hdateti.get_timestamp("naive_ET")
+    timestamp = hdateti.get_current_timestamp_as_string("naive_ET")
     tag = "%s-%s-%s" % (user_name, server_name, timestamp)
     tag = prefix + "." + tag
     _LOG.debug("tag='%s'", tag)
