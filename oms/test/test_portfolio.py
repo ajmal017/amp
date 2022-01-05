@@ -163,6 +163,7 @@ cash,1000000.0
 net_wealth,1000000.0
 gross_exposure,0.0
 leverage,0.0
+pnl,NaN
 """
         expected = pd.read_csv(
             io.StringIO(txt),
@@ -211,6 +212,7 @@ cash,10000.0
 net_wealth,1778351.42
 gross_exposure,1768351.42
 leverage,0.994
+pnl,NaN
 """
         expected = pd.read_csv(
             io.StringIO(txt),
@@ -270,6 +272,7 @@ cash,1000000.0
 net_wealth,1000000.0
 gross_exposure,0.0
 leverage,0.0
+pnl,NaN
 """
         expected = pd.read_csv(
             io.StringIO(txt),
@@ -361,9 +364,9 @@ asset_id                    101       -1
 2000-01-01 09:30:00-05:00          NaN  1000000.0
 2000-01-01 09:35:00-05:00  20006.23851  1000000.0
 # historical statistics=
-                           net_asset_holdings       cash    net_wealth  gross_exposure  leverage
-2000-01-01 09:30:00-05:00             0.00000  1000000.0  1.000000e+06         0.00000  0.000000
-2000-01-01 09:35:00-05:00         20006.23851  1000000.0  1.020006e+06     20006.23851  0.019614"""
+                           net_asset_holdings       cash    net_wealth  gross_exposure  leverage          pnl
+2000-01-01 09:30:00-05:00             0.00000  1000000.0  1.000000e+06         0.00000  0.000000          NaN
+2000-01-01 09:35:00-05:00         20006.23851  1000000.0  1.020006e+06     20006.23851  0.019614  20006.23851"""
 
             self.assert_equal(actual, expected, fuzzy_match=True)
 
@@ -405,7 +408,7 @@ asset_id                    101          -1
 2000-01-01 09:30:00-05:00          NaN  1000000.0000
 2000-01-01 09:35:00-05:00  20006.23851   998096.8783
 # historical statistics=
-                           net_asset_holdings          cash    net_wealth  gross_exposure  leverage
-2000-01-01 09:30:00-05:00             0.00000  1000000.0000  1.000000e+06         0.00000  0.000000
-2000-01-01 09:35:00-05:00         20006.23851   998096.8783  1.018103e+06     20006.23851  0.019651"""
+                           net_asset_holdings          cash    net_wealth  gross_exposure  leverage          pnl
+2000-01-01 09:30:00-05:00             0.00000  1000000.0000  1.000000e+06         0.00000  0.000000          NaN
+2000-01-01 09:35:00-05:00         20006.23851   998096.8783  1.018103e+06     20006.23851  0.019651  18103.11681"""
             self.assert_equal(actual, expected, fuzzy_match=True)

@@ -290,7 +290,10 @@ class AbstractPortfolio(abc.ABC):
         """
         Return a dataframe of portfolio statistics over time.
         """
-        return pd.DataFrame(self._statistics).transpose()
+        df = pd.DataFrame(self._statistics).transpose()
+        # Add `pnl` by diffing the snapshots of `net_wealth`.
+        df["pnl"] = df["net_wealth"].diff()
+        return df
 
     def get_historical_holdings(self) -> pd.DataFrame:
         """
