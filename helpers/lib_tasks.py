@@ -207,7 +207,7 @@ use_one_line_cmd = False
 def _run(
     ctx: Any, cmd: str, *args, dry_run: bool = False, **ctx_run_kwargs: Any
 ) -> int:
-    _LOG.debug("cmd=%s", cmd)
+    _LOG.debug(hprint.to_str("cmd dry_run"))
     if use_one_line_cmd:
         cmd = _to_single_line_cmd(cmd)
     _LOG.debug("cmd=%s", cmd)
@@ -892,11 +892,16 @@ def git_branch_copy(ctx, new_branch_name="", use_patch=False):  # type: ignore
     _run(ctx, cmd)
 
 
-def _git_diff_with_branch(ctx: Any, hash_: str,
-                          tag: str,
-                          dir_name: str,
-                          diff_type: str, subdir: str, dry_run: bool
-                          ) -> None:
+def _git_diff_with_branch(
+    ctx: Any,
+    hash_: str,
+    tag: str,
+    dir_name: str,
+    diff_type: str,
+    subdir: str,
+    dry_run: bool,
+) -> None:
+    _LOG.debug(hprint.to_str("hash_ tag dir_name diff_type subdir dry_run"))
     # Check that this branch is not master.
     curr_branch_name = hgit.get_branch_name()
     hdbg.dassert_ne(curr_branch_name, "master")
@@ -966,8 +971,8 @@ def _git_diff_with_branch(ctx: Any, hash_: str,
     script_file_name = f"./tmp.vimdiff_branch_with_{tag}.sh"
     hsysinte.create_executable_script(script_file_name, script_txt)
     print(f"# To diff against {tag} run:\n> {script_file_name}")
-    if not dry_run:
-        _run(ctx, script_file_name, pty=True)
+    _run(ctx, script_file_name, dry_run=dry_run, pty=True)
+
 
 @task
 def git_branch_diff_with_base(  # type: ignore
@@ -985,16 +990,12 @@ def git_branch_diff_with_base(  # type: ignore
     hash_ = hgit.get_branch_hash(dir_name=dir_name)
     #
     tag = "base"
-    _git_diff_with_branch(ctx, hash_,
-                          tag,
-                          dir_name,
-                          diff_type, subdir, dry_run
-                          )
+    _git_diff_with_branch(ctx, hash_, tag, dir_name, diff_type, subdir, dry_run)
 
 
 @task
 def git_branch_diff_with_master(  # type: ignore
-        ctx, diff_type="", subdir="", dry_run=False
+    ctx, diff_type="", subdir="", dry_run=False
 ):
     """
     Diff files of the current branch with origin/master.
@@ -1006,11 +1007,7 @@ def git_branch_diff_with_master(  # type: ignore
     dir_name = "."
     hash_ = "origin/master"
     tag = "origin_master"
-    _git_diff_with_branch(ctx, hash_,
-                          tag,
-                          dir_name,
-                          diff_type, subdir, dry_run
-                          )
+    _git_diff_with_branch(ctx, hash_, tag, dir_name, diff_type, subdir, dry_run)
 
 
 # TODO(gp): Add the following scripts:
@@ -1476,7 +1473,8 @@ def integrate_files(  # type: ignore
 
 @task
 def integrate_diff_overlapping_files(  # type: ignore
-        ctx, src_dir, dst_dir, subdir=""):
+    ctx, src_dir, dst_dir, subdir=""
+):
     """
     Find the files modified in both branches `src_dir_name` and `dst_dir_name`
     Compare these files from HEAD to master version before the branch point.

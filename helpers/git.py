@@ -1208,6 +1208,10 @@ def is_client_clean(
     """
     _LOG.debug(hprint.to_str("abort_if_not_clean"))
     files = get_modified_files(dir_name)
+    # Remove "amp" from files.
+    if "amp" in files:
+        _LOG.warning("Skipping 'amp' in modified files")
+        files = [f for f in files if "amp" != f]
     # A Git client is clean iff there are no files in the index.
     is_clean = len(files) == 0
     if abort_if_not_clean:

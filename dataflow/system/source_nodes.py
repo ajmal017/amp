@@ -343,16 +343,42 @@ class KibotEquityReader(dtfcore.DataSource):
         self.df = df
 
 
+# #############################################################################
+
+
+def _convert_to_multiindex(df: pd.DataFrame, asset_id_col: str) -> pd.DataFrame:
+    # Copied from `_load_multiple_instrument_data()`.
+    _LOG.debug(
+        "Before multiindex conversion\n:%s",
+        hprint.dataframe_to_str(df.head()),
+    )
+    dfs = {}
+    # TODO(Paul): Pass the column name through the constructor, so we can make it
+    #  programmable.
+    hdbg.dassert_in(asset_id_col, df.columns)
+    for asset_id, df in df.groupby(asset_id_col):
+        dfs[asset_id] = df
+    # Reorganize the data into the desired format.
+    df = pd.concat(dfs.values(), axis=1, keys=dfs.keys())
+    df = df.swaplevel(i=0, j=1, axis=1)
+    df.sort_index(axis=1, level=0, inplace=True)
+    _LOG.debug(
+        "After multiindex conversion\n:%s",
+        hprint.dataframe_to_str(df.head()),
+    )
+    return df
+
+
 class RealTimeDataSource(dtfcore.DataSource):
     """
     A RealTimeDataSource is a node that:
 
-    - has a wall clock (replayed or not, simulated or real)
+    - is backed by a MarketDataInterface (replayed, simulated, or real-time)
     - emits different data based on the value of a clock
       - This represents the fact the state of a DB is updated over time
     - has a blocking behavior
       - E.g., the data might not be available immediately when the data is
-        requested and thus we have to wait
+        requested and thus the caller has to wait
     """
 
     def __init__(
@@ -366,7 +392,10 @@ class RealTimeDataSource(dtfcore.DataSource):
         """
         Constructor.
 
-        :param period: how much history is needed from the real-time node
+        :param period: how much history is needed from the real-time node. See
+            `AbstractMarketDataInterface.get_data()` for details.
+        :param asset_id_col: the name of the column from `market_data_interface`
+            containing the asset ids
         """
         super().__init__(nid)
         hdbg.dassert_isinstance(
@@ -385,36 +414,85 @@ class RealTimeDataSource(dtfcore.DataSource):
         return ret  # type: ignore[no-any-return]
 
     def fit(self) -> Optional[Dict[str, pd.DataFrame]]:
+        self._get_data()
+        return super().fit()  # type: ignore[no-any-return]
+
+    def predict(self) -> Optional[Dict[str, pd.DataFrame]]:
+        self._get_data()
+        return super().predict()  # type: ignore[no-any-return]
+
+    def _get_data(self) -> None:
         # TODO(gp): This approach of communicating params through the state
         #  makes the code difficult to understand.
         self.df = self._market_data_interface.get_data(self._period)
         if self._multiindex_output:
-            self._convert_to_multiindex()
+            self.df = _convert_to_multiindex(self.df, self._asset_id_col)
+
+
+# #############################################################################
+
+
+class HistoricalDataSource(dtfcore.DataSource):
+    """
+    Given a fully initialized `MarketDataInterface` stream the data to the DAG.
+
+    Note that the `MarketDataInterface` decides the universe of asset_ids.
+    """
+
+    def __init__(
+        self,
+        nid: dtfcore.NodeId,
+        market_data_interface: mdmadain.AbstractMarketDataInterface,
+        asset_id_col: Union[int, str],
+        ts_col_name: str,
+        multiindex_output: bool,
+    ) -> None:
+        """
+        Constructor.
+
+        :param asset_id_col: the name of the column from `market_data_interface`
+            containing the asset ids
+        :param ts_col_name: the name of the column from `market_data_interface`
+            containing the end time stamp of the interval to filter on
+        """
+        super().__init__(nid)
+        hdbg.dassert_isinstance(
+            market_data_interface, mdmadain.AbstractMarketDataInterface
+        )
+        self._market_data_interface = market_data_interface
+        self._asset_id_col = asset_id_col
+        self._ts_col_name = ts_col_name
+        self._multiindex_output = multiindex_output
+
+    def fit(self) -> Optional[Dict[str, pd.DataFrame]]:
+        self._get_data()
         return super().fit()  # type: ignore[no-any-return]
 
     def predict(self) -> Optional[Dict[str, pd.DataFrame]]:
-        self.df = self._market_data_interface.get_data(self._period)
-        if self._multiindex_output:
-            self._convert_to_multiindex()
+        self._get_data()
         return super().predict()  # type: ignore[no-any-return]
 
-    def _convert_to_multiindex(self) -> None:
-        # From _load_multiple_instrument_data().
-        _LOG.debug(
-            "Before multiindex conversion\n:%s",
-            hprint.dataframe_to_str(self.df.head()),
+    def _get_data(self):
+        """
+        Get data for the requested [a, b] interval.
+        """
+        # From ArmaGenerator._lazy_load(),
+        # self.df = df.loc[self._start_date : self._end_date]
+        # the interval needs to be [a, b].
+        #
+        left_close = True
+        right_close = True
+        # We assume that the `MarketDataInterface` object is in charge of specifying
+        # the universe of assets.
+        asset_ids = None
+        self.df = self._market_data_interface.get_data_for_interval(
+            self._start_ts,
+            self._end_ts,
+            self._ts_col_name,
+            asset_ids,
+            left_close=left_close,
+            right_close=right_close,
+            normalize_data=True,
         )
-        dfs = {}
-        # TODO(Paul): Pass the column name through the constructor, so we can make it
-        # programmable.
-        for asset_id, df in self.df.groupby(self._asset_id_col):
-            dfs[asset_id] = df
-        # Reorganize the data into the desired format.
-        df = pd.concat(dfs.values(), axis=1, keys=dfs.keys())
-        df = df.swaplevel(i=0, j=1, axis=1)
-        df.sort_index(axis=1, level=0, inplace=True)
-        self.df = df
-        _LOG.debug(
-            "After multiindex conversion\n:%s",
-            hprint.dataframe_to_str(self.df.head()),
-        )
+        if self._multiindex_output:
+            self.df = _convert_to_multiindex(self.df, self._asset_id_col)
