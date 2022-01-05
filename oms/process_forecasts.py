@@ -5,6 +5,7 @@ import oms.process_forecasts as oprofore
 """
 
 import asyncio
+import collections
 import datetime
 import logging
 import os
@@ -175,6 +176,7 @@ async def process_forecasts(
         # volatility = pd.Series(1, index=predictions.index)
         orders = forecast_processor.generate_orders(predictions, volatility)
         await forecast_processor.submit_orders(orders)
+        _LOG.debug("ForecastProcessor=\n%s", str(forecast_processor))
     _LOG.debug("Event: exiting process_forecasts() for loop.")
 
 
@@ -196,6 +198,30 @@ class ForecastProcessor:
         self._offset_min = pd.DateOffset(minutes=self._order_duration)
         #
         self._log_dir = log_dir
+        #
+        self._target_positions = collections.OrderedDict()
+        self._orders = collections.OrderedDict()
+
+    def __str__(self) -> str:
+        """"""
+        act = []
+        if self._target_positions:
+            last_key = next(reversed(self._target_positions))
+            last_target_positions = self._target_positions[last_key]
+            act.append(
+                "# last target positions=\n%s"
+                % hprint.dataframe_to_str(last_target_positions)
+            )
+        else:
+            act.append("# last target positions=\nNone")
+        if self._orders:
+            last_key = next(reversed(self._orders))
+            last_orders = self._orders[last_key]
+            act.append("# last orders=\n%s" % last_orders)
+        else:
+            act.append("#last orders=\nNone")
+        act = "\n".join(act)
+        return act
 
     def generate_orders(
         self,
@@ -208,6 +234,9 @@ class ForecastProcessor:
         # Get the wall clock timestamp.
         wall_clock_timestamp = self._get_wall_clock_time()
         _LOG.debug("wall_clock_timestamp=%s", wall_clock_timestamp)
+        self._sequential_insert(
+            wall_clock_timestamp, target_positions, self._target_positions
+        )
         # Generate orders from target positions.
         _LOG.debug(
             "\n%s",
@@ -231,6 +260,8 @@ class ForecastProcessor:
         orders = self._generate_orders(
             target_positions[["curr_num_shares", "diff_num_shares"]], order_config
         )
+        orders_as_str = omorder.orders_to_string(orders)
+        self._sequential_insert(wall_clock_timestamp, orders_as_str, self._orders)
         return orders
 
     async def submit_orders(self, orders):
@@ -420,7 +451,9 @@ class ForecastProcessor:
         hdbg.dassert(predictions.index.equals(volatility.index))
         # The portfolio may have grandfathered holdings for which there is no
         # prediction.
-        idx = predictions.index.union(marked_to_market.index)
+        idx = predictions.index.union(
+            marked_to_market.set_index("asset_id").index
+        )
         predictions = self._normalize_predictions_srs(predictions, idx)
         volatility = self._normalize_volatility_srs(volatility, idx)
         # Merge current holdings and predictions.
@@ -488,3 +521,27 @@ class ForecastProcessor:
             orders.append(order)
         _LOG.debug("Number of orders generated=%i", len(orders))
         return orders
+
+    # TODO(Paul): This is the same as the corresponding method in `Portfolio`.
+    @staticmethod
+    def _sequential_insert(
+        key: pd.Timestamp,
+        obj: Any,
+        odict: Dict[pd.Timestamp, Any],
+    ) -> None:
+        """
+        Insert `(key, obj)` in `odict` ensuring that keys are in increasing
+        order.
+
+        Assume that `odict` is a dict maintaining the insertion order of
+        the keys.
+        """
+        hdbg.dassert_isinstance(key, pd.Timestamp)
+        hdbg.dassert_isinstance(odict, collections.OrderedDict)
+        # Ensure that timestamps are inserted in increasing order.
+        if odict:
+            last_key = next(reversed(odict))
+            hdbg.dassert_lt(last_key, key)
+        # TODO(Paul): If `obj` is a series or dataframe, ensure that the index is
+        #  unique.
+        odict[key] = obj
