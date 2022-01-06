@@ -159,8 +159,8 @@ class TestDryRunTasks1(hunitest.TestCase):
         target = "git_pull"
         self._dry_run(target)
 
-    def test_git_pull_master(self) -> None:
-        target = "git_pull_master"
+    def test_git_fetch_master(self) -> None:
+        target = "git_fetch_master"
         self._dry_run(target)
 
     def test_git_clean(self) -> None:
@@ -242,8 +242,8 @@ class TestDryRunTasks2(_LibTasksTestCase, _CheckDryRunTestCase):
         target = "git_pull(ctx)"
         self._check_output(target)
 
-    def test_git_pull_master(self) -> None:
-        target = "git_pull_master(ctx)"
+    def test_git_fetch_master(self) -> None:
+        target = "git_fetch_master(ctx)"
         self._check_output(target)
 
     def test_git_clean(self) -> None:

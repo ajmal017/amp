@@ -60,13 +60,13 @@ from helpers.lib_tasks import (  # noqa: F401  # pylint: disable=unused-import
     # TODO(gp): -> git_master_merge
     git_merge_master,
     git_pull,
-    # TODO(gp): -> git_master_pull
-    git_pull_master,
+    # TODO(gp): -> git_master_fetch
+    git_fetch_master,
     # TODO(gp): -> git_branch_rename
     git_rename_branch,
-    integrate_diff_overlapping_files,
     integrate_create_branch,
     integrate_diff_dirs,
+    integrate_diff_overlapping_files,
     integrate_files,
     lint,
     lint_create_branch,

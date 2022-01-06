@@ -355,7 +355,7 @@ def print_tasks(ctx, as_code=False):  # type: ignore
     cmd = rf'\grep "^@task" -A 1 {lib_tasks_file_name} | grep def'
     # def print_setup(ctx):  # type: ignore
     # def git_pull(ctx):  # type: ignore
-    # def git_pull_master(ctx):  # type: ignore
+    # def git_fetch_master(ctx):  # type: ignore
     _, txt = hsysinte.system_to_string(cmd)
     for line in txt.split("\n"):
         _LOG.debug("line=%s", line)
@@ -382,19 +382,21 @@ def git_pull(ctx):  # type: ignore
     Pull all the repos.
     """
     _report_task()
+    #
     cmd = "git pull --autostash"
     _run(ctx, cmd)
+    #
     cmd = "git submodule foreach 'git pull --autostash'"
     _run(ctx, cmd)
 
 
-# TODO(gp): Maybe inline
 @task
-def git_pull_master(ctx):  # type: ignore
+def git_fetch_master(ctx):  # type: ignore
     """
     Pull master without changing branch.
     """
     _report_task()
+    #
     cmd = "git fetch origin master:master"
     _run(ctx, cmd)
 
@@ -410,7 +412,7 @@ def git_merge_master(ctx, ff_only=False, abort_if_not_clean=True):  # type: igno
     # Check that the Git client is clean.
     hgit.is_client_clean(dir_name=".", abort_if_not_clean=abort_if_not_clean)
     # Pull master.
-    git_pull_master(ctx)
+    git_fetch_master(ctx)
     # Merge master.
     cmd = "git merge master"
     if ff_only:
@@ -917,6 +919,9 @@ def _git_diff_with_branch(
     )
     files = sorted(files)
     print("files=%s\n%s" % (len(files), "\n".join(files)))
+    if len(files) == 0:
+        _LOG.warning("Nothing to diff: exiting")
+        return
     # Create the dir storing all the files to compare.
     dst_dir = f"./tmp.{tag}"
     hio.create_dir(dst_dir, incremental=False)

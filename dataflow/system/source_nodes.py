@@ -347,6 +347,34 @@ class KibotEquityReader(dtfcore.DataSource):
 
 
 def _convert_to_multiindex(df: pd.DataFrame, asset_id_col: str) -> pd.DataFrame:
+    """
+    Transform a df like:
+    ```
+    :                            id close  volume
+    end_time
+    2022-01-04 09:01:00-05:00  13684    NaN       0
+    2022-01-04 09:01:00-05:00  17085    NaN       0
+    2022-01-04 09:02:00-05:00  13684    NaN       0
+    2022-01-04 09:02:00-05:00  17085    NaN       0
+    2022-01-04 09:03:00-05:00  13684    NaN       0
+    ```
+
+    Return a df like:
+    ```
+                                    close       volume
+                              13684 17085  13684 17085
+    end_time
+    2022-01-04 09:01:00-05:00   NaN   NaN      0     0
+    2022-01-04 09:02:00-05:00   NaN   NaN      0     0
+    2022-01-04 09:03:00-05:00   NaN   NaN      0     0
+    2022-01-04 09:04:00-05:00   NaN   NaN      0     0
+    ```
+
+    Note that the `asset_id` column is removed.
+    """
+
+    hdbg.dassert_isinstance(df, pd.DataFrame)
+    hdbg.dassert_lte(1, df.shape[0])
     # Copied from `_load_multiple_instrument_data()`.
     _LOG.debug(
         "Before multiindex conversion\n:%s",
@@ -362,6 +390,8 @@ def _convert_to_multiindex(df: pd.DataFrame, asset_id_col: str) -> pd.DataFrame:
     df = pd.concat(dfs.values(), axis=1, keys=dfs.keys())
     df = df.swaplevel(i=0, j=1, axis=1)
     df.sort_index(axis=1, level=0, inplace=True)
+    # Remove the asset_id column, since it's redundant.
+    del df[asset_id_col]
     _LOG.debug(
         "After multiindex conversion\n:%s",
         hprint.dataframe_to_str(df.head()),
@@ -434,7 +464,7 @@ class RealTimeDataSource(dtfcore.DataSource):
 
 class HistoricalDataSource(dtfcore.DataSource):
     """
-    Given a fully initialized `MarketDataInterface` stream the data to the DAG.
+    Stream the data to the DAG from a `MarketDataInterface`.
 
     Note that the `MarketDataInterface` decides the universe of asset_ids.
     """
@@ -446,6 +476,8 @@ class HistoricalDataSource(dtfcore.DataSource):
         asset_id_col: Union[int, str],
         ts_col_name: str,
         multiindex_output: bool,
+        *,
+        col_names_to_remove: Optional[List[str]] = None,
     ) -> None:
         """
         Constructor.
@@ -454,6 +486,7 @@ class HistoricalDataSource(dtfcore.DataSource):
             containing the asset ids
         :param ts_col_name: the name of the column from `market_data_interface`
             containing the end time stamp of the interval to filter on
+        :param col_names_to_remove: name of the columns to remove from the df
         """
         super().__init__(nid)
         hdbg.dassert_isinstance(
@@ -463,36 +496,74 @@ class HistoricalDataSource(dtfcore.DataSource):
         self._asset_id_col = asset_id_col
         self._ts_col_name = ts_col_name
         self._multiindex_output = multiindex_output
+        self._col_names_to_remove = col_names_to_remove
 
     def fit(self) -> Optional[Dict[str, pd.DataFrame]]:
-        self._get_data()
+        _LOG.debug(
+            "wall_clock_time=%s",
+            self._market_data_interface.get_wall_clock_time(),
+        )
+        intervals = self._fit_intervals
+        self.df = self._get_data(intervals)
         return super().fit()  # type: ignore[no-any-return]
 
     def predict(self) -> Optional[Dict[str, pd.DataFrame]]:
-        self._get_data()
+        _LOG.debug(
+            "wall_clock_time=%s",
+            self._market_data_interface.get_wall_clock_time(),
+        )
+        intervals = self._predict_intervals
+        self.df = self._get_data(intervals)
         return super().predict()  # type: ignore[no-any-return]
 
-    def _get_data(self):
+    def _get_data(self, intervals: dtfcore.Intervals) -> pd.DataFrame:
         """
         Get data for the requested [a, b] interval.
         """
-        # From ArmaGenerator._lazy_load(),
-        # self.df = df.loc[self._start_date : self._end_date]
+        _LOG.debug(hprint.to_str("intervals"))
+        # For simplicity's sake we get a slice of the data that includes all the
+        # requested intervals, relying on parent's `fit()` and `predict()` to
+        # extract the data strictly needed.
+        (
+            min_timestamp,
+            max_timestamp,
+        ) = dtfcore.find_min_max_timestamps_from_intervals(intervals)
+        _LOG.debug(hprint.to_str("min_timestamp max_timestamp"))
+        # From ArmaGenerator._lazy_load():
+        #   ```
+        #   self.df = df.loc[self._start_date : self._end_date]
+        #   ```
         # the interval needs to be [a, b].
-        #
         left_close = True
         right_close = True
         # We assume that the `MarketDataInterface` object is in charge of specifying
         # the universe of assets.
         asset_ids = None
-        self.df = self._market_data_interface.get_data_for_interval(
-            self._start_ts,
-            self._end_ts,
+        df = self._market_data_interface.get_data_for_interval(
+            min_timestamp,
+            max_timestamp,
             self._ts_col_name,
             asset_ids,
             left_close=left_close,
             right_close=right_close,
             normalize_data=True,
         )
+        # Remove the columns that are not needed.
+        if self._col_names_to_remove is not None:
+            _LOG.debug(
+                "Before column removal\n:%s",
+                hprint.dataframe_to_str(df.head()),
+            )
+            _LOG.debug(
+                "Removing %s from %s", self._col_names_to_remove, df.columns
+            )
+            for col_name in self._col_names_to_remove:
+                hdbg.dassert_in(col_name, df.columns)
+                del df[col_name]
+            _LOG.debug(
+                "After column removal\n:%s",
+                hprint.dataframe_to_str(df.head()),
+            )
         if self._multiindex_output:
-            self.df = _convert_to_multiindex(self.df, self._asset_id_col)
+            df = _convert_to_multiindex(df, self._asset_id_col)
+        return df

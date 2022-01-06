@@ -25,7 +25,6 @@ _LOG = logging.getLogger(__name__)
 # #############################################################################
 
 
-# TODO(gp): -> AbstractFitPredictNode
 class FitPredictNode(dtfcornode.Node, abc.ABC):
     """
     Class with abstract sklearn-style `fit()` and `predict()` functions.
@@ -106,7 +105,14 @@ class FitPredictNode(dtfcornode.Node, abc.ABC):
 # #############################################################################
 
 
-# TODO(gp): -> AbstractDataSource?
+# TODO(gp):
+#  In practice we are mixing two behaviors
+#  1) allowing cross-validation through `set_fit_intervals` / `set_predict_intervals`
+#  2) a mechanism in `fit` / `predict` to extract the desired data intervals
+#  This node requires to have all the data stored in self.df so that `fit()` can
+#   extract the subset to use.
+#  Not all the nodes can / want to load all the data at once (e.g., nodes using Parquet
+#   backend might want to read only the data that is needed for the cross-validation).
 class DataSource(FitPredictNode, abc.ABC):
     """
     A source node that generates data for cross-validation from the passed data
@@ -136,18 +142,24 @@ class DataSource(FitPredictNode, abc.ABC):
         # This data is initialized by the derived classes depending on their
         # semantics.
         self.df: Optional[pd.DataFrame] = None
-        self._fit_intervals: Optional[List[Tuple[Any, Any]]] = None
-        self._predict_intervals: Optional[List[Tuple[Any, Any]]] = None
+        self._fit_intervals: Optional[dtfcorutil.Intervals] = None
+        self._predict_intervals: Optional[dtfcorutil.Intervals] = None
         self._predict_idxs = None
 
-    def set_fit_intervals(self, intervals: List[Tuple[Any, Any]]) -> None:
+    def set_fit_intervals(
+        self, intervals: Optional[dtfcorutil.Intervals]
+    ) -> None:
         """
         Set the intervals to be used to generate data for the fit stage.
 
-        :param intervals: a list of closed time intervals like [start1, end1],
-            [start2, end2]. `None` boundary is interpreted as data start/end
+        :param intervals:
+            - `None` means no filtering
+            - a list of closed time intervals, e.g., `[[start1, end1], [start2, end2]]`.
+              `None` boundary is interpreted as data start/end
+            -
         """
-        self._validate_intervals(intervals)
+        if intervals is None:
+            dtfcorutil.dassert_valid_intervals(intervals)
         self._fit_intervals = intervals
 
     # `DataSource` uses data passed at construction time, so it does not need a
@@ -163,6 +175,8 @@ class DataSource(FitPredictNode, abc.ABC):
         self.df = cast(pd.DataFrame, self.df)
         # Filter.
         if self._fit_intervals is not None:
+            # TODO(gp): Factor out this code in utils.py and make it support `None`
+            # endpoints.
             idx_slices = [
                 self.df.loc[interval[0] : interval[1]].index
                 for interval in self._fit_intervals
@@ -180,15 +194,17 @@ class DataSource(FitPredictNode, abc.ABC):
         self._set_info("fit", info)
         return {self.output_names[0]: fit_df}
 
-    def set_predict_intervals(self, intervals: List[Tuple[Any, Any]]) -> None:
+    def set_predict_intervals(self, intervals: dtfcorutil.Intervals) -> None:
         """
         Same as `set_fit_intervals()`, but for the predict stage.
         """
         # TODO(*): Warn if intervals overlap with `fit` intervals.
         # TODO(*): Maybe enforce that the intervals be ordered.
-        self._validate_intervals(intervals)
+        if intervals is not None:
+            dtfcorutil.dassert_valid_intervals(intervals)
         self._predict_intervals = intervals
 
+    # TODO(gp): Factor out common code with `fit()`.
     def predict(  # type: ignore[override]  # pylint: disable=arguments-differ
         self,
     ) -> Dict[str, pd.DataFrame]:
@@ -197,7 +213,6 @@ class DataSource(FitPredictNode, abc.ABC):
         """
         hdbg.dassert_is_not(self.df, None)
         self.df = cast(pd.DataFrame, self.df)
-        # TODO(gp): Factor out common code with `fit()`.
         if self._predict_intervals is not None:
             idx_slices = [
                 self.df.loc[interval[0] : interval[1]].index
@@ -217,16 +232,6 @@ class DataSource(FitPredictNode, abc.ABC):
     def get_df(self) -> pd.DataFrame:
         hdbg.dassert_is_not(self.df, None, "No DataFrame found!")
         return self.df
-
-    # TODO(gp): This is a nice function to move to `dataflow/utils.py`.
-    @staticmethod
-    def _validate_intervals(intervals: List[Tuple[Any, Any]]) -> None:
-        hdbg.dassert_isinstance(intervals, list)
-        for interval in intervals:
-            # Intervals are [a, b] with a <= b.
-            hdbg.dassert_eq(len(interval), 2)
-            if interval[0] is not None and interval[1] is not None:
-                hdbg.dassert_lte(interval[0], interval[1])
 
 
 # #############################################################################
