@@ -47,6 +47,7 @@ async def process_forecasts(
 
     :param prediction_df: a dataframe indexed by timestamps with one column for the
         predictions for each asset
+    :param volatility_df: like `prediction_df`, but for volatility
     :param portfolio: initialized `Portfolio` object
     :param config:
         - `execution_mode`:
@@ -55,7 +56,6 @@ async def process_forecasts(
             - `real_time`: place the trades only for the last prediction as in a
         - `log_dir`: directory for logging state
     """
-    _LOG.info("predictions_df=\n%s", prediction_df)
     # Check `predictions_df`.
     hdbg.dassert_isinstance(prediction_df, pd.DataFrame)
     hpandas.dassert_index_is_datetime(prediction_df)
@@ -68,57 +68,62 @@ async def process_forecasts(
     hdbg.dassert(prediction_df.index.equals(volatility_df.index))
     # Check `portfolio`.
     hdbg.dassert_isinstance(portfolio, omportfo.AbstractPortfolio)
-    # Extract the objects from the config.
-    def _get_object_from_config(key: str, expected_type: type) -> Any:
-        hdbg.dassert_in(key, config)
-        obj = config[key]
-        hdbg.dassert_issubclass(obj, expected_type)
-        return obj
-
-    order_type = _get_object_from_config("order_type", str)
-    order_duration = _get_object_from_config("order_duration", int)
+    # TODO(*): Make `order_config` a subconfig.
+    # Create an `order_config` from `config` elements.
+    order_type = _get_object_from_config(config, "order_type", str)
+    order_duration = _get_object_from_config(config, "order_duration", int)
     order_config = cconfig.get_config_from_nested_dict(
         {
             "order_type": order_type,
             "order_duration": order_duration,
         }
     )
+    # Extract ATH and trading start times from config.
     # TODO(Paul): Add a check for ATH start/end.
-    ath_start_time = _get_object_from_config("ath_start_time", datetime.time)
-    #
-    trading_start_time = _get_object_from_config(
-        "trading_start_time", datetime.time
+    ath_start_time = _get_object_from_config(
+        config, "ath_start_time", datetime.time
     )
+    trading_start_time = _get_object_from_config(
+        config, "trading_start_time", datetime.time
+    )
+    # Ensure `ath_start_time` <= `trading_start_time`.
     hdbg.dassert_lte(ath_start_time, trading_start_time)
-    #
-    ath_end_time = _get_object_from_config("ath_end_time", datetime.time)
-    trading_end_time = _get_object_from_config("trading_end_time", datetime.time)
+    # Extract end times and sanity-check.
+    ath_end_time = _get_object_from_config(config, "ath_end_time", datetime.time)
+    trading_end_time = _get_object_from_config(
+        config, "trading_end_time", datetime.time
+    )
     hdbg.dassert_lte(trading_end_time, ath_end_time)
-    #
-    execution_mode = _get_object_from_config("execution_mode", str)
-    #
-    log_dir = config.get("log_dir", None)
-    # We should not have anything left in the config that we didn't extract.
-    # hdbg.dassert(not config, "config=%s", str(config))
-    #
+    # Get executiom mode ("real_time" or "batch").
+    execution_mode = _get_object_from_config(config, "execution_mode", str)
     if execution_mode == "real_time":
         prediction_df = prediction_df.tail(1)
     elif execution_mode == "batch":
         pass
     else:
         raise ValueError(f"Unrecognized execution mode='{execution_mode}'")
-    _LOG.debug("predictions_df=%s\n%s", str(prediction_df.shape), prediction_df)
+    # Get log dir.
+    log_dir = config.get("log_dir", None)
+    # We should not have anything left in the config that we didn't extract.
+    # hdbg.dassert(not config, "config=%s", str(config))
+    #
+    _LOG.debug(
+        "predictions_df=%s\n%s",
+        str(prediction_df.shape),
+        hprint.dataframe_to_str(prediction_df),
+    )
     _LOG.debug("predictions_df.index=%s", str(prediction_df.index))
-    market_data_interface = portfolio.market_data_interface
-    get_wall_clock_time = market_data_interface.get_wall_clock_time
-    tqdm_out = htqdm.TqdmToLogger(_LOG, level=logging.INFO)
     num_rows = len(prediction_df)
     _LOG.debug("Number of rows in `prediction_df`=%d", num_rows)
+    #
+    get_wall_clock_time = portfolio.market_data_interface.get_wall_clock_time
+    tqdm_out = htqdm.TqdmToLogger(_LOG, level=logging.INFO)
     iter_ = enumerate(prediction_df.iterrows())
+    offset_min = pd.DateOffset(minutes=order_duration)
+    # Initialize a `ForecastProcessor` object to perform the heavy lifting.
+    forecast_processor = ForecastProcessor(portfolio, order_config, log_dir)
     # `timestamp` is the time when the forecast is available and in the current
     #  setup is also when the order should begin.
-    offset_min = pd.DateOffset(minutes=order_duration)
-    forecast_processor = ForecastProcessor(portfolio, order_config, log_dir)
     for idx, (timestamp, predictions) in tqdm(
         iter_, total=num_rows, file=tqdm_out
     ):
@@ -174,7 +179,6 @@ async def process_forecasts(
             ),
         )
         volatility = volatility_df.loc[timestamp]
-        # volatility = pd.Series(1, index=predictions.index)
         orders = forecast_processor.generate_orders(predictions, volatility)
         await forecast_processor.submit_orders(orders)
         _LOG.debug("ForecastProcessor=\n%s", str(forecast_processor))
@@ -204,27 +208,30 @@ class ForecastProcessor:
         self._orders = collections.OrderedDict()
 
     def __str__(self) -> str:
-        """"""
+        """
+        Return the most recent state of the ForecastProcessor as a string.
+        """
         act = []
         if self._target_positions:
             last_key = next(reversed(self._target_positions))
-            last_target_positions = self._target_positions[last_key]
-            act.append(
-                "# last target positions=\n%s"
-                % hprint.dataframe_to_str(last_target_positions)
-            )
+            target_positions = self._target_positions[last_key]
+            target_positions_str = hprint.dataframe_to_str(target_positions)
         else:
-            act.append("# last target positions=\nNone")
+            target_positions_str = "None"
+        act.append("# last target positions=\n%s" % target_positions_str)
         if self._orders:
             last_key = next(reversed(self._orders))
-            last_orders = self._orders[last_key]
-            act.append("# last orders=\n%s" % last_orders)
+            orders_str = self._orders[last_key]
         else:
-            act.append("#last orders=\nNone")
+            orders_str = "None"
+        act.append("# last orders=\n%s" % orders_str)
         act = "\n".join(act)
         return act
 
     def log_state(self) -> None:
+        """
+        Log the most recent state of the object.
+        """
         hdbg.dassert(self._log_dir, "Must specify `log_dir` to log state.")
         #
         wall_clock_time = self._get_wall_clock_time()
@@ -252,11 +259,19 @@ class ForecastProcessor:
         self,
         predictions: pd.Series,
         volatility: pd.Series,
-    ) -> None:
+    ) -> List[omorder.Order]:
+        """
+        Translate returns and volatility forecasts into a list of orders.
+
+        :param predictions: returns forecasts
+        :param volatility: volatility forecasts
+        :return: a list of orders to execute
+        """
+        # Convert forecasts into target positions.
         target_positions = self._compute_target_positions_in_shares(
             predictions, volatility
         )
-        # Get the wall clock timestamp.
+        # Get the wall clock timestamp and internally log `target_positions`.
         wall_clock_timestamp = self._get_wall_clock_time()
         _LOG.debug("wall_clock_timestamp=%s", wall_clock_timestamp)
         self._sequential_insert(
@@ -271,8 +286,7 @@ class ForecastProcessor:
             ),
         )
         # Enter position between now and the next `order_duration` minutes.
-        # Create a config for `Order`. This requires timestamps and so is
-        # inside the loop.
+        # Create a config for `Order`.
         timestamp_start = wall_clock_timestamp
         timestamp_end = wall_clock_timestamp + self._offset_min
         order_dict_ = {
@@ -285,11 +299,17 @@ class ForecastProcessor:
         orders = self._generate_orders(
             target_positions[["curr_num_shares", "diff_num_shares"]], order_config
         )
+        # Convert orders to a string representation and internally log.
         orders_as_str = omorder.orders_to_string(orders)
         self._sequential_insert(wall_clock_timestamp, orders_as_str, self._orders)
         return orders
 
-    async def submit_orders(self, orders):
+    async def submit_orders(self, orders) -> None:
+        """
+        Submit `orders` to the broker and confirm receipt.
+
+        :param orders: list of orders to execute
+        """
         # Submit orders.
         if orders:
             broker = self._portfolio.broker
@@ -312,7 +332,7 @@ class ForecastProcessor:
         Compute target holdings in shares.
 
         :param predictions: predictions indexed by `asset_id`
-        :param portfolio: portfolio with current holdings
+        :param volatility: volatility forecasts indexed by `asset_id`
         """
         assets_and_predictions = self._prepare_data_for_optimizer(
             predictions, volatility
@@ -332,6 +352,14 @@ class ForecastProcessor:
         predictions: pd.Series,
         volatility: pd.Series,
     ) -> pd.DataFrame:
+        """
+        Clean up data for optimization.
+
+        Cleaning includes ensuring data completeness and NaN handling.
+
+        :param predictions: predictions indexed by `asset_id`
+        :param volatility: volatility forecasts indexed by `asset_id`
+        """
         hdbg.dassert(
             predictions.index.equals(volatility.index),
             "`predictions` and `volatility` have mismatched indices of asset ids",
@@ -388,7 +416,7 @@ class ForecastProcessor:
         self, predictions: pd.Series, index: pd.DatetimeIndex
     ) -> pd.DataFrame:
         """
-        Normalize predictions with `index`, NaN-filling, and transforming to a
+        Normalize predictions with `index`, NaN-filling, and df conversion.
         series.
 
         :param predictions:
@@ -421,8 +449,7 @@ class ForecastProcessor:
         self, volatility: pd.Series, index: pd.DatetimeIndex
     ) -> pd.DataFrame:
         """
-        Normalize predictions with `index`, NaN-filling, and transforming to a
-        series.
+        Normalize predictions with `index`, NaN-filling, and df conversion.
 
         :param volatility:
         :param index:
@@ -571,3 +598,13 @@ class ForecastProcessor:
         # TODO(Paul): If `obj` is a series or dataframe, ensure that the index is
         #  unique.
         odict[key] = obj
+
+
+# Extract the objects from the config.
+def _get_object_from_config(
+    config: cconfig.Config, key: str, expected_type: type
+) -> Any:
+    hdbg.dassert_in(key, config)
+    obj = config[key]
+    hdbg.dassert_issubclass(obj, expected_type)
+    return obj
