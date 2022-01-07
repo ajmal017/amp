@@ -23,6 +23,9 @@ import market_data.market_data_interface as mdmadain
 _LOG = logging.getLogger(__name__)
 
 
+# TODO(gp): -> market_data_example.py
+
+
 def generate_random_price_data(
     start_datetime: pd.Timestamp,
     end_datetime: pd.Timestamp,
@@ -214,6 +217,10 @@ def generate_random_bars_for_asset(
     df["asset_id"] = asset_id
     return df.reset_index(drop=True)
 
+
+# #########################################################################
+
+# TODO(gp): -> get_ReplayedTimeMarketDataInterface_example1
 
 def get_replayed_time_market_data_interface_example1(
     event_loop: asyncio.AbstractEventLoop,

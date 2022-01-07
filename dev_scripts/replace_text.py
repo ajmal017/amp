@@ -1,7 +1,11 @@
 #!/usr/bin/env python
 
 r"""
-- Replace an instance of text in all py, ipynb, and txt files or in filenames.
+- Replace an instance of text in all:
+    - `.py` file contents
+    - `.ipynb` file contents
+    - `.txt` file contents
+    - filenames
 - Git rename the names of files based on certain criteria.
 
 # Replace an import with a new one:
@@ -13,7 +17,7 @@ r"""
 # Custom flow:
 > replace_text.py --custom_flow _custom1
 
-# Custome flow for AmpTask14
+# Custom flow for AmpTask14
 > replace_text.py --custom_flow _custom2 --revert_all
 
 # Replace text in a specific directory:
@@ -438,17 +442,17 @@ def _parse() -> argparse.ArgumentParser:
     parser.add_argument(
         "--revert_all",
         action="store_true",
-        help="Revert all the files before processing",
+        help="Revert all the files (excluding this one) before processing",
     )
     parser.add_argument("--custom_flow", action="store", type=str)
     parser.add_argument(
         "--old",
         action="store",
         type=str,
-        help="regex (in perl format) to replace",
+        help="Regex of text to replace",
     )
     parser.add_argument(
-        "--new", action="store", type=str, help="regex (in perl format) to use"
+        "--new", action="store", type=str, help="New string to replace with"
     )
     parser.add_argument(
         "--preview", action="store_true", help="Preview only the replacement"
@@ -476,7 +480,6 @@ def _parse() -> argparse.ArgumentParser:
         "--backup", action="store_true", help="Keep backups of files"
     )
     parser.add_argument(
-        "-d",
         "--dirs",
         action="append",
         default=None,

@@ -19,6 +19,7 @@ import im_v2.common.data.client as imvcdcli
 import market_data.market_data_client as mdmadacl
 
 
+# TODO(gp): Merge into market_data_interface_example.py
 def get_MarketDataInterface_example1(
     asset_ids: List[str], columns: List[str], column_remap: Dict[str, str]
 ) -> mdmadacl.MarketDataInterface:

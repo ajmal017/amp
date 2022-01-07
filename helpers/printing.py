@@ -738,7 +738,7 @@ def remove_non_printable_chars(txt: str) -> str:
     return txt
 
 
-# TODO(gp): Maybe move to python_helpers since it's not about printing.
+# TODO(gp): Maybe move to helpers/hpython.py since it's not about printing.
 def sort_dictionary(dict_: Dict) -> Dict:
     """
     Sort a dictionary recursively using nested OrderedDict.

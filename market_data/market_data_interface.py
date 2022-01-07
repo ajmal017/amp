@@ -579,6 +579,8 @@ class AbstractMarketDataInterface(abc.ABC):
         :param df: normalized data
         :return: data with start and end dates in specified timezone
         """
+        if df.empty:
+            return df
         # Convert end timestamp values that are used as dataframe index.
         hpandas.dassert_index_is_datetime(df)
         df.index = df.index.tz_convert(self._timezone)
@@ -659,8 +661,10 @@ class AbstractMarketDataInterface(abc.ABC):
 # SqlMarketDataInterface
 # #############################################################################
 
+# TODO(gp): -> move to db_market_data
 
 # TODO(gp): This should be pushed to the IM
+# TODO(gp): -> DbMarketData
 class SqlMarketDataInterface(AbstractMarketDataInterface):
     """
     Implement an interface to a real-time SQL database with 1-minute bar data.
@@ -892,7 +896,8 @@ class SqlMarketDataInterface(AbstractMarketDataInterface):
 # ReplayedTimeMarketDataInterface
 # #############################################################################
 
-# TODO(gp): -> replayed_time_market_data.py
+# TODO(gp): -> replayed_market_data.py
+# TODO(gp): -> ReplayedMarketData
 
 # TODO(gp): This should have a delay and / or we should use timestamp_db.
 class ReplayedTimeMarketDataInterface(AbstractMarketDataInterface):
