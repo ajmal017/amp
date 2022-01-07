@@ -412,8 +412,8 @@ def log_frame(
 #  of each module independently.
 def install_log_verb_debug(logger: logging.Logger, *, verbose: bool) -> Callable:
     """
-    Create in a module a _LOG.verb_debug() that can be disabled in a centralized
-    way.
+    Create in a module a _LOG.verb_debug() that can be disabled in a
+    centralized way.
 
     This is useful when we want to have an higher-level of verbose debugging that
     can be enabled programmatically.
@@ -804,11 +804,20 @@ def dataframe_to_str(
 
 
 # TODO(gp): Move to pandas_helpers.
-# TODO(gp): -> df_and_shape_to_str(df, tag, ...
 # TODO(gp): Merge df_to_str and this adding a parameter `print_shape_info`.
-def df_to_short_str(tag: str, df: "pd.DataFrame", *, n: int = 3) -> str:
+def df_to_short_str(
+    tag: str,
+    df: "pd.DataFrame",
+    *,
+    n: int = 3,
+    print_dtypes: bool = False,
+) -> str:
     """
     Print a dataframe to string reporting the info about the size.
+
+    :param n: number of rows to print
+    :param print_dtypes: report df.types and information about the type of each column by looking
+        at the first value
     """
     out = []
     # Print the tag.
@@ -819,6 +828,26 @@ def df_to_short_str(tag: str, df: "pd.DataFrame", *, n: int = 3) -> str:
         out.append("df.index in [%s, %s]" % (df.index.min(), df.index.max()))
         out.append("df.columns=%s" % ",".join(map(str, df.columns)))
     out.append("df.shape=%s" % str(df.shape))
+    # Print information about the types.
+    if not df.empty:
+        if print_dtypes:
+            out.append("df.type=")
+
+            def _report_type_of_first_element(srs: "pd.Series") -> str:
+                """
+                Report dtype, the first element, and its type of a series.
+                """
+                elem = srs.values[0]
+                val = "%10s %25s %s" % (srs.dtype, type(elem), elem)
+                return val
+
+            col_name = "index"
+            fmt = "  %20s: %s"
+            out.append(fmt % (col_name, _report_type_of_first_element(df.index)))
+            for col_name in df.columns:
+                out.append(
+                fmt % (col_name, _report_type_of_first_element(df[col_name]))
+            )
     # Print the data frame.
     if df.shape[0] <= n:
         out.append(dataframe_to_str(df))

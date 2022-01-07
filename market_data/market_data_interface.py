@@ -179,7 +179,8 @@ class AbstractMarketDataInterface(abc.ABC):
         limit: Optional[int] = None,
     ) -> pd.DataFrame:
         """
-        Get an amount of data `period` in the past before the current timestamp.
+        Get an amount of data `period` in the past before the current
+        timestamp.
 
         This is used during real-time execution to evaluate a model.
         """
@@ -220,7 +221,7 @@ class AbstractMarketDataInterface(abc.ABC):
             on and use as index
         :param ts: the timestamp to filter on
         :param asset_ids: list of asset ids to filter on. `None` for all asset ids.
-        :param normalize: normalize the data
+        :param normalize_data: normalize the data
         """
         start_ts = ts - pd.Timedelta(1, unit="s")
         end_ts = ts + pd.Timedelta(1, unit="s")
@@ -249,7 +250,8 @@ class AbstractMarketDataInterface(abc.ABC):
         limit: Optional[int] = None,
     ) -> pd.DataFrame:
         """
-        Return price data for an interval with `start_ts` and `end_ts` boundaries.
+        Return price data for an interval with `start_ts` and `end_ts`
+        boundaries.
 
         All the `get_data_*` functions should go through this function since
         it is in charge of converting the data to the right timezone and
@@ -592,8 +594,8 @@ class AbstractMarketDataInterface(abc.ABC):
         period: str, wall_clock_time: pd.Timestamp
     ) -> Optional[pd.Timestamp]:
         """
-        Return the start time corresponding to returning the desired `period` of
-        time.
+        Return the start time corresponding to returning the desired `period`
+        of time.
 
         E.g., if the df looks like:
         ```
@@ -623,6 +625,11 @@ class AbstractMarketDataInterface(abc.ABC):
         if period == "last_day":
             # Get the data for the last day.
             last_start_time = wall_clock_time.replace(hour=0, minute=0, second=0)
+        elif period == "last_2days":
+            # Get the data for the last 2 days.
+            last_start_time = (
+                wall_clock_time.replace(hour=0, minute=0, second=0)
+            ) - pd.Timedelta(days=1)
         elif period == "last_week":
             # Get the data for the last week.
             last_start_time = wall_clock_time.replace(
@@ -661,12 +668,7 @@ class SqlMarketDataInterface(AbstractMarketDataInterface):
 
     def __init__(
         self,
-        # TODO(gp): Pass a connection directly.
-        dbname: str,
-        host: str,
-        port: int,
-        user: str,
-        password: str,
+        db_connection,
         table_name: str,
         where_clause: Optional[str],
         valid_id: Any,
@@ -683,13 +685,7 @@ class SqlMarketDataInterface(AbstractMarketDataInterface):
             - E.g., `WHERE ...=... AND ...=...`
         """
         super().__init__(*args, **kwargs)  # type: ignore[arg-type]
-        self.connection = hsql.get_connection(
-            host=host,
-            dbname=dbname,
-            port=port,
-            user=user,
-            password=password,
-        )
+        self.connection = db_connection
         # TODO(gp): No need to cache it.
         self.cursor = self.connection.cursor()
         self._table_name = table_name
@@ -995,28 +991,9 @@ class ReplayedTimeMarketDataInterface(AbstractMarketDataInterface):
             df_tmp = df_tmp[self._columns]
         # Handle `period`.
         hdbg.dassert_in(ts_col_name, df_tmp.columns)
-        # TODO(gp): This is inefficient. Make it faster by binary search.
-        # TODO(gp): Use trim_df.
-        if start_ts is not None:
-            _LOG.verb_debug("start_ts=%s", start_ts)
-            tss = df_tmp[ts_col_name]
-            _LOG.verb_debug("tss=\n%s", hprint.dataframe_to_str(tss))
-            if left_close:
-                mask = tss >= start_ts
-            else:
-                mask = tss > start_ts
-            _LOG.verb_debug("mask=\n%s", hprint.dataframe_to_str(mask))
-            df_tmp = df_tmp[mask]
-        if end_ts is not None:
-            # _LOG.debug("end_ts=%s", end_ts)
-            tss = df_tmp[ts_col_name]
-            _LOG.verb_debug("tss=\n%s", hprint.dataframe_to_str(tss))
-            if right_close:
-                mask = tss <= end_ts
-            else:
-                mask = tss < end_ts
-            _LOG.verb_debug("mask=\n%s", hprint.dataframe_to_str(mask))
-            df_tmp = df_tmp[mask]
+        df_tmp = hpandas.trim_df(
+            df_tmp, ts_col_name, start_ts, end_ts, left_close, right_close
+        )
         # Handle `asset_ids`
         _LOG.verb_debug("before df_tmp=\n%s", hprint.dataframe_to_str(df_tmp))
         if asset_ids is not None:
@@ -1082,6 +1059,7 @@ def save_market_data(
         rt_df = market_data.get_data(
             period, normalize_data=normalize_data, limit=limit
         )
+    _LOG.debug(hprint.df_to_short_str("rt_df", rt_df, print_dtypes=True))
     #
     _LOG.info("Saving ...")
     compression = None
@@ -1120,6 +1098,7 @@ def load_market_data(
         kwargs_tmp["s3fs"] = s3fs_
     kwargs.update(kwargs_tmp)  # type: ignore[arg-type]
     df = cpanh.read_csv(file_name, **kwargs)
+    _LOG.debug(hprint.df_to_short_str("df", df, print_dtypes=True))
     return df
 
 

@@ -1,7 +1,24 @@
+<!--ts-->
+   * [Code org of amp](#code-org-of-amp)
+      * [Top level dirs](#top-level-dirs)
+      * [Component dirs](#component-dirs)
+         * [helpers](#helpers)
+         * [core](#core)
+         * [dataflow](#dataflow)
+         * [im](#im)
+         * [market_data](#market_data)
+         * [oms](#oms)
+         * [research_amp](#research_amp)
+   * [All Python files](#all-python-files)
+   * [Invariants](#invariants)
+   * [Misc](#misc)
+
+
+
+<!--te-->
 # Code org of amp
 
 ## Top level dirs
-
 ```
 (cd amp; tree -L 1 -d --charset=ascii -I "*test*|*notebooks*" 2>&1 | tee /tmp/tmp)
 .
@@ -26,16 +43,15 @@
 ## Component dirs
 
 - The directories are listed in order of dependency
-  - helpers
-  - core
-  - im
-  - market_data
-  - dataflow
-  - oms
-  - research_amp
+  - `helpers`
+  - `core`
+  - `im`
+  - `market_data`
+  - `dataflow`
+  - `oms`
+  - `research_amp`
 
 ### helpers
-
 ```
 (cd amp; tree -v --charset=ascii -I "*test*|*notebooks*" helpers 2>&1 | tee /tmp/tmp)
 
@@ -99,7 +115,6 @@ helpers
 ```
 
 ### core
-
 ```
 (cd amp; tree -v --charset=ascii -I "*test*|*notebooks*" core 2>&1 | tee /tmp/tmp)
 
@@ -139,7 +154,6 @@ core
 ```
 
 ### dataflow
-
 ```
 (cd amp; tree -v --charset=ascii -I "*test*|*notebooks*" dataflow 2>&1 | tee /tmp/tmp)
 
@@ -220,7 +234,6 @@ dataflow
 ```
 
 ### im
-
 ```
 (cd amp; tree -v --charset=ascii -I "*test*|*notebooks*" im 2>&1 | tee /tmp/tmp)
 
@@ -286,7 +299,6 @@ im
 ```
 
 ### market_data
-
 ```
 (cd amp; tree -v --charset=ascii -I "*test*|*notebooks*" market_data 2>&1 | tee /tmp/tmp)
 
@@ -299,7 +311,6 @@ market_data
 ```
 
 ### oms
-
 ```
 (cd amp; tree -v --charset=ascii -I "*test*|*notebooks*" oms 2>&1 | tee /tmp/tmp)
 
@@ -330,7 +341,6 @@ oms
 ```
 
 ### research_amp
-
 ```
 (cd amp; tree -v --charset=ascii -I "*test*|*notebooks*" research_amp 2>&1 | tee /tmp/tmp)
 
@@ -343,10 +353,8 @@ research_amp
 ```
 
 # All Python files
-
 ```
 (cd amp; tree -v --prune --charset=ascii -P "*.py" -I "*test*|*notebooks*" 2>&1 | tee /tmp/tmp)
-
 
 .
 |-- __init__.py
@@ -838,8 +846,8 @@ research_amp
 
 # Invariants
 
-- We assume that there is no file with the same name in the same repo and
-  across different repos
+- We assume that there is no file with the same name in the same repo and across
+  different repos
   - In case of name collision, we prepend as many dirs necessary to make the
     filename unique
   - E.g., the files below should be renamed:

@@ -172,7 +172,7 @@ class Test_git_repo_name1(hunitest.TestCase):
         self.assert_equal(act, exp)
 
     @pytest.mark.skipif(
-        not hgit.is_in_amp_as_submodule(), reason="Run only in amp as sub-module"
+        hgit.is_in_amp_as_submodule(), reason="Run only in amp as super-module"
     )
     def test_get_all_repo_names1(self) -> None:
         mode = "short_name"
@@ -181,7 +181,7 @@ class Test_git_repo_name1(hunitest.TestCase):
         self.assert_equal(str(act), str(exp))
 
     @pytest.mark.skipif(
-        not hgit.is_in_amp_as_submodule(), reason="Run only in amp as sub-module"
+        hgit.is_in_amp_as_submodule(), reason="Run only in amp as super-module"
     )
     def test_get_all_repo_names2(self) -> None:
         mode = "full_name"

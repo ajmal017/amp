@@ -1941,7 +1941,7 @@ def get_git_tag(
 
 
 # TODO(gp): Consider using a token "latest" in version, so that it's always a
-# string and we avoid a special behavior encoded in None.
+#  string and we avoid a special behavior encoded in None.
 def get_image(
     base_image: str,
     stage: str,
