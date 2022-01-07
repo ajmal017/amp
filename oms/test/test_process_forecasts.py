@@ -55,12 +55,8 @@ class TestSimulatedProcessForecasts1(hunitest.TestCase):
         ]
         volatility = pd.DataFrame(volatility_data, index=index, columns=columns)
         # Build a Portfolio.
-        initial_timestamp = pd.Timestamp(
-            "2000-01-01 09:30:00-05:00", tz="America/New_York"
-        )
         portfolio = oporexam.get_simulated_portfolio_example1(
             event_loop,
-            initial_timestamp,
             market_data_interface=market_data_interface,
             asset_ids=[101, 202],
         )
@@ -95,9 +91,6 @@ class TestMockedProcessForecasts1(omtodh.TestOmsDbHelper):
             # Build a Portfolio.
             db_connection = self.connection
             table_name = oomsdb.CURRENT_POSITIONS_TABLE_NAME
-            initial_timestamp = pd.Timestamp(
-                "2000-01-01 09:30:00-05:00", tz="America/New_York"
-            )
             #
             oomsdb.create_oms_tables(self.connection, incremental=False)
             #
@@ -105,7 +98,6 @@ class TestMockedProcessForecasts1(omtodh.TestOmsDbHelper):
                 event_loop,
                 db_connection,
                 table_name,
-                initial_timestamp,
                 asset_ids=[101, 202],
             )
             # Build OrderProcessor.

@@ -63,7 +63,7 @@ class AbstractPortfolio(abc.ABC):
         asset_id_col: str,
         mark_to_market_col: str,
         timestamp_col: str,
-        holdings_df: pd.DataFrame,
+        initial_holdings: pd.Series,
     ):
         """
         Constructor.
@@ -75,8 +75,6 @@ class AbstractPortfolio(abc.ABC):
         :param mark_to_market_col: column name used as price to mark holdings to
             market
         :param timestamp_col: column to use when accessing price data
-        :param holdings_df: the initial state of the portfolio in terms of cash
-            and non-cash holdings
         """
         _LOG.debug(
             hprint.to_str(
@@ -85,21 +83,23 @@ class AbstractPortfolio(abc.ABC):
         )
         self._strategy_id = strategy_id
         self._account = account
-        #
+        # Set and unpack broker.
         hdbg.dassert_issubclass(broker, ombroker.AbstractBroker)
         self.broker = broker
+        # Extract `market_data_interface` from `broker`.
         self.market_data_interface = broker.market_data_interface
+        # Extract `get_wall_clock_time` from `market_data_interface`.
         self._get_wall_clock_time = (
             broker.market_data_interface.get_wall_clock_time
         )
         self._asset_id_col = asset_id_col
         self._mark_to_market_col = mark_to_market_col
         self._timestamp_col = timestamp_col
-        #
-        self._validate_initial_holdings_df(holdings_df)
-        self._holdings_df = holdings_df
-        # Get the initial timestamp from the `holdings_df`.
-        # initial_timestamp = holdings_df.index[0]
+        # Initialize universe and holdings.
+        self._validate_initial_holdings(initial_holdings)
+        initial_holdings.index.name = "asset_id"
+        initial_holdings.name = "curr_num_shares"
+        # Get the initialization timestamp from the wall clock.
         initial_timestamp = self._get_wall_clock_time()
         _LOG.debug("initial_timestamp=%s" % initial_timestamp)
         self._initial_timestamp = initial_timestamp
@@ -109,10 +109,9 @@ class AbstractPortfolio(abc.ABC):
         # - timestamp to pd.Series of holdings in shares (indexed by asset_id).
         _LOG.debug("Initializing asset_holdings...")
         self._asset_holdings = collections.OrderedDict()
-        asset_holdings = holdings_df[
-            holdings_df["asset_id"] != AbstractPortfolio.CASH_ID
+        asset_holdings = initial_holdings[
+            initial_holdings.index != AbstractPortfolio.CASH_ID
         ]
-        asset_holdings = asset_holdings.set_index("asset_id")["curr_num_shares"]
         asset_holdings.name = initial_timestamp
         hdbg.dassert_isinstance(asset_holdings, pd.Series)
         self._sequential_insert(
@@ -122,9 +121,7 @@ class AbstractPortfolio(abc.ABC):
         # - timestamp to float.
         _LOG.debug("Initializing cash...")
         self._cash = collections.OrderedDict()
-        cash = holdings_df.set_index("asset_id").loc[AbstractPortfolio.CASH_ID][
-            "curr_num_shares"
-        ]
+        cash = initial_holdings.iloc[AbstractPortfolio.CASH_ID]
         self._sequential_insert(initial_timestamp, cash, self._cash)
         _LOG.debug("cash initialized.")
         # - timestamp to pd.DataFrame of price, value (indexed by asset_id).
@@ -169,7 +166,6 @@ class AbstractPortfolio(abc.ABC):
         cls,
         *args: Any,
         initial_cash: float,
-        initial_timestamp: pd.Timestamp,
         asset_ids: Optional[List[int]] = None,
         **kwargs: Any,
     ) -> "AbstractPortfolio":
@@ -185,7 +181,6 @@ class AbstractPortfolio(abc.ABC):
         portfolio = cls.from_dict(
             *args,
             holdings_dict=holdings_dict,
-            initial_timestamp=initial_timestamp,
             **kwargs,
         )
         return portfolio
@@ -195,7 +190,6 @@ class AbstractPortfolio(abc.ABC):
         cls,
         *args: Any,
         holdings_dict: Dict[int, float],
-        initial_timestamp: pd.Timestamp,
         **kwargs: Any,
     ) -> "AbstractPortfolio":
         """
@@ -203,18 +197,11 @@ class AbstractPortfolio(abc.ABC):
 
         :param holdings_dict: dictionary from asset_id to position
         """
-        hdbg.dassert_isinstance(initial_timestamp, pd.Timestamp)
-        # Convert the dictionary into a `holdings_df`, which has `asset_id`,
-        # `curr_num_shares` as columns.
         hdbg.dassert_isinstance(holdings_dict, dict)
-        holdings_df = pd.Series(holdings_dict).to_frame().reset_index()
-        holdings_df.columns = AbstractPortfolio.HOLDINGS_COLS
-        size = len(holdings_dict)
-        holdings_df.index = [initial_timestamp] * size
-        # Build the portfolio.
+        initial_holdings = pd.Series(holdings_dict)
         portfolio = cls(
             *args,
-            holdings_df,
+            initial_holdings,
             **kwargs,
         )
         return portfolio
@@ -270,10 +257,6 @@ class AbstractPortfolio(abc.ABC):
         #
         df = self.get_cached_mark_to_market()
         _LOG.debug("mark_to_market_df=\n%s", hprint.dataframe_to_str(df))
-        # Update the internal holdings_df.
-        holdings_df = df[AbstractPortfolio.HOLDINGS_COLS]
-        self._holdings_df = pd.concat([holdings_df, self._holdings_df])
-        self._holdings_df = self._holdings_df.convert_dtypes()
         return df
 
     def get_cached_mark_to_market(self) -> pd.DataFrame:
@@ -523,69 +506,35 @@ class AbstractPortfolio(abc.ABC):
         )
 
     @staticmethod
-    def _validate_holdings_df(
-        holdings_df: pd.DataFrame,
+    def _validate_initial_holdings(
+        initial_holdings: pd.Series,
     ) -> None:
         """
-        Ensure that `holdings_df` passes basic sanity checks.
+        Ensure that `initial_holdings` passes basic sanity checks.
         """
-        # The input should be a nonempty dataframe with a datetime index.
-        hdbg.dassert_isinstance(holdings_df, pd.DataFrame)
-        hdbg.dassert_isinstance(holdings_df.index, pd.DatetimeIndex)
-        hdbg.dassert(hasattr(holdings_df.index.dtype, "tz"))
-        hdbg.dassert(not holdings_df.empty, "The dataframe must be nonempty.")
-        # The dataframe must have the correct columns.
-        hdbg.dassert_eq_all(
-            holdings_df.columns.to_list(),
-            AbstractPortfolio.HOLDINGS_COLS,
-            "Columns do not conform to requirements.",
-        )
-        # The columns should be of the correct types.
-        hdbg.dassert_eq(
-            holdings_df["asset_id"].dtype.type,
-            np.int64,
-            "The column `asset_id` should only contain integer ids.",
-        )
-        hdbg.dassert_in(
-            holdings_df["curr_num_shares"].dtype.type,
-            [np.float64, np.int64],
-            "The column `curr_num_shares` should be a float column.",
-        )
-        # The dataframe must contain a row for cash.
+        idx = initial_holdings.index
+        # The index must be an Int64Index (asset_id must be an int) with no
+        # duplicates. The ID for cash must be present.
+        hdbg.dassert(not idx.has_duplicates)
+        hdbg.dassert_isinstance(idx, pd.Int64Index)
         hdbg.dassert_in(
             AbstractPortfolio.CASH_ID,
-            holdings_df["asset_id"].to_list(),
+            idx,
             "No cash holdings available.",
+        )
+        # The holdings must be numerical. They represent number of shares.
+        hdbg.dassert_in(
+            initial_holdings.dtype.type,
+            [np.float64, np.int64],
+            "The initial holdings should consist of numerical values (in shares).",
         )
         # All share values should be finite.
         hdbg.dassert(
-            np.isfinite(holdings_df["curr_num_shares"]).all(),
+            np.isfinite(initial_holdings).all(),
             "All share values must be finite.",
         )
-
-    @staticmethod
-    def _validate_initial_holdings_df(holdings_df: pd.DataFrame) -> None:
-        """
-        Ensure that `holdings_df` qualifies as an initial holdings df.
-
-        The dataframe should specify asset holdings (in shares) at a
-        single point in time. Cash must be included and be non-negative.
-        """
-        AbstractPortfolio._validate_holdings_df(holdings_df)
-        # Initialization should be at a single point in time.
-        hdbg.dassert_eq(
-            holdings_df.index.nunique(),
-            1,
-            "Encountered too many unique index values in initial holdings dataframe",
-        )
-        # At initialization there should be no more than one row per asset.
-        hdbg.dassert_no_duplicates(holdings_df["asset_id"].to_list())
-        # Initial cash must be non-negative.
-        mask = holdings_df["asset_id"] == AbstractPortfolio.CASH_ID
-        cash_holdings = holdings_df[mask]
-        hdbg.dassert_eq(cash_holdings.shape[0], 1)
-        cash = cash_holdings["curr_num_shares"].values[0]
-        hdbg.dassert_lte(0, cash)
+        initial_cash = initial_holdings.iloc[AbstractPortfolio.CASH_ID]
+        hdbg.dassert_lte(0, initial_cash)
 
     @staticmethod
     def _sequential_insert(

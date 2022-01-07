@@ -52,10 +52,8 @@ class TestSimulatedPortfolio1(hunitest.TestCase):
                 event_loop
             )
             # Build a Portfolio.
-            initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
             portfolio = oporexam.get_simulated_portfolio_example1(
                 event_loop,
-                initial_timestamp,
                 market_data_interface=market_data_interface,
             )
             return portfolio
@@ -69,75 +67,70 @@ class TestSimulatedPortfolio2(hunitest.TestCase):
         """
         Initialize a Portfolio with cash.
         """
-        # Build ReplayedTimeMarketDataInterface.
-        event_loop = None
-        (
-            market_data_interface,
-            _,
-        ) = mdmdinex.get_replayed_time_market_data_interface_example3(event_loop)
-        # Build Portfolio.
-        initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
-        portfolio = oporexam.get_simulated_portfolio_example1(
-            event_loop,
-            initial_timestamp,
-            market_data_interface=market_data_interface,
-        )
-        # Check.
-        txt = r"""
-,asset_id,curr_num_shares
-2000-01-01 09:35:00-05:00,-1.0,1000000.0"""
-        expected = pd.read_csv(
-            io.StringIO(txt),
-            index_col=0,
-            parse_dates=True,
-        )
-        self.assert_dfs_close(portfolio._holdings_df, expected)
+        with hasynci.solipsism_context() as event_loop:
+            (
+                market_data_interface,
+                _,
+            ) = mdmdinex.get_replayed_time_market_data_interface_example3(
+                event_loop
+            )
+            # Build Portfolio.
+            portfolio = oporexam.get_simulated_portfolio_example1(
+                event_loop,
+                market_data_interface=market_data_interface,
+            )
+            # Check.
+            expected = pd.DataFrame(
+                {-1: 1000000.0},
+                [
+                    pd.Timestamp(
+                        "2000-01-01 09:35:00-05:00", tz="America/New_York"
+                    )
+                ],
+            )
+            self.assert_dfs_close(portfolio.get_historical_holdings(), expected)
 
     def test_initialization_with_holdings1(self) -> None:
         """
         Initialize a Portfolio with holdings.
         """
-        # Build ReplayedTimeMarketDataInterface.
-        event_loop = None
-        (
-            market_data_interface,
-            get_wall_clock_time,
-        ) = mdmdinex.get_replayed_time_market_data_interface_example3(event_loop)
-        # Build Broker.
-        broker = obroexam.get_simulated_broker_example1(
-            event_loop, market_data_interface=market_data_interface
-        )
-        # Build Portfolio.
-        strategy_id = "str1"
-        account = "paper"
-        market_data_interface = market_data_interface
-        asset_id_col = "asset_id"
-        mark_to_market_col = "price"
-        timestamp_col = "end_datetime"
-        holdings_dict = {101: 727.5, 202: 1040.3, -1: 10000}
-        initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
-        portfolio = omportfo.SimulatedPortfolio.from_dict(
-            strategy_id,
-            account,
-            broker,
-            asset_id_col,
-            mark_to_market_col,
-            timestamp_col,
-            holdings_dict=holdings_dict,
-            initial_timestamp=initial_timestamp,
-        )
-        # Check.
-        txt = r"""
-,asset_id,curr_num_shares
-2000-01-01 09:35:00-05:00,101,727.5
-2000-01-01 09:35:00-05:00,202,1040.3
-2000-01-01 09:35:00-05:00,-1.0,10000.0"""
-        expected = pd.read_csv(
-            io.StringIO(txt),
-            index_col=0,
-            parse_dates=True,
-        )
-        self.assert_dfs_close(portfolio._holdings_df, expected)
+        with hasynci.solipsism_context() as event_loop:
+            (
+                market_data_interface,
+                get_wall_clock_time,
+            ) = mdmdinex.get_replayed_time_market_data_interface_example3(
+                event_loop
+            )
+            # Build Broker.
+            broker = obroexam.get_simulated_broker_example1(
+                event_loop, market_data_interface=market_data_interface
+            )
+            # Build Portfolio.
+            strategy_id = "str1"
+            account = "paper"
+            asset_id_col = "asset_id"
+            mark_to_market_col = "price"
+            timestamp_col = "end_datetime"
+            holdings_dict = {101: 727.5, 202: 1040.3, -1: 10000}
+            portfolio = omportfo.SimulatedPortfolio.from_dict(
+                strategy_id,
+                account,
+                broker,
+                asset_id_col,
+                mark_to_market_col,
+                timestamp_col,
+                holdings_dict=holdings_dict,
+            )
+            # Check.
+            expected = pd.DataFrame(
+                {101: 727.5, 202: 1040.3, -1: 10000.0},
+                [
+                    pd.Timestamp(
+                        "2000-01-01 09:35:00-05:00", tz="America/New_York"
+                    )
+                ],
+            )
+            self.assert_dfs_close(portfolio.get_historical_holdings(), expected)
 
     def test_get_historical_statistics1(self) -> None:
         with hasynci.solipsism_context() as event_loop:
@@ -148,12 +141,8 @@ class TestSimulatedPortfolio2(hunitest.TestCase):
                 event_loop
             )
             #
-            initial_timestamp = pd.Timestamp(
-                "2000-01-01 09:35:00-05:00", tz="America/New_York"
-            )
             portfolio = oporexam.get_simulated_portfolio_example1(
                 event_loop,
-                initial_timestamp,
                 market_data_interface=market_data_interface,
             )
             # Check.
@@ -171,6 +160,9 @@ pnl,NaN
                 index_col=0,
             )
             # The timestamp doesn't parse correctly from the CSV.
+            initial_timestamp = pd.Timestamp(
+                "2000-01-01 09:35:00-05:00", tz="America/New_York"
+            )
             expected.columns = [initial_timestamp]
             actual = portfolio.get_historical_statistics().transpose()
             self.assert_dfs_close(actual, expected, rtol=1e-2, atol=1e-2)
@@ -194,9 +186,6 @@ pnl,NaN
             mark_to_market_col = "price"
             timestamp_col = "end_datetime"
             holdings_dict = {101: 727.5, 202: 1040.3, -1: 10000}
-            initial_timestamp = pd.Timestamp(
-                "2000-01-01 09:35:00-05:00", tz="America/New_York"
-            )
             portfolio = omportfo.SimulatedPortfolio.from_dict(
                 strategy_id,
                 account,
@@ -205,7 +194,6 @@ pnl,NaN
                 mark_to_market_col,
                 timestamp_col,
                 holdings_dict=holdings_dict,
-                initial_timestamp=initial_timestamp,
             )
             txt = r"""
 ,2000-01-01 09:35:00-05:00i
@@ -221,6 +209,9 @@ pnl,NaN
                 index_col=0,
             )
             # The timestamp doesn't parse correctly from the CSV.
+            initial_timestamp = pd.Timestamp(
+                "2000-01-01 09:35:00-05:00", tz="America/New_York"
+            )
             expected.columns = [initial_timestamp]
             actual = portfolio.get_historical_statistics().transpose()
             self.assert_dfs_close(actual, expected, rtol=1e-2, atol=1e-2)
@@ -264,7 +255,6 @@ start_datetime,end_datetime,asset_id,price
             )
             portfolio = oporexam.get_simulated_portfolio_example1(
                 event_loop,
-                initial_timestamp,
                 market_data_interface=market_data_interface,
             )
             # Check.
@@ -349,14 +339,10 @@ class TestMockedPortfolio1(omtodh.TestOmsDbHelper):
                 assert 0
             #
             # Create MockedPortfolio with some initial cash.
-            initial_timestamp = pd.Timestamp(
-                "2000-01-01 09:30:00-05:00", tz="America/New_York"
-            )
             portfolio = oporexam.get_mocked_portfolio_example1(
                 event_loop,
                 self.connection,
                 table_name,
-                initial_timestamp,
                 asset_ids=[101],
             )
             coroutines = [self._coroutine1(portfolio)]
@@ -382,14 +368,10 @@ class TestMockedPortfolio1(omtodh.TestOmsDbHelper):
                 assert 0
             #
             # Create MockedPortfolio with some initial cash.
-            initial_timestamp = pd.Timestamp(
-                "2000-01-01 09:30:00-05:00", tz="America/New_York"
-            )
             portfolio = oporexam.get_mocked_portfolio_example1(
                 event_loop,
                 self.connection,
                 table_name,
-                initial_timestamp,
                 asset_ids=[101],
             )
             coroutines = [self._coroutine2(portfolio)]

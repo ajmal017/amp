@@ -179,12 +179,8 @@ class TestRealTimePipelineWithOms1(hunitest.TestCase):
                 }
             )
             # Build Portfolio.
-            initial_timestamp = pd.Timestamp(
-                "2000-01-01 09:30:00-05:00", tz="America/New_York"
-            )
             portfolio = oporexam.get_simulated_portfolio_example1(
                 event_loop,
-                initial_timestamp,
                 market_data_interface=market_data_interface,
                 asset_ids=[1000],
             )
@@ -340,14 +336,10 @@ class TestRealTimeMvnReturnsWithOms1(otodh.TestOmsDbHelper):
     ) -> omportfo.MockedPortfolio:
         db_connection = self.connection
         table_name = oomsdb.CURRENT_POSITIONS_TABLE_NAME
-        initial_timestamp = pd.Timestamp(
-            "2000-01-03 09:30:00-05:00", tz="America/New_York"
-        )
         portfolio = oporexam.get_mocked_portfolio_example1(
             event_loop,
             db_connection,
             table_name,
-            initial_timestamp,
             market_data_interface=market_data_interface,
             mark_to_market_col="close",
             asset_ids=[101],

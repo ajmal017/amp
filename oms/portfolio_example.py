@@ -8,8 +8,6 @@ import asyncio
 import logging
 from typing import List, Optional
 
-import pandas as pd
-
 import helpers.sql as hsql
 import market_data.market_data_interface as mdmadain
 import oms.broker_example as obroexam
@@ -20,7 +18,6 @@ _LOG = logging.getLogger(__name__)
 
 def get_simulated_portfolio_example1(
     event_loop: Optional[asyncio.AbstractEventLoop],
-    initial_timestamp: pd.Timestamp,
     *,
     market_data_interface: Optional[mdmadain.AbstractMarketDataInterface] = None,
     mark_to_market_col: str = "price",
@@ -46,7 +43,6 @@ def get_simulated_portfolio_example1(
         timestamp_col,
         #
         initial_cash=initial_cash,
-        initial_timestamp=initial_timestamp,
         asset_ids=asset_ids,
     )
     return portfolio
@@ -58,7 +54,6 @@ def get_mocked_portfolio_example1(
     # TODO(gp): For symmetry with get_mocked_broker_example1 we should have a
     #  default value.
     table_name: str,
-    initial_timestamp: pd.Timestamp,
     *,
     market_data_interface: Optional[mdmadain.AbstractMarketDataInterface] = None,
     mark_to_market_col: str = "price",
@@ -86,7 +81,6 @@ def get_mocked_portfolio_example1(
         asset_id_col=asset_id_column,
         #
         initial_cash=initial_cash,
-        initial_timestamp=initial_timestamp,
         asset_ids=asset_ids,
     )
     return portfolio
