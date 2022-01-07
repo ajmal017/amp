@@ -154,7 +154,7 @@ class TestRealTimePipelineWithOms1(hunitest.TestCase):
             df = mdmdinex.generate_random_price_data(
                 start_datetime, end_datetime, columns, asset_ids
             )
-            initial_replayed_delay = 0
+            initial_replayed_delay = 5
             (
                 market_data_interface,
                 get_wall_clock_time,
@@ -186,6 +186,7 @@ class TestRealTimePipelineWithOms1(hunitest.TestCase):
                 event_loop,
                 initial_timestamp,
                 market_data_interface=market_data_interface,
+                asset_ids=[1000],
             )
             # Populate place trades.
             order_type = "price@twap"
@@ -197,13 +198,13 @@ class TestRealTimePipelineWithOms1(hunitest.TestCase):
                     "2000-01-01 09:30:00-05:00", tz="America/New_York"
                 ).time(),
                 "trading_start_time": pd.Timestamp(
-                    "2000-01-01 09:30:00-05:00", tz="America/New_York"
+                    "2000-01-01 09:35:00-05:00", tz="America/New_York"
                 ).time(),
                 "ath_end_time": pd.Timestamp(
-                    "2000-01-01 16:40:00-05:00", tz="America/New_York"
+                    "2000-01-01 16:00:00-05:00", tz="America/New_York"
                 ).time(),
                 "trading_end_time": pd.Timestamp(
-                    "2000-01-01 16:40:00-05:00", tz="America/New_York"
+                    "2000-01-01 15:55:00-05:00", tz="America/New_York"
                 ).time(),
                 "execution_mode": "real_time",
             }
@@ -321,7 +322,7 @@ class TestRealTimeMvnReturnsWithOms1(otodh.TestOmsDbHelper):
         self, event_loop: asyncio.AbstractEventLoop
     ) -> mdmadain.AbstractMarketDataInterface:
         df = self.get_market_data_df()
-        initial_replayed_delay = 0
+        initial_replayed_delay = 1
         (
             market_data_interface,
             get_wall_clock_time,
@@ -349,6 +350,7 @@ class TestRealTimeMvnReturnsWithOms1(otodh.TestOmsDbHelper):
             initial_timestamp,
             market_data_interface=market_data_interface,
             mark_to_market_col="close",
+            asset_ids=[101],
         )
         # TODO(Paul): Set this more systematically.
         portfolio.broker._column_remap = {
@@ -464,6 +466,7 @@ class TestRealTimeMvnReturnsWithOms2(otodh.TestOmsDbHelper):
             get_wall_clock_time,
         ) = mdmdinex.get_replayed_time_market_data_interface_example4(
             event_loop,
+            initial_replayed_delay=1,
         )
         return market_data_interface
 
@@ -484,6 +487,7 @@ class TestRealTimeMvnReturnsWithOms2(otodh.TestOmsDbHelper):
             initial_timestamp,
             market_data_interface=market_data_interface,
             mark_to_market_col="close",
+            asset_ids=[101, 202, 303],
         )
         # TODO(Paul): Set this more systematically.
         portfolio.broker._column_remap = {
@@ -516,7 +520,8 @@ class TestRealTimeMvnReturnsWithOms2(otodh.TestOmsDbHelper):
         )
         return order_processor
 
-    @pytest.mark.slow("~18 seconds")
+    # @pytest.mark.slow("~18 seconds")
+    @pytest.mark.skip("Unstable due to floating point rounding.")
     def test1(self) -> None:
         # Clean the DB tables.
         oomsdb.create_oms_tables(self.connection, incremental=False)

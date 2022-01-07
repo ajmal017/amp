@@ -62,6 +62,7 @@ class TestSimulatedProcessForecasts1(hunitest.TestCase):
             event_loop,
             initial_timestamp,
             market_data_interface=market_data_interface,
+            asset_ids=[101, 202],
         )
         config["order_type"] = "price@twap"
         config["order_duration"] = 5
@@ -81,8 +82,8 @@ class TestSimulatedProcessForecasts1(hunitest.TestCase):
         #  pricing assets not currently in the portfolio.
         actual = portfolio.get_historical_holdings()
         expected = r"""asset_id                        101        202            -1
-2000-01-01 09:30:00-05:00       NaN        NaN  1000000.000000
-2000-01-01 09:35:01-05:00       NaN        NaN  1000000.000000
+2000-01-01 09:30:00-05:00       0.0        0.0  1000000.000000
+2000-01-01 09:35:01-05:00       0.0        0.0  1000000.000000
 2000-01-01 09:40:01-05:00  7.689909  15.379818   976932.207284
 2000-01-01 09:45:01-05:00 -7.141466  21.424398   985720.044676"""
         self.assert_equal(str(actual), expected, fuzzy_match=True)
@@ -105,6 +106,7 @@ class TestMockedProcessForecasts1(omtodh.TestOmsDbHelper):
                 db_connection,
                 table_name,
                 initial_timestamp,
+                asset_ids=[101, 202],
             )
             # Build OrderProcessor.
             get_wall_clock_time = portfolio._get_wall_clock_time
@@ -177,7 +179,7 @@ class TestMockedProcessForecasts1(omtodh.TestOmsDbHelper):
         #  pricing assets not currently in the portfolio.
         actual = portfolio.get_historical_holdings()
         expected = r"""asset_id                        101        202            -1
-2000-01-01 09:30:00-05:00       NaN        NaN  1000000.000000
+2000-01-01 09:30:00-05:00       0.0        0.0  1000000.000000
 2000-01-01 09:35:01-05:00       NaN        NaN  1000000.000000
 2000-01-01 09:40:01-05:00  7.689909  15.379818   976932.207284
 2000-01-01 09:45:01-05:00 -7.141466  21.424398   985720.044676"""

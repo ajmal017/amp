@@ -350,18 +350,22 @@ class TestMockedPortfolio1(omtodh.TestOmsDbHelper):
                 "2000-01-01 09:30:00-05:00", tz="America/New_York"
             )
             portfolio = oporexam.get_mocked_portfolio_example1(
-                event_loop, self.connection, table_name, initial_timestamp
+                event_loop,
+                self.connection,
+                table_name,
+                initial_timestamp,
+                asset_ids=[101],
             )
             portfolio.mark_to_market()
             # Check.
             actual = str(portfolio)
             expected = r"""# historical holdings=
 asset_id                    101       -1
-2000-01-01 09:30:00-05:00   NaN  1000000.0
+2000-01-01 09:30:00-05:00   0.0  1000000.0
 2000-01-01 09:35:00-05:00  20.0  1000000.0
 # historical holdings marked to market=
-                                   101       -1
-2000-01-01 09:30:00-05:00          NaN  1000000.0
+asset_id                           101       -1
+2000-01-01 09:30:00-05:00      0.00000  1000000.0
 2000-01-01 09:35:00-05:00  20006.23851  1000000.0
 # historical statistics=
                            net_asset_holdings       cash    net_wealth  gross_exposure  leverage          pnl
@@ -394,18 +398,22 @@ asset_id                    101       -1
                 "2000-01-01 09:30:00-05:00", tz="America/New_York"
             )
             portfolio = oporexam.get_mocked_portfolio_example1(
-                event_loop, self.connection, table_name, initial_timestamp
+                event_loop,
+                self.connection,
+                table_name,
+                initial_timestamp,
+                asset_ids=[101],
             )
             portfolio.mark_to_market()
             # Check.
             actual = str(portfolio)
             expected = r"""# historical holdings=
 asset_id                    101          -1
-2000-01-01 09:30:00-05:00   NaN  1000000.0000
+2000-01-01 09:30:00-05:00   0.0  1000000.0000
 2000-01-01 09:35:00-05:00  20.0   998096.8783
 # historical holdings marked to market=
-                                   101          -1
-2000-01-01 09:30:00-05:00          NaN  1000000.0000
+asset_id                           101            -1
+2000-01-01 09:30:00-05:00      0.00000  1000000.0000
 2000-01-01 09:35:00-05:00  20006.23851   998096.8783
 # historical statistics=
                            net_asset_holdings          cash    net_wealth  gross_exposure  leverage          pnl

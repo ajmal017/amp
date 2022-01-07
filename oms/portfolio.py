@@ -104,6 +104,7 @@ class AbstractPortfolio(abc.ABC):
         # Get the initial timestamp from the `holdings_df`.
         initial_timestamp = holdings_df.index[0]
         # initial_timestamp = get_wall_clock_time()
+        _LOG.debug("initial_timestamp=%s" % initial_timestamp)
         self._initial_timestamp = initial_timestamp
         # At each call to `mark_to_market()`, we capture `wall_clock_time` and
         # perform a sequence of updates to the following dictionaries.
@@ -133,6 +134,8 @@ class AbstractPortfolio(abc.ABC):
         self._price_assets(asset_holdings)
         # Compute the initial portfolio statistics.
         self._compute_statistics()
+        #
+        self._initial_universe = asset_holdings.index
 
     def __str__(self) -> str:
         """
@@ -162,19 +165,22 @@ class AbstractPortfolio(abc.ABC):
         *args: Any,
         initial_cash: float,
         initial_timestamp: pd.Timestamp,
+        asset_ids: Optional[List[int]] = None,
         **kwargs: Any,
     ) -> "AbstractPortfolio":
         """
         Initialize with no non-cash assets.
         """
         hdbg.dassert_lt(0, initial_cash)
-        holdings_df = cls._create_holdings_df_from_cash(
-            initial_cash, initial_timestamp
-        )
-        # Build the portfolio.
-        portfolio = cls(
+        if not asset_ids:
+            asset_ids = []
+        hdbg.dassert_not_in(AbstractPortfolio.CASH_ID, asset_ids)
+        holdings_dict = {asset_id: 0 for asset_id in asset_ids}
+        holdings_dict[AbstractPortfolio.CASH_ID] = initial_cash
+        portfolio = cls.from_dict(
             *args,
-            holdings_df,
+            holdings_dict=holdings_dict,
+            initial_timestamp=initial_timestamp,
             **kwargs,
         )
         return portfolio
@@ -208,6 +214,22 @@ class AbstractPortfolio(abc.ABC):
         )
         return portfolio
 
+    @property
+    def universe(self) -> List[int]:
+        # TODO(Paul): Consider making this time-dependent.
+        return self._initial_universe.to_list()
+
+    def get_asset_ids_not_in_universe(self, asset_ids: List[int]) -> List[int]:
+        """
+        Get subset of asset ids not in universe. Empty list if null.
+
+        :param asset_ids: query asset_ids
+        :return: asset ids in `asset_ids` not in portfolio universe.
+        """
+        idx = pd.Index(asset_ids)
+        diff = idx.difference(self._initial_universe)
+        return diff.to_list()
+
     def mark_to_market(self) -> pd.DataFrame:
         """
         Mark the portfolio to market.
@@ -233,7 +255,7 @@ class AbstractPortfolio(abc.ABC):
         # Perform sanity-checks.
         # These four dictionaries should have the same keys. Here we check that
         # they have the same length.
-        # TODO(Paul): Check keys instead of length.
+        # TODO(Paul): Maybe check keys instead of length.
         hdbg.dassert_eq(
             len(self._asset_holdings), len(self._assets_marked_to_market)
         )
@@ -379,6 +401,7 @@ class AbstractPortfolio(abc.ABC):
         :return: series of asset values
         """
         as_of_timestamp = next(reversed(self._asset_holdings))
+        _LOG.debug("_price_assets `as_of_timestamp`=%s" % as_of_timestamp)
         hdbg.dassert_isinstance(asset_ids, pd.Series)
         asset_ids_list = asset_ids.index.to_list()
         # TODO(*): Get the market as-of timestamp.
@@ -577,8 +600,8 @@ class AbstractPortfolio(abc.ABC):
         if odict:
             last_key = next(reversed(odict))
             hdbg.dassert_lt(last_key, key)
-        # TODO(Paul): If `obj` is a series or dataframe, ensure that the index is
-        #  unique.
+        if isinstance(obj, pd.Series) or isinstance(obj, pd.DataFrame):
+            hdbg.dassert(not obj.index.has_duplicates)
         odict[key] = obj
 
 
@@ -831,10 +854,18 @@ class MockedPortfolio(AbstractPortfolio):
         query.append(f"SELECT * FROM {self._table_name}")
         wall_clock_timestamp = self._get_wall_clock_time()
         trade_date = wall_clock_timestamp.date()
-        # TODO(gp): This query returns all the asset IDs. Do we need to subset to
-        #  our universe?
+        # Restrict query to portfolio universe.
+        hdbg.dassert(self.universe, "Universe is empty.")
+        _LOG.debug("universe=\n%s", self.universe)
+        universe = tuple(self.universe)
+        if len(universe) == 1:
+            universe = str(universe)[:-2] + ")"
+        else:
+            universe = universe
+        # TODO(Paul): Make sure that we do not exclude IDs with a nonzero current/target position.
+        #  (ensure that these are included in the universe).
         query.append(
-            f"WHERE account='{self._account}' AND tradedate='{trade_date}'"
+            f"WHERE account='{self._account}' AND tradedate='{trade_date}' AND {self._asset_id_col} IN {universe}"
         )
         query.append(f"ORDER BY {self._asset_id_col}")
         query = "\n".join(query)

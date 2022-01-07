@@ -6,7 +6,7 @@ import oms.portfolio_example as oporexam
 
 import asyncio
 import logging
-from typing import Optional
+from typing import List, Optional
 
 import pandas as pd
 
@@ -24,6 +24,7 @@ def get_simulated_portfolio_example1(
     *,
     market_data_interface: Optional[mdmadain.AbstractMarketDataInterface] = None,
     mark_to_market_col: str = "price",
+    asset_ids: Optional[List[int]] = None,
 ) -> omportfo.SimulatedPortfolio:
     # Build SimulatedBroker.
     broker = obroexam.get_simulated_broker_example1(
@@ -50,6 +51,7 @@ def get_simulated_portfolio_example1(
         #
         initial_cash=initial_cash,
         initial_timestamp=initial_timestamp,
+        asset_ids=asset_ids,
     )
     return portfolio
 
@@ -64,6 +66,7 @@ def get_mocked_portfolio_example1(
     *,
     market_data_interface: Optional[mdmadain.AbstractMarketDataInterface] = None,
     mark_to_market_col: str = "price",
+    asset_ids: Optional[List[int]] = None,
 ) -> omportfo.MockedPortfolio:
     # Build MockedBroker.
     broker = obroexam.get_mocked_broker_example1(
@@ -92,5 +95,6 @@ def get_mocked_portfolio_example1(
         #
         initial_cash=initial_cash,
         initial_timestamp=initial_timestamp,
+        asset_ids=asset_ids,
     )
     return portfolio
