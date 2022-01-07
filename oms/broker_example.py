@@ -20,8 +20,8 @@ def get_simulated_broker_example1(
     market_data_interface: Optional[mdmadain.AbstractMarketDataInterface] = None,
 ) -> ombroker.SimulatedBroker:
     """
-    Build an example of `SimulatedBroker` using an example `MarketDataInterface`,
-    unless specified.
+    Build an example of `SimulatedBroker` using an example
+    `MarketDataInterface`, unless specified.
     """
     # Build MarketDataInterface.
     if market_data_interface is None:
@@ -32,10 +32,7 @@ def get_simulated_broker_example1(
     # Build SimulatedBroker.
     strategy_id = "SAU1"
     account = "candidate"
-    get_wall_clock_time = market_data_interface.get_wall_clock_time
-    broker = ombroker.SimulatedBroker(
-        strategy_id, account, market_data_interface, get_wall_clock_time
-    )
+    broker = ombroker.SimulatedBroker(strategy_id, account, market_data_interface)
     return broker
 
 
@@ -60,12 +57,10 @@ def get_mocked_broker_example1(
     # Build MockedBroker.
     strategy_id = "SAU1"
     account = "candidate"
-    get_wall_clock_time = market_data_interface.get_wall_clock_time
     broker = ombroker.MockedBroker(
         strategy_id,
         account,
         market_data_interface,
-        get_wall_clock_time,
         db_connection=db_connection,
         submitted_orders_table_name=submitted_orders_table_name,
         accepted_orders_table_name=accepted_orders_table_name,

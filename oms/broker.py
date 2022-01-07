@@ -11,7 +11,6 @@ from typing import Any, Dict, List, Optional, Tuple, cast
 
 import pandas as pd
 
-import helpers.datetime_ as hdateti
 import helpers.dbg as hdbg
 import helpers.hasyncio as hasynci
 import helpers.sql as hsql
@@ -120,7 +119,6 @@ class AbstractBroker(abc.ABC):
         strategy_id: str,
         account: str,
         market_data_interface: mdmadain.AbstractMarketDataInterface,
-        get_wall_clock_time: hdateti.GetWallClockTime,
         column_remap: Optional[Dict[str, str]] = None,
     ) -> None:
         """
@@ -136,9 +134,7 @@ class AbstractBroker(abc.ABC):
             market_data_interface, mdmadain.AbstractMarketDataInterface
         )
         self.market_data_interface = market_data_interface
-        # TODO(gp): Use market_data_interface.get_wall_clock_time and remove
-        #  from the interface.
-        self._get_wall_clock_time = get_wall_clock_time
+        self._get_wall_clock_time = market_data_interface.get_wall_clock_time
         self._column_remap = column_remap
         # Track the orders for internal accounting, mapping wall clock when the
         # order was submitted to the submitted orders.
