@@ -1,3 +1,4 @@
+import asyncio
 import io
 import logging
 
@@ -43,20 +44,21 @@ class TestSimulatedPortfolio1(hunitest.TestCase):
         """
         Return a freshly minted Portfolio with only cash.
         """
-        # Build a ReplayedTimeMarketDataInterface.
-        event_loop = None
-        (
-            market_data_interface,
-            _,
-        ) = mdmdinex.get_replayed_time_market_data_interface_example3(event_loop)
-        # Build a Portfolio.
-        initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
-        portfolio = oporexam.get_simulated_portfolio_example1(
-            event_loop,
-            initial_timestamp,
-            market_data_interface=market_data_interface,
-        )
-        return portfolio
+        with hasynci.solipsism_context() as event_loop:
+            (
+                market_data_interface,
+                _,
+            ) = mdmdinex.get_replayed_time_market_data_interface_example3(
+                event_loop
+            )
+            # Build a Portfolio.
+            initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
+            portfolio = oporexam.get_simulated_portfolio_example1(
+                event_loop,
+                initial_timestamp,
+                market_data_interface=market_data_interface,
+            )
+            return portfolio
 
 
 # #############################################################################
@@ -138,23 +140,24 @@ class TestSimulatedPortfolio2(hunitest.TestCase):
         self.assert_dfs_close(portfolio._holdings_df, expected)
 
     def test_get_historical_statistics1(self) -> None:
-        # Build MarketDataInterface.
-        event_loop = None
-        (
-            market_data_interface,
-            _,
-        ) = mdmdinex.get_replayed_time_market_data_interface_example3(event_loop)
-        #
-        initial_timestamp = pd.Timestamp(
-            "2000-01-01 09:35:00-05:00", tz="America/New_York"
-        )
-        portfolio = oporexam.get_simulated_portfolio_example1(
-            event_loop,
-            initial_timestamp,
-            market_data_interface=market_data_interface,
-        )
-        # Check.
-        txt = r"""
+        with hasynci.solipsism_context() as event_loop:
+            (
+                market_data_interface,
+                _,
+            ) = mdmdinex.get_replayed_time_market_data_interface_example3(
+                event_loop
+            )
+            #
+            initial_timestamp = pd.Timestamp(
+                "2000-01-01 09:35:00-05:00", tz="America/New_York"
+            )
+            portfolio = oporexam.get_simulated_portfolio_example1(
+                event_loop,
+                initial_timestamp,
+                market_data_interface=market_data_interface,
+            )
+            # Check.
+            txt = r"""
 ,2000-01-01 09:35:00-05:00
 net_asset_holdings,0
 cash,1000000.0
@@ -163,45 +166,48 @@ gross_exposure,0.0
 leverage,0.0
 pnl,NaN
 """
-        expected = pd.read_csv(
-            io.StringIO(txt),
-            index_col=0,
-        )
-        # The timestamp doesn't parse correctly from the CSV.
-        expected.columns = [initial_timestamp]
-        actual = portfolio.get_historical_statistics().transpose()
-        self.assert_dfs_close(actual, expected, rtol=1e-2, atol=1e-2)
+            expected = pd.read_csv(
+                io.StringIO(txt),
+                index_col=0,
+            )
+            # The timestamp doesn't parse correctly from the CSV.
+            expected.columns = [initial_timestamp]
+            actual = portfolio.get_historical_statistics().transpose()
+            self.assert_dfs_close(actual, expected, rtol=1e-2, atol=1e-2)
 
     def test_historical_statistics2(self) -> None:
-        # Build MarketDataInterface.
-        event_loop = None
-        (
-            market_data_interface,
-            get_wall_clock_time,
-        ) = mdmdinex.get_replayed_time_market_data_interface_example3(event_loop)
-        # Build Broker.
-        broker = obroexam.get_simulated_broker_example1(
-            event_loop, market_data_interface=market_data_interface
-        )
-        # Build Portfolio.
-        strategy_id = "str1"
-        account = "paper"
-        asset_id_col = "asset_id"
-        mark_to_market_col = "price"
-        timestamp_col = "end_datetime"
-        holdings_dict = {101: 727.5, 202: 1040.3, -1: 10000}
-        initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
-        portfolio = omportfo.SimulatedPortfolio.from_dict(
-            strategy_id,
-            account,
-            broker,
-            asset_id_col,
-            mark_to_market_col,
-            timestamp_col,
-            holdings_dict=holdings_dict,
-            initial_timestamp=initial_timestamp,
-        )
-        txt = r"""
+        with hasynci.solipsism_context() as event_loop:
+            (
+                market_data_interface,
+                get_wall_clock_time,
+            ) = mdmdinex.get_replayed_time_market_data_interface_example3(
+                event_loop
+            )
+            # Build Broker.
+            broker = obroexam.get_simulated_broker_example1(
+                event_loop, market_data_interface=market_data_interface
+            )
+            # Build Portfolio.
+            strategy_id = "str1"
+            account = "paper"
+            asset_id_col = "asset_id"
+            mark_to_market_col = "price"
+            timestamp_col = "end_datetime"
+            holdings_dict = {101: 727.5, 202: 1040.3, -1: 10000}
+            initial_timestamp = pd.Timestamp(
+                "2000-01-01 09:35:00-05:00", tz="America/New_York"
+            )
+            portfolio = omportfo.SimulatedPortfolio.from_dict(
+                strategy_id,
+                account,
+                broker,
+                asset_id_col,
+                mark_to_market_col,
+                timestamp_col,
+                holdings_dict=holdings_dict,
+                initial_timestamp=initial_timestamp,
+            )
+            txt = r"""
 ,2000-01-01 09:35:00-05:00i
 net_asset_holdings,1768351.42
 cash,10000.0
@@ -210,58 +216,59 @@ gross_exposure,1768351.42
 leverage,0.994
 pnl,NaN
 """
-        expected = pd.read_csv(
-            io.StringIO(txt),
-            index_col=0,
-        )
-        # The timestamp doesn't parse correctly from the CSV.
-        expected.columns = [initial_timestamp]
-        actual = portfolio.get_historical_statistics().transpose()
-        self.assert_dfs_close(actual, expected, rtol=1e-2, atol=1e-2)
+            expected = pd.read_csv(
+                io.StringIO(txt),
+                index_col=0,
+            )
+            # The timestamp doesn't parse correctly from the CSV.
+            expected.columns = [initial_timestamp]
+            actual = portfolio.get_historical_statistics().transpose()
+            self.assert_dfs_close(actual, expected, rtol=1e-2, atol=1e-2)
 
     def test_get_historical_statistics3(self) -> None:
-        # Build MarketDataInterface.
-        tz = "ET"
-        initial_timestamp = pd.Timestamp("2000-01-01 09:35:00-05:00")
-        event_loop = None
-        get_wall_clock_time = creatime.get_replayed_wall_clock_time(
-            tz,
-            initial_timestamp,
-            event_loop=event_loop,
-        )
-        price_txt = r"""
+        with hasynci.solipsism_context() as event_loop:
+            tz = "ET"
+            initial_timestamp = pd.Timestamp(
+                "2000-01-01 09:35:00-05:00", tz="America/New_York"
+            )
+            get_wall_clock_time = creatime.get_replayed_wall_clock_time(
+                tz,
+                initial_timestamp,
+                event_loop=event_loop,
+            )
+            price_txt = r"""
 start_datetime,end_datetime,asset_id,price
 2000-01-01 09:30:00-05:00,2000-01-01 09:35:00-05:00,100,100.34
 """
-        price_df = pd.read_csv(
-            io.StringIO(price_txt),
-            parse_dates=["start_datetime", "end_datetime"],
-        )
-        start_time_col_name = "start_datetime"
-        end_time_col_name = "end_datetime"
-        knowledge_datetime_col_name = "end_datetime"
-        delay_in_secs = 0
-        asset_id_col_name = "asset_id"
-        asset_ids = None
-        columns = []
-        market_data_interface = mdmadain.ReplayedTimeMarketDataInterface(
-            price_df,
-            knowledge_datetime_col_name,
-            delay_in_secs,
-            asset_id_col_name,
-            asset_ids,
-            start_time_col_name,
-            end_time_col_name,
-            columns,
-            get_wall_clock_time,
-        )
-        portfolio = oporexam.get_simulated_portfolio_example1(
-            event_loop,
-            initial_timestamp,
-            market_data_interface=market_data_interface,
-        )
-        # Check.
-        txt = r"""
+            price_df = pd.read_csv(
+                io.StringIO(price_txt),
+                parse_dates=["start_datetime", "end_datetime"],
+            )
+            start_time_col_name = "start_datetime"
+            end_time_col_name = "end_datetime"
+            knowledge_datetime_col_name = "end_datetime"
+            delay_in_secs = 0
+            asset_id_col_name = "asset_id"
+            asset_ids = None
+            columns = []
+            market_data_interface = mdmadain.ReplayedTimeMarketDataInterface(
+                price_df,
+                knowledge_datetime_col_name,
+                delay_in_secs,
+                asset_id_col_name,
+                asset_ids,
+                start_time_col_name,
+                end_time_col_name,
+                columns,
+                get_wall_clock_time,
+            )
+            portfolio = oporexam.get_simulated_portfolio_example1(
+                event_loop,
+                initial_timestamp,
+                market_data_interface=market_data_interface,
+            )
+            # Check.
+            txt = r"""
 ,2000-01-01 09:35:00-05:00
 net_asset_holdings,0
 cash,1000000.0
@@ -270,14 +277,14 @@ gross_exposure,0.0
 leverage,0.0
 pnl,NaN
 """
-        expected = pd.read_csv(
-            io.StringIO(txt),
-            index_col=0,
-        )
-        # The timestamp doesn't parse correctly from the CSV.
-        expected.columns = [initial_timestamp]
-        actual = portfolio.get_historical_statistics().transpose()
-        self.assert_dfs_close(actual, expected, rtol=1e-2, atol=1e-2)
+            expected = pd.read_csv(
+                io.StringIO(txt),
+                index_col=0,
+            )
+            # The timestamp doesn't parse correctly from the CSV.
+            expected.columns = [initial_timestamp]
+            actual = portfolio.get_historical_statistics().transpose()
+            self.assert_dfs_close(actual, expected, rtol=1e-2, atol=1e-2)
 
 
 # #############################################################################
@@ -352,23 +359,8 @@ class TestMockedPortfolio1(omtodh.TestOmsDbHelper):
                 initial_timestamp,
                 asset_ids=[101],
             )
-            portfolio.mark_to_market()
-            # Check.
-            actual = str(portfolio)
-            expected = r"""# historical holdings=
-asset_id                    101       -1
-2000-01-01 09:30:00-05:00   0.0  1000000.0
-2000-01-01 09:35:00-05:00  20.0  1000000.0
-# historical holdings marked to market=
-asset_id                           101       -1
-2000-01-01 09:30:00-05:00      0.00000  1000000.0
-2000-01-01 09:35:00-05:00  20006.23851  1000000.0
-# historical statistics=
-                           net_asset_holdings       cash    net_wealth  gross_exposure  leverage          pnl
-2000-01-01 09:30:00-05:00             0.00000  1000000.0  1.000000e+06         0.00000  0.000000          NaN
-2000-01-01 09:35:00-05:00         20006.23851  1000000.0  1.020006e+06     20006.23851  0.019614  20006.23851"""
-
-            self.assert_equal(actual, expected, fuzzy_match=True)
+            coroutines = [self._coroutine1(portfolio)]
+            hasynci.run(asyncio.gather(*coroutines), event_loop=event_loop)
 
     def test2(self) -> None:
         """
@@ -400,19 +392,49 @@ asset_id                           101       -1
                 initial_timestamp,
                 asset_ids=[101],
             )
-            portfolio.mark_to_market()
-            # Check.
-            actual = str(portfolio)
-            expected = r"""# historical holdings=
-asset_id                    101          -1
-2000-01-01 09:30:00-05:00   0.0  1000000.0000
-2000-01-01 09:35:00-05:00  20.0   998096.8783
+            coroutines = [self._coroutine2(portfolio)]
+            hasynci.run(asyncio.gather(*coroutines), event_loop=event_loop)
+
+    async def _coroutine1(
+        self,
+        portfolio,
+    ):
+        await asyncio.sleep(60 * 5)
+        portfolio.mark_to_market()
+        # Check.
+        actual = str(portfolio)
+        expected = r"""# historical holdings=
+asset_id                    101       -1
+2000-01-01 09:35:00-05:00   0.0  1000000.0
+2000-01-01 09:40:00-05:00  20.0  1000000.0
 # historical holdings marked to market=
-asset_id                           101            -1
-2000-01-01 09:30:00-05:00      0.00000  1000000.0000
-2000-01-01 09:35:00-05:00  20006.23851   998096.8783
+asset_id                            101       -1
+2000-01-01 09:35:00-05:00      0.000000  1000000.0
+2000-01-01 09:40:00-05:00  20004.027347  1000000.0
 # historical statistics=
-                           net_asset_holdings          cash    net_wealth  gross_exposure  leverage          pnl
-2000-01-01 09:30:00-05:00             0.00000  1000000.0000  1.000000e+06         0.00000  0.000000          NaN
-2000-01-01 09:35:00-05:00         20006.23851   998096.8783  1.018103e+06     20006.23851  0.019651  18103.11681"""
-            self.assert_equal(actual, expected, fuzzy_match=True)
+                           net_asset_holdings       cash    net_wealth  gross_exposure  leverage           pnl
+2000-01-01 09:35:00-05:00            0.000000  1000000.0  1.000000e+06        0.000000  0.000000           NaN
+2000-01-01 09:40:00-05:00        20004.027347  1000000.0  1.020004e+06    20004.027347  0.019612  20004.027347"""
+        self.assert_equal(actual, expected, fuzzy_match=True)
+
+    async def _coroutine2(
+        self,
+        portfolio,
+    ):
+        await asyncio.sleep(60 * 5)
+        portfolio.mark_to_market()
+        # Check.
+        actual = str(portfolio)
+        expected = r"""# historical holdings=
+asset_id                    101          -1
+2000-01-01 09:35:00-05:00   0.0  1000000.0000
+2000-01-01 09:40:00-05:00  20.0   998096.8783
+# historical holdings marked to market=
+asset_id                            101          -1
+2000-01-01 09:35:00-05:00      0.000000  1000000.0000
+2000-01-01 09:40:00-05:00  20004.027347   998096.8783
+# historical statistics=
+                           net_asset_holdings          cash    net_wealth  gross_exposure  leverage           pnl
+2000-01-01 09:35:00-05:00            0.000000  1000000.0000  1.000000e+06        0.000000  0.000000           NaN
+2000-01-01 09:40:00-05:00        20004.027347   998096.8783  1.018101e+06    20004.027347  0.019648  18100.905647"""
+        self.assert_equal(actual, expected, fuzzy_match=True)

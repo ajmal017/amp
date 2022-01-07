@@ -82,7 +82,7 @@ class TestSimulatedProcessForecasts1(hunitest.TestCase):
         #  pricing assets not currently in the portfolio.
         actual = portfolio.get_historical_holdings()
         expected = r"""asset_id                        101        202            -1
-2000-01-01 09:30:00-05:00       0.0        0.0  1000000.000000
+2000-01-01 09:35:00-05:00       0.0        0.0  1000000.000000
 2000-01-01 09:35:01-05:00       0.0        0.0  1000000.000000
 2000-01-01 09:40:01-05:00  7.689909  15.379818   976932.207284
 2000-01-01 09:45:01-05:00 -7.141419  21.424257   985720.138665"""
@@ -179,7 +179,7 @@ class TestMockedProcessForecasts1(omtodh.TestOmsDbHelper):
         #  pricing assets not currently in the portfolio.
         actual = portfolio.get_historical_holdings()
         expected = r"""asset_id                        101        202            -1
-2000-01-01 09:30:00-05:00       0.0        0.0  1000000.000000
+2000-01-01 09:35:00-05:00       0.0        0.0  1000000.000000
 2000-01-01 09:35:01-05:00       NaN        NaN  1000000.000000
 2000-01-01 09:40:01-05:00  7.689909  15.379818   976932.207284
 2000-01-01 09:45:01-05:00 -7.141419  21.424257   985720.138665"""

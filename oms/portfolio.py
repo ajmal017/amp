@@ -99,14 +99,15 @@ class AbstractPortfolio(abc.ABC):
         self._validate_initial_holdings_df(holdings_df)
         self._holdings_df = holdings_df
         # Get the initial timestamp from the `holdings_df`.
-        initial_timestamp = holdings_df.index[0]
-        # initial_timestamp = get_wall_clock_time()
+        # initial_timestamp = holdings_df.index[0]
+        initial_timestamp = self._get_wall_clock_time()
         _LOG.debug("initial_timestamp=%s" % initial_timestamp)
         self._initial_timestamp = initial_timestamp
         # At each call to `mark_to_market()`, we capture `wall_clock_time` and
         # perform a sequence of updates to the following dictionaries.
         # We initialize the collection of dictionaries from `holdings_df`.
         # - timestamp to pd.Series of holdings in shares (indexed by asset_id).
+        _LOG.debug("Initializing asset_holdings...")
         self._asset_holdings = collections.OrderedDict()
         asset_holdings = holdings_df[
             holdings_df["asset_id"] != AbstractPortfolio.CASH_ID
@@ -117,20 +118,27 @@ class AbstractPortfolio(abc.ABC):
         self._sequential_insert(
             initial_timestamp, asset_holdings, self._asset_holdings
         )
-        # - timestamp to pd.DataFrame of price, value (indexed by asset_id).
-        self._assets_marked_to_market = collections.OrderedDict()
+        _LOG.debug("asset_holdings initialized.")
         # - timestamp to float.
+        _LOG.debug("Initializing cash...")
         self._cash = collections.OrderedDict()
         cash = holdings_df.set_index("asset_id").loc[AbstractPortfolio.CASH_ID][
             "curr_num_shares"
         ]
         self._sequential_insert(initial_timestamp, cash, self._cash)
-        # - timestamp to pd.Series of statistics.
-        self._statistics = collections.OrderedDict()
+        _LOG.debug("cash initialized.")
+        # - timestamp to pd.DataFrame of price, value (indexed by asset_id).
+        _LOG.debug("Initializing assets_marked_to_market...")
+        self._assets_marked_to_market = collections.OrderedDict()
         # Price the assets at the initial timestamp.
         self._price_assets(asset_holdings)
+        _LOG.debug("assets_marked_to_market initialized.")
+        _LOG.debug("Initializing statistics...")
+        # - timestamp to pd.Series of statistics.
+        self._statistics = collections.OrderedDict()
         # Compute the initial portfolio statistics.
         self._compute_statistics()
+        _LOG.debug("statistics initialized.")
         #
         self._initial_universe = asset_holdings.index
 
@@ -241,6 +249,7 @@ class AbstractPortfolio(abc.ABC):
 
         :return: dataframe with HOLDINGS and PRICE columns
         """
+        _LOG.debug("Marking to market...")
         # Update asset_holdings, cash.
         self._observe_holdings()
         # Get the latest timestamp.
@@ -831,6 +840,7 @@ class MockedPortfolio(AbstractPortfolio):
         query = []
         query.append(f"SELECT * FROM {self._table_name}")
         wall_clock_timestamp = self._get_wall_clock_time()
+        _LOG.debug("wall_clock_timestamp=%s" % wall_clock_timestamp)
         trade_date = wall_clock_timestamp.date()
         # Restrict query to portfolio universe.
         hdbg.dassert(self.universe, "Universe is empty.")
