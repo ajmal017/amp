@@ -6,9 +6,9 @@ import oms.call_optimizer as ocalopti
 
 import logging
 
-import numpy as np
 import pandas as pd
 
+import core.config as cconfig
 import helpers.dbg as hdbg
 
 _LOG = logging.getLogger(__name__)
@@ -17,6 +17,7 @@ _LOG = logging.getLogger(__name__)
 def compute_target_positions_in_cash(
     df: pd.DataFrame,
     cash_asset_id: int,
+    # config: cconfig.Config,
 ) -> pd.DataFrame:
     """
     Compute target trades from holdings (dollar-valued) and predictions.
@@ -43,13 +44,13 @@ def compute_target_positions_in_cash(
     #
     df = df.set_index("asset_id")
     hdbg.dassert(not df.index.has_duplicates)
+    # TODO(Paul): Pass this through a config.
+    # target_gmv = config["target_gmv"]
+    target_gmv = 100000
     # In this placeholder, we maintain two invariants (approximately):
     #   1. Net wealth is conserved from one step to the next.
-    #   2. Leverage is conserved from one step to the next.
+    #   2. GMV is conserved from one step to the next.
     # The second invariant may be restated as conserving gross exposure.
-    # TODO(Paul): Make this configurable.
-    TARGET_LEVERAGE = 0.1
-    _LOG.debug("TARGET_LEVERAGE=%s", TARGET_LEVERAGE)
     predictions = df["prediction"]
     _LOG.debug("predictions=\n%s", predictions)
     volatility = df["volatility"]
@@ -60,21 +61,15 @@ def compute_target_positions_in_cash(
     unscaled_target_positions = predictions.divide(volatility)
     unscaled_target_positions_l1 = unscaled_target_positions.abs().sum()
     _LOG.debug("unscaled_target_positions_l1 =%s", unscaled_target_positions_l1)
-    hdbg.dassert(
-        np.isfinite(unscaled_target_positions_l1),
-        "scale_factor=%s",
-        unscaled_target_positions_l1,
-    )
     hdbg.dassert_lt(0, unscaled_target_positions_l1)
+    scale_factor = target_gmv / unscaled_target_positions_l1
+    _LOG.debug("scale_factor=%s", scale_factor)
     # These positions are expressed in dollars.
     current_positions = df["value"]
     net_wealth = current_positions.sum()
     _LOG.debug("net_wealth=%s", net_wealth)
     # Drop cash.
     df.drop(index=cash_asset_id, inplace=True)
-    # Set the scale factor for the unscaled target positions.
-    scale_factor = net_wealth * TARGET_LEVERAGE / unscaled_target_positions_l1
-    _LOG.debug("scale_factor=%s", scale_factor)
     target_positions = scale_factor * unscaled_target_positions
     target_positions[cash_asset_id] = current_positions[cash_asset_id]
     target_trades = target_positions - current_positions
