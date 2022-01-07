@@ -1632,10 +1632,10 @@ def get_swt(
         sig = sig.squeeze()
     if timing_mode is None:
         timing_mode = "knowledge_time"
-    _LOG.debug("timing_mode=`%s`", timing_mode)
+    # _LOG.debug("timing_mode=`%s`", timing_mode)
     if output_mode is None:
         output_mode = "tuple"
-    _LOG.debug("output_mode=`%s`", output_mode)
+    # _LOG.debug("output_mode=`%s`", output_mode)
     # Convert to numpy and pad, since the pywt swt implementation
     # requires that the input be a power of 2 in length.
     sig_len = sig.size
@@ -1743,11 +1743,11 @@ def _pad_to_pow_of_2(arr: np.array) -> np.array:
     """
     Minimally extend `arr` with zeros so that len is a power of 2.
     """
-    sig_len = arr.shape[0]
-    _LOG.debug("signal length=%d", sig_len)
-    pow2_ceil = int(2 ** np.ceil(np.log2(sig_len)))
-    padded = np.pad(arr, (0, pow2_ceil - sig_len))
-    _LOG.debug("padded length=%d", len(padded))
+    arr_len = arr.shape[0]
+    _LOG.debug("array length=%d", arr_len)
+    pow2_ceil = int(2 ** np.ceil(np.log2(arr_len)))
+    padded = np.pad(arr, (0, pow2_ceil - arr_len))
+    _LOG.debug("padded array length=%d", len(padded))
     return padded
 
 
@@ -2006,12 +2006,12 @@ def resample(
         resample_kwargs["label"] = "right"
     # Execute resampling with specified kwargs.
     _LOG.debug(
-        "Resampling data with size=%s using kwargs='%s'",
-        str(data.size),
+        "Resampling data of length=%s using kwargs='%s'",
+        str(data.shape[0]),
         str(resample_kwargs),
     )
     resampled_data = data.resample(**resample_kwargs)
-    _LOG.debug("resampled_data.size=%s", str(resampled_data.size))
+    _LOG.debug("resampled_data.size=%s" % str(resampled_data.size))
     return resampled_data
 
 
