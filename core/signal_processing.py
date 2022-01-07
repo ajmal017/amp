@@ -1624,7 +1624,7 @@ def get_swt(
     """
     # Choice of wavelet may significantly impact results.
     wavelet = wavelet or "haar"
-    _LOG.debug("wavelet=`%s`", wavelet)
+    # _LOG.debug("wavelet=`%s`", wavelet)
     if isinstance(sig, pd.DataFrame):
         hdbg.dassert_eq(
             sig.shape[1], 1, "Input dataframe must have a single column."
@@ -1644,7 +1644,7 @@ def get_swt(
     decomp = pywt.swt(padded, wavelet=wavelet, level=depth, norm=True)
     # Ensure we have at least one level.
     levels = len(decomp)
-    _LOG.debug("levels=%d", levels)
+    # _LOG.debug("levels=%d", levels)
     hdbg.dassert_lt(0, levels)
     # Reorganize wavelet coefficients. `pywt.swt` output is of the form
     #     [(cAn, cDn), ..., (cA2, cD2), (cA1, cD1)]
@@ -1663,7 +1663,7 @@ def get_swt(
     smooth_df.index = sig.index
     # Record wavelet width (required for removing warm-up artifacts).
     width = len(pywt.Wavelet(wavelet).filter_bank[0])
-    _LOG.debug("wavelet width=%s", width)
+    # _LOG.debug("wavelet width=%s", width)
     if timing_mode == "knowledge_time":
         for j in range(1, levels + 1):
             # Remove "warm-up" artifacts.
