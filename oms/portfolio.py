@@ -12,13 +12,11 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import pandas as pd
 
-import helpers.datetime_ as hdateti
 import helpers.dbg as hdbg
 import helpers.hasyncio as hasynci
 import helpers.io_ as hio
 import helpers.printing as hprint
 import helpers.sql as hsql
-import market_data.market_data_interface as mdmadain
 import oms.broker as ombroker
 
 _LOG = logging.getLogger(__name__)
@@ -61,9 +59,7 @@ class AbstractPortfolio(abc.ABC):
         self,
         strategy_id: str,
         account: str,
-        market_data_interface: mdmadain.AbstractMarketDataInterface,
-        # TODO(*): Get the wall clock time from market data interface.
-        get_wall_clock_time: hdateti.GetWallClockTime,
+        broker: ombroker.AbstractBroker,
         asset_id_col: str,
         mark_to_market_col: str,
         timestamp_col: str,
@@ -90,11 +86,12 @@ class AbstractPortfolio(abc.ABC):
         self._strategy_id = strategy_id
         self._account = account
         #
-        hdbg.dassert_issubclass(
-            market_data_interface, mdmadain.AbstractMarketDataInterface
+        hdbg.dassert_issubclass(broker, ombroker.AbstractBroker)
+        self.broker = broker
+        self.market_data_interface = broker.market_data_interface
+        self._get_wall_clock_time = (
+            broker.market_data_interface.get_wall_clock_time
         )
-        self.market_data_interface = market_data_interface
-        self._get_wall_clock_time = get_wall_clock_time
         self._asset_id_col = asset_id_col
         self._mark_to_market_col = mark_to_market_col
         self._timestamp_col = timestamp_col
@@ -612,19 +609,6 @@ class AbstractPortfolio(abc.ABC):
 
 # TODO(gp): -> InMemoryPortfolio, DataFramePortfolio?
 class SimulatedPortfolio(AbstractPortfolio):
-    def __init__(
-        self,
-        *args: Any,
-        # In Python parameters after *args are always keywords-only.
-        # TODO(gp): Looks like a broker is needed for all the implementation. So
-        #  move it up.
-        broker: ombroker.SimulatedBroker,
-    ):
-        """
-        Constructor.
-        """
-        super().__init__(*args)
-        self.broker = broker
 
     # A `fills_df` represents orders that have been executed (e.g., how many shares,
     # at how much).
@@ -779,7 +763,6 @@ class MockedPortfolio(AbstractPortfolio):
     def __init__(
         self,
         *args: Any,
-        broker: ombroker.MockedBroker,
         db_connection: hsql.DbConnection,
         # TODO(gp): -> position_table_name
         table_name: str,
@@ -791,11 +774,6 @@ class MockedPortfolio(AbstractPortfolio):
         Constructor.
         """
         super().__init__(*args, **kwargs)
-        hdbg.dassert_issubclass(
-            broker,
-            ombroker.AbstractBroker,
-        )
-        self.broker = broker
         #
         self._db_connection = db_connection
         self._table_name = table_name

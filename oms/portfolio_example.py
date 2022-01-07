@@ -30,11 +30,9 @@ def get_simulated_portfolio_example1(
     broker = obroexam.get_simulated_broker_example1(
         event_loop, market_data_interface=market_data_interface
     )
-    market_data_interface = broker.market_data_interface
     # Build SimulatedPortfolio.
     strategy_id = "st1"
     account = "paper"
-    get_wall_clock_time = market_data_interface.get_wall_clock_time
     asset_id_column = "asset_id"
     mark_to_market_col = mark_to_market_col
     timestamp_col = "end_datetime"
@@ -42,12 +40,10 @@ def get_simulated_portfolio_example1(
     portfolio = omportfo.SimulatedPortfolio.from_cash(
         strategy_id,
         account,
-        market_data_interface,
-        get_wall_clock_time,
+        broker,
         asset_id_column,
         mark_to_market_col,
         timestamp_col,
-        broker=broker,
         #
         initial_cash=initial_cash,
         initial_timestamp=initial_timestamp,
@@ -75,20 +71,16 @@ def get_mocked_portfolio_example1(
     # Build MockedPortfolio.
     strategy_id = "st1"
     account = "candidate"
-    market_data_interface = broker.market_data_interface
-    get_wall_clock_time = market_data_interface.get_wall_clock_time
     asset_id_column = "asset_id"
     timestamp_col = "end_datetime"
     initial_cash = 1e6
     portfolio = omportfo.MockedPortfolio.from_cash(
         strategy_id,
         account,
-        market_data_interface,
-        get_wall_clock_time,
+        broker,
         asset_id_column,
         mark_to_market_col,
         timestamp_col,
-        broker=broker,
         db_connection=db_connection,
         table_name=table_name,
         asset_id_col=asset_id_column,

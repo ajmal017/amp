@@ -117,12 +117,10 @@ class TestSimulatedPortfolio2(hunitest.TestCase):
         portfolio = omportfo.SimulatedPortfolio.from_dict(
             strategy_id,
             account,
-            market_data_interface,
-            get_wall_clock_time,
+            broker,
             asset_id_col,
             mark_to_market_col,
             timestamp_col,
-            broker=broker,
             holdings_dict=holdings_dict,
             initial_timestamp=initial_timestamp,
         )
@@ -196,12 +194,10 @@ pnl,NaN
         portfolio = omportfo.SimulatedPortfolio.from_dict(
             strategy_id,
             account,
-            market_data_interface,
-            get_wall_clock_time,
+            broker,
             asset_id_col,
             mark_to_market_col,
             timestamp_col,
-            broker=broker,
             holdings_dict=holdings_dict,
             initial_timestamp=initial_timestamp,
         )
