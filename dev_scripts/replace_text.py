@@ -440,6 +440,12 @@ def _parse() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
+        "--dst_dir",
+        action="store",
+        default=None,
+        help="Change dir before replacing",
+    )
+    parser.add_argument(
         "--revert_all",
         action="store_true",
         help="Revert all the files (excluding this one) before processing",
@@ -492,6 +498,10 @@ def _parse() -> argparse.ArgumentParser:
 def _main(parser: argparse.ArgumentParser) -> None:
     args = parser.parse_args()
     hdbg.init_logger(args.log_level)
+    if args.dst_dir:
+        print("pwd=", os.getcwd())
+        hdbg.dassert_dir_exists(args.dst_dir)
+        os.chdir(args.dst_dir)
     if args.revert_all:
         # Revert all the files but this one. Use at your own risk.
         _LOG.warning("Reverting all files but this one")
