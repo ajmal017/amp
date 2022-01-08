@@ -1,7 +1,7 @@
 import pandas as pd
 
-import helpers.printing as hprint
-import helpers.unit_test as hunitest
+import helpers.hprint as hprint
+import helpers.hunit_test as hunitest
 import market_data.market_data_client_example as mdmdclex
 
 # TODO(gp): -> test_market_data_im_client.py

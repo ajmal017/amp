@@ -11,11 +11,11 @@ import pandas as pd
 
 import core.pandas_helpers as cpanh
 import core.real_time as creatime
-import helpers.dbg as hdbg
+import helpers.hdbg as hdbg
 import helpers.hpandas as hpandas
-import helpers.printing as hprint
-import helpers.s3 as hs3
-import helpers.timer as htimer
+import helpers.hprint as hprint
+import helpers.hs3 as hs3
+import helpers.htimer as htimer
 import market_data.abstract_market_data as mdabmada
 
 _LOG = logging.getLogger(__name__)
