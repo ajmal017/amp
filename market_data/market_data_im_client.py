@@ -32,7 +32,7 @@ class MarketDataInterface(mdabmada.AbstractMarketData):
         :param im_client: IM client
         """
         super().__init__(*args, **kwargs)
-        # hdbg.dassert_is_instance(im_client, )
+        # TODO(gp): Add hdbg.dassert_is_instance(im_client, )
         self._im_client = im_client
 
     def should_be_online(self, wall_clock_time: pd.Timestamp) -> bool:
@@ -83,7 +83,7 @@ class MarketDataInterface(mdabmada.AbstractMarketData):
             market_data = market_data.head(limit)
         if normalize_data:
             market_data = self._convert_im_data(market_data)
-            market_data = self.process_data(market_data)
+            market_data = self._normalize_data(market_data)
         return market_data
 
     def _convert_im_data(self, df: pd.DataFrame) -> pd.DataFrame:

@@ -4,8 +4,6 @@ Import as:
 import helpers.printing as hprint
 """
 
-# TODO(gp): -> hprint
-
 import logging
 import re
 import sys

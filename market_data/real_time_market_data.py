@@ -37,7 +37,6 @@ class RealTimeMarketData(mdabmada.AbstractMarketData):
         table_name: str,
         where_clause: Optional[str],
         valid_id: Any,
-        # TODO(gp): Move args first.
         # Params from `AbstractMarketData`.
         *args: List[Any],
         **kwargs: Dict[str, Any],
@@ -51,13 +50,14 @@ class RealTimeMarketData(mdabmada.AbstractMarketData):
         """
         super().__init__(*args, **kwargs)  # type: ignore[arg-type]
         self.connection = db_connection
-        # TODO(gp): No need to cache it.
-        self.cursor = self.connection.cursor()
         self._table_name = table_name
         self._where_clause = where_clause
         self._valid_id = valid_id
 
-    def process_data(self, df: pd.DataFrame) -> pd.DataFrame:
+    def should_be_online(self, wall_clock_time: pd.Timestamp) -> bool:
+        return True
+
+    def _normalize_data(self, df: pd.DataFrame) -> pd.DataFrame:
         # Add new TZ-localized datetime columns for research and readability.
         for col_name in [self._start_time_col_name, self._end_time_col_name]:
             if col_name in df.columns:
@@ -69,11 +69,8 @@ class RealTimeMarketData(mdabmada.AbstractMarketData):
                     srs = srs.dt.tz_convert("America/New_York")
                     df[col_name] = srs
         # Sort in increasing time order and reindex.
-        df = super().process_data(df)
+        df = super()._normalize_data(df)
         return df
-
-    def should_be_online(self, wall_clock_time: pd.Timestamp) -> bool:
-        return True
 
     def _get_data(
         self,
@@ -101,7 +98,7 @@ class RealTimeMarketData(mdabmada.AbstractMarketData):
         _LOG.info("query=%s", query)
         df = hsql.execute_query_to_df(self.connection, query)
         if normalize_data:
-            df = self.process_data(df)
+            df = self._normalize_data(df)
         return df
 
     def _get_last_end_time(self) -> Optional[pd.Timestamp]:

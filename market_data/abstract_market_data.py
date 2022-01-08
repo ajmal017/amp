@@ -27,8 +27,6 @@ _LOG.verb_debug = hprint.install_log_verb_debug(_LOG, verbose=False)
 # AbstractMarketData
 # #############################################################################
 
-# TODO(gp): -> abstract_market_data.py
-
 
 class AbstractMarketData(abc.ABC):
     """
@@ -160,13 +158,10 @@ class AbstractMarketData(abc.ABC):
         hdbg.dassert_lte(1, max_iterations)
         self._max_iterations = max_iterations
 
-    # TODO(gp): If the DB supports asyncio this should become async.
-    # TODO(gp): -> get_data_for_last_period
-    def get_data(
+    def get_data_for_last_period(
         self,
         period: str,
         *,
-        # TODO(gp): -> normalize
         normalize_data: bool = True,
         # TODO(gp): Not sure limit is really needed. We could move it to the DB
         #  implementation.
@@ -178,6 +173,7 @@ class AbstractMarketData(abc.ABC):
 
         This is used during real-time execution to evaluate a model.
         """
+        # TODO(gp): If the DB supports asyncio this should become async.
         # Handle `period`.
         _LOG.verb_debug(hprint.to_str("period"))
         wall_clock_time = self.get_wall_clock_time()
@@ -285,7 +281,7 @@ class AbstractMarketData(abc.ABC):
         if normalize_data:
             # Convert start and end timestamps to `self._timezone` if data is
             # normalized.
-            df = self._convert_dates_to_timezone(df)
+            df = self._convert_timestamps_to_timezone(df)
         # Remap column names.
         df = self._remap_columns(df)
         _LOG.verb_debug("-> df=\n%s", hprint.dataframe_to_str(df))
@@ -337,47 +333,6 @@ class AbstractMarketData(abc.ABC):
         )
         return price
 
-    # TODO(gp): -> _normalize?
-    def process_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Transform df from real-time DB into data similar to the historical TAQ
-        bars.
-
-        The input df looks like:
-        ```
-          asset_id           start_time             end_time     close   volume
-
-        idx
-          0  17085  2021-07-26 13:40:00  2021-07-26 13:41:00  149.0250   575024
-          1  17085  2021-07-26 13:41:00  2021-07-26 13:42:00  148.8600   400176
-          2  17085  2021-07-26 13:30:00  2021-07-26 13:31:00  148.5300  1407725
-        ```
-
-        The output df looks like:
-        ```
-                                asset_id                start_time    close   volume
-        end_time
-        2021-07-20 09:31:00-04:00  17085 2021-07-20 09:30:00-04:00  143.990  1524506
-        2021-07-20 09:32:00-04:00  17085 2021-07-20 09:31:00-04:00  143.310   586654
-        2021-07-20 09:33:00-04:00  17085 2021-07-20 09:32:00-04:00  143.535   667639
-        ```
-        """
-        # Sort in increasing time order and reindex.
-        df.sort_values(
-            [self._end_time_col_name, self._asset_id_col], inplace=True
-        )
-        df.set_index(self._end_time_col_name, drop=True, inplace=True)
-        # TODO(gp): Add a check to make sure we are not getting data after the
-        #  current time.
-        _LOG.verb_debug("df.empty=%s, df.shape=%s", df.empty, str(df.shape))
-        # # The data source should not return data after the current time.
-        # if not df.empty:
-        #     wall_clock_time = self.get_wall_clock_time()
-        #     _LOG.debug(hprint.to_str("wall_clock_time df.index.max()"))
-        #     hdbg.dassert_lte(df.index.max(), wall_clock_time)
-        # _LOG.debug(hprint.df_to_short_str("after process_data", df))
-        return df
-
     # Methods for handling real-time behaviors.
 
     def get_last_end_time(self) -> Optional[pd.Timestamp]:
@@ -409,7 +364,7 @@ class AbstractMarketData(abc.ABC):
         # TODO(gp): This is not super robust.
         if False:
             # For debugging.
-            df = self.get_data(period="last_5mins")
+            df = self.get_data_for_last_period(period="last_5mins")
             _LOG.info("df=\n%s", hprintin.dataframe_to_str(df))
         # Get the data.
         # TODO(*): Remove the hard-coded 1-minute.
@@ -468,8 +423,7 @@ class AbstractMarketData(abc.ABC):
         _LOG.verb_debug("-> ret=%s", ret)
         return ret
 
-    # TODO(gp): -> wait_for_latest_data
-    async def is_last_bar_available(
+    async def wait_for_latest_data(
         self,
     ) -> Tuple[pd.Timestamp, pd.Timestamp, int]:
         """
@@ -516,6 +470,46 @@ class AbstractMarketData(abc.ABC):
             hprint.to_str("start_sampling_time end_sampling_time num_iter"),
         )
         return start_sampling_time, end_sampling_time, num_iter
+
+    def _normalize_data(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Transform df from real-time DB into data similar to the historical TAQ
+        bars.
+
+        The input df looks like:
+        ```
+          asset_id           start_time             end_time     close   volume
+
+        idx
+          0  17085  2021-07-26 13:40:00  2021-07-26 13:41:00  149.0250   575024
+          1  17085  2021-07-26 13:41:00  2021-07-26 13:42:00  148.8600   400176
+          2  17085  2021-07-26 13:30:00  2021-07-26 13:31:00  148.5300  1407725
+        ```
+
+        The output df looks like:
+        ```
+                                asset_id                start_time    close   volume
+        end_time
+        2021-07-20 09:31:00-04:00  17085 2021-07-20 09:30:00-04:00  143.990  1524506
+        2021-07-20 09:32:00-04:00  17085 2021-07-20 09:31:00-04:00  143.310   586654
+        2021-07-20 09:33:00-04:00  17085 2021-07-20 09:32:00-04:00  143.535   667639
+        ```
+        """
+        # Sort in increasing time order and reindex.
+        df.sort_values(
+            [self._end_time_col_name, self._asset_id_col], inplace=True
+        )
+        df.set_index(self._end_time_col_name, drop=True, inplace=True)
+        # TODO(gp): Add a check to make sure we are not getting data after the
+        #  current time.
+        _LOG.verb_debug("df.empty=%s, df.shape=%s", df.empty, str(df.shape))
+        # # The data source should not return data after the current time.
+        # if not df.empty:
+        #     wall_clock_time = self.get_wall_clock_time()
+        #     _LOG.debug(hprint.to_str("wall_clock_time df.index.max()"))
+        #     hdbg.dassert_lte(df.index.max(), wall_clock_time)
+        # _LOG.debug(hprint.df_to_short_str("after process_data", df))
+        return df
 
     # /////////////////////////////////////////////////////////////////////////////
 
@@ -565,8 +559,7 @@ class AbstractMarketData(abc.ABC):
             df = df.rename(columns=self._column_remap)
         return df
 
-    # TODO(gp): -> _convert_timestamps_to_timezone
-    def _convert_dates_to_timezone(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _convert_timestamps_to_timezone(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Convert start and end timestamps to the specified timezone.
 
@@ -649,3 +642,18 @@ class AbstractMarketData(abc.ABC):
             raise ValueError("Invalid period='%s'" % period)
         _LOG.verb_debug("last_start_time=%s", last_start_time)
         return last_start_time
+
+
+# TODO(gp): This could go in a market_data_utils.py
+def skip_test_since_not_online(market_data: AbstractMarketData) -> bool:
+    """
+    Return true if a test should be skipped since `market_data` is not on-line.
+    """
+    ret = False
+    if not market_data.is_online():
+        current_time = hdateti.get_current_time(tz="ET")
+        _LOG.warning(
+            "Skipping this test since DB is not on-line at %s", current_time
+        )
+        ret = True
+    return ret

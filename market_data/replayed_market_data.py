@@ -8,7 +8,6 @@ import logging
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
-from IPython.display import display
 
 import core.pandas_helpers as cpanh
 import core.real_time as creatime
@@ -28,6 +27,7 @@ _LOG.verb_debug = hprint.install_log_verb_debug(_LOG, verbose=False)
 # ReplayedMarketData
 # #############################################################################
 
+
 # TODO(gp): This should have a delay and / or we should use timestamp_db.
 class ReplayedMarketData(mdabmada.AbstractMarketData):
     """
@@ -42,7 +42,6 @@ class ReplayedMarketData(mdabmada.AbstractMarketData):
         df: pd.DataFrame,
         knowledge_datetime_col_name: str,
         delay_in_secs: int,
-        # TODO(gp): Move args first.
         # Params from `AbstractMarketData`.
         *args: List[Any],
         **kwargs: Dict[str, Any],
@@ -80,10 +79,10 @@ class ReplayedMarketData(mdabmada.AbstractMarketData):
         return True
 
     # TODO(gp): Remove this.
-    def process_data(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _normalize_data(self, df: pd.DataFrame) -> pd.DataFrame:
         _LOG.verb_debug("")
         # Sort in increasing time order and reindex.
-        df = super().process_data(df)
+        df = super()._normalize_data(df)
         return df
 
     def _get_data(
@@ -99,7 +98,8 @@ class ReplayedMarketData(mdabmada.AbstractMarketData):
     ) -> pd.DataFrame:
         _LOG.verb_debug(
             hprint.to_str(
-                "start_ts end_ts ts_col_name asset_ids left_close right_close normalize_data limit"
+                "start_ts end_ts ts_col_name asset_ids left_close "
+                "right_close normalize_data limit"
             )
         )
         if asset_ids is not None:
@@ -141,7 +141,7 @@ class ReplayedMarketData(mdabmada.AbstractMarketData):
             df_tmp = df_tmp.head(limit)
         # Normalize data.
         if normalize_data:
-            df_tmp = self.process_data(df_tmp)
+            df_tmp = self._normalize_data(df_tmp)
         _LOG.verb_debug("-> df_tmp=\n%s", hprint.dataframe_to_str(df_tmp))
         return df_tmp
 
@@ -152,7 +152,7 @@ class ReplayedMarketData(mdabmada.AbstractMarketData):
         # TODO(gp): SELECT MAX(start_time) instead of getting all the data
         #  and then find the max and use `start_time`
         period = "last_week"
-        df = self.get_data(period)
+        df = self.get_data_for_last_period(period)
         _LOG.debug(hprint.df_to_short_str("after get_data", df))
         if df.empty:
             ret = None
@@ -188,9 +188,10 @@ def save_market_data(
     3  2021-12-31 20:41:00  2021-12-31 20:42:00  14592  337.75   26750    2021-12-31 20:42:06
     ```
     """
+    hdbg.dassert(market_data.is_online())
     normalize_data = False
     with htimer.TimedScope(logging.DEBUG, "market_data.get_data"):
-        rt_df = market_data.get_data(
+        rt_df = market_data.get_data_for_last_period(
             period, normalize_data=normalize_data, limit=limit
         )
     _LOG.debug(hprint.df_to_short_str("rt_df", rt_df, print_dtypes=True))
@@ -297,5 +298,6 @@ def describe_rt_df(df: pd.DataFrame, *, include_delay_stats: bool) -> None:
         df = compute_rt_delay(df)
         describe_rt_delay(df)
     #
+    from IPython.display import display
     display(df.head(3))
     display(df.tail(3))

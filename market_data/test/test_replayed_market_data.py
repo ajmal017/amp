@@ -80,7 +80,7 @@ class TestReplayedMarketData1(hunitest.TestCase):
         #
         period = "last_5mins"
         normalize_data = True
-        func = lambda market_data: market_data.get_data(
+        func = lambda market_data: market_data.get_data_for_last_period(
             period, normalize_data=normalize_data
         )
         # pylint: disable=line-too-long
@@ -117,7 +117,7 @@ class TestReplayedMarketData1(hunitest.TestCase):
         #
         period = "last_5mins"
         normalize_data = False
-        func = lambda market_data: market_data.get_data(
+        func = lambda market_data: market_data.get_data_for_last_period(
             period, normalize_data=normalize_data
         )
         # pylint: disable=line-too-long
@@ -155,7 +155,7 @@ class TestReplayedMarketData1(hunitest.TestCase):
         #
         period = "last_1min"
         normalize_data = True
-        func = lambda market_data: market_data.get_data(
+        func = lambda market_data: market_data.get_data_for_last_period(
             period, normalize_data=normalize_data
         )
         # pylint: disable=line-too-long
@@ -188,7 +188,7 @@ class TestReplayedMarketData1(hunitest.TestCase):
         #
         period = "last_10mins"
         normalize_data = True
-        func = lambda market_data: market_data.get_data(
+        func = lambda market_data: market_data.get_data_for_last_period(
             period, normalize_data=normalize_data
         )
         # pylint: disable=line-too-long
@@ -227,7 +227,7 @@ class TestReplayedMarketData1(hunitest.TestCase):
         #
         period = "last_day"
         normalize_data = True
-        func = lambda market_data: market_data.get_data(
+        func = lambda market_data: market_data.get_data_for_last_period(
             period, normalize_data=normalize_data
         )
         # pylint: disable=line-too-long
@@ -266,7 +266,7 @@ class TestReplayedMarketData1(hunitest.TestCase):
         #
         period = "all"
         normalize_data = True
-        func = lambda market_data: market_data.get_data(
+        func = lambda market_data: market_data.get_data_for_last_period(
             period, normalize_data=normalize_data
         )
         # pylint: disable=line-too-long
@@ -304,7 +304,7 @@ class TestReplayedMarketData1(hunitest.TestCase):
         #
         period = "last_5mins"
         normalize_data = True
-        func = lambda market_data: market_data.get_data(
+        func = lambda market_data: market_data.get_data_for_last_period(
             period, normalize_data=normalize_data
         )
         # Check.
@@ -332,7 +332,7 @@ class TestReplayedMarketData1(hunitest.TestCase):
         initial_replayed_delay = 1
         period = "last_5mins"
         normalize_data = True
-        func = lambda market_data: market_data.get_data(
+        func = lambda market_data: market_data.get_data_for_last_period(
             period, normalize_data=normalize_data
         )
         # pylint: disable=line-too-long
@@ -364,7 +364,7 @@ class TestReplayedMarketData1(hunitest.TestCase):
         #
         period = "last_5mins"
         normalize_data = True
-        func = lambda market_data: market_data.get_data(
+        func = lambda market_data: market_data.get_data_for_last_period(
             period, normalize_data=normalize_data
         )
         # Check.
@@ -399,7 +399,7 @@ class TestReplayedMarketData1(hunitest.TestCase):
         #
         period = "last_5mins"
         normalize_data = True
-        func = lambda market_data: market_data.get_data(
+        func = lambda market_data: market_data.get_data_for_last_period(
             period, normalize_data=normalize_data
         )
         # Check.
@@ -437,7 +437,7 @@ class TestReplayedMarketData1(hunitest.TestCase):
         #
         period = "last_5mins"
         normalize_data = True
-        func = lambda market_data: market_data.get_data(
+        func = lambda market_data: market_data.get_data_for_last_period(
             period, normalize_data=normalize_data
         )
         # Check.
@@ -696,7 +696,7 @@ class TestReplayedMarketData3(hunitest.TestCase):
             )
             # Run the method.
             start_time, end_time, num_iter = hasynci.run(
-                market_data.is_last_bar_available(),
+                market_data.wait_for_latest_data(),
                 event_loop=event_loop,
             )
         return start_time, end_time, num_iter
@@ -738,7 +738,7 @@ class TestReplayedMarketData4(hunitest.TestCase):
             )
             # Run the method.
             start_time, end_time, num_iter = hasynci.run(
-                market_data.is_last_bar_available(),
+                market_data.wait_for_latest_data(),
                 event_loop=event_loop,
             )
         return start_time, end_time, num_iter

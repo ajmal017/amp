@@ -438,7 +438,7 @@ class RealTimeDataSource(dtfcore.DataSource):
     async def wait_for_latest_data(
         self,
     ) -> Tuple[pd.Timestamp, pd.Timestamp, int]:
-        ret = await self._market_data.is_last_bar_available()
+        ret = await self._market_data.wait_for_latest_data()
         return ret  # type: ignore[no-any-return]
 
     def fit(self) -> Optional[Dict[str, pd.DataFrame]]:
@@ -452,7 +452,7 @@ class RealTimeDataSource(dtfcore.DataSource):
     def _get_data(self) -> None:
         # TODO(gp): This approach of communicating params through the state
         #  makes the code difficult to understand.
-        self.df = self._market_data.get_data(self._period)
+        self.df = self._market_data.get_data_for_last_period(self._period)
         if self._multiindex_output:
             self.df = _convert_to_multiindex(self.df, self._asset_id_col)
 

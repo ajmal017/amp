@@ -4,8 +4,6 @@ Import as:
 import helpers.s3 as hs3
 """
 
-# TODO(gp): -> helpers.hs3
-
 import argparse
 import configparser
 import functools
