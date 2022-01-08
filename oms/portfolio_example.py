@@ -9,7 +9,7 @@ import logging
 from typing import List, Optional
 
 import helpers.sql as hsql
-import market_data.market_data_interface as mdmadain
+import market_data as mdata
 import oms.broker_example as obroexam
 import oms.portfolio as omportfo
 
@@ -19,13 +19,13 @@ _LOG = logging.getLogger(__name__)
 def get_simulated_portfolio_example1(
     event_loop: Optional[asyncio.AbstractEventLoop],
     *,
-    market_data_interface: Optional[mdmadain.AbstractMarketDataInterface] = None,
+    market_data: Optional[mdata.AbstractMarketData] = None,
     mark_to_market_col: str = "price",
     asset_ids: Optional[List[int]] = None,
 ) -> omportfo.SimulatedPortfolio:
     # Build SimulatedBroker.
     broker = obroexam.get_simulated_broker_example1(
-        event_loop, market_data_interface=market_data_interface
+        event_loop, market_data=market_data
     )
     # Build SimulatedPortfolio.
     strategy_id = "st1"
@@ -55,13 +55,13 @@ def get_mocked_portfolio_example1(
     #  default value.
     table_name: str,
     *,
-    market_data_interface: Optional[mdmadain.AbstractMarketDataInterface] = None,
+    market_data: Optional[mdata.AbstractMarketData] = None,
     mark_to_market_col: str = "price",
     asset_ids: Optional[List[int]] = None,
 ) -> omportfo.MockedPortfolio:
     # Build MockedBroker.
     broker = obroexam.get_mocked_broker_example1(
-        event_loop, db_connection, market_data_interface=market_data_interface
+        event_loop, db_connection, market_data=market_data
     )
     # Build MockedPortfolio.
     strategy_id = "st1"

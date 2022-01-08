@@ -13,8 +13,7 @@ import dataflow.system as dtfsys
 import helpers.hasyncio as hasynci
 import helpers.printing as hprint
 import helpers.unit_test as hunitest
-import market_data.market_data_interface as mdmadain
-import market_data.market_data_interface_example as mdmdinex
+import market_data as mdata
 import oms.oms_db as oomsdb
 import oms.order_processor as oordproc
 import oms.portfolio as omportfo
@@ -51,21 +50,21 @@ class TestRealTimeReturnPipeline1(hunitest.TestCase):
             )
             columns = ["close", "vol"]
             asset_ids = [101]
-            df = mdmdinex.generate_random_price_data(
+            df = mdata.generate_random_price_data(
                 start_datetime, end_datetime, columns, asset_ids
             )
             initial_replayed_delay = 5
             (
-                market_data_interface,
+                market_data,
                 _,
-            ) = mdmdinex.get_replayed_time_market_data_interface_example1(
+            ) = mdata.get_ReplayedTimeMarketData_example1(
                 event_loop,
                 initial_replayed_delay,
                 df,
             )
             period = "last_5mins"
             source_node_kwargs = {
-                "market_data_interface": market_data_interface,
+                "market_data": market_data,
                 "period": period,
                 "asset_id_col": "asset_id",
                 "multiindex_output": False,
@@ -151,21 +150,21 @@ class TestRealTimePipelineWithOms1(hunitest.TestCase):
             )
             columns = ["price", "vol"]
             asset_ids = [1000]
-            df = mdmdinex.generate_random_price_data(
+            df = mdata.generate_random_price_data(
                 start_datetime, end_datetime, columns, asset_ids
             )
             initial_replayed_delay = 5
             (
-                market_data_interface,
+                market_data,
                 get_wall_clock_time,
-            ) = mdmdinex.get_replayed_time_market_data_interface_example1(
+            ) = mdata.get_ReplayedTimeMarketData_example1(
                 event_loop,
                 initial_replayed_delay,
                 df,
             )
             period = "last_5mins"
             source_node_kwargs = {
-                "market_data_interface": market_data_interface,
+                "market_data": market_data,
                 "period": period,
                 "asset_id_col": "asset_id",
                 "multiindex_output": True,
@@ -181,7 +180,7 @@ class TestRealTimePipelineWithOms1(hunitest.TestCase):
             # Build Portfolio.
             portfolio = oporexam.get_simulated_portfolio_example1(
                 event_loop,
-                market_data_interface=market_data_interface,
+                market_data=market_data,
                 asset_ids=[1000],
             )
             # Populate place trades.
@@ -314,25 +313,25 @@ class TestRealTimeMvnReturnsWithOms1(otodh.TestOmsDbHelper):
         _LOG.debug("df=%s", hprint.dataframe_to_str(df))
         return df
 
-    def get_market_data_interface(
+    def get_market_data(
         self, event_loop: asyncio.AbstractEventLoop
-    ) -> mdmadain.AbstractMarketDataInterface:
+    ) -> mdata.AbstractMarketData:
         df = self.get_market_data_df()
         initial_replayed_delay = 1
         (
-            market_data_interface,
+            market_data,
             get_wall_clock_time,
-        ) = mdmdinex.get_replayed_time_market_data_interface_example1(
+        ) = mdata.get_ReplayedTimeMarketData_example1(
             event_loop,
             initial_replayed_delay,
             df,
         )
-        return market_data_interface
+        return market_data
 
     def get_portfolio(
         self,
         event_loop: asyncio.AbstractEventLoop,
-        market_data_interface: mdmadain.AbstractMarketDataInterface,
+        market_data: mdata.AbstractMarketData,
     ) -> omportfo.MockedPortfolio:
         db_connection = self.connection
         table_name = oomsdb.CURRENT_POSITIONS_TABLE_NAME
@@ -340,7 +339,7 @@ class TestRealTimeMvnReturnsWithOms1(otodh.TestOmsDbHelper):
             event_loop,
             db_connection,
             table_name,
-            market_data_interface=market_data_interface,
+            market_data=market_data,
             mark_to_market_col="close",
             asset_ids=[101],
         )
@@ -380,8 +379,8 @@ class TestRealTimeMvnReturnsWithOms1(otodh.TestOmsDbHelper):
         oomsdb.create_oms_tables(self.connection, incremental=False)
         #
         with hasynci.solipsism_context() as event_loop:
-            market_data_interface = self.get_market_data_interface(event_loop)
-            portfolio = self.get_portfolio(event_loop, market_data_interface)
+            market_data = self.get_market_data(event_loop)
+            portfolio = self.get_portfolio(event_loop, market_data)
             # Create the real-time DAG.
             base_dag_builder = dtfcore.MvnReturnsBuilder()
             dag_builder = dtfsys.RealTimeDagAdapter(
@@ -450,22 +449,22 @@ class TestRealTimeMvnReturnsWithOms2(otodh.TestOmsDbHelper):
     Run `MvnReturns` pipeline in real-time with mocked OMS objects.
     """
 
-    def get_market_data_interface(
+    def get_market_data(
         self, event_loop: asyncio.AbstractEventLoop
-    ) -> mdmadain.AbstractMarketDataInterface:
+    ) -> mdata.AbstractMarketData:
         (
-            market_data_interface,
+            market_data,
             get_wall_clock_time,
-        ) = mdmdinex.get_replayed_time_market_data_interface_example4(
+        ) = mdata.get_ReplayedTimeMarketData_example4(
             event_loop,
             initial_replayed_delay=1,
         )
-        return market_data_interface
+        return market_data
 
     def get_portfolio(
         self,
         event_loop: asyncio.AbstractEventLoop,
-        market_data_interface: mdmadain.AbstractMarketDataInterface,
+        market_data: mdata.AbstractMarketData,
     ) -> omportfo.MockedPortfolio:
         db_connection = self.connection
         table_name = oomsdb.CURRENT_POSITIONS_TABLE_NAME
@@ -477,7 +476,7 @@ class TestRealTimeMvnReturnsWithOms2(otodh.TestOmsDbHelper):
             db_connection,
             table_name,
             initial_timestamp,
-            market_data_interface=market_data_interface,
+            market_data=market_data,
             mark_to_market_col="close",
             asset_ids=[101, 202, 303],
         )
@@ -519,8 +518,8 @@ class TestRealTimeMvnReturnsWithOms2(otodh.TestOmsDbHelper):
         oomsdb.create_oms_tables(self.connection, incremental=False)
         #
         with hasynci.solipsism_context() as event_loop:
-            market_data_interface = self.get_market_data_interface(event_loop)
-            portfolio = self.get_portfolio(event_loop, market_data_interface)
+            market_data = self.get_market_data(event_loop)
+            portfolio = self.get_portfolio(event_loop, market_data)
             # Create the real-time DAG.
             base_dag_builder = dtfcore.MvnReturnsBuilder()
             dag_builder = dtfsys.RealTimeDagAdapter(

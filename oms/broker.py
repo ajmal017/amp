@@ -14,7 +14,7 @@ import pandas as pd
 import helpers.dbg as hdbg
 import helpers.hasyncio as hasynci
 import helpers.sql as hsql
-import market_data.market_data_interface as mdmadain
+import market_data as mdata
 import oms.oms_db as oomsdb
 import oms.order as omorder
 
@@ -118,7 +118,7 @@ class AbstractBroker(abc.ABC):
         self,
         strategy_id: str,
         account: str,
-        market_data_interface: mdmadain.AbstractMarketDataInterface,
+        market_data: mdata.AbstractMarketData,
         column_remap: Optional[Dict[str, str]] = None,
     ) -> None:
         """
@@ -131,10 +131,10 @@ class AbstractBroker(abc.ABC):
         self._account = account
         #
         hdbg.dassert_issubclass(
-            market_data_interface, mdmadain.AbstractMarketDataInterface
+            market_data, mdata.AbstractMarketData
         )
-        self.market_data_interface = market_data_interface
-        self._get_wall_clock_time = market_data_interface.get_wall_clock_time
+        self.market_data = market_data
+        self._get_wall_clock_time = market_data.get_wall_clock_time
         self._column_remap = column_remap
         # Track the orders for internal accounting, mapping wall clock when the
         # order was submitted to the submitted orders.
@@ -278,7 +278,7 @@ class AbstractBroker(abc.ABC):
         # TODO(Paul): The function `get_execution_price()` should be
         #  configurable.
         price = get_execution_price(
-            self.market_data_interface, order, self._column_remap
+            self.market_data, order, self._column_remap
         )
         fill = Fill(order, wall_clock_timestamp, num_shares, price)
         return [fill]
@@ -444,7 +444,7 @@ class MockedBroker(AbstractBroker):
 
 
 def get_execution_price(
-    market_data_interface: mdmadain.AbstractMarketDataInterface,
+    market_data: mdata.AbstractMarketData,
     order: omorder.Order,
     column_remap: Optional[Dict[str, str]] = None,
 ) -> float:
@@ -465,7 +465,7 @@ def get_execution_price(
     if price_type in ("price", "midpoint"):
         column = column_remap[price_type]
         price = _get_price_per_share(
-            market_data_interface,
+            market_data,
             order.start_timestamp,
             order.end_timestamp,
             timestamp_col_name,
@@ -481,7 +481,7 @@ def get_execution_price(
             column = "bid"
         column = column_remap[column]
         price = _get_price_per_share(
-            market_data_interface,
+            market_data,
             order.start_timestamp,
             order.end_timestamp,
             timestamp_col_name,
@@ -499,7 +499,7 @@ def get_execution_price(
         timestamp_col_name = "end_datetime"
         column = column_remap["bid"]
         bid_price = _get_price_per_share(
-            market_data_interface,
+            market_data,
             order.start_timestamp,
             order.end_timestamp,
             timestamp_col_name,
@@ -509,7 +509,7 @@ def get_execution_price(
         )
         column = column_remap["ask"]
         ask_price = _get_price_per_share(
-            market_data_interface,
+            market_data,
             order.start_timestamp,
             order.end_timestamp,
             timestamp_col_name,
@@ -542,7 +542,7 @@ def get_execution_price(
 
 
 def _get_price_per_share(
-    mi: mdmadain.AbstractMarketDataInterface,
+    mi: mdata.AbstractMarketData,
     start_timestamp: pd.Timestamp,
     end_timestamp: pd.Timestamp,
     timestamp_col_name: str,

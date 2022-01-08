@@ -220,9 +220,8 @@ def generate_random_bars_for_asset(
 
 # #########################################################################
 
-# TODO(gp): -> get_ReplayedTimeMarketDataInterface_example1
 
-def get_replayed_time_market_data_interface_example1(
+def get_ReplayedTimeMarketData_example1(
     event_loop: asyncio.AbstractEventLoop,
     initial_replayed_delay: int,
     df: pd.DataFrame,
@@ -230,9 +229,9 @@ def get_replayed_time_market_data_interface_example1(
     delay_in_secs: int = 0,
     sleep_in_secs: float = 1.0,
     time_out_in_secs: int = 60 * 2,
-) -> Tuple[mdmadain.ReplayedTimeMarketDataInterface, hdateti.GetWallClockTime]:
+) -> Tuple[mdmadain.ReplayedMarketData, hdateti.GetWallClockTime]:
     """
-    Build a `ReplayedTimeMarketDataInterface` backed by synthetic data.
+    Build a `ReplayedMarketData` backed by synthetic data.
 
     :param start_datetime: start time for the generation of the synthetic data
     :param end_datetime: end time for the generation of the synthetic data
@@ -242,7 +241,7 @@ def get_replayed_time_market_data_interface_example1(
     :param asset_ids: asset ids to generate data for. `None` defaults to all the
         available asset ids in the data frame
     """
-    # Build the `ReplayedTimeMarketDataInterface` backed by the df with
+    # Build the `ReplayedMarketData` backed by the df with
     # `initial_replayed_delay` after the first timestamp of the data.
     knowledge_datetime_col_name = "timestamp_db"
     asset_id_col_name = "asset_id"
@@ -263,8 +262,8 @@ def get_replayed_time_market_data_interface_example1(
         event_loop=event_loop,
         speed_up_factor=speed_up_factor,
     )
-    # Build a `ReplayedTimeMarketDataInterface`.
-    market_data_interface = mdmadain.ReplayedTimeMarketDataInterface(
+    # Build a `ReplayedMarketData`.
+    market_data = mdmadain.ReplayedMarketData(
         df,
         knowledge_datetime_col_name,
         delay_in_secs,
@@ -278,11 +277,11 @@ def get_replayed_time_market_data_interface_example1(
         sleep_in_secs=sleep_in_secs,
         time_out_in_secs=time_out_in_secs,
     )
-    return market_data_interface, get_wall_clock_time
+    return market_data, get_wall_clock_time
 
 
 # TODO(gp): initial_replayed_delay -> initial_delay_in_mins (or in secs).
-def get_replayed_time_market_data_interface_example2(
+def get_ReplayedTimeMarketData_example2(
     event_loop: asyncio.AbstractEventLoop,
     start_datetime: pd.Timestamp,
     end_datetime: pd.Timestamp,
@@ -293,9 +292,9 @@ def get_replayed_time_market_data_interface_example2(
     columns: Optional[List[str]] = None,
     sleep_in_secs: float = 1.0,
     time_out_in_secs: int = 60 * 2,
-) -> Tuple[mdmadain.ReplayedTimeMarketDataInterface, hdateti.GetWallClockTime]:
+) -> Tuple[mdmadain.ReplayedMarketData, hdateti.GetWallClockTime]:
     """
-    Build a `ReplayedTimeMarketDataInterface` backed by synthetic data.
+    Build a `ReplayedMarketData` backed by synthetic data.
 
     :param start_datetime: start time for the generation of the synthetic data
     :param end_datetime: end time for the generation of the synthetic data
@@ -313,9 +312,9 @@ def get_replayed_time_market_data_interface_example2(
         start_datetime, end_datetime, columns, asset_ids
     )
     (
-        market_data_interface,
+        market_data,
         get_wall_clock_time,
-    ) = get_replayed_time_market_data_interface_example1(
+    ) = get_ReplayedTimeMarketData_example1(
         event_loop,
         initial_replayed_delay,
         df,
@@ -323,14 +322,14 @@ def get_replayed_time_market_data_interface_example2(
         sleep_in_secs=sleep_in_secs,
         time_out_in_secs=time_out_in_secs,
     )
-    return market_data_interface, get_wall_clock_time
+    return market_data, get_wall_clock_time
 
 
-def get_replayed_time_market_data_interface_example3(
+def get_ReplayedTimeMarketData_example3(
     event_loop: asyncio.AbstractEventLoop,
-) -> Tuple[mdmadain.ReplayedTimeMarketDataInterface, hdateti.GetWallClockTime]:
+) -> Tuple[mdmadain.ReplayedMarketData, hdateti.GetWallClockTime]:
     """
-    Build a ReplayedTimeMarketDataInterface:
+    Build a ReplayedMarketData:
 
     - with synthetic data between `2000-01-01 9:30` and `10:30`
     - for two assets
@@ -348,15 +347,15 @@ def get_replayed_time_market_data_interface_example3(
         start_datetime, end_datetime, columns_, asset_ids
     )
     _LOG.debug("df=%s", hprint.dataframe_to_str(df))
-    # Build a `ReplayedTimeMarketDataInterface`.
+    # Build a `ReplayedMarketData`.
     initial_replayed_delay = 5
     delay_in_secs = 0
     sleep_in_secs = 30
     time_out_in_secs = 60 * 5
     (
-        market_data_interface,
+        market_data,
         get_wall_clock_time,
-    ) = get_replayed_time_market_data_interface_example1(
+    ) = get_ReplayedTimeMarketData_example1(
         event_loop,
         initial_replayed_delay,
         df=df,
@@ -364,15 +363,15 @@ def get_replayed_time_market_data_interface_example3(
         sleep_in_secs=sleep_in_secs,
         time_out_in_secs=time_out_in_secs,
     )
-    return market_data_interface, get_wall_clock_time
+    return market_data, get_wall_clock_time
 
 
-def get_replayed_time_market_data_interface_example4(
+def get_ReplayedTimeMarketData_example4(
     event_loop: asyncio.AbstractEventLoop,
     initial_replayed_delay: int = 0,
-) -> Tuple[mdmadain.ReplayedTimeMarketDataInterface, hdateti.GetWallClockTime]:
+) -> Tuple[mdmadain.ReplayedMarketData, hdateti.GetWallClockTime]:
     """
-    Build a ReplayedTimeMarketDataInterface:
+    Build a ReplayedMarketData:
 
     - with synthetic data between `2000-01-01 9:30` and `10:30`
     - for three assets
@@ -387,11 +386,11 @@ def get_replayed_time_market_data_interface_example4(
     asset_ids = [101, 202, 303]
     df = generate_random_bars(start_datetime, end_datetime, asset_ids)
     _LOG.debug("df=%s", hprint.dataframe_to_str(df))
-    # Build a `ReplayedTimeMarketDataInterface`.
+    # Build a `ReplayedMarketData`.
     delay_in_secs = 0
     sleep_in_secs = 30
     time_out_in_secs = 60 * 5
-    # Build the `ReplayedTimeMarketDataInterface` backed by the df with
+    # Build the `ReplayedMarketData` backed by the df with
     # `initial_replayed_delay` after the first timestamp of the data.
     knowledge_datetime_col_name = "timestamp_db"
     asset_id_col_name = "asset_id"
@@ -411,8 +410,8 @@ def get_replayed_time_market_data_interface_example4(
         event_loop=event_loop,
         speed_up_factor=speed_up_factor,
     )
-    # Build a `ReplayedTimeMarketDataInterface`.
-    market_data_interface = mdmadain.ReplayedTimeMarketDataInterface(
+    # Build a `ReplayedMarketData`.
+    market_data = mdmadain.ReplayedMarketData(
         df,
         knowledge_datetime_col_name,
         delay_in_secs,
@@ -426,4 +425,4 @@ def get_replayed_time_market_data_interface_example4(
         sleep_in_secs=sleep_in_secs,
         time_out_in_secs=time_out_in_secs,
     )
-    return market_data_interface, get_wall_clock_time
+    return market_data, get_wall_clock_time

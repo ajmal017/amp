@@ -6,7 +6,7 @@ import pandas as pd
 
 import helpers.hasyncio as hasynci
 import helpers.unit_test as hunitest
-import market_data.market_data_interface_example as mdmdinex
+import market_data as mdata
 import oms.oms_db as oomsdb
 import oms.order_processor as oordproc
 import oms.portfolio_example as oporexam
@@ -32,9 +32,9 @@ class TestSimulatedProcessForecasts1(hunitest.TestCase):
         """
         config = {}
         (
-            market_data_interface,
+            market_data,
             get_wall_clock_time,
-        ) = mdmdinex.get_replayed_time_market_data_interface_example3(event_loop)
+        ) = mdata.get_ReplayedTimeMarketData_example3(event_loop)
         # Build predictions.
         index = [
             pd.Timestamp("2000-01-01 09:35:00-05:00", tz="America/New_York"),
@@ -57,7 +57,7 @@ class TestSimulatedProcessForecasts1(hunitest.TestCase):
         # Build a Portfolio.
         portfolio = oporexam.get_simulated_portfolio_example1(
             event_loop,
-            market_data_interface=market_data_interface,
+            market_data=market_data,
             asset_ids=[101, 202],
         )
         config["order_type"] = "price@twap"

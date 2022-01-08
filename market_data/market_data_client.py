@@ -14,7 +14,7 @@ import market_data.market_data_interface as mdmadain
 
 
 # TODO(gp): -> MarketDataImClient?
-class MarketDataInterface(mdmadain.AbstractMarketDataInterface):
+class MarketDataInterface(mdmadain.AbstractMarketData):
     """
     Implement a `MarketDataInterface` that uses a `ImClient` as backend.
     """
@@ -28,7 +28,7 @@ class MarketDataInterface(mdmadain.AbstractMarketDataInterface):
         """
         Constructor.
 
-        :param args: see `AbstractMarketDataInterface`
+        :param args: see `AbstractMarketData`
         :param im_client: IM client
         """
         super().__init__(*args, **kwargs)
@@ -88,7 +88,7 @@ class MarketDataInterface(mdmadain.AbstractMarketDataInterface):
 
     def _convert_im_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Convert IM data to the format required by `AbstractMarketDataInterface`.
+        Convert IM data to the format required by `AbstractMarketData`.
 
         :param df: IM data to transform
         ```

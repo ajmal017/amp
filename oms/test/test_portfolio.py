@@ -9,8 +9,7 @@ import helpers.hasyncio as hasynci
 import helpers.printing as hprint
 import helpers.sql as hsql
 import helpers.unit_test as hunitest
-import market_data.market_data_interface as mdmadain
-import market_data.market_data_interface_example as mdmdinex
+import market_data as mdata
 import oms.broker_example as obroexam
 import oms.oms_db as oomsdb
 import oms.portfolio as omportfo
@@ -46,15 +45,15 @@ class TestSimulatedPortfolio1(hunitest.TestCase):
         """
         with hasynci.solipsism_context() as event_loop:
             (
-                market_data_interface,
+                market_data,
                 _,
-            ) = mdmdinex.get_replayed_time_market_data_interface_example3(
+            ) = mdata.get_ReplayedTimeMarketData_example3(
                 event_loop
             )
             # Build a Portfolio.
             portfolio = oporexam.get_simulated_portfolio_example1(
                 event_loop,
-                market_data_interface=market_data_interface,
+                market_data=market_data,
             )
             return portfolio
 
@@ -69,15 +68,15 @@ class TestSimulatedPortfolio2(hunitest.TestCase):
         """
         with hasynci.solipsism_context() as event_loop:
             (
-                market_data_interface,
+                market_data,
                 _,
-            ) = mdmdinex.get_replayed_time_market_data_interface_example3(
+            ) = mdata.get_ReplayedTimeMarketData_example3(
                 event_loop
             )
             # Build Portfolio.
             portfolio = oporexam.get_simulated_portfolio_example1(
                 event_loop,
-                market_data_interface=market_data_interface,
+                market_data=market_data,
             )
             # Check.
             expected = pd.DataFrame(
@@ -96,14 +95,14 @@ class TestSimulatedPortfolio2(hunitest.TestCase):
         """
         with hasynci.solipsism_context() as event_loop:
             (
-                market_data_interface,
+                market_data,
                 get_wall_clock_time,
-            ) = mdmdinex.get_replayed_time_market_data_interface_example3(
+            ) = mdata.get_ReplayedTimeMarketData_example3(
                 event_loop
             )
             # Build Broker.
             broker = obroexam.get_simulated_broker_example1(
-                event_loop, market_data_interface=market_data_interface
+                event_loop, market_data=market_data
             )
             # Build Portfolio.
             strategy_id = "str1"
@@ -135,15 +134,15 @@ class TestSimulatedPortfolio2(hunitest.TestCase):
     def test_get_historical_statistics1(self) -> None:
         with hasynci.solipsism_context() as event_loop:
             (
-                market_data_interface,
+                market_data,
                 _,
-            ) = mdmdinex.get_replayed_time_market_data_interface_example3(
+            ) = mdata.get_ReplayedTimeMarketData_example3(
                 event_loop
             )
             #
             portfolio = oporexam.get_simulated_portfolio_example1(
                 event_loop,
-                market_data_interface=market_data_interface,
+                market_data=market_data,
             )
             # Check.
             txt = r"""
@@ -170,14 +169,14 @@ pnl,NaN
     def test_historical_statistics2(self) -> None:
         with hasynci.solipsism_context() as event_loop:
             (
-                market_data_interface,
+                market_data,
                 get_wall_clock_time,
-            ) = mdmdinex.get_replayed_time_market_data_interface_example3(
+            ) = mdata.get_ReplayedTimeMarketData_example3(
                 event_loop
             )
             # Build Broker.
             broker = obroexam.get_simulated_broker_example1(
-                event_loop, market_data_interface=market_data_interface
+                event_loop, market_data=market_data
             )
             # Build Portfolio.
             strategy_id = "str1"
@@ -242,7 +241,7 @@ start_datetime,end_datetime,asset_id,price
             asset_id_col_name = "asset_id"
             asset_ids = None
             columns = []
-            market_data_interface = mdmadain.ReplayedTimeMarketDataInterface(
+            market_data = mdata.ReplayedMarketData(
                 price_df,
                 knowledge_datetime_col_name,
                 delay_in_secs,
@@ -255,7 +254,7 @@ start_datetime,end_datetime,asset_id,price
             )
             portfolio = oporexam.get_simulated_portfolio_example1(
                 event_loop,
-                market_data_interface=market_data_interface,
+                market_data=market_data,
             )
             # Check.
             txt = r"""

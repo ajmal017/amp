@@ -31,12 +31,12 @@ class RealTimeDagAdapter(dtfcore.DagAdapter):
         asset_id_col: str,
         log_dir: Optional[str] = None,
     ):
-        market_data_interface = portfolio.market_data_interface
+        market_data = portfolio.market_data
         #
         overriding_config = cconfig.Config()
         # Configure a DataSourceNode.
         source_node_kwargs = {
-            "market_data_interface": market_data_interface,
+            "market_data": market_data,
             "period": period,
             "asset_id_col": asset_id_col,
             "multiindex_output": True,
@@ -56,7 +56,7 @@ class RealTimeDagAdapter(dtfcore.DagAdapter):
         # We could also write the `process_forecasts_config` key directly but we
         # want to show a `Config` created with multiple pieces.
         overriding_config["process_forecasts"]["process_forecasts_config"] = {
-            "market_data_interface": market_data_interface,
+            "market_data": market_data,
             "order_type": order_type,
             "order_duration": 5,
             "ath_start_time": pd.Timestamp(

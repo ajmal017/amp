@@ -70,7 +70,7 @@ class AbstractPortfolio(abc.ABC):
 
         :param strategy_id, account: back office information about the strategy
             driving this portfolio
-        :param asset_id_col: column name in the output df of `market_data_interface`
+        :param asset_id_col: column name in the output df of `market_data`
             storing the asset id
         :param mark_to_market_col: column name used as price to mark holdings to
             market
@@ -86,11 +86,11 @@ class AbstractPortfolio(abc.ABC):
         # Set and unpack broker.
         hdbg.dassert_issubclass(broker, ombroker.AbstractBroker)
         self.broker = broker
-        # Extract `market_data_interface` from `broker`.
-        self.market_data_interface = broker.market_data_interface
-        # Extract `get_wall_clock_time` from `market_data_interface`.
+        # Extract `market_data` from `broker`.
+        self.market_data = broker.market_data
+        # Extract `get_wall_clock_time` from `market_data`.
         self._get_wall_clock_time = (
-            broker.market_data_interface.get_wall_clock_time
+            broker.market_data.get_wall_clock_time
         )
         self._asset_id_col = asset_id_col
         self._mark_to_market_col = mark_to_market_col
@@ -229,7 +229,7 @@ class AbstractPortfolio(abc.ABC):
         This function checks the portfolio state at `wall_clock_time` and
         updates the internal state.
           - Holdings are as of `wall_clock_time` (e.g., any updates from fills)
-          - Uses `market_data_interface` to price holdings
+          - Uses `market_data` to price holdings
           - Computes portfolios statistics such as leverage, exposure, etc.
 
         # TODO(Paul): Add a dataframe snippet.
@@ -356,12 +356,12 @@ class AbstractPortfolio(abc.ABC):
         asset_ids: List[int],
     ) -> pd.Series:
         """
-        Wrap `portfolio.market_data_interface` and packages output.
+        Wrap `portfolio.market_data` and packages output.
 
-        :param asset_ids: as in `market_data_interface.get_data_at_timestamp()`
+        :param asset_ids: as in `market_data.get_data_at_timestamp()`
         :return: series of prices at `as_of_timestamp` indexed by asset_id
         """
-        prices = self.market_data_interface.get_last_price(
+        prices = self.market_data.get_last_price(
             self._mark_to_market_col, asset_ids
         )
         hdbg.dassert_eq(self._mark_to_market_col, prices.name)
@@ -384,7 +384,7 @@ class AbstractPortfolio(abc.ABC):
         asset_ids: pd.Series,
     ) -> None:
         """
-        Access the underlying market_data_interface to price assets.
+        Access the underlying market_data to price assets.
 
         :param asset_ids: series of share counts indexed by asset id
         :return: series of asset values

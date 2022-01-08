@@ -116,7 +116,7 @@ async def process_forecasts(
     num_rows = len(prediction_df)
     _LOG.debug("Number of rows in `prediction_df`=%d", num_rows)
     #
-    get_wall_clock_time = portfolio.market_data_interface.get_wall_clock_time
+    get_wall_clock_time = portfolio.market_data.get_wall_clock_time
     tqdm_out = htqdm.TqdmToLogger(_LOG, level=logging.INFO)
     iter_ = enumerate(prediction_df.iterrows())
     offset_min = pd.DateOffset(minutes=order_duration)
@@ -194,7 +194,7 @@ class ForecastProcessor:
     ) -> None:
         self._portfolio = portfolio
         self._get_wall_clock_time = (
-            portfolio.market_data_interface.get_wall_clock_time
+            portfolio.market_data.get_wall_clock_time
         )
         self._order_config = order_config
         # TODO(Paul): process config with checks.

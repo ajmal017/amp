@@ -17,7 +17,7 @@ import helpers.datetime_ as hdateti
 import helpers.dbg as hdbg
 import helpers.printing as hprint
 import im.kibot as vkibot
-import market_data.market_data_interface as mdmadain
+import market_data as mdata
 
 _LOG = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ def data_source_node_factory(
         - `ArmaGenerator`
         - `MultivariateNormalGenerator`
     - real-time data sources e.g.,
-        - `RealTimeDataSource` (which uses a full-fledged `AbstractMarketDataInterface`)
+        - `RealTimeDataSource` (which uses a full-fledged `AbstractMarketData`)
     - data generators using data from disk
         - `DiskDataSource` (which reads CSV and PQ files)
     - data generators using pluggable functions
@@ -414,7 +414,7 @@ class RealTimeDataSource(dtfcore.DataSource):
     def __init__(
         self,
         nid: dtfcore.NodeId,
-        market_data_interface: mdmadain.AbstractMarketDataInterface,
+        market_data: mdata.AbstractMarketData,
         period: str,
         asset_id_col: Union[int, str],
         multiindex_output: bool,
@@ -423,15 +423,15 @@ class RealTimeDataSource(dtfcore.DataSource):
         Constructor.
 
         :param period: how much history is needed from the real-time node. See
-            `AbstractMarketDataInterface.get_data()` for details.
-        :param asset_id_col: the name of the column from `market_data_interface`
+            `AbstractMarketData.get_data()` for details.
+        :param asset_id_col: the name of the column from `market_data`
             containing the asset ids
         """
         super().__init__(nid)
         hdbg.dassert_isinstance(
-            market_data_interface, mdmadain.AbstractMarketDataInterface
+            market_data, mdata.AbstractMarketData
         )
-        self._market_data_interface = market_data_interface
+        self._market_data = market_data
         self._period = period
         self._asset_id_col = asset_id_col
         self._multiindex_output = multiindex_output
@@ -440,7 +440,7 @@ class RealTimeDataSource(dtfcore.DataSource):
     async def wait_for_latest_data(
         self,
     ) -> Tuple[pd.Timestamp, pd.Timestamp, int]:
-        ret = await self._market_data_interface.is_last_bar_available()
+        ret = await self._market_data.is_last_bar_available()
         return ret  # type: ignore[no-any-return]
 
     def fit(self) -> Optional[Dict[str, pd.DataFrame]]:
@@ -454,7 +454,7 @@ class RealTimeDataSource(dtfcore.DataSource):
     def _get_data(self) -> None:
         # TODO(gp): This approach of communicating params through the state
         #  makes the code difficult to understand.
-        self.df = self._market_data_interface.get_data(self._period)
+        self.df = self._market_data.get_data(self._period)
         if self._multiindex_output:
             self.df = _convert_to_multiindex(self.df, self._asset_id_col)
 
@@ -472,7 +472,7 @@ class HistoricalDataSource(dtfcore.DataSource):
     def __init__(
         self,
         nid: dtfcore.NodeId,
-        market_data_interface: mdmadain.AbstractMarketDataInterface,
+        market_data: mdata.AbstractMarketData,
         asset_id_col: Union[int, str],
         ts_col_name: str,
         multiindex_output: bool,
@@ -482,17 +482,17 @@ class HistoricalDataSource(dtfcore.DataSource):
         """
         Constructor.
 
-        :param asset_id_col: the name of the column from `market_data_interface`
+        :param asset_id_col: the name of the column from `market_data`
             containing the asset ids
-        :param ts_col_name: the name of the column from `market_data_interface`
+        :param ts_col_name: the name of the column from `market_data`
             containing the end time stamp of the interval to filter on
         :param col_names_to_remove: name of the columns to remove from the df
         """
         super().__init__(nid)
         hdbg.dassert_isinstance(
-            market_data_interface, mdmadain.AbstractMarketDataInterface
+            market_data, mdata.AbstractMarketData
         )
-        self._market_data_interface = market_data_interface
+        self._market_data = market_data
         self._asset_id_col = asset_id_col
         self._ts_col_name = ts_col_name
         self._multiindex_output = multiindex_output
@@ -501,7 +501,7 @@ class HistoricalDataSource(dtfcore.DataSource):
     def fit(self) -> Optional[Dict[str, pd.DataFrame]]:
         _LOG.debug(
             "wall_clock_time=%s",
-            self._market_data_interface.get_wall_clock_time(),
+            self._market_data.get_wall_clock_time(),
         )
         intervals = self._fit_intervals
         self.df = self._get_data(intervals)
@@ -510,7 +510,7 @@ class HistoricalDataSource(dtfcore.DataSource):
     def predict(self) -> Optional[Dict[str, pd.DataFrame]]:
         _LOG.debug(
             "wall_clock_time=%s",
-            self._market_data_interface.get_wall_clock_time(),
+            self._market_data.get_wall_clock_time(),
         )
         intervals = self._predict_intervals
         self.df = self._get_data(intervals)
@@ -539,7 +539,7 @@ class HistoricalDataSource(dtfcore.DataSource):
         # We assume that the `MarketDataInterface` object is in charge of specifying
         # the universe of assets.
         asset_ids = None
-        df = self._market_data_interface.get_data_for_interval(
+        df = self._market_data.get_data_for_interval(
             min_timestamp,
             max_timestamp,
             self._ts_col_name,

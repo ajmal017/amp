@@ -30,13 +30,13 @@ _LOG.verb_debug = hprint.install_log_verb_debug(_LOG, verbose=False)
 
 
 # #############################################################################
-# AbstractMarketDataInterface
+# AbstractMarketData
 # #############################################################################
 
 # TODO(gp): -> abstract_market_data.py
 
 
-class AbstractMarketDataInterface(abc.ABC):
+class AbstractMarketData(abc.ABC):
     """
     Implement an interface to an historical / real-time source of price data.
 
@@ -66,7 +66,7 @@ class AbstractMarketDataInterface(abc.ABC):
         assets and then `MarketDataInterface` just propagates or subsets the universe
 
     - For these reasons, assets are selected at 3 different points:
-    1) `AbstractMarketDataInterface` allows to specify or subset the assets through
+    1) `AbstractMarketData` allows to specify or subset the assets through
         `asset_ids` through the constructor
     1) Derived classes / backends specify the assets returned
        - E.g., a concrete implementation backed by a DB can stream the data for
@@ -658,14 +658,14 @@ class AbstractMarketDataInterface(abc.ABC):
 
 
 # #############################################################################
-# SqlMarketDataInterface
+# RealTimeMarketData
 # #############################################################################
 
 # TODO(gp): -> move to db_market_data
 
 # TODO(gp): This should be pushed to the IM
 # TODO(gp): -> DbMarketData
-class SqlMarketDataInterface(AbstractMarketDataInterface):
+class RealTimeMarketData(AbstractMarketData):
     """
     Implement an interface to a real-time SQL database with 1-minute bar data.
     """
@@ -677,7 +677,7 @@ class SqlMarketDataInterface(AbstractMarketDataInterface):
         where_clause: Optional[str],
         valid_id: Any,
         # TODO(gp): Move args first.
-        # Params from `AbstractMarketDataInterface`.
+        # Params from `AbstractMarketData`.
         *args: List[Any],
         **kwargs: Dict[str, Any],
     ):
@@ -893,14 +893,14 @@ class SqlMarketDataInterface(AbstractMarketDataInterface):
 
 
 # #############################################################################
-# ReplayedTimeMarketDataInterface
+# ReplayedMarketData
 # #############################################################################
 
 # TODO(gp): -> replayed_market_data.py
 # TODO(gp): -> ReplayedMarketData
 
 # TODO(gp): This should have a delay and / or we should use timestamp_db.
-class ReplayedTimeMarketDataInterface(AbstractMarketDataInterface):
+class ReplayedMarketData(AbstractMarketData):
     """
     Implement an interface to a replayed time historical / RT database.
 
@@ -914,7 +914,7 @@ class ReplayedTimeMarketDataInterface(AbstractMarketDataInterface):
         knowledge_datetime_col_name: str,
         delay_in_secs: int,
         # TODO(gp): Move args first.
-        # Params from `AbstractMarketDataInterface`.
+        # Params from `AbstractMarketData`.
         *args: List[Any],
         **kwargs: Dict[str, Any],
     ):
@@ -1039,7 +1039,7 @@ class ReplayedTimeMarketDataInterface(AbstractMarketDataInterface):
 
 
 def save_market_data(
-    market_data: AbstractMarketDataInterface,
+    market_data: AbstractMarketData,
     file_name: str,
     period: str,
     limit: Optional[int],
