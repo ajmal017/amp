@@ -124,15 +124,13 @@ class AbstractBroker(abc.ABC):
         """
         Constructor.
 
-        :param column_remap: (optional) remap columns when accessing
-            a `MarketDataInterface` to retrieve execution prices
+        :param column_remap: (optional) remap columns when accessing a
+            `MarketData` to retrieve execution prices
         """
         self._strategy_id = strategy_id
         self._account = account
         #
-        hdbg.dassert_issubclass(
-            market_data, mdata.AbstractMarketData
-        )
+        hdbg.dassert_issubclass(market_data, mdata.AbstractMarketData)
         self.market_data = market_data
         self._get_wall_clock_time = market_data.get_wall_clock_time
         self._column_remap = column_remap
@@ -277,9 +275,7 @@ class AbstractBroker(abc.ABC):
         num_shares = order.diff_num_shares
         # TODO(Paul): The function `get_execution_price()` should be
         #  configurable.
-        price = get_execution_price(
-            self.market_data, order, self._column_remap
-        )
+        price = get_execution_price(self.market_data, order, self._column_remap)
         fill = Fill(order, wall_clock_timestamp, num_shares, price)
         return [fill]
 

@@ -348,8 +348,8 @@ class KibotEquityReader(dtfcore.DataSource):
 
 def _convert_to_multiindex(df: pd.DataFrame, asset_id_col: str) -> pd.DataFrame:
     """
-    Transform a df like:
-    ```
+    Transform a df like: ```
+
     :                            id close  volume
     end_time
     2022-01-04 09:01:00-05:00  13684    NaN       0
@@ -403,7 +403,7 @@ class RealTimeDataSource(dtfcore.DataSource):
     """
     A RealTimeDataSource is a node that:
 
-    - is backed by a MarketDataInterface (replayed, simulated, or real-time)
+    - is backed by a `MarketData` (replayed, simulated, or real-time)
     - emits different data based on the value of a clock
       - This represents the fact the state of a DB is updated over time
     - has a blocking behavior
@@ -428,9 +428,7 @@ class RealTimeDataSource(dtfcore.DataSource):
             containing the asset ids
         """
         super().__init__(nid)
-        hdbg.dassert_isinstance(
-            market_data, mdata.AbstractMarketData
-        )
+        hdbg.dassert_isinstance(market_data, mdata.AbstractMarketData)
         self._market_data = market_data
         self._period = period
         self._asset_id_col = asset_id_col
@@ -464,9 +462,9 @@ class RealTimeDataSource(dtfcore.DataSource):
 
 class HistoricalDataSource(dtfcore.DataSource):
     """
-    Stream the data to the DAG from a `MarketDataInterface`.
+    Stream the data to the DAG from a `MarketData`.
 
-    Note that the `MarketDataInterface` decides the universe of asset_ids.
+    Note that the `MarketData` decides the universe of asset_ids.
     """
 
     def __init__(
@@ -489,9 +487,7 @@ class HistoricalDataSource(dtfcore.DataSource):
         :param col_names_to_remove: name of the columns to remove from the df
         """
         super().__init__(nid)
-        hdbg.dassert_isinstance(
-            market_data, mdata.AbstractMarketData
-        )
+        hdbg.dassert_isinstance(market_data, mdata.AbstractMarketData)
         self._market_data = market_data
         self._asset_id_col = asset_id_col
         self._ts_col_name = ts_col_name
@@ -536,7 +532,7 @@ class HistoricalDataSource(dtfcore.DataSource):
         # the interval needs to be [a, b].
         left_close = True
         right_close = True
-        # We assume that the `MarketDataInterface` object is in charge of specifying
+        # We assume that the `MarketData` object is in charge of specifying
         # the universe of assets.
         asset_ids = None
         df = self._market_data.get_data_for_interval(

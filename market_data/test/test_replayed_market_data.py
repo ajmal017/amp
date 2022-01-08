@@ -6,8 +6,8 @@ import pandas as pd
 import helpers.hasyncio as hasynci
 import helpers.printing as hprint
 import helpers.unit_test as hunitest
-import market_data.market_data_interface as mdmadain
-import market_data.market_data_interface_example as mdmdinex
+import market_data.market_data_example as mdmadaex
+import market_data.replayed_market_data as mdremada
 
 _LOG = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ def _check_get_data(
     initial_replayed_delay: int,
     func: Callable,
     expected_df_as_str: str,
-) -> mdmadain.ReplayedMarketData:
+) -> mdremada.ReplayedMarketData:
     """
     - Build `ReplayedTimePriceInterval`
     - Execute the function `get_data*` in `func`
@@ -28,10 +28,7 @@ def _check_get_data(
         start_datetime = pd.Timestamp("2000-01-01 09:30:00-05:00")
         end_datetime = pd.Timestamp("2000-01-01 10:29:00-05:00")
         asset_ids = [1000]
-        (
-            market_data,
-            _,
-        ) = mdmdinex.get_ReplayedTimeMarketData_example2(
+        (market_data, _,) = mdmadaex.get_ReplayedTimeMarketData_example2(
             event_loop,
             start_datetime,
             end_datetime,
@@ -57,7 +54,7 @@ def _check_get_data(
 class TestReplayedMarketData1(hunitest.TestCase):
     def check_last_end_time(
         self,
-        market_data: mdmadain.ReplayedMarketData,
+        market_data: mdremada.ReplayedMarketData,
         expected_last_end_time: pd.Timestamp,
         expected_is_online: bool,
     ) -> None:
@@ -605,8 +602,7 @@ class TestReplayedMarketData2(hunitest.TestCase):
 
 class TestReplayedMarketData3(hunitest.TestCase):
     """
-    Test `ReplayedMarketData.is_last_bar_available()` using
-    simulated time.
+    Test `ReplayedMarketData.is_last_bar_available()` using simulated time.
     """
 
     def test_get_last_end_time1(self) -> None:
@@ -617,10 +613,7 @@ class TestReplayedMarketData3(hunitest.TestCase):
             asset_ids = [1000]
             initial_replayed_delay = 5
             delay_in_secs = 0
-            (
-                market_data,
-                _,
-            ) = mdmdinex.get_ReplayedTimeMarketData_example2(
+            (market_data, _,) = mdmadaex.get_ReplayedTimeMarketData_example2(
                 event_loop,
                 start_datetime,
                 end_datetime,
@@ -691,10 +684,7 @@ class TestReplayedMarketData3(hunitest.TestCase):
             delay_in_secs = 0
             sleep_in_secs = 30
             time_out_in_secs = 60 * 5
-            (
-                market_data,
-                _,
-            ) = mdmdinex.get_ReplayedTimeMarketData_example2(
+            (market_data, _,) = mdmadaex.get_ReplayedTimeMarketData_example2(
                 event_loop,
                 start_datetime,
                 end_datetime,
@@ -714,8 +704,7 @@ class TestReplayedMarketData3(hunitest.TestCase):
 
 class TestReplayedMarketData4(hunitest.TestCase):
     """
-    Test `ReplayedMarketData.is_last_bar_available()` using
-    simulated time.
+    Test `ReplayedMarketData.is_last_bar_available()` using simulated time.
     """
 
     def test_is_last_bar_available1(self) -> None:
@@ -744,10 +733,7 @@ class TestReplayedMarketData4(hunitest.TestCase):
         """
         with hasynci.solipsism_context() as event_loop:
             # Build a ReplayedMarketData.
-            (
-                market_data,
-                _,
-            ) = mdmdinex.get_ReplayedTimeMarketData_example4(
+            (market_data, _,) = mdmadaex.get_ReplayedTimeMarketData_example4(
                 event_loop,
             )
             # Run the method.

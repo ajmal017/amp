@@ -19,10 +19,10 @@ def get_simulated_broker_example1(
     market_data: Optional[mdata.AbstractMarketData] = None,
 ) -> ombroker.SimulatedBroker:
     """
-    Build an example of `SimulatedBroker` using an example
-    `MarketDataInterface`, unless specified.
+    Build an example of `SimulatedBroker` using an example `MarketData`, unless
+    specified.
     """
-    # Build MarketDataInterface.
+    # Build MarketData.
     if market_data is None:
         (
             market_data,
@@ -44,10 +44,10 @@ def get_mocked_broker_example1(
     accepted_orders_table_name: str = oomsdb.ACCEPTED_ORDERS_TABLE_NAME,
 ) -> ombroker.SimulatedBroker:
     """
-    Build an example of `MockedBroker` using an example `MarketDataInterface`,
-    unless specified.
+    Build an example of `MockedBroker` using an example `MarketData`, unless
+    specified.
     """
-    # Build MarketDataInterface.
+    # Build MarketData.
     if market_data is None:
         (
             market_data,

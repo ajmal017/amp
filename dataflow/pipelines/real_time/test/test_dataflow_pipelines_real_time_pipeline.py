@@ -54,10 +54,7 @@ class TestRealTimeReturnPipeline1(hunitest.TestCase):
                 start_datetime, end_datetime, columns, asset_ids
             )
             initial_replayed_delay = 5
-            (
-                market_data,
-                _,
-            ) = mdata.get_ReplayedTimeMarketData_example1(
+            (market_data, _,) = mdata.get_ReplayedTimeMarketData_example1(
                 event_loop,
                 initial_replayed_delay,
                 df,
@@ -283,7 +280,7 @@ class TestRealTimeMvnReturnsWithOms1(otodh.TestOmsDbHelper):
     @staticmethod
     def get_market_data_df() -> pd.DataFrame:
         """
-        Create a dataframe with the data for a `MarketDataInterface`.
+        Create a dataframe with the data for a `MarketData`.
         """
         start_datetime = pd.Timestamp(
             "2000-01-03 09:30:00-05:00", tz="America/New_York"

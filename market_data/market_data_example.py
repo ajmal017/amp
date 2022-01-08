@@ -1,7 +1,7 @@
 """
 Import as:
 
-import market_data.market_data_interface_example as mdmdinex
+import market_data.market_data_example as mdmadaex
 """
 
 import asyncio
@@ -18,7 +18,7 @@ import helpers.datetime_ as hdateti
 import helpers.dbg as hdbg
 import helpers.hnumpy as hnumpy
 import helpers.printing as hprint
-import market_data.market_data_interface as mdmadain
+import market_data.replayed_market_data as mdremada
 
 _LOG = logging.getLogger(__name__)
 
@@ -218,7 +218,7 @@ def generate_random_bars_for_asset(
     return df.reset_index(drop=True)
 
 
-# #########################################################################
+# #############################################################################
 
 
 def get_ReplayedTimeMarketData_example1(
@@ -229,7 +229,7 @@ def get_ReplayedTimeMarketData_example1(
     delay_in_secs: int = 0,
     sleep_in_secs: float = 1.0,
     time_out_in_secs: int = 60 * 2,
-) -> Tuple[mdmadain.ReplayedMarketData, hdateti.GetWallClockTime]:
+) -> Tuple[mdremada.ReplayedMarketData, hdateti.GetWallClockTime]:
     """
     Build a `ReplayedMarketData` backed by synthetic data.
 
@@ -263,7 +263,7 @@ def get_ReplayedTimeMarketData_example1(
         speed_up_factor=speed_up_factor,
     )
     # Build a `ReplayedMarketData`.
-    market_data = mdmadain.ReplayedMarketData(
+    market_data = mdremada.ReplayedMarketData(
         df,
         knowledge_datetime_col_name,
         delay_in_secs,
@@ -292,7 +292,7 @@ def get_ReplayedTimeMarketData_example2(
     columns: Optional[List[str]] = None,
     sleep_in_secs: float = 1.0,
     time_out_in_secs: int = 60 * 2,
-) -> Tuple[mdmadain.ReplayedMarketData, hdateti.GetWallClockTime]:
+) -> Tuple[mdremada.ReplayedMarketData, hdateti.GetWallClockTime]:
     """
     Build a `ReplayedMarketData` backed by synthetic data.
 
@@ -311,10 +311,7 @@ def get_ReplayedTimeMarketData_example2(
     df = generate_random_price_data(
         start_datetime, end_datetime, columns, asset_ids
     )
-    (
-        market_data,
-        get_wall_clock_time,
-    ) = get_ReplayedTimeMarketData_example1(
+    (market_data, get_wall_clock_time,) = get_ReplayedTimeMarketData_example1(
         event_loop,
         initial_replayed_delay,
         df,
@@ -327,7 +324,7 @@ def get_ReplayedTimeMarketData_example2(
 
 def get_ReplayedTimeMarketData_example3(
     event_loop: asyncio.AbstractEventLoop,
-) -> Tuple[mdmadain.ReplayedMarketData, hdateti.GetWallClockTime]:
+) -> Tuple[mdremada.ReplayedMarketData, hdateti.GetWallClockTime]:
     """
     Build a ReplayedMarketData:
 
@@ -352,10 +349,7 @@ def get_ReplayedTimeMarketData_example3(
     delay_in_secs = 0
     sleep_in_secs = 30
     time_out_in_secs = 60 * 5
-    (
-        market_data,
-        get_wall_clock_time,
-    ) = get_ReplayedTimeMarketData_example1(
+    (market_data, get_wall_clock_time,) = get_ReplayedTimeMarketData_example1(
         event_loop,
         initial_replayed_delay,
         df=df,
@@ -369,7 +363,7 @@ def get_ReplayedTimeMarketData_example3(
 def get_ReplayedTimeMarketData_example4(
     event_loop: asyncio.AbstractEventLoop,
     initial_replayed_delay: int = 0,
-) -> Tuple[mdmadain.ReplayedMarketData, hdateti.GetWallClockTime]:
+) -> Tuple[mdremada.ReplayedMarketData, hdateti.GetWallClockTime]:
     """
     Build a ReplayedMarketData:
 
@@ -411,7 +405,7 @@ def get_ReplayedTimeMarketData_example4(
         speed_up_factor=speed_up_factor,
     )
     # Build a `ReplayedMarketData`.
-    market_data = mdmadain.ReplayedMarketData(
+    market_data = mdremada.ReplayedMarketData(
         df,
         knowledge_datetime_col_name,
         delay_in_secs,
