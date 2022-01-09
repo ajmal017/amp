@@ -48,11 +48,11 @@ import re
 import sys
 from typing import Dict, List, Optional, Tuple
 
-import helpers.dbg as hdbg
-import helpers.io_ as hio
-import helpers.parser as hparser
-import helpers.printing as hprint
-import helpers.system_interaction as hsysinte
+import helpers.hdbg as hdbg
+import helpers.hio as hio
+import helpers.hparser as hparser
+import helpers.hprint as hprint
+import helpers.hsystem as hsysinte
 
 # TODO(gp):
 #  - allow to read a cfile with a subset of files / points to replace
