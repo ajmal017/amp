@@ -302,6 +302,8 @@ class AbstractPortfolio(abc.ABC):
         df = pd.DataFrame(self._statistics).transpose()
         # Add `pnl` by diffing the snapshots of `net_wealth`.
         df["pnl"] = df["net_wealth"].diff()
+        df["realized_pnl"] = df["cash"].diff()
+        df["unrealized_pnl"] = df["net_asset_holdings"].diff()
         return df
 
     def get_historical_holdings(self) -> pd.DataFrame:
