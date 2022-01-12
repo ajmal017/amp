@@ -1,15 +1,18 @@
 import asyncio
 import datetime
 import logging
+from typing import List, Tuple, Union
 
 import pandas as pd
 
 import core.signal_processing as csigproc
 import helpers.hasyncio as hasynci
+import helpers.hdbg as hdbg
 import helpers.hunit_test as hunitest
 import market_data as mdata
 import oms.oms_db as oomsdb
 import oms.order_processor as oordproc
+import oms.portfolio as omportfo
 import oms.portfolio_example as oporexam
 import oms.process_forecasts as oprofore
 import oms.test.oms_db_helper as omtodh
@@ -77,13 +80,13 @@ class TestSimulatedProcessForecasts1(hunitest.TestCase):
         )
         actual = str(portfolio)
         expected = r"""# historical holdings=
-asset_id                         101        202            -1  
+asset_id                         101        202            -1
 2000-01-01 09:35:00-05:00        0.0        0.0  1000000.000000
 2000-01-01 09:35:01-05:00        0.0        0.0  1000000.000000
 2000-01-01 09:40:01-05:00  33.322939  66.645878   900039.564897
 2000-01-01 09:45:01-05:00 -24.994967    74.9849   950024.378208
 # historical holdings marked to market=
-asset_id                            101           202            -1  
+asset_id                            101           202            -1
 2000-01-01 09:35:00-05:00           0.0           0.0  1000000.000000
 2000-01-01 09:35:01-05:00           0.0           0.0  1000000.000000
 2000-01-01 09:40:01-05:00  33329.649211  66659.298423   900039.564897
@@ -184,13 +187,13 @@ class TestMockedProcessForecasts1(omtodh.TestOmsDbHelper):
         actual = str(portfolio)
         # TODO(Paul): Get this and the simulated test output to agree perfectly.
         expected = r"""# historical holdings=
-asset_id                         101        202            -1  
+asset_id                         101        202            -1
 2000-01-01 09:35:00-05:00        0.0        0.0  1000000.000000
 2000-01-01 09:35:01-05:00        NaN        NaN  1000000.000000
 2000-01-01 09:40:01-05:00  33.322939  66.645878   900039.564897
 2000-01-01 09:45:01-05:00 -24.994967    74.9849   950024.378208
 # historical holdings marked to market=
-                                    101           202            -1  
+                                    101           202            -1
 2000-01-01 09:35:00-05:00           0.0           0.0  1000000.000000
 2000-01-01 09:35:01-05:00           NaN           NaN  1000000.000000
 2000-01-01 09:40:01-05:00  33329.649211  66659.298423   900039.564897
@@ -207,27 +210,32 @@ asset_id                         101        202            -1
 class TestMockedProcessForecasts2(omtodh.TestOmsDbHelper):
     def test_mocked_system1(self) -> None:
         with hasynci.solipsism_context() as event_loop:
-            # Build a Portfolio.
+            # Build MarketData.
+            initial_replayed_delay = 5
+            data = self._get_market_data_df()
+            asset_id = [data["asset_id"][0]]
+            market_data, _ = mdata.get_ReplayedTimeMarketData_from_df(
+                event_loop,
+                initial_replayed_delay,
+                data,
+            )
+            # Create a portfolio with one asset (and cash).
             db_connection = self.connection
             table_name = oomsdb.CURRENT_POSITIONS_TABLE_NAME
-            #
             oomsdb.create_oms_tables(self.connection, incremental=False)
-            #
             portfolio = oporexam.get_mocked_portfolio_example1(
                 event_loop,
                 db_connection,
                 table_name,
-                asset_ids=[101],
+                market_data=market_data,
+                asset_ids=asset_id,
             )
             # Build OrderProcessor.
-            get_wall_clock_time = portfolio._get_wall_clock_time
-            poll_kwargs = hasynci.get_poll_kwargs(get_wall_clock_time)
-            # poll_kwargs["sleep_in_secs"] = 1
-            poll_kwargs["timeout_in_secs"] = 60 * 10
             delay_to_accept_in_secs = 3
             delay_to_fill_in_secs = 10
             broker = portfolio.broker
-            termination_condition = 4
+            poll_kwargs = hasynci.get_poll_kwargs(portfolio._get_wall_clock_time)
+            poll_kwargs["timeout_in_secs"] = 60 * 10
             order_processor = oordproc.OrderProcessor(
                 db_connection,
                 delay_to_accept_in_secs,
@@ -235,32 +243,76 @@ class TestMockedProcessForecasts2(omtodh.TestOmsDbHelper):
                 broker,
                 poll_kwargs=poll_kwargs,
             )
+            # Build order process coroutine.
+            termination_condition = 4
             order_processor_coroutine = order_processor.run_loop(
                 termination_condition
             )
+            predictions, volatility = self._get_predictions_and_volatility(data)
             coroutines = [
-                self._test_mocked_system1(portfolio),
+                self._test_mocked_system1(predictions, volatility, portfolio),
                 order_processor_coroutine,
             ]
             hasynci.run(asyncio.gather(*coroutines), event_loop=event_loop)
 
-    async def _test_mocked_system1(
-        self,
-        portfolio,
-    ) -> None:
-        """
-        Run process_forecasts() logic with a given prediction df to update a
-        Portfolio.
-        """
-        config = {}
+    @staticmethod
+    def _get_market_data_df() -> pd.DataFrame:
+        idx = pd.date_range(
+            start=pd.Timestamp(
+                "2000-01-01 09:31:00-05:00", tz="America/New_York"
+            ),
+            end=pd.Timestamp("2000-01-01 09:55:00-05:00", tz="America/New_York"),
+            freq="T",
+        )
+        bar_duration = "1T"
+        bar_delay = "0T"
+        data = mdata.build_timestamp_df(idx, bar_duration, bar_delay)
+        price = [
+            101.0,
+            101.0,
+            101.0,
+            101.0,
+            101.0,
+            100.0,
+            100.0,
+            100.0,
+            100.0,
+            100.0,
+            101.0,
+            101.0,
+            101.0,
+            101.0,
+            101.0,
+            100.0,
+            100.0,
+            100.0,
+            100.0,
+            100.0,
+            101.0,
+            101.0,
+            101.0,
+            101.0,
+            101.0,
+        ]
+        data["price"] = price
+        data["asset_id"] = 101
+        return data
+
+    @staticmethod
+    def _get_predictions_and_volatility(
+        market_data_df,
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         # Build predictions.
+        asset_id = market_data_df["asset_id"][0]
         index = [
             pd.Timestamp("2000-01-01 09:35:00-05:00", tz="America/New_York"),
             pd.Timestamp("2000-01-01 09:40:00-05:00", tz="America/New_York"),
             pd.Timestamp("2000-01-01 09:45:00-05:00", tz="America/New_York"),
             pd.Timestamp("2000-01-01 09:50:00-05:00", tz="America/New_York"),
         ]
-        columns = [101]
+        # Sanity check the index (e.g., in case we update the test).
+        hdbg.dassert_is_subset(index, market_data_df["end_datetime"].to_list())
+        columns = [asset_id]
         prediction_data = [
             [1],
             [-1],
@@ -275,6 +327,19 @@ class TestMockedProcessForecasts2(omtodh.TestOmsDbHelper):
             [1],
         ]
         volatility = pd.DataFrame(volatility_data, index, columns)
+        return predictions, volatility
+
+    async def _test_mocked_system1(
+        self,
+        predictions: pd.DataFrame,
+        volatility: pd.DataFrame,
+        portfolio: omportfo.MockedPortfolio,
+    ) -> None:
+        """
+        Run process_forecasts() logic with a given prediction df to update a
+        Portfolio.
+        """
+        config = {}
         config["order_type"] = "price@twap"
         config["order_duration"] = 5
         config["ath_start_time"] = datetime.time(9, 30)
@@ -290,40 +355,37 @@ class TestMockedProcessForecasts2(omtodh.TestOmsDbHelper):
             config,
         )
         #
+        asset_ids = portfolio.universe
+        hdbg.dassert_eq(len(asset_ids), 1)
+        asset_id = asset_ids[0]
         price = portfolio.market_data.get_data_for_interval(
-            index[0],
-            index[-1],
+            pd.Timestamp("2000-01-01 09:30:00-05:00", tz="America/New_York"),
+            pd.Timestamp("2000-01-01 09:50:00-05:00", tz="America/New_York"),
             ts_col_name="timestamp_db",
-            asset_ids=[101],
+            asset_ids=asset_ids,
+            left_close=True,
+            right_close=True,
         )["price"]
         #
         twap = csigproc.resample(price, rule="5T").mean().rename("twap")
         rets = twap.pct_change().rename("rets")
-        predictions_srs = predictions[101].rename("prediction")
+        predictions_srs = predictions[asset_id].rename("prediction")
         research_pnl = (
             predictions_srs.shift(2).multiply(rets).rename("research_pnl")
         )
         #
         actual = []
-        actual.append(
-            "TWAP=\n%s"
-            % hunitest.convert_df_to_string(twap, index=True, decimals=3)
-        )
-        actual.append(
-            "rets=\n%s"
-            % hunitest.convert_df_to_string(rets, index=True, decimals=3)
-        )
-        actual.append(
-            "prediction=\n%s"
-            % hunitest.convert_df_to_string(
-                predictions_srs, index=True, decimals=3
-            )
-        )
-        actual.append(
-            "research_pnl=\n%s"
-            % hunitest.convert_df_to_string(research_pnl, index=True, decimals=3)
-        )
-        #
+        self._append(actual, "TWAP", twap)
+        self._append(actual, "rets", rets)
+        self._append(actual, "prediction", predictions_srs)
+        self._append(actual, "research_pnl", research_pnl)
         actual.append(portfolio)
         actual = "\n".join(map(str, actual))
         self.check_string(actual)
+
+    @staticmethod
+    def _append(
+        list_: List[str], label: str, data: Union[pd.Series, pd.DataFrame]
+    ) -> None:
+        data_str = hunitest.convert_df_to_string(data, index=True, decimals=3)
+        list_.append(f"{label}=\n{data_str}")
