@@ -11,8 +11,8 @@ from typing import Any, Dict, List, Optional, Tuple, cast
 
 import pandas as pd
 
-import helpers.hdbg as hdbg
 import helpers.hasyncio as hasynci
+import helpers.hdbg as hdbg
 import helpers.hsql as hsql
 import market_data as mdata
 import oms.oms_db as oomsdb
@@ -554,13 +554,12 @@ def _get_price_per_share(
         start_timestamp and end_timestamp
     :param column: column to use to compute the price
     """
+    asset_ids = [asset_id]
     if timing == "start":
-        asset_ids = [asset_id]
         price = mi.get_data_at_timestamp(
             start_timestamp, timestamp_col_name, asset_ids
         )[column]
     elif timing == "end":
-        asset_ids = [asset_id]
         price = mi.get_data_at_timestamp(
             end_timestamp, timestamp_col_name, asset_ids
         )[column]
@@ -569,9 +568,9 @@ def _get_price_per_share(
             start_timestamp,
             end_timestamp,
             timestamp_col_name,
-            asset_id,
+            asset_ids,
             column,
-        )
+        )[asset_id]
     else:
         raise ValueError(f"Invalid timing='{timing}'")
     hdbg.dassert_is_not(price, None)
