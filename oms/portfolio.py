@@ -863,7 +863,7 @@ class MockedPortfolio(AbstractPortfolio):
             return 0.0
         hdbg.dassert_in("net_cost", snapshot_df.columns)
         net_cost = snapshot_df["net_cost"].sum()
-        _LOG.debug("net_cost=%f", net_cost)
+        _LOG.debug("net_cost (cumulative)=%f", net_cost)
         return net_cost
 
     def _update_cash(
@@ -892,11 +892,14 @@ class MockedPortfolio(AbstractPortfolio):
         # Get the current net cost.
         current_net_cost = self._get_net_cost(snapshot_df)
         hdbg.dassert(
-            np.isfinite(current_net_cost), "current_net_cost=%s", current_net_cost
+            np.isfinite(current_net_cost),
+            "current_net_cost (cumulative)=%f",
+            current_net_cost,
         )
         # The cost of the previous transactions is the difference of net cost.
         cost = current_net_cost - prev_net_cost
-        hdbg.dassert(np.isfinite(cost), "cost=%s", cost)
+        _LOG.debug("cost (net_cost diff)=%f" % cost)
+        hdbg.dassert(np.isfinite(cost))
         # The current cash is given by the previous cash and the cash spent in the
         # previous transactions.
         updated_cash = prev_cash - cost

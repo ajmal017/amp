@@ -1,10 +1,10 @@
 import asyncio
 import datetime
 import logging
-import pytest
 from typing import List, Tuple, Union
 
 import pandas as pd
+import pytest
 
 import core.signal_processing as csigproc
 import helpers.hasyncio as hasynci
@@ -292,37 +292,8 @@ class TestMockedProcessForecasts2(omtodh.TestOmsDbHelper):
         bar_duration = "1T"
         bar_delay = "0T"
         data = mdata.build_timestamp_df(idx, bar_duration, bar_delay)
-        price = [
-            101.0,
-            101.0,
-            101.0,
-            101.0,
-            101.0,
-            #
-            100.0,
-            100.0,
-            100.0,
-            100.0,
-            100.0,
-            #
-            101.0,
-            101.0,
-            101.0,
-            101.0,
-            101.0,
-            #
-            100.0,
-            100.0,
-            100.0,
-            100.0,
-            100.0,
-            #
-            101.0,
-            101.0,
-            101.0,
-            101.0,
-            101.0,
-        ]
+        price_pattern = [101.0] * 5 + [100.0] * 5
+        price = price_pattern * 2 + [101.0] * 5
         data["price"] = price
         data["asset_id"] = 101
         return data
