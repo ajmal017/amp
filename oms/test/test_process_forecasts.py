@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import logging
+import pytest
 from typing import List, Tuple, Union
 
 import pandas as pd
@@ -209,10 +210,32 @@ asset_id                         101        202            -1
 
 class TestMockedProcessForecasts2(omtodh.TestOmsDbHelper):
     def test_mocked_system1(self) -> None:
+        data = self._get_market_data_df1()
+        predictions, volatility = self._get_predictions_and_volatility1(data)
+        self._run_coroutines(data, predictions, volatility)
+
+    def test_mocked_system2(self) -> None:
+        data = self._get_market_data_df2()
+        predictions, volatility = self._get_predictions_and_volatility1(data)
+        self._run_coroutines(data, predictions, volatility)
+
+    def test_mocked_system3(self) -> None:
+        data = self._get_market_data_df1()
+        predictions, volatility = self._get_predictions_and_volatility2(data)
+        self._run_coroutines(data, predictions, volatility)
+
+    @pytest.mark.skip(
+        "This test times out because nothing interesting happens after the first set of orders."
+    )
+    def test_mocked_system4(self) -> None:
+        data = self._get_market_data_df2()
+        predictions, volatility = self._get_predictions_and_volatility2(data)
+        self._run_coroutines(data, predictions, volatility)
+
+    def _run_coroutines(self, data, predictions, volatility):
         with hasynci.solipsism_context() as event_loop:
             # Build MarketData.
             initial_replayed_delay = 5
-            data = self._get_market_data_df()
             asset_id = [data["asset_id"][0]]
             market_data, _ = mdata.get_ReplayedTimeMarketData_from_df(
                 event_loop,
@@ -248,7 +271,6 @@ class TestMockedProcessForecasts2(omtodh.TestOmsDbHelper):
             order_processor_coroutine = order_processor.run_loop(
                 termination_condition
             )
-            predictions, volatility = self._get_predictions_and_volatility(data)
             coroutines = [
                 self._test_mocked_system1(predictions, volatility, portfolio),
                 order_processor_coroutine,
@@ -256,7 +278,10 @@ class TestMockedProcessForecasts2(omtodh.TestOmsDbHelper):
             hasynci.run(asyncio.gather(*coroutines), event_loop=event_loop)
 
     @staticmethod
-    def _get_market_data_df() -> pd.DataFrame:
+    def _get_market_data_df1() -> pd.DataFrame:
+        """
+        Generate price series that alternates every 5 minutes.
+        """
         idx = pd.date_range(
             start=pd.Timestamp(
                 "2000-01-01 09:31:00-05:00", tz="America/New_York"
@@ -273,21 +298,25 @@ class TestMockedProcessForecasts2(omtodh.TestOmsDbHelper):
             101.0,
             101.0,
             101.0,
+            #
             100.0,
             100.0,
             100.0,
             100.0,
             100.0,
+            #
             101.0,
             101.0,
             101.0,
             101.0,
             101.0,
+            #
             100.0,
             100.0,
             100.0,
             100.0,
             100.0,
+            #
             101.0,
             101.0,
             101.0,
@@ -299,9 +328,28 @@ class TestMockedProcessForecasts2(omtodh.TestOmsDbHelper):
         return data
 
     @staticmethod
-    def _get_predictions_and_volatility(
+    def _get_market_data_df2() -> pd.DataFrame:
+        idx = pd.date_range(
+            start=pd.Timestamp(
+                "2000-01-01 09:31:00-05:00", tz="America/New_York"
+            ),
+            end=pd.Timestamp("2000-01-01 09:55:00-05:00", tz="America/New_York"),
+            freq="T",
+        )
+        bar_duration = "1T"
+        bar_delay = "0T"
+        data = mdata.build_timestamp_df(idx, bar_duration, bar_delay)
+        data["price"] = 100
+        data["asset_id"] = 101
+        return data
+
+    @staticmethod
+    def _get_predictions_and_volatility1(
         market_data_df,
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Generate a signal that alternates every 5 minutes.
+        """
         # Build predictions.
         asset_id = market_data_df["asset_id"][0]
         index = [
@@ -318,6 +366,40 @@ class TestMockedProcessForecasts2(omtodh.TestOmsDbHelper):
             [-1],
             [1],
             [-1],
+        ]
+        predictions = pd.DataFrame(prediction_data, index, columns)
+        volatility_data = [
+            [1],
+            [1],
+            [1],
+            [1],
+        ]
+        volatility = pd.DataFrame(volatility_data, index, columns)
+        return predictions, volatility
+
+    @staticmethod
+    def _get_predictions_and_volatility2(
+        market_data_df,
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Generate a signal that is only long.
+        """
+        # Build predictions.
+        asset_id = market_data_df["asset_id"][0]
+        index = [
+            pd.Timestamp("2000-01-01 09:35:00-05:00", tz="America/New_York"),
+            pd.Timestamp("2000-01-01 09:40:00-05:00", tz="America/New_York"),
+            pd.Timestamp("2000-01-01 09:45:00-05:00", tz="America/New_York"),
+            pd.Timestamp("2000-01-01 09:50:00-05:00", tz="America/New_York"),
+        ]
+        # Sanity check the index (e.g., in case we update the test).
+        hdbg.dassert_is_subset(index, market_data_df["end_datetime"].to_list())
+        columns = [asset_id]
+        prediction_data = [
+            [1],
+            [1],
+            [1],
+            [1],
         ]
         predictions = pd.DataFrame(prediction_data, index, columns)
         volatility_data = [
