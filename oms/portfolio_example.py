@@ -21,6 +21,7 @@ def get_simulated_portfolio_example1(
     *,
     market_data: Optional[mdata.AbstractMarketData] = None,
     mark_to_market_col: str = "price",
+    pricing_method: str = "last",
     asset_ids: Optional[List[int]] = None,
 ) -> omportfo.SimulatedPortfolio:
     # Build SimulatedBroker.
@@ -40,6 +41,7 @@ def get_simulated_portfolio_example1(
         broker,
         asset_id_column,
         mark_to_market_col,
+        pricing_method,
         timestamp_col,
         #
         initial_cash=initial_cash,
@@ -57,6 +59,7 @@ def get_mocked_portfolio_example1(
     *,
     market_data: Optional[mdata.AbstractMarketData] = None,
     mark_to_market_col: str = "price",
+    pricing_method: str = "last",
     asset_ids: Optional[List[int]] = None,
 ) -> omportfo.MockedPortfolio:
     # Build MockedBroker.
@@ -75,6 +78,7 @@ def get_mocked_portfolio_example1(
         broker,
         asset_id_column,
         mark_to_market_col,
+        pricing_method,
         timestamp_col,
         db_connection=db_connection,
         table_name=table_name,

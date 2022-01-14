@@ -162,6 +162,7 @@ class TestExamplePipeline1(otodh.TestOmsDbHelper):
             table_name,
             market_data=market_data,
             mark_to_market_col="close",
+            pricing_method="twap.5T",
             asset_ids=self.asset_ids,
         )
         portfolio.broker._column_remap = {

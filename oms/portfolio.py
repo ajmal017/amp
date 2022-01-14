@@ -62,6 +62,7 @@ class AbstractPortfolio(abc.ABC):
         broker: ombroker.AbstractBroker,
         asset_id_col: str,
         mark_to_market_col: str,
+        pricing_method: str,
         timestamp_col: str,
         initial_holdings: pd.Series,
     ):
@@ -74,6 +75,9 @@ class AbstractPortfolio(abc.ABC):
             storing the asset id
         :param mark_to_market_col: column name used as price to mark holdings to
             market
+        :param pricing_method: pricing methodology to use for valuing assets.
+            If e.g. "twap", then we also include the bar duration as a
+            pandas-style suffix: "twap.5T"
         :param timestamp_col: column to use when accessing price data
         """
         _LOG.debug(
@@ -92,6 +96,23 @@ class AbstractPortfolio(abc.ABC):
         self._get_wall_clock_time = broker.market_data.get_wall_clock_time
         self._asset_id_col = asset_id_col
         self._mark_to_market_col = mark_to_market_col
+        # Parse `pricing_method`.
+        hdbg.dassert_isinstance(pricing_method, str)
+        if pricing_method == "last":
+            self._pricing_type = "last"
+        else:
+            split_str = pricing_method.split(".")
+            hdbg.dassert_eq(len(split_str), 2)
+            pricing_type = split_str[0]
+            hdbg.dassert_in(pricing_type, ["twap", "vwap"])
+            self._pricing_type = pricing_type
+            bar_duration = split_str[1]
+            hdbg.dassert(
+                pd.Timedelta(bar_duration),
+                "Cannot convert %s to `pd.Timedelta`" % bar_duration,
+            )
+            self._bar_duration = bar_duration
+        # Timestamp column.
         self._timestamp_col = timestamp_col
         # Initialize universe and holdings.
         self._validate_initial_holdings(initial_holdings)
@@ -361,9 +382,19 @@ class AbstractPortfolio(abc.ABC):
         :param asset_ids: as in `market_data.get_data_at_timestamp()`
         :return: series of prices at `as_of_timestamp` indexed by asset_id
         """
-        prices = self.market_data.get_last_price(
-            self._mark_to_market_col, asset_ids
-        )
+        if self._pricing_type == "last":
+            prices = self.market_data.get_last_price(
+                self._mark_to_market_col, asset_ids
+            )
+        elif self._pricing_type == "twap":
+            prices = self.market_data.get_last_twap_price(
+                self._bar_duration,
+                "end_datetime",
+                asset_ids,
+                self._mark_to_market_col,
+            )
+        else:
+            raise NotImplementedError
         hdbg.dassert_eq(self._mark_to_market_col, prices.name)
         prices.index.name = "asset_id"
         prices.name = "price"

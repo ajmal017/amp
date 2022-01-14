@@ -47,9 +47,7 @@ class TestSimulatedPortfolio1(hunitest.TestCase):
             (
                 market_data,
                 _,
-            ) = mdata.get_ReplayedTimeMarketData_example3(
-                event_loop
-            )
+            ) = mdata.get_ReplayedTimeMarketData_example3(event_loop)
             # Build a Portfolio.
             portfolio = oporexam.get_simulated_portfolio_example1(
                 event_loop,
@@ -70,9 +68,7 @@ class TestSimulatedPortfolio2(hunitest.TestCase):
             (
                 market_data,
                 _,
-            ) = mdata.get_ReplayedTimeMarketData_example3(
-                event_loop
-            )
+            ) = mdata.get_ReplayedTimeMarketData_example3(event_loop)
             # Build Portfolio.
             portfolio = oporexam.get_simulated_portfolio_example1(
                 event_loop,
@@ -97,9 +93,7 @@ class TestSimulatedPortfolio2(hunitest.TestCase):
             (
                 market_data,
                 get_wall_clock_time,
-            ) = mdata.get_ReplayedTimeMarketData_example3(
-                event_loop
-            )
+            ) = mdata.get_ReplayedTimeMarketData_example3(event_loop)
             # Build Broker.
             broker = obroexam.get_simulated_broker_example1(
                 event_loop, market_data=market_data
@@ -109,6 +103,7 @@ class TestSimulatedPortfolio2(hunitest.TestCase):
             account = "paper"
             asset_id_col = "asset_id"
             mark_to_market_col = "price"
+            pricing_method = "last"
             timestamp_col = "end_datetime"
             holdings_dict = {101: 727.5, 202: 1040.3, -1: 10000}
             portfolio = omportfo.SimulatedPortfolio.from_dict(
@@ -117,6 +112,7 @@ class TestSimulatedPortfolio2(hunitest.TestCase):
                 broker,
                 asset_id_col,
                 mark_to_market_col,
+                pricing_method,
                 timestamp_col,
                 holdings_dict=holdings_dict,
             )
@@ -136,9 +132,7 @@ class TestSimulatedPortfolio2(hunitest.TestCase):
             (
                 market_data,
                 _,
-            ) = mdata.get_ReplayedTimeMarketData_example3(
-                event_loop
-            )
+            ) = mdata.get_ReplayedTimeMarketData_example3(event_loop)
             #
             portfolio = oporexam.get_simulated_portfolio_example1(
                 event_loop,
@@ -173,9 +167,7 @@ unrealized_pnl,NaN
             (
                 market_data,
                 get_wall_clock_time,
-            ) = mdata.get_ReplayedTimeMarketData_example3(
-                event_loop
-            )
+            ) = mdata.get_ReplayedTimeMarketData_example3(event_loop)
             # Build Broker.
             broker = obroexam.get_simulated_broker_example1(
                 event_loop, market_data=market_data
@@ -185,6 +177,7 @@ unrealized_pnl,NaN
             account = "paper"
             asset_id_col = "asset_id"
             mark_to_market_col = "price"
+            pricing_method = "last"
             timestamp_col = "end_datetime"
             holdings_dict = {101: 727.5, 202: 1040.3, -1: 10000}
             portfolio = omportfo.SimulatedPortfolio.from_dict(
@@ -193,6 +186,7 @@ unrealized_pnl,NaN
                 broker,
                 asset_id_col,
                 mark_to_market_col,
+                pricing_method,
                 timestamp_col,
                 holdings_dict=holdings_dict,
             )
@@ -391,11 +385,11 @@ class TestMockedPortfolio1(omtodh.TestOmsDbHelper):
         # Check.
         actual = str(portfolio)
         expected = r"""# historical holdings=
-asset_id                    101       -1  
+asset_id                    101       -1
 2000-01-01 09:35:00-05:00   0.0  1000000.0
 2000-01-01 09:40:00-05:00  20.0  1000000.0
 # historical holdings marked to market=
-asset_id                            101       -1  
+asset_id                            101       -1
 2000-01-01 09:35:00-05:00      0.000000  1000000.0
 2000-01-01 09:40:00-05:00  20004.027347  1000000.0
 # historical statistics=
@@ -413,11 +407,11 @@ asset_id                            101       -1
         # Check.
         actual = str(portfolio)
         expected = r"""# historical holdings=
-asset_id                    101          -1  
+asset_id                    101          -1
 2000-01-01 09:35:00-05:00   0.0  1000000.0000
 2000-01-01 09:40:00-05:00  20.0   998096.8783
 # historical holdings marked to market=
-asset_id                            101          -1  
+asset_id                            101          -1
 2000-01-01 09:35:00-05:00      0.000000  1000000.0000
 2000-01-01 09:40:00-05:00  20004.027347   998096.8783
 # historical statistics=
