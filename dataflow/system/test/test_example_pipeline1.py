@@ -229,7 +229,7 @@ class TestExamplePipeline1(otodh.TestOmsDbHelper):
                 volatility_col,
                 "last_week",
                 "asset_id",
-                "tmp_log_dir",
+                log_dir="tmp_log_dir",
             )
             _LOG.debug("dag_builder=\n%s", dag_builder)
             config = dag_builder.get_config_template()
