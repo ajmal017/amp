@@ -324,13 +324,6 @@ class AbstractMarketData(abc.ABC):
         _LOG.verb_debug("prices=\n%s", prices)
         twap = prices.groupby(self._asset_id_col)[column].mean()
         hpandas.dassert_series_type_in(twap, [np.float64, np.int64])
-        hdbg.dassert(
-            not twap.isna().any(),
-            "twap=%s in interval `start_ts=%s`, `end_ts=%s`",
-            twap,
-            start_ts,
-            end_ts,
-        )
         return twap
 
     def get_last_twap_price(
