@@ -15,6 +15,7 @@ import pandas as pd
 import helpers.hasyncio as hasynci
 import helpers.hdbg as hdbg
 import helpers.hio as hio
+import helpers.hpandas as hpandas
 import helpers.hprint as hprint
 import helpers.hsql as hsql
 import oms.broker as ombroker
@@ -518,13 +519,13 @@ class AbstractPortfolio(abc.ABC):
         # The columns should be of the correct types. Skip if the dataframe is
         # empty (since the correct types are not inferred in that case).
         if not df.empty:
-            hdbg.dassert_eq(
-                df["asset_id"].dtype.type,
+            hpandas.dassert_series_type_is(
+                df["asset_id"],
                 np.int64,
                 "The column `asset_id` should only contain integer ids.",
             )
-            hdbg.dassert_in(
-                df["curr_num_shares"].dtype.type,
+            hpandas.dassert_series_type_in(
+                df["curr_num_shares"],
                 [np.float64, np.int64],
                 "The column `curr_num_shares` should be a float column.",
             )

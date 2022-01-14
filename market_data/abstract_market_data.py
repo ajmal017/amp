@@ -9,6 +9,7 @@ import asyncio
 import logging
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+import numpy as np
 import pandas as pd
 
 import helpers.hdatetime as hdateti
@@ -322,6 +323,7 @@ class AbstractMarketData(abc.ABC):
         # Compute the mean value.
         _LOG.verb_debug("prices=\n%s", prices)
         twap = prices.groupby(self._asset_id_col)[column].mean()
+        hpandas.dassert_series_type_in(twap, [np.float64, np.int64])
         hdbg.dassert(
             not twap.isna().any(),
             "twap=%s in interval `start_ts=%s`, `end_ts=%s`",
@@ -408,6 +410,7 @@ class AbstractMarketData(abc.ABC):
         hdbg.dassert_isinstance(last_price_srs, pd.Series)
         last_price_srs.index.name = self._asset_id_col
         last_price_srs.name = col_name
+        hpandas.dassert_series_type_in(last_price_srs, [np.float64, np.int64])
         # TODO(gp): Print if there are nans.
         return last_price_srs
 
