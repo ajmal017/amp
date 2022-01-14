@@ -389,7 +389,7 @@ class AbstractPortfolio(abc.ABC):
         elif self._pricing_type == "twap":
             prices = self.market_data.get_last_twap_price(
                 self._bar_duration,
-                "end_datetime",
+                self._timestamp_col,
                 asset_ids,
                 self._mark_to_market_col,
             )
