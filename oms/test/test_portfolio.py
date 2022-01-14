@@ -389,13 +389,13 @@ asset_id                    101       -1
 2000-01-01 09:35:00-05:00   0.0  1000000.0
 2000-01-01 09:40:00-05:00  20.0  1000000.0
 # historical holdings marked to market=
-asset_id                            101       -1
-2000-01-01 09:35:00-05:00      0.000000  1000000.0
-2000-01-01 09:40:00-05:00  20004.027347  1000000.0
+asset_id                        101       -1
+2000-01-01 09:35:00-05:00      0.00  1000000.0
+2000-01-01 09:40:00-05:00  20004.03  1000000.0
 # historical statistics=
-                           net_asset_holdings       cash    net_wealth  gross_exposure  leverage           pnl  realized_pnl  unrealized_pnl
-2000-01-01 09:35:00-05:00            0.000000  1000000.0  1.000000e+06        0.000000  0.000000           NaN           NaN             NaN
-2000-01-01 09:40:00-05:00        20004.027347  1000000.0  1.020004e+06    20004.027347  0.019612  20004.027347           0.0    20004.027347"""
+                           net_asset_holdings       cash  net_wealth  gross_exposure  leverage       pnl  realized_pnl  unrealized_pnl
+2000-01-01 09:35:00-05:00                0.00  1000000.0    1.00e+06            0.00      0.00       NaN           NaN             NaN
+2000-01-01 09:40:00-05:00            20004.03  1000000.0    1.02e+06        20004.03      0.02  20004.03           0.0        20004.03"""
         self.assert_equal(actual, expected, fuzzy_match=True)
 
     async def _coroutine2(
@@ -407,15 +407,15 @@ asset_id                            101       -1
         # Check.
         actual = str(portfolio)
         expected = r"""# historical holdings=
-asset_id                    101          -1
-2000-01-01 09:35:00-05:00   0.0  1000000.0000
-2000-01-01 09:40:00-05:00  20.0   998096.8783
+asset_id                    101        -1
+2000-01-01 09:35:00-05:00   0.0  1000000.00
+2000-01-01 09:40:00-05:00  20.0   998096.88
 # historical holdings marked to market=
-asset_id                            101          -1
-2000-01-01 09:35:00-05:00      0.000000  1000000.0000
-2000-01-01 09:40:00-05:00  20004.027347   998096.8783
+asset_id                        101        -1
+2000-01-01 09:35:00-05:00      0.00  1000000.00
+2000-01-01 09:40:00-05:00  20004.03   998096.88
 # historical statistics=
-                           net_asset_holdings          cash    net_wealth  gross_exposure  leverage           pnl  realized_pnl  unrealized_pnl
-2000-01-01 09:35:00-05:00            0.000000  1000000.0000  1.000000e+06        0.000000  0.000000           NaN           NaN             NaN
-2000-01-01 09:40:00-05:00        20004.027347   998096.8783  1.018101e+06    20004.027347  0.019648  18100.905647    -1903.1217    20004.027347"""
+                           net_asset_holdings        cash  net_wealth  gross_exposure  leverage       pnl  realized_pnl  unrealized_pnl
+2000-01-01 09:35:00-05:00                0.00  1000000.00    1.00e+06            0.00      0.00       NaN           NaN             NaN
+2000-01-01 09:40:00-05:00            20004.03   998096.88    1.02e+06        20004.03      0.02  18100.91      -1903.12        20004.03"""
         self.assert_equal(actual, expected, fuzzy_match=True)

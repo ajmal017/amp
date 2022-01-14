@@ -164,19 +164,25 @@ class AbstractPortfolio(abc.ABC):
         Return the state of the Portfolio in terms of the holdings as a string.
         """
         act = []
+        precision = 2
         act.append(
             "# historical holdings=\n%s"
-            % hprint.dataframe_to_str(self.get_historical_holdings())
+            % hprint.dataframe_to_str(
+                self.get_historical_holdings(), precision=precision
+            )
         )
         act.append(
             "# historical holdings marked to market=\n%s"
             % hprint.dataframe_to_str(
-                self.get_historical_holdings_marked_to_market()
+                self.get_historical_holdings_marked_to_market(),
+                precision=precision,
             )
         )
         act.append(
             "# historical statistics=\n%s"
-            % hprint.dataframe_to_str(self.get_historical_statistics())
+            % hprint.dataframe_to_str(
+                self.get_historical_statistics(), precision=precision
+            )
         )
         act = "\n".join(act)
         return act
@@ -675,7 +681,9 @@ class SimulatedPortfolio(AbstractPortfolio):
             fills_df = fills_df.convert_dtypes()
         else:
             fills_df = None
-        _LOG.debug("fills_df=\n%s", hprint.dataframe_to_str(fills_df))
+        _LOG.debug(
+            "fills_df=\n%s", hprint.dataframe_to_str(fills_df, precision=2)
+        )
         return fills_df
 
     @staticmethod
@@ -845,7 +853,9 @@ class MockedPortfolio(AbstractPortfolio):
         # 2021-12-09    10006 2021-12-09 11:54:28  0.0              0
         # 2021-12-09    10009 1970-01-01 00:00:00  0.0              0
         # ```
-        _LOG.debug("snapshot_df=\n%s", hprint.dataframe_to_str(snapshot_df))
+        _LOG.debug(
+            "snapshot_df=\n%s", hprint.dataframe_to_str(snapshot_df, precision=2)
+        )
         if not snapshot_df.empty:
             hdbg.dassert_no_duplicates(
                 snapshot_df["asset_id"],

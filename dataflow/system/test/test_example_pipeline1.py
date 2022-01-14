@@ -43,21 +43,7 @@ class SystemTester:
 
     def get_portfolio_signature(self, portfolio) -> List[str]:
         actual = ["\n# portfolio signature=\n"]
-        # TODO(gp): Use Portfolio.str() passing index and decimals.
-        # NOTE: `portfolio` as a string can be unstable in unit tests in
-        #  the less significant digits.
-        historical_holdings = portfolio.get_historical_holdings()
-        self._append(actual, "historical holdings", historical_holdings)
-        historical_holdings_marked_to_market = (
-            portfolio.get_historical_holdings_marked_to_market()
-        )
-        self._append(
-            actual,
-            "historical holdings marked to market",
-            historical_holdings_marked_to_market,
-        )
-        historical_statistics = portfolio.get_historical_statistics()
-        self._append(actual, "historical statistics", historical_statistics)
+        actual.append(str(portfolio))
         actual = "\n".join(actual)
         return actual
 
