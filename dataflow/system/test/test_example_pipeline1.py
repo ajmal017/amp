@@ -81,17 +81,24 @@ class TestExamplePipeline1(otodh.TestOmsDbHelper):
 
     @pytest.mark.slow
     def test1(self) -> None:
-        data = self._get_market_data_df1()
-        self._run_coroutines(data)
+        data, real_time_loop_time_out_in_secs = self._get_market_data_df1()
+        self._run_coroutines(data, real_time_loop_time_out_in_secs)
 
     @pytest.mark.slow
     def test2(self) -> None:
-        # TODO(Paul): Investigate discrepancy between realized PnL and
-        #  research PnL.
-        data = self._get_market_data_df2()
-        self._run_coroutines(data)
+        data, real_time_loop_time_out_in_secs = self._get_market_data_df2()
+        self._run_coroutines(data, real_time_loop_time_out_in_secs)
 
-    def _run_coroutines(self, data):
+    @pytest.mark.slow
+    def test3(self) -> None:
+        data, real_time_loop_time_out_in_secs = self._get_market_data_df3()
+        self._run_coroutines(data, real_time_loop_time_out_in_secs)
+
+    def _run_coroutines(
+        self,
+        data: pd.DataFrame,
+        real_time_loop_time_out_in_secs: int,
+    ):
         with hasynci.solipsism_context() as event_loop:
             initial_replayed_delay = 5
             market_data, _ = mdata.get_ReplayedTimeMarketData_from_df(
@@ -124,9 +131,6 @@ class TestExamplePipeline1(otodh.TestOmsDbHelper):
                     sleep_interval_in_secs, event_loop=event_loop
                 )
             )
-            # One trading day:
-            # real_time_loop_time_out_in_secs = 6.5 * 60 * 60 - 1
-            real_time_loop_time_out_in_secs = 35 * 60
             execute_rt_loop_kwargs[
                 "time_out_in_secs"
             ] = real_time_loop_time_out_in_secs
@@ -194,7 +198,8 @@ class TestExamplePipeline1(otodh.TestOmsDbHelper):
         feature_pattern = [1.0] * 5 + [-1.0] * 5
         feature = feature_pattern * 4
         data["feature1"] = feature
-        return data
+        real_time_loop_time_out_in_secs = 35 * 60
+        return data, real_time_loop_time_out_in_secs
 
     @staticmethod
     def _get_market_data_df2() -> pd.DataFrame:
@@ -219,7 +224,34 @@ class TestExamplePipeline1(otodh.TestOmsDbHelper):
         feature_pattern = [-1.0] * 5 + [1.0] * 5
         feature = feature_pattern * 4
         data["feature1"] = feature
-        return data
+        real_time_loop_time_out_in_secs = 35 * 60
+        return data, real_time_loop_time_out_in_secs
+
+    @staticmethod
+    def _get_market_data_df3() -> pd.DataFrame:
+        """
+        Generate price series that alternates every 5 minutes.
+        """
+        idx = pd.date_range(
+            start=pd.Timestamp(
+                "2000-01-01 09:31:00-05:00", tz="America/New_York"
+            ),
+            end=pd.Timestamp("2000-01-01 11:30:00-05:00", tz="America/New_York"),
+            freq="T",
+        )
+        bar_duration = "1T"
+        bar_delay = "0T"
+        data = mdata.build_timestamp_df(idx, bar_duration, bar_delay)
+        price_pattern = [101.0] * 3 + [100.0] * 3 + [101.0] * 3 + [102.0] * 6
+        price = price_pattern * 8
+        data["close"] = price
+        data["asset_id"] = 101
+        data["volume"] = 100
+        feature_pattern = [-1.0] * 5 + [1.0] * 5
+        feature = feature_pattern * 12
+        data["feature1"] = feature
+        real_time_loop_time_out_in_secs = 115 * 60
+        return data, real_time_loop_time_out_in_secs
 
     @staticmethod
     def _append(

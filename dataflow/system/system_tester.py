@@ -5,7 +5,7 @@ import dataflow.system.system_tester as dtfsysytes
 """
 
 import logging
-from typing import List, Union
+from typing import List, Tuple, Union
 
 import pandas as pd
 
@@ -19,7 +19,7 @@ class SystemTester:
     Test a System.
     """
 
-    def get_events_signature(self, events) -> List[str]:
+    def get_events_signature(self, events) -> str:
         # TODO(gp): Use events.to_str()
         actual = ["# event signature=\n"]
         events_as_str = "\n".join(
@@ -35,11 +35,14 @@ class SystemTester:
         actual = "\n".join(actual)
         return actual
 
-    def get_portfolio_signature(self, portfolio) -> List[str]:
+    def get_portfolio_signature(self, portfolio) -> Tuple[str, pd.Series]:
         actual = ["\n# portfolio signature=\n"]
         actual.append(str(portfolio))
         actual = "\n".join(actual)
-        return actual
+        statistics = portfolio.get_historical_statistics()
+        pnl = statistics["pnl"]
+        _LOG.debug("pnl=\n%s", pnl)
+        return actual, pnl
 
     def get_research_pnl_signature(
         self,
@@ -50,7 +53,7 @@ class SystemTester:
         volatility_col: str,
         volatility_adjusted_returns_col: str,
         prediction_col: str,
-    ):
+    ) -> Tuple[str, pd.Series]:
         actual = ["\n# result_bundle.result_df signature=\n"]
         #
         result_df = result_bundle.result_df
@@ -77,9 +80,10 @@ class SystemTester:
             .multiply(volatility_adjusted_returns)
             .sum(axis=1, min_count=1)
         )
+        _LOG.debug("research_pnl=\n%s", research_pnl)
         self._append(actual, "research pnl", research_pnl)
-        actual = "\n".join(actual)
-        return actual
+        actual = "\n".join(map(str, actual))
+        return actual, research_pnl
 
     def compute_run_signature(
         self,
@@ -98,17 +102,26 @@ class SystemTester:
         #
         events = dag_runner.events
         actual.append(self.get_events_signature(events))
-        actual.append(self.get_portfolio_signature(portfolio))
-        actual.append(
-            self.get_research_pnl_signature(
-                result_bundle,
-                price_col=price_col,
-                returns_col=returns_col,
-                volatility_col=volatility_col,
-                volatility_adjusted_returns_col=volatility_adjusted_returns_col,
-                prediction_col=prediction_col,
-            )
+        signature, pnl = self.get_portfolio_signature(portfolio)
+        actual.append(signature)
+        signature, research_pnl = self.get_research_pnl_signature(
+            result_bundle,
+            price_col=price_col,
+            returns_col=returns_col,
+            volatility_col=volatility_col,
+            volatility_adjusted_returns_col=volatility_adjusted_returns_col,
+            prediction_col=prediction_col,
         )
+        actual.append(signature)
+        if min(pnl.count(), research_pnl.count()) >= 10:
+            # Resample `pnl` so that its datetime index aligns on even bars, like
+            #  research_pnl's does.
+            freq = research_pnl.index.freq
+            pnl = pnl.resample(rule=freq).sum(min_count=1)
+            _LOG.debug("resampled pnl=\n%s", pnl)
+            correlation = pnl.corr(research_pnl)
+            actual.append("\n# pnl agreement with research pnl\n")
+            actual.append(f"corr = {correlation:.3f}")
         actual = "\n".join(map(str, actual))
         return actual
 
