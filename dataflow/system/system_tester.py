@@ -20,6 +20,7 @@ class SystemTester:
     """
 
     def get_events_signature(self, events) -> List[str]:
+        # TODO(gp): Use events.to_str()
         actual = ["# event signature=\n"]
         events_as_str = "\n".join(
             [
