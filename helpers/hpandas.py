@@ -306,7 +306,7 @@ def trim_df(
         interval
         - E.g., [start_ts, end_ts), or (start_ts, end_ts]
     """
-    _LOG.debug(hprint.df_to_short_str("df", df, print_dtypes=True))
+    _LOG.verb_debug(hprint.df_to_short_str("df", df, print_dtypes=True))
     _LOG.debug(
         hprint.to_str("ts_col_name start_ts end_ts left_close right_close")
     )

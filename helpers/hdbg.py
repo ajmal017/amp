@@ -652,7 +652,7 @@ def dassert_file_extension(
 
 # TODO(gp): Separate this to helpers/hlogging.py
 
-# Copied from helpers/system_interaction.py to avoid circular imports.
+# From `helpers/hsystem.py` to avoid circular imports.
 def _is_running_in_ipynb() -> bool:
     try:
         _ = get_ipython().config  # type: ignore
@@ -676,17 +676,20 @@ WARNING = "\033[33mWARNING\033[0m"
 ERROR = "\033[31mERROR\033[0m"
 
 
+# ##################################################################################
+
+
 # From https://stackoverflow.com/questions/32402502
 class _LocalTimeZoneFormatter:
     """
-    Override logging.Formatter to use an aware datetime object.
+    Override `logging.Formatter` to use an aware datetime object.
     """
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)  # type: ignore[call-arg]
         try:
-            # TODO(gp): Automatically detect the time zone. It might be complicated in
-            #  Docker.
+            # TODO(gp): Automatically detect the time zone. It might be complicated
+            #  in Docker.
             from dateutil import tz
 
             # self._tzinfo = pytz.timezone('America/New_York')
@@ -696,8 +699,8 @@ class _LocalTimeZoneFormatter:
             self._tzinfo = None
 
     def converter(self, timestamp: float) -> datetime.datetime:
-        # To make the linter happy and respecting the signature of the
-        # superclass method.
+        # To make the linter happy and respect the signature of the superclass
+        # method.
         _ = self
         # timestamp=1622423570.0147252
         dt = datetime.datetime.utcfromtimestamp(timestamp)
@@ -720,6 +723,9 @@ class _LocalTimeZoneFormatter:
             except TypeError:
                 s = dt.isoformat()
         return s
+
+
+# ##################################################################################
 
 
 # [mypy] error: Definition of "converter" in base class
@@ -767,6 +773,9 @@ class _ColoredFormatter(  # type: ignore[misc]
             )
         colored_record.levelname = colored_levelname
         return logging.Formatter.format(self, colored_record)
+
+
+# ##################################################################################
 
 
 def get_memory_usage(process: Optional[Any] = None) -> Tuple[float, float, float]:
@@ -830,7 +839,10 @@ class ResourceUsageFilter(logging.Filter):
         return True
 
 
-# Copied from `helpers/system_interaction.py` to avoid circular dependencies.
+# ##################################################################################
+
+
+# From `helpers/hsystem.py` to avoid circular dependencies.
 def get_user_name() -> str:
     import getpass
 
@@ -853,7 +865,7 @@ def _get_logging_format(
     The logging format can be:
     - print: looks like a `print` statement
 
-    :param force_print_form: force to use the non-verbose format
+    :param force_print_format: force to use the non-verbose format
     :param force_verbose_format: force to use the verbose format
     :param force_no_warning:
     """
@@ -871,7 +883,7 @@ def _get_logging_format(
         verbose_format = True
     if force_print_format:
         verbose_format = False
-        #
+    #
     if verbose_format:
         # TODO(gp): We would like to have filename:name:funcName:lineno all
         #  justified on 15 chars.
@@ -953,7 +965,7 @@ def init_logger(
     :param log_filename: log to that file
     :param force_verbose_format: use the verbose format for the logging
     :param force_print_format: use the print format for the logging
-    :param force_write: use white color for printing. This can pollute the
+    :param force_white: use white color for printing. This can pollute the
         output of a script when redirected to file with echo characters
     :param in_pytest: True when we are running through pytest, so that we
         can overwrite the default logger from pytest
@@ -970,16 +982,6 @@ def init_logger(
     root_logger = logging.getLogger()
     # Set verbosity for all loggers.
     root_logger.setLevel(verbosity)
-    # if False:
-    #     eff_level = root_logger.getEffectiveLevel()
-    #     print(
-    #         "effective level= %s (%s)"
-    #         % (eff_level, logging.getLevelName(eff_level))
-    #     )
-    # if False:
-    #     # dassert_eq(root_logger.getEffectiveLevel(), verbosity)
-    #     for handler in root_logger.handlers:
-    #         handler.setLevel(verbosity)
     # Exit to avoid to replicate the same output multiple times.
     if not in_pytest and root_logger.handlers:
         print(WARNING + ": Logger already initialized: skipping")
@@ -995,8 +997,10 @@ def init_logger(
         force_no_warning,
         report_resource_usage,
     )
-    # Use normal formatter.
+    # To use the normal formatter:
+    # ```
     # formatter = logging.Formatter(log_format, datefmt=date_fmt)
+    # ```
     # Use formatter with colors.
     formatter = _ColoredFormatter(log_format, date_fmt)
     ch.setFormatter(formatter)

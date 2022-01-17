@@ -16,6 +16,7 @@ import oms.portfolio as omportfo
 _LOG = logging.getLogger(__name__)
 
 
+# TODO(gp): -> get_SimulatedPortfolio_example
 def get_simulated_portfolio_example1(
     event_loop: Optional[asyncio.AbstractEventLoop],
     *,
@@ -50,6 +51,7 @@ def get_simulated_portfolio_example1(
     return portfolio
 
 
+# TODO(gp): -> get_MockedPortfolio_example
 def get_mocked_portfolio_example1(
     event_loop: Optional[asyncio.AbstractEventLoop],
     db_connection: hsql.DbConnection,

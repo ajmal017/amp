@@ -7,33 +7,34 @@ import dataflow.system.system_runner as dtfsysyrun
 import abc
 import asyncio
 import logging
-import os
-from typing import Coroutine, Tuple
+from typing import Coroutine, Optional, Tuple
 
 import pandas as pd
-
-import market_data_lime as mdlime
 
 import core.config as cconfig
 import core.real_time_example as cretiexa
 import dataflow.core.builders as dtfcorbuil
 import dataflow.system as dtfsys
 import helpers.hasyncio as hasynci
-import helpers.hunit_test as hunitest
+import helpers.hdatetime as hdateti
 import market_data as mdata
 import oms as oms
 
 _LOG = logging.getLogger(__name__)
 
 
+# #############################################################################
+# SystemRunner
+# #############################################################################
+
+
 class SystemRunner(abc.ABC):
     """
-    Create an end-to-end DataFlow-based system comprised of:
+    Create an end-to-end DataFlow-based system composed of:
     - `MarketData`
+    - `Portfolio`
     - `Dag`
     - `DagRunner`
-    - `Portfolio`
-    - `OrderProcessor`
     """
 
     @abc.abstractmethod
@@ -56,45 +57,23 @@ class SystemRunner(abc.ABC):
     ) -> Tuple[cconfig.Config, dtfcorbuil.DagBuilder]:
         ...
 
-    def get_order_processor(
-        self, portfolio: oms.AbstractPortfolio
-    ) -> oms.OrderProcessor:
-        ...
-
-    def get_order_processor_coroutine(
-        self, portfolio: oms.AbstractPortfolio, real_time_loop_time_out_in_secs: int
-    ) -> Coroutine:
-        # Build OrderProcessor.
-        order_processor = self.get_order_processor(portfolio)
-        # TODO(Paul): Maybe make this public.
-        initial_timestamp = portfolio._initial_timestamp
-        offset = pd.Timedelta(real_time_loop_time_out_in_secs, unit="seconds")
-        termination_condition = initial_timestamp + offset
-        order_processor_coroutine = order_processor.run_loop(
-            termination_condition
-        )
-        return order_processor_coroutine
-
+    # TODO(gp): This could be `get_DagRunner_example()`.
     def get_dag_runner(
         self,
-        dag_builder,
-        config,
-        event_loop,
-        get_wall_clock_time,
-        real_time_loop_time_out_in_secs,
+        dag_builder: dtfcorbuil.DagBuilder,
+        config: cconfig.Config,
+        get_wall_clock_time: hdateti.GetWallClockTime,
+        *,
+        sleep_interval_in_secs: int = 60 * 5,
+        real_time_loop_time_out_in_secs: Optional[int] = None,
     ):
+        _ = self
         # Set up the event loop.
-        sleep_interval_in_secs = 60 * 5
-        execute_rt_loop_kwargs = (
-            cretiexa.get_replayed_time_execute_rt_loop_kwargs(
-                sleep_interval_in_secs,
-                get_wall_clock_time=get_wall_clock_time,
-                event_loop=event_loop,
-            )
-        )
-        execute_rt_loop_kwargs[
-            "time_out_in_secs"
-        ] = real_time_loop_time_out_in_secs
+        execute_rt_loop_kwargs = {
+            "get_wall_clock_time": get_wall_clock_time,
+            "sleep_interval_in_secs": sleep_interval_in_secs,
+            "time_out_in_secs": real_time_loop_time_out_in_secs,
+        }
         dag_runner_kwargs = {
             "config": config,
             "dag_builder": dag_builder,
@@ -107,7 +86,52 @@ class SystemRunner(abc.ABC):
 
 
 # #############################################################################
+# SystemWithOmsRunner
+# #############################################################################
 
 
-class SystemWithOmsRunner:
-    pass
+class SystemWithSimulatedOmsRunner(SystemRunner, abc.ABC):
+    """
+    A system with a simulated OMS has always:
+    - a `Simulated` or a `MockerPortfolio`
+    - an `OrderProcessor`
+    """
+
+    # TODO(gp): Part of this should become a `get_OrderProcessor_example()`.
+    def get_order_processor(
+        self, portfolio: oms.AbstractPortfolio
+    ) -> oms.OrderProcessor:
+        db_connection = self.connection
+        get_wall_clock_time = portfolio._get_wall_clock_time
+        order_processor_poll_kwargs = hasynci.get_poll_kwargs(get_wall_clock_time)
+        # order_processor_poll_kwargs["sleep_in_secs"] = 1
+        # Since orders should come every 5 mins we give it a buffer of 15 extra
+        # mins.
+        order_processor_poll_kwargs["timeout_in_secs"] = 60 * (5 + 15)
+        delay_to_accept_in_secs = 3
+        delay_to_fill_in_secs = 10
+        broker = portfolio.broker
+        order_processor = oms.OrderProcessor(
+            db_connection,
+            delay_to_accept_in_secs,
+            delay_to_fill_in_secs,
+            broker,
+            poll_kwargs=order_processor_poll_kwargs,
+        )
+        return order_processor
+
+    def get_order_processor_coroutine(
+        self,
+        portfolio: oms.AbstractPortfolio,
+        real_time_loop_time_out_in_secs: int,
+    ) -> Coroutine:
+        # Build OrderProcessor.
+        order_processor = self.get_order_processor(portfolio)
+        # TODO(Paul): Maybe make this public.
+        initial_timestamp = portfolio._initial_timestamp
+        offset = pd.Timedelta(real_time_loop_time_out_in_secs, unit="seconds")
+        termination_condition = initial_timestamp + offset
+        order_processor_coroutine = order_processor.run_loop(
+            termination_condition
+        )
+        return order_processor_coroutine
