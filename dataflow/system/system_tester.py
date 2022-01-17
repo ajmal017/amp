@@ -74,12 +74,20 @@ class SystemTester:
         # Prediction.
         predictions = result_df[prediction_col]
         self._append(actual, "predictions", predictions)
+        # Cross-sectional rescaling factor.
+        # The leading constant is an arbitrary convenience factor.
+        target_gmv = 100000
+        scale = (
+            predictions.divide(volatility).abs().sum(axis=1, min_count=1)
+            / target_gmv
+        )
+        self._append(actual, "cross-sectional rescaling factor", scale)
         # Research PnL.
         research_pnl = (
             predictions.shift(2)
             .multiply(volatility_adjusted_returns)
             .sum(axis=1, min_count=1)
-        )
+        ).divide(scale.shift(2))
         _LOG.debug("research_pnl=\n%s", research_pnl)
         self._append(actual, "research pnl", research_pnl)
         actual = "\n".join(map(str, actual))
@@ -113,7 +121,7 @@ class SystemTester:
             prediction_col=prediction_col,
         )
         actual.append(signature)
-        if min(pnl.count(), research_pnl.count()) >= 10:
+        if min(pnl.count(), research_pnl.count()) > 1:
             # Resample `pnl` so that its datetime index aligns on even bars, like
             #  research_pnl's does.
             freq = research_pnl.index.freq
