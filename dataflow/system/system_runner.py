@@ -12,7 +12,6 @@ from typing import Coroutine, Optional, Tuple
 import pandas as pd
 
 import core.config as cconfig
-import core.real_time_example as cretiexa
 import dataflow.core.builders as dtfcorbuil
 import dataflow.system as dtfsys
 import helpers.hasyncio as hasynci
@@ -93,7 +92,7 @@ class SystemRunner(abc.ABC):
 class SystemWithSimulatedOmsRunner(SystemRunner, abc.ABC):
     """
     A system with a simulated OMS has always:
-    - a `Simulated` or a `MockerPortfolio`
+    - a `SimulatedPortfolio` or a `MockedPortfolio`
     - an `OrderProcessor`
     """
 

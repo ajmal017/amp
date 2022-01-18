@@ -62,11 +62,15 @@ def get_mocked_portfolio_example1(
     market_data: Optional[mdata.AbstractMarketData] = None,
     mark_to_market_col: str = "price",
     pricing_method: str = "last",
+    timestamp_col: str = "end_datetime",
     asset_ids: Optional[List[int]] = None,
 ) -> omportfo.MockedPortfolio:
     # Build MockedBroker.
     broker = obroexam.get_mocked_broker_example1(
-        event_loop, db_connection, market_data=market_data
+        event_loop,
+        db_connection,
+        market_data=market_data,
+        timestamp_col=timestamp_col,
     )
     # Build MockedPortfolio.
     strategy_id = "st1"
