@@ -76,7 +76,6 @@ def get_mocked_portfolio_example1(
     strategy_id = "st1"
     account = "candidate"
     asset_id_column = "asset_id"
-    timestamp_col = "end_datetime"
     initial_cash = 1e6
     portfolio = omportfo.MockedPortfolio.from_cash(
         strategy_id,
