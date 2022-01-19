@@ -221,17 +221,13 @@ class TestExamplePipeline1(otodh.TestOmsDbHelper):
             #
             system_tester = dtfsysytes.SystemTester()
             result_bundles = result_bundles[0]
-            volatility_adjusted_returns_col = "vwap.ret_0.vol_adj.c"
-            price_col = "vwap"
             returns_col = "vwap.ret_0"
             actual = system_tester.compute_run_signature(
                 dag_runner,
                 portfolio,
                 result_bundles[-1],
-                price_col=price_col,
                 returns_col=returns_col,
                 volatility_col=volatility_col,
-                volatility_adjusted_returns_col=volatility_adjusted_returns_col,
                 prediction_col=prediction_col,
             )
             return actual

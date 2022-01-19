@@ -9,6 +9,7 @@ from typing import List, Tuple, Union
 
 import pandas as pd
 
+import dataflow.model as dtfmod
 import helpers.hunit_test as hunitest
 
 _LOG = logging.getLogger(__name__)
@@ -48,48 +49,31 @@ class SystemTester:
         self,
         result_bundle,
         *,
-        price_col: str,
         returns_col: str,
         volatility_col: str,
-        volatility_adjusted_returns_col: str,
         prediction_col: str,
+        target_gmv: float = 100000,
+        dollar_neutral: bool = False,
     ) -> Tuple[str, pd.Series]:
-        actual = ["\n# result_bundle.result_df signature=\n"]
-        #
+        actual = ["\n# forecast_evaluator signature=\n"]
+        forecast_evaluator = dtfmod.ForecastEvaluator(
+            returns_col=returns_col,
+            volatility_col=volatility_col,
+            prediction_col=prediction_col,
+        )
         result_df = result_bundle.result_df
-        # Price.
-        price = result_df[price_col]
-        self._append(actual, "price", price)
-        # Returns.
-        returns = result_df[returns_col]
-        self._append(actual, "returns", returns)
-        # Volatility.
-        volatility = result_df[volatility_col]
-        self._append(actual, "volatility", volatility)
-        # Volatility-adjusted returns.
-        volatility_adjusted_returns = result_df[volatility_adjusted_returns_col]
-        self._append(
-            actual, "volatility adjusted returns", volatility_adjusted_returns
+        signature = forecast_evaluator.to_str(
+            result_df,
+            target_gmv=target_gmv,
+            dollar_neutral=dollar_neutral,
         )
-        # Prediction.
-        predictions = result_df[prediction_col]
-        self._append(actual, "predictions", predictions)
-        # Cross-sectional rescaling factor.
-        # The leading constant is an arbitrary convenience factor.
-        target_gmv = 100000
-        scale = (
-            predictions.divide(volatility).abs().sum(axis=1, min_count=1)
-            / target_gmv
+        actual.append(signature)
+        _, _, stats = forecast_evaluator.compute_portfolio(
+            result_df,
+            target_gmv=target_gmv,
+            dollar_neutral=dollar_neutral,
         )
-        self._append(actual, "cross-sectional rescaling factor", scale)
-        # Research PnL.
-        research_pnl = (
-            predictions.shift(2)
-            .multiply(volatility_adjusted_returns)
-            .sum(axis=1, min_count=1)
-        ).divide(scale.shift(2))
-        _LOG.debug("research_pnl=\n%s", research_pnl)
-        self._append(actual, "research pnl", research_pnl)
+        research_pnl = stats["pnl"]
         actual = "\n".join(map(str, actual))
         return actual, research_pnl
 
@@ -99,10 +83,8 @@ class SystemTester:
         portfolio,
         result_bundle,
         *,
-        price_col: str,
         returns_col: str,
         volatility_col: str,
-        volatility_adjusted_returns_col: str,
         prediction_col: str,
     ) -> str:
         # Check output.
@@ -114,10 +96,8 @@ class SystemTester:
         actual.append(signature)
         signature, research_pnl = self.get_research_pnl_signature(
             result_bundle,
-            price_col=price_col,
             returns_col=returns_col,
             volatility_col=volatility_col,
-            volatility_adjusted_returns_col=volatility_adjusted_returns_col,
             prediction_col=prediction_col,
         )
         actual.append(signature)
