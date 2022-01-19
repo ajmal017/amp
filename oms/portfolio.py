@@ -341,6 +341,8 @@ class AbstractPortfolio(abc.ABC):
         asset_holdings = pd.DataFrame(self._asset_holdings).transpose()
         cash = pd.Series(self._cash)
         asset_holdings[AbstractPortfolio.CASH_ID] = cash
+        asset_holdings.columns.name = self._asset_id_col
+        asset_holdings = asset_holdings.astype("float")
         return asset_holdings
 
     def get_historical_holdings_marked_to_market(self) -> pd.DataFrame:
@@ -353,6 +355,8 @@ class AbstractPortfolio(abc.ABC):
         asset_values = pd.DataFrame(asset_values).transpose()
         cash = pd.Series(self._cash)
         asset_values[AbstractPortfolio.CASH_ID] = cash
+        asset_values.columns.name = self._asset_id_col
+        asset_values = asset_values.astype("float")
         return asset_values
 
     def log_state(self, log_dir: str) -> None:
@@ -873,7 +877,18 @@ class MockedPortfolio(AbstractPortfolio):
             "asset_id"
         )["current_position"]
         hdbg.dassert_isinstance(asset_holdings, pd.Series)
+        _LOG.debug("asset_holdings=%s" % asset_holdings)
+        asset_holdings = asset_holdings.reindex(
+            index=self._initial_universe, copy=False
+        )
         asset_holdings.name = wall_clock_timestamp
+        # If the database does not have an entry for an asset (e.g., as in
+        # a mock database without universe initialization), then a NaN is
+        # returned.
+        _LOG.debug(
+            "Number of NaN asset_holdings=%d" % asset_holdings.isna().sum()
+        )
+        asset_holdings.fillna(0, inplace=True)
         self._sequential_insert(
             wall_clock_timestamp, asset_holdings, self._asset_holdings
         )

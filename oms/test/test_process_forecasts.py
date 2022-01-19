@@ -82,15 +82,15 @@ class TestSimulatedProcessForecasts1(hunitest.TestCase):
         actual = str(portfolio)
         expected = r"""# historical holdings=
 asset_id                     101    202        -1
-2000-01-01 09:35:00-05:00    0.0    0.0  1000000.00
-2000-01-01 09:35:01-05:00    0.0    0.0  1000000.00
+2000-01-01 09:35:00-05:00   0.00   0.00  1000000.00
+2000-01-01 09:35:01-05:00   0.00   0.00  1000000.00
 2000-01-01 09:40:01-05:00  33.32  66.65   900039.56
 2000-01-01 09:45:01-05:00 -24.99  74.98   950024.38
 # historical holdings marked to market=
 asset_id                        101       202        -1
-2000-01-01 09:35:00-05:00       0.0       0.0  1000000.00
-2000-01-01 09:35:01-05:00       0.0       0.0  1000000.00
-2000-01-01 09:40:01-05:00  33329.65   66659.3   900039.56
+2000-01-01 09:35:00-05:00      0.00      0.00  1000000.00
+2000-01-01 09:35:01-05:00      0.00      0.00  1000000.00
+2000-01-01 09:40:01-05:00  33329.65  66659.30   900039.56
 2000-01-01 09:45:01-05:00 -24992.93  74978.79   950024.38
 # historical statistics=
                            net_asset_holdings        cash  net_wealth  gross_exposure  leverage    pnl  realized_pnl  unrealized_pnl
@@ -98,7 +98,6 @@ asset_id                        101       202        -1
 2000-01-01 09:35:01-05:00                0.00  1000000.00    1.00e+06            0.00       0.0   0.00          0.00            0.00
 2000-01-01 09:40:01-05:00            99988.95   900039.56    1.00e+06        99988.95       0.1  28.51     -99960.44        99988.95
 2000-01-01 09:45:01-05:00            49985.86   950024.38    1.00e+06        99971.72       0.1 -18.28      49984.81       -50003.09"""
-
         self.assert_equal(actual, expected, fuzzy_match=True)
 
 
@@ -184,21 +183,19 @@ class TestMockedProcessForecasts1(omtodh.TestOmsDbHelper):
             portfolio,
             config,
         )
-        # TODO(Paul): Re-check the correctness after fixing the issue with
-        #  pricing assets not currently in the portfolio.
+        # TODO(Paul): Factor out a test that compares simulation and mock.
         actual = str(portfolio)
-        # TODO(Paul): Get this and the simulated test output to agree perfectly.
         expected = r"""# historical holdings=
 asset_id                     101    202        -1
-2000-01-01 09:35:00-05:00    0.0    0.0  1000000.00
-2000-01-01 09:35:01-05:00    NaN    NaN  1000000.00
+2000-01-01 09:35:00-05:00   0.00   0.00  1000000.00
+2000-01-01 09:35:01-05:00   0.00   0.00  1000000.00
 2000-01-01 09:40:01-05:00  33.32  66.65   900039.56
 2000-01-01 09:45:01-05:00 -24.99  74.98   950024.38
 # historical holdings marked to market=
-                                101       202        -1
-2000-01-01 09:35:00-05:00       0.0       0.0  1000000.00
-2000-01-01 09:35:01-05:00       NaN       NaN  1000000.00
-2000-01-01 09:40:01-05:00  33329.65   66659.3   900039.56
+asset_id                        101       202        -1
+2000-01-01 09:35:00-05:00      0.00      0.00  1000000.00
+2000-01-01 09:35:01-05:00      0.00      0.00  1000000.00
+2000-01-01 09:40:01-05:00  33329.65  66659.30   900039.56
 2000-01-01 09:45:01-05:00 -24992.93  74978.79   950024.38
 # historical statistics=
                            net_asset_holdings        cash  net_wealth  gross_exposure  leverage    pnl  realized_pnl  unrealized_pnl

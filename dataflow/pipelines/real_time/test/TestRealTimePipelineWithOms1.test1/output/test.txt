@@ -19,14 +19,14 @@ config:
     process_forecasts_config: {'order_type': 'price@twap', 'order_duration': 1, 'ath_start_time': datetime.time(9, 30), 'trading_start_time': datetime.time(9, 35), 'ath_end_time': datetime.time(16, 0), 'trading_end_time': datetime.time(15, 55), 'execution_mode': 'real_time'}
     portfolio: # historical holdings=
     asset_id                    1000       -1   
-    2000-01-01 09:35:00-05:00    0.0  1000000.00
-    2000-01-01 09:35:01-05:00    0.0  1000000.00
+    2000-01-01 09:35:00-05:00   0.00  1000000.00
+    2000-01-01 09:35:01-05:00   0.00  1000000.00
     2000-01-01 09:40:01-05:00  99.97   900034.39
     2000-01-01 09:45:01-05:00  99.98   900023.34
     # historical holdings marked to market=
     asset_id                       1000       -1   
-    2000-01-01 09:35:00-05:00       0.0  1000000.00
-    2000-01-01 09:35:01-05:00       0.0  1000000.00
+    2000-01-01 09:35:00-05:00      0.00  1000000.00
+    2000-01-01 09:35:01-05:00      0.00  1000000.00
     2000-01-01 09:40:01-05:00  99988.95   900034.39
     2000-01-01 09:45:01-05:00  99971.72   900023.34
     # historical statistics=
@@ -110,14 +110,14 @@ config:
     process_forecasts_config: {'order_type': 'price@twap', 'order_duration': 1, 'ath_start_time': datetime.time(9, 30), 'trading_start_time': datetime.time(9, 35), 'ath_end_time': datetime.time(16, 0), 'trading_end_time': datetime.time(15, 55), 'execution_mode': 'real_time'}
     portfolio: # historical holdings=
     asset_id                    1000       -1   
-    2000-01-01 09:35:00-05:00    0.0  1000000.00
-    2000-01-01 09:35:01-05:00    0.0  1000000.00
+    2000-01-01 09:35:00-05:00   0.00  1000000.00
+    2000-01-01 09:35:01-05:00   0.00  1000000.00
     2000-01-01 09:40:01-05:00  99.97   900034.39
     2000-01-01 09:45:01-05:00  99.98   900023.34
     # historical holdings marked to market=
     asset_id                       1000       -1   
-    2000-01-01 09:35:00-05:00       0.0  1000000.00
-    2000-01-01 09:35:01-05:00       0.0  1000000.00
+    2000-01-01 09:35:00-05:00      0.00  1000000.00
+    2000-01-01 09:35:01-05:00      0.00  1000000.00
     2000-01-01 09:40:01-05:00  99988.95   900034.39
     2000-01-01 09:45:01-05:00  99971.72   900023.34
     # historical statistics=
@@ -201,14 +201,14 @@ config:
     process_forecasts_config: {'order_type': 'price@twap', 'order_duration': 1, 'ath_start_time': datetime.time(9, 30), 'trading_start_time': datetime.time(9, 35), 'ath_end_time': datetime.time(16, 0), 'trading_end_time': datetime.time(15, 55), 'execution_mode': 'real_time'}
     portfolio: # historical holdings=
     asset_id                    1000       -1   
-    2000-01-01 09:35:00-05:00    0.0  1000000.00
-    2000-01-01 09:35:01-05:00    0.0  1000000.00
+    2000-01-01 09:35:00-05:00   0.00  1000000.00
+    2000-01-01 09:35:01-05:00   0.00  1000000.00
     2000-01-01 09:40:01-05:00  99.97   900034.39
     2000-01-01 09:45:01-05:00  99.98   900023.34
     # historical holdings marked to market=
     asset_id                       1000       -1   
-    2000-01-01 09:35:00-05:00       0.0  1000000.00
-    2000-01-01 09:35:01-05:00       0.0  1000000.00
+    2000-01-01 09:35:00-05:00      0.00  1000000.00
+    2000-01-01 09:35:01-05:00      0.00  1000000.00
     2000-01-01 09:40:01-05:00  99988.95   900034.39
     2000-01-01 09:45:01-05:00  99971.72   900023.34
     # historical statistics=

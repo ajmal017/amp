@@ -31,7 +31,7 @@ class TestExamplePipeline1(otodh.TestOmsDbHelper):
 
     asset_ids = [101]
 
-    def get_portfolio(
+    def get_database_portfolio(
         self,
         event_loop: asyncio.AbstractEventLoop,
         market_data: mdata.AbstractMarketData,
@@ -44,6 +44,28 @@ class TestExamplePipeline1(otodh.TestOmsDbHelper):
             event_loop,
             db_connection,
             table_name,
+            market_data=market_data,
+            mark_to_market_col="close",
+            pricing_method="twap.5T",
+            asset_ids=self.asset_ids,
+        )
+        portfolio.broker._column_remap = {
+            "bid": "bid",
+            "ask": "ask",
+            "midpoint": "midpoint",
+            "price": "close",
+        }
+        return portfolio
+
+    def get_simulated_portfolio(
+        self,
+        event_loop: asyncio.AbstractEventLoop,
+        market_data: mdata.AbstractMarketData,
+    ) -> omportfo.SimulatedPortfolio:
+        # Neither the fake data nor the pipeline is filtering out weekends, and
+        # so this is treated as a valid trading day.
+        portfolio = oporexam.get_simulated_portfolio_example1(
+            event_loop,
             market_data=market_data,
             mark_to_market_col="close",
             pricing_method="twap.5T",
@@ -80,25 +102,56 @@ class TestExamplePipeline1(otodh.TestOmsDbHelper):
         return order_processor
 
     @pytest.mark.slow
-    def test1(self) -> None:
+    def test_market_data1_database_portfolio(self) -> None:
         data, real_time_loop_time_out_in_secs = self._get_market_data_df1()
-        self._run_coroutines(data, real_time_loop_time_out_in_secs)
+        actual = self._run_coroutines(data, real_time_loop_time_out_in_secs)
+        self.check_string(actual)
 
     @pytest.mark.slow
-    def test2(self) -> None:
+    def test_market_data2_database_portfolio(self) -> None:
         data, real_time_loop_time_out_in_secs = self._get_market_data_df2()
-        self._run_coroutines(data, real_time_loop_time_out_in_secs)
+        actual = self._run_coroutines(data, real_time_loop_time_out_in_secs)
+        self.check_string(actual)
 
     @pytest.mark.slow
-    def test3(self) -> None:
+    def test_market_data3_database_portfolio(self) -> None:
         data, real_time_loop_time_out_in_secs = self._get_market_data_df3()
-        self._run_coroutines(data, real_time_loop_time_out_in_secs)
+        actual = self._run_coroutines(data, real_time_loop_time_out_in_secs)
+        self.check_string(actual)
+
+    @pytest.mark.slow
+    def test_market_data1_database_vs_dataframe_portfolio(self) -> None:
+        data, real_time_loop_time_out_in_secs = self._get_market_data_df1()
+        expected = self._run_coroutines(data, real_time_loop_time_out_in_secs)
+        actual = self._run_coroutines(
+            data, real_time_loop_time_out_in_secs, is_database_portfolio=False
+        )
+        self.assert_equal(actual, expected)
+
+    @pytest.mark.slow
+    def test_market_data2_database_vs_dataframe_portfolio(self) -> None:
+        data, real_time_loop_time_out_in_secs = self._get_market_data_df2()
+        expected = self._run_coroutines(data, real_time_loop_time_out_in_secs)
+        actual = self._run_coroutines(
+            data, real_time_loop_time_out_in_secs, is_database_portfolio=False
+        )
+        self.assert_equal(actual, expected)
+
+    @pytest.mark.slow
+    def test_market_data3_database_vs_dataframe_portfolio(self) -> None:
+        data, real_time_loop_time_out_in_secs = self._get_market_data_df3()
+        expected = self._run_coroutines(data, real_time_loop_time_out_in_secs)
+        actual = self._run_coroutines(
+            data, real_time_loop_time_out_in_secs, is_database_portfolio=False
+        )
+        self.assert_equal(actual, expected)
 
     def _run_coroutines(
         self,
         data: pd.DataFrame,
         real_time_loop_time_out_in_secs: int,
-    ):
+        is_database_portfolio: bool = True,
+    ) -> str:
         with hasynci.solipsism_context() as event_loop:
             initial_replayed_delay = 5
             market_data, _ = mdata.get_ReplayedTimeMarketData_from_df(
@@ -108,7 +161,10 @@ class TestExamplePipeline1(otodh.TestOmsDbHelper):
             )
             # Clean the DB tables.
             oomsdb.create_oms_tables(self.connection, incremental=False)
-            portfolio = self.get_portfolio(event_loop, market_data)
+            if is_database_portfolio:
+                portfolio = self.get_database_portfolio(event_loop, market_data)
+            else:
+                portfolio = self.get_simulated_portfolio(event_loop, market_data)
             # Create the real-time DAG.
             base_dag_builder = dtfpiexpip.ExamplePipeline1_ModelBuilder()
             prediction_col = "feature1"
@@ -120,7 +176,7 @@ class TestExamplePipeline1(otodh.TestOmsDbHelper):
                 volatility_col,
                 "last_week",
                 "asset_id",
-                log_dir="tmp_log_dir",
+                # log_dir="tmp_log_dir",
             )
             _LOG.debug("dag_builder=\n%s", dag_builder)
             config = dag_builder.get_config_template()
@@ -141,18 +197,23 @@ class TestExamplePipeline1(otodh.TestOmsDbHelper):
                 "execute_rt_loop_kwargs": execute_rt_loop_kwargs,
                 "dst_dir": None,
             }
-            # Build OrderProcessor.
-            order_processor = self.get_order_processor(portfolio)
-            # TODO(Paul): Maybe make this public.
-            initial_timestamp = portfolio._initial_timestamp
-            offset = pd.Timedelta(real_time_loop_time_out_in_secs, unit="seconds")
-            termination_condition = initial_timestamp + offset
-            order_processor_coroutine = order_processor.run_loop(
-                termination_condition
-            )
-            # Run.
+            # Set up coroutines.
             dag_runner = dtfsrtdaru.RealTimeDagRunner(**dag_runner_kwargs)
-            coroutines = [dag_runner.predict(), order_processor_coroutine]
+            coroutines = [dag_runner.predict()]
+            if is_database_portfolio:
+                # Build OrderProcessor.
+                order_processor = self.get_order_processor(portfolio)
+                # TODO(Paul): Maybe make this public.
+                initial_timestamp = portfolio._initial_timestamp
+                offset = pd.Timedelta(
+                    real_time_loop_time_out_in_secs, unit="seconds"
+                )
+                termination_condition = initial_timestamp + offset
+                order_processor_coroutine = order_processor.run_loop(
+                    termination_condition
+                )
+                coroutines.append(order_processor_coroutine)
+            # Run.
             # TODO(Paul): Why is this a list?
             result_bundles = hasynci.run(
                 asyncio.gather(*coroutines), event_loop=event_loop
@@ -173,7 +234,7 @@ class TestExamplePipeline1(otodh.TestOmsDbHelper):
                 volatility_adjusted_returns_col=volatility_adjusted_returns_col,
                 prediction_col=prediction_col,
             )
-            self.check_string(actual)
+            return actual
 
     @staticmethod
     def _get_market_data_df1() -> pd.DataFrame:

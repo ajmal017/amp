@@ -23,6 +23,7 @@ def get_simulated_portfolio_example1(
     market_data: Optional[mdata.AbstractMarketData] = None,
     mark_to_market_col: str = "price",
     pricing_method: str = "last",
+    timestamp_col: str = "end_datetime",
     asset_ids: Optional[List[int]] = None,
 ) -> omportfo.SimulatedPortfolio:
     # Build SimulatedBroker.
@@ -34,7 +35,6 @@ def get_simulated_portfolio_example1(
     account = "paper"
     asset_id_column = "asset_id"
     mark_to_market_col = mark_to_market_col
-    timestamp_col = "end_datetime"
     initial_cash = 1e6
     portfolio = omportfo.SimulatedPortfolio.from_cash(
         strategy_id,
