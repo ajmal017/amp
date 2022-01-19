@@ -543,7 +543,7 @@ class CustomFormatter(logging.Formatter):
             task = asyncio.Task.current_task()
             if task is not None:
                 msg += " %s" % task.get_name()
-        except RuntimeError:
+        except (RuntimeError, AttributeError):
             pass
         # Add information about the caller.
         # ```
