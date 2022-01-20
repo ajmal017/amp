@@ -8,8 +8,10 @@ import datetime
 import logging
 from typing import Optional, Tuple
 
+import numpy as np
 import pandas as pd
 
+import core.finance as cofinanc
 import helpers.hdbg as hdbg
 import helpers.hprint as hprint
 
@@ -29,6 +31,7 @@ class ForecastEvaluator:
         *,
         start_time: datetime.time = datetime.time(9, 30),
         end_time: datetime.time = datetime.time(16, 00),
+        remove_weekends: bool = False,
     ) -> None:
         """
         Initialize column names.
@@ -50,16 +53,19 @@ class ForecastEvaluator:
         self._prediction_col = prediction_col
         self._start_time = start_time
         self._end_time = end_time
+        self._remove_weekends = remove_weekends
 
     def to_str(
         self,
         df: pd.DataFrame,
+        *,
         target_gmv: Optional[float] = None,
         dollar_neutrality: str = "no_constraint",
     ) -> str:
         """
         Return the state of the Portfolio in terms of the holdings as a string.
 
+        :param df: as in `compute_portfolio`
         :param target_gmv: as in `compute_portfolio`
         :param dollar_neutrality: as in `compute_portfolio`
         """
@@ -92,6 +98,7 @@ class ForecastEvaluator:
         *,
         target_gmv: Optional[float] = None,
         dollar_neutrality: str = "no_constraint",
+        reindex_like_input: bool = False,
     ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
         Compute target positions, PnL, and portfolio stats.
@@ -99,8 +106,17 @@ class ForecastEvaluator:
         :param df: multiindexed dataframe with predictions, returns, volatility
         :param target_gmv: if `None`, then GMV may float
         :param dollar_neutrality: enforce a hard dollar neutrality constraint
-        :return: (target_positions, pnl, stats)
+        :param reindex_like_input: output dataframes to have the same input as
+            `df` (e.g., including any weekends or values outside of the
+            `start_time`-`end_time` range)
+        :return: (positions, pnl, stats)
         """
+        # Record index in case we reindex the results.
+        if reindex_like_input:
+            idx = df.index
+        # Remove weekends if enabled.
+        if self._remove_weekends:
+            df = cofinanc.remove_weekends(df)
         # Filter dateframe by time.
         _LOG.debug(
             "Filtering to data between time %s and %s",
@@ -108,16 +124,43 @@ class ForecastEvaluator:
             self._end_time,
         )
         df = df.between_time(self._start_time, self._end_time)
-        # Compute first approximation of dollar value risk-adjusted positions.
+        # Compute naive dollar value risk-adjusted positions.
         returns_predictions = ForecastEvaluator._get_df(df, self._prediction_col)
         volatility = ForecastEvaluator._get_df(df, self._volatility_col)
-        # Units of target positions = cash.
+        # The values of`target_positions` represent cash values.
         target_positions = returns_predictions.divide(volatility)
         _LOG.debug(
             "target_positions=\n%s" % hprint.dataframe_to_str(target_positions)
         )
+        target_positions = ForecastEvaluator._apply_dollar_neutrality(
+            target_positions, dollar_neutrality
+        )
+        target_positions = ForecastEvaluator._apply_gmv_scaling(
+            target_positions, target_gmv
+        )
+        returns = ForecastEvaluator._get_df(df, self._returns_col)
+        pnl = target_positions.shift(2).multiply(returns)
+        # Compute statistics.
+        stats = self._compute_statistics(target_positions, pnl)
+        # Convert one-step-ahead target positions to "point-in-time"
+        # (hypothetically) realized positions.
+        positions = target_positions.shift(1)
+        # Possibly reindex dataframes.
+        if reindex_like_input:
+            positions = positions.reindex(idx)
+            pnl = pnl.reindex(idx)
+            stats = stats.reindex(idx)
+        return positions, pnl, stats
+
+    @staticmethod
+    def _apply_dollar_neutrality(
+        target_positions: pd.DataFrame,
+        dollar_neutrality: str,
+    ) -> pd.DataFrame:
         hdbg.dassert_isinstance(dollar_neutrality, str)
-        if dollar_neutrality == "linear":
+        if dollar_neutrality == "no_constraint":
+            pass
+        elif dollar_neutrality == "linear":
             hdbg.dassert_lt(
                 1,
                 target_positions.shape[1],
@@ -133,13 +176,47 @@ class ForecastEvaluator:
                 % hprint.dataframe_to_str(target_positions)
             )
         elif dollar_neutrality == "nonlinear":
-            raise NotImplementedError
-        elif dollar_neutrality == "no_constraint":
-            pass
+            hdbg.dassert_lt(
+                1,
+                target_positions.shape[1],
+                "Unable to enforce dollar neutrality with a single asset.",
+            )
+            positive_asset_value = target_positions.clip(lower=0).sum(axis=1)
+            negative_asset_value = -1 * target_positions.clip(upper=0).sum(axis=1)
+            min_sided_asset_value = np.minimum(
+                positive_asset_value, negative_asset_value
+            )
+            hdbg.dassert_isinstance(positive_asset_value, pd.Series)
+            hdbg.dassert_isinstance(negative_asset_value, pd.Series)
+            hdbg.dassert_isinstance(min_sided_asset_value, pd.Series)
+            #
+            positive_scale_factor = min_sided_asset_value.divide(
+                positive_asset_value
+            )
+            negative_scale_factor = min_sided_asset_value.divide(
+                negative_asset_value
+            )
+            #
+            positive_positions = target_positions.clip(lower=0).multiply(
+                positive_scale_factor, axis=0
+            )
+            negative_positions = target_positions.clip(upper=0).multiply(
+                negative_scale_factor, axis=0
+            )
+            target_positions = positive_positions.add(negative_positions)
+            #
+            raise NotImplementedError("Implementation incomplete.")
         else:
             raise AssertionError(
                 "Unrecognized option `dollar_neutrality`=%s" % dollar_neutrality
             )
+        return target_positions
+
+    @staticmethod
+    def _apply_gmv_scaling(
+        target_positions: pd.DataFrame,
+        target_gmv: Optional[float],
+    ) -> pd.DataFrame:
         if target_gmv is not None:
             hdbg.dassert_lt(0, target_gmv)
             l1_norm = target_positions.abs().sum(axis=1, min_count=1)
@@ -152,11 +229,7 @@ class ForecastEvaluator:
                 "gmv scaled target_positions=\n%s"
                 % hprint.dataframe_to_str(target_positions)
             )
-        returns = ForecastEvaluator._get_df(df, self._returns_col)
-        pnl = target_positions.shift(2).multiply(returns)
-        # Stats
-        stats = self._compute_statistics(target_positions, pnl)
-        return target_positions.shift(1), pnl, stats
+        return target_positions
 
     def _compute_statistics(
         self,
