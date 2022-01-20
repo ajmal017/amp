@@ -342,6 +342,8 @@ class AbstractPortfolio(abc.ABC):
         cash = pd.Series(self._cash)
         asset_holdings[AbstractPortfolio.CASH_ID] = cash
         asset_holdings.columns.name = self._asset_id_col
+        # Explicitly cast to float. This makes the string representation of
+        # the dataframe more uniform and better.
         asset_holdings = asset_holdings.astype("float")
         return asset_holdings
 
@@ -356,6 +358,8 @@ class AbstractPortfolio(abc.ABC):
         cash = pd.Series(self._cash)
         asset_values[AbstractPortfolio.CASH_ID] = cash
         asset_values.columns.name = self._asset_id_col
+        # Explicitly cast to float. This makes the string representation of
+        # the dataframe more uniform and better.
         asset_values = asset_values.astype("float")
         return asset_values
 

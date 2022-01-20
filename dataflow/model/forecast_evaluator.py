@@ -4,6 +4,7 @@ Import as:
 import dataflow.model.forecast_evaluator as dtfmofoeva
 """
 
+import datetime
 import logging
 from typing import Optional, Tuple
 
@@ -22,10 +23,12 @@ class ForecastEvaluator:
 
     def __init__(
         self,
-        *,
         returns_col: str,
         volatility_col: str,
         prediction_col: str,
+        *,
+        start_time: datetime.time = datetime.time(9, 30),
+        end_time: datetime.time = datetime.time(16, 00),
     ) -> None:
         """
         Initialize column names.
@@ -45,30 +48,29 @@ class ForecastEvaluator:
         self._returns_col = returns_col
         self._volatility_col = volatility_col
         self._prediction_col = prediction_col
+        self._start_time = start_time
+        self._end_time = end_time
 
     def to_str(
         self,
         df: pd.DataFrame,
-        *,
         target_gmv: Optional[float] = None,
-        dollar_neutral: bool = False,
+        dollar_neutrality: str = "no_constraint",
     ) -> str:
         """
         Return the state of the Portfolio in terms of the holdings as a string.
 
         :param target_gmv: as in `compute_portfolio`
-        :param dollar_neutral: as in `compute_portfolio`
+        :param dollar_neutrality: as in `compute_portfolio`
         """
         target_positions, pnl, stats = self.compute_portfolio(
-            df, target_gmv=target_gmv, dollar_neutral=dollar_neutral
+            df, target_gmv=target_gmv, dollar_neutrality=dollar_neutrality
         )
         act = []
         precision = 2
         act.append(
             "# holdings marked to market=\n%s"
-            % hprint.dataframe_to_str(
-                target_positions.shift(1), precision=precision
-            )
+            % hprint.dataframe_to_str(target_positions, precision=precision)
         )
         act.append(
             "# pnl=\n%s"
@@ -89,17 +91,24 @@ class ForecastEvaluator:
         df: pd.DataFrame,
         *,
         target_gmv: Optional[float] = None,
-        dollar_neutral: bool = False,
+        dollar_neutrality: str = "no_constraint",
     ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
         Compute target positions, PnL, and portfolio stats.
 
         :param df: multiindexed dataframe with predictions, returns, volatility
         :param target_gmv: if `None`, then GMV may float
-        :param dollar_neutral: enforce a hard dollar neutrality constraint
+        :param dollar_neutrality: enforce a hard dollar neutrality constraint
         :return: (target_positions, pnl, stats)
         """
-        # Compute first appoximation of dollar value risk-adjusted positions.
+        # Filter dateframe by time.
+        _LOG.debug(
+            "Filtering to data between time %s and %s",
+            self._start_time,
+            self._end_time,
+        )
+        df = df.between_time(self._start_time, self._end_time)
+        # Compute first approximation of dollar value risk-adjusted positions.
         returns_predictions = ForecastEvaluator._get_df(df, self._prediction_col)
         volatility = ForecastEvaluator._get_df(df, self._volatility_col)
         # Units of target positions = cash.
@@ -107,7 +116,8 @@ class ForecastEvaluator:
         _LOG.debug(
             "target_positions=\n%s" % hprint.dataframe_to_str(target_positions)
         )
-        if dollar_neutral:
+        hdbg.dassert_isinstance(dollar_neutrality, str)
+        if dollar_neutrality == "linear":
             hdbg.dassert_lt(
                 1,
                 target_positions.shape[1],
@@ -121,6 +131,14 @@ class ForecastEvaluator:
             _LOG.debug(
                 "dollar neutral target_positions=\n%s"
                 % hprint.dataframe_to_str(target_positions)
+            )
+        elif dollar_neutrality == "nonlinear":
+            raise NotImplementedError
+        elif dollar_neutrality == "no_constraint":
+            pass
+        else:
+            raise AssertionError(
+                "Unrecognized option `dollar_neutrality`=%s" % dollar_neutrality
             )
         if target_gmv is not None:
             hdbg.dassert_lt(0, target_gmv)
@@ -138,7 +156,7 @@ class ForecastEvaluator:
         pnl = target_positions.shift(2).multiply(returns)
         # Stats
         stats = self._compute_statistics(target_positions, pnl)
-        return target_positions, pnl, stats
+        return target_positions.shift(1), pnl, stats
 
     def _compute_statistics(
         self,
