@@ -7,7 +7,7 @@ import abc
 import collections
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -368,24 +368,40 @@ class AbstractPortfolio(abc.ABC):
         #
         wall_clock_time = self._get_wall_clock_time()
         wall_clock_time_str = wall_clock_time.strftime("%Y%m%d_%H%M%S")
-        filename = f"{wall_clock_time_str}.csv"
+        file_name = f"{wall_clock_time_str}.csv"
         #
         holdings_df = self.get_historical_holdings()
-        holdings_filename = os.path.join(log_dir, "holdings", filename)
-        hio.create_enclosing_dir(holdings_filename, incremental=True)
-        holdings_df.to_csv(holdings_filename)
+        AbstractPortfolio._write_df(holdings_df, log_dir, "holdings", file_name)
         #
-        holdings_mtm = self.get_historical_holdings_marked_to_market()
-        holdings_mtm_filename = os.path.join(
-            log_dir, "holdings_marked_to_market", filename
+        holdings_mtm_df = self.get_historical_holdings_marked_to_market()
+        AbstractPortfolio._write_df(
+            holdings_mtm_df, log_dir, "holdings_marked_to_market", file_name
         )
-        hio.create_enclosing_dir(holdings_mtm_filename, incremental=True)
-        holdings_mtm.to_csv(holdings_mtm_filename)
         #
-        stats = self.get_historical_statistics()
-        stats_filename = os.path.join(log_dir, "statistics", filename)
-        hio.create_enclosing_dir(stats_filename, incremental=True)
-        stats.to_csv(stats_filename)
+        stats_df = self.get_historical_statistics()
+        AbstractPortfolio._write_df(stats_df, log_dir, "statistics", file_name)
+
+    @staticmethod
+    def read_state(
+        log_dir: str,
+        file_name: str,
+        *,
+        tz: str = "America/New_York",
+        cast_asset_ids_to_int: bool = True,
+    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        holdings_df = AbstractPortfolio._read_df(
+            log_dir, "holdings", file_name, tz
+        )
+        holdings_mtm_df = AbstractPortfolio._read_df(
+            log_dir, "holdings_marked_to_market", file_name, tz
+        )
+        stats_df = AbstractPortfolio._read_df(
+            log_dir, "statistics", file_name, tz
+        )
+        if cast_asset_ids_to_int:
+            holdings_df.columns = holdings_df.columns.astype("int64")
+            holdings_mtm_df.columns = holdings_mtm_df.columns.astype("int64")
+        return holdings_df, holdings_mtm_df, stats_df
 
     def price_assets(
         self,
@@ -415,6 +431,29 @@ class AbstractPortfolio(abc.ABC):
         prices.name = "price"
         hdbg.dassert(not prices.index.has_duplicates)
         return prices
+
+    @staticmethod
+    def _write_df(
+        df: pd.DataFrame,
+        log_dir: str,
+        name: str,
+        file_name: str,
+    ) -> None:
+        path = os.path.join(log_dir, name, file_name)
+        hio.create_enclosing_dir(path, incremental=True)
+        df.to_csv(path)
+
+    @staticmethod
+    def _read_df(
+        log_dir: str,
+        name: str,
+        file_name: str,
+        tz: str,
+    ) -> pd.DataFrame:
+        path = os.path.join(log_dir, name, file_name)
+        df = pd.read_csv(path, index_col=0, parse_dates=True)
+        df.index = df.index.tz_convert(tz)
+        return df
 
     @abc.abstractmethod
     def _observe_holdings(
