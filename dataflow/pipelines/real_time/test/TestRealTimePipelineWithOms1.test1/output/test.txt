@@ -8,7 +8,7 @@ config:
     source_node_name: RealTimeDataSource
     source_node_kwargs:
       market_data: <market_data.replayed_market_data.ReplayedMarketData object>
-      period: last_5mins
+      timedelta: 0 days 00:05:00
       asset_id_col: asset_id
       multiindex_output: True
   process_data:
@@ -99,7 +99,7 @@ config:
     source_node_name: RealTimeDataSource
     source_node_kwargs:
       market_data: <market_data.replayed_market_data.ReplayedMarketData object>
-      period: last_5mins
+      timedelta: 0 days 00:05:00
       asset_id_col: asset_id
       multiindex_output: True
   process_data:
@@ -190,7 +190,7 @@ config:
     source_node_name: RealTimeDataSource
     source_node_kwargs:
       market_data: <market_data.replayed_market_data.ReplayedMarketData object>
-      period: last_5mins
+      timedelta: 0 days 00:05:00
       asset_id_col: asset_id
       multiindex_output: True
   process_data:

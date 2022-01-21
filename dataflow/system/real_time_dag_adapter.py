@@ -27,7 +27,7 @@ class RealTimeDagAdapter(dtfcore.DagAdapter):
         portfolio: omportfo.AbstractPortfolio,
         prediction_col: str,
         volatility_col: str,
-        period: str,
+        timedelta: pd.Timedelta,
         asset_id_col: str,
         *,
         log_dir: Optional[str] = None,
@@ -38,7 +38,7 @@ class RealTimeDagAdapter(dtfcore.DagAdapter):
         # Configure a DataSourceNode.
         source_node_kwargs = {
             "market_data": market_data,
-            "period": period,
+            "timedelta": timedelta,
             "asset_id_col": asset_id_col,
             "multiindex_output": True,
         }

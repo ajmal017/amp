@@ -81,10 +81,10 @@ class TestReplayedMarketData1(hunitest.TestCase):
         """
         initial_replayed_delay = 5
         #
-        period = "last_5mins"
+        timedelta = pd.Timedelta("5T")
         normalize_data = True
         func = lambda market_data: market_data.get_data_for_last_period(
-            period, normalize_data=normalize_data
+            timedelta, normalize_data=normalize_data
         )
         # pylint: disable=line-too-long
         expected_df_as_str = """
@@ -118,10 +118,10 @@ class TestReplayedMarketData1(hunitest.TestCase):
         """
         initial_replayed_delay = 5
         #
-        period = "last_5mins"
+        timedelta = pd.Timedelta("5T")
         normalize_data = False
         func = lambda market_data: market_data.get_data_for_last_period(
-            period, normalize_data=normalize_data
+            timedelta, normalize_data=normalize_data
         )
         # pylint: disable=line-too-long
         expected_df_as_str = """
@@ -156,10 +156,10 @@ class TestReplayedMarketData1(hunitest.TestCase):
         """
         initial_replayed_delay = 5
         #
-        period = "last_1min"
+        timedelta = pd.Timedelta("1T")
         normalize_data = True
         func = lambda market_data: market_data.get_data_for_last_period(
-            period, normalize_data=normalize_data
+            timedelta, normalize_data=normalize_data
         )
         # pylint: disable=line-too-long
         expected_df_as_str = """
@@ -189,10 +189,10 @@ class TestReplayedMarketData1(hunitest.TestCase):
         """
         initial_replayed_delay = 20
         #
-        period = "last_10mins"
+        timedelta = pd.Timedelta("10T")
         normalize_data = True
         func = lambda market_data: market_data.get_data_for_last_period(
-            period, normalize_data=normalize_data
+            timedelta, normalize_data=normalize_data
         )
         # pylint: disable=line-too-long
         expected_df_as_str = """
@@ -228,10 +228,10 @@ class TestReplayedMarketData1(hunitest.TestCase):
         """
         initial_replayed_delay = 30
         #
-        period = "last_day"
+        timedelta = pd.Timedelta("1D")
         normalize_data = True
         func = lambda market_data: market_data.get_data_for_last_period(
-            period, normalize_data=normalize_data
+            timedelta, normalize_data=normalize_data
         )
         # pylint: disable=line-too-long
         expected_df_as_str = """
@@ -262,15 +262,15 @@ class TestReplayedMarketData1(hunitest.TestCase):
     def test_get_data6(self) -> None:
         """
         - Set the current time to 10:00
-        - Get all data for specified period
+        - Get all data using 365 days for specified period
         - The returned data should be in [9:30, 10:00]
         """
         initial_replayed_delay = 30
         #
-        period = "all"
+        timedelta = pd.Timedelta("365T")
         normalize_data = True
         func = lambda market_data: market_data.get_data_for_last_period(
-            period, normalize_data=normalize_data
+            timedelta, normalize_data=normalize_data
         )
         # pylint: disable=line-too-long
         expected_df_as_str = """
@@ -307,10 +307,10 @@ class TestReplayedMarketData1(hunitest.TestCase):
         """
         initial_replayed_delay = 0
         #
-        period = "last_5mins"
+        timedelta = pd.Timedelta("5T")
         normalize_data = True
         func = lambda market_data: market_data.get_data_for_last_period(
-            period, normalize_data=normalize_data
+            timedelta, normalize_data=normalize_data
         )
         # Check.
         expected_df_as_str = """
@@ -335,10 +335,10 @@ class TestReplayedMarketData1(hunitest.TestCase):
         first minute of trading.
         """
         initial_replayed_delay = 1
-        period = "last_5mins"
+        timedelta = pd.Timedelta("5T")
         normalize_data = True
         func = lambda market_data: market_data.get_data_for_last_period(
-            period, normalize_data=normalize_data
+            timedelta, normalize_data=normalize_data
         )
         # pylint: disable=line-too-long
         expected_df_as_str = """
@@ -367,10 +367,10 @@ class TestReplayedMarketData1(hunitest.TestCase):
         """
         initial_replayed_delay = 3
         #
-        period = "last_5mins"
+        timedelta = pd.Timedelta("5T")
         normalize_data = True
         func = lambda market_data: market_data.get_data_for_last_period(
-            period, normalize_data=normalize_data
+            timedelta, normalize_data=normalize_data
         )
         # Check.
         # pylint: disable=line-too-long
@@ -402,10 +402,10 @@ class TestReplayedMarketData1(hunitest.TestCase):
         """
         initial_replayed_delay = 6
         #
-        period = "last_5mins"
+        timedelta = pd.Timedelta("5T")
         normalize_data = True
         func = lambda market_data: market_data.get_data_for_last_period(
-            period, normalize_data=normalize_data
+            timedelta, normalize_data=normalize_data
         )
         # Check.
         # pylint: disable=line-too-long
@@ -440,10 +440,10 @@ class TestReplayedMarketData1(hunitest.TestCase):
         """
         initial_replayed_delay = 63
         #
-        period = "last_5mins"
+        timedelta = pd.Timedelta("5T")
         normalize_data = True
         func = lambda market_data: market_data.get_data_for_last_period(
-            period, normalize_data=normalize_data
+            timedelta, normalize_data=normalize_data
         )
         # Check.
         # pylint: disable=line-too-long

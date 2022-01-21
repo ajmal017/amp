@@ -3996,6 +3996,8 @@ def _get_lint_docker_cmd(
         docker_cmd_.append(r"--user $(id -u):$(id -g)")
     docker_cmd_.extend(
         [
+            # Pass MYPYPATH for `mypy` to find the packages from PYTHONPATH.
+            "-e MYPYPATH",
             f"-v '{repo_root}':/src",
             f"--workdir={work_dir}",
             f"{image}",

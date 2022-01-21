@@ -497,6 +497,7 @@ def purify_amp_references(txt: str) -> str:
     txt = re.sub(r"\s+amp\/", " ", txt, flags=re.MULTILINE)
     txt = re.sub(r"\/amp:", ":", txt, flags=re.MULTILINE)
     txt = re.sub(r"^\./", "", txt, flags=re.MULTILINE)
+    txt = re.sub(r"amp\.helpers", "helpers", txt, flags=re.MULTILINE)
     _LOG.debug("After %s: txt='\n%s'", hintros.get_function_name(), txt)
     return txt
 
@@ -506,6 +507,8 @@ def purify_app_references(txt: str) -> str:
     Remove references to `/app`.
     """
     txt = re.sub("/app/", "", txt, flags=re.MULTILINE)
+    txt = re.sub("app\.helpers", "helpers", txt, flags=re.MULTILINE)
+    txt = re.sub("app\.amp\.helpers", "amp.helpers", txt, flags=re.MULTILINE)
     _LOG.debug("After %s: txt='\n%s'", hintros.get_function_name(), txt)
     return txt
 
@@ -532,6 +535,7 @@ def purify_from_env_vars(txt: str) -> str:
     return txt
 
 
+# TODO(gp): -> purify_object_references
 def purify_object_reference(txt: str) -> str:
     """
     Remove references like `at 0x7f43493442e0`.

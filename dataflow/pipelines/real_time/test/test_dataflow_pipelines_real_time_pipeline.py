@@ -65,10 +65,10 @@ class TestRealTimeReturnPipeline1(hunitest.TestCase):
                 initial_replayed_delay,
                 df,
             )
-            period = "last_5mins"
+            timedelta = pd.Timedelta("5T")
             source_node_kwargs = {
                 "market_data": market_data,
-                "period": period,
+                "timedelta": timedelta,
                 "asset_id_col": "asset_id",
                 "multiindex_output": False,
             }
@@ -165,10 +165,10 @@ class TestRealTimePipelineWithOms1(hunitest.TestCase):
                 initial_replayed_delay,
                 df,
             )
-            period = "last_5mins"
+            timedelta = pd.Timedelta("5T")
             source_node_kwargs = {
                 "market_data": market_data,
-                "period": period,
+                "timedelta": timedelta,
                 "asset_id_col": "asset_id",
                 "multiindex_output": True,
             }
@@ -387,13 +387,17 @@ class TestRealTimeMvnReturnsWithOms1(otodh.TestOmsDbHelper):
             portfolio = self.get_portfolio(event_loop, market_data)
             # Create the real-time DAG.
             base_dag_builder = dtfcore.MvnReturnsBuilder()
+            prediction_col = "close"
+            volatility_col = "close"
+            timedelta = pd.Timedelta("5T")
+            asset_id_col = "asset_id"
             dag_builder = dtfsys.RealTimeDagAdapter(
                 base_dag_builder,
                 portfolio,
-                "close",
-                "close",
-                "last_5mins",
-                "asset_id",
+                prediction_col,
+                volatility_col,
+                timedelta,
+                asset_id_col,
             )
             _LOG.debug("dag_builder=\n%s", dag_builder)
             config = dag_builder.get_config_template()
@@ -533,13 +537,17 @@ class TestRealTimeMvnReturnsWithOms2(otodh.TestOmsDbHelper):
             portfolio = self.get_portfolio(event_loop, market_data)
             # Create the real-time DAG.
             base_dag_builder = dtfcore.MvnReturnsBuilder()
+            prediction_col = "close.ret_0"
+            volatility_col = "close.ret_0"
+            timedelta = pd.Timedelta("5T")
+            asset_id_col = "asset_id"
             dag_builder = dtfsys.RealTimeDagAdapter(
                 base_dag_builder,
                 portfolio,
-                "close.ret_0",
-                "close.ret_0",
-                "last_5mins",
-                "asset_id",
+                prediction_col,
+                volatility_col,
+                timedelta,
+                asset_id_col
             )
             _LOG.debug("dag_builder=\n%s", dag_builder)
             config = dag_builder.get_config_template()
