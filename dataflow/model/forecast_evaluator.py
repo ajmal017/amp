@@ -6,6 +6,7 @@ import dataflow.model.forecast_evaluator as dtfmofoeva
 
 import datetime
 import logging
+import os
 from typing import Optional, Tuple
 
 import numpy as np
@@ -13,6 +14,7 @@ import pandas as pd
 
 import core.finance as cofinanc
 import helpers.hdbg as hdbg
+import helpers.hio as hio
 import helpers.hprint as hprint
 
 _LOG = logging.getLogger(__name__)
@@ -92,6 +94,52 @@ class ForecastEvaluator:
         act = "\n".join(act)
         return act
 
+    def log_portfolio(
+        self,
+        df: pd.DataFrame,
+        log_dir: str,
+        *,
+        target_gmv: Optional[float] = None,
+        dollar_neutrality: str = "no_constraint",
+        reindex_like_input: bool = False,
+    ) -> str:
+        hdbg.dassert(log_dir, "Must specify `log_dir` to log portfolio.")
+        positions, pnl, statistics = self.compute_portfolio(
+            df,
+            target_gmv=target_gmv,
+            dollar_neutrality=dollar_neutrality,
+            reindex_like_input=reindex_like_input,
+        )
+        last_timestamp = df.index[-1]
+        hdbg.dassert_isinstance(last_timestamp, pd.Timestamp)
+        last_time_str = last_timestamp.strftime("%Y%m%d_%H%M%S")
+        file_name = f"{last_time_str}.csv"
+        #
+        ForecastEvaluator._write_df(positions, log_dir, "positions", file_name)
+        ForecastEvaluator._write_df(pnl, log_dir, "pnl", file_name)
+        ForecastEvaluator._write_df(statistics, log_dir, "statistics", file_name)
+        return file_name
+
+    def read_portfolio(
+        self,
+        log_dir: str,
+        file_name: str,
+        *,
+        tz: str = "America/New_York",
+        cast_asset_ids_to_int: bool = True,
+    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        positions = ForecastEvaluator._read_df(
+            log_dir, "positions", file_name, tz
+        )
+        pnl = ForecastEvaluator._read_df(log_dir, "pnl", file_name, tz)
+        statistics = ForecastEvaluator._read_df(
+            log_dir, "statistics", file_name, tz
+        )
+        if cast_asset_ids_to_int:
+            positions.columns = positions.columns.astype("int64")
+            pnl.columns = pnl.columns.astype("int64")
+        return positions, pnl, statistics
+
     def compute_portfolio(
         self,
         df: pd.DataFrame,
@@ -111,6 +159,7 @@ class ForecastEvaluator:
             `start_time`-`end_time` range)
         :return: (positions, pnl, stats)
         """
+        ForecastEvaluator._validate_df(df)
         # Record index in case we reindex the results.
         if reindex_like_input:
             idx = df.index
@@ -151,6 +200,29 @@ class ForecastEvaluator:
             pnl = pnl.reindex(idx)
             stats = stats.reindex(idx)
         return positions, pnl, stats
+
+    @staticmethod
+    def _write_df(
+        df: pd.DataFrame,
+        log_dir: str,
+        name: str,
+        file_name: str,
+    ) -> None:
+        path = os.path.join(log_dir, name, file_name)
+        hio.create_enclosing_dir(path, incremental=True)
+        df.to_csv(path)
+
+    @staticmethod
+    def _read_df(
+        log_dir: str,
+        name: str,
+        file_name: str,
+        tz: str,
+    ) -> pd.DataFrame:
+        path = os.path.join(log_dir, name, file_name)
+        df = pd.read_csv(path, index_col=0, parse_dates=True)
+        df.index = df.index.tz_convert(tz)
+        return df
 
     @staticmethod
     def _apply_dollar_neutrality(
@@ -248,6 +320,11 @@ class ForecastEvaluator:
             }
         )
         return stats
+
+    @staticmethod
+    def _validate_df(df: pd.DataFrame) -> None:
+        hdbg.dassert_isinstance(df, pd.DataFrame)
+        hdbg.dassert_isinstance(df.index, pd.DatetimeIndex)
 
     @staticmethod
     def _get_df(df: pd.DataFrame, col: str) -> pd.DataFrame:
