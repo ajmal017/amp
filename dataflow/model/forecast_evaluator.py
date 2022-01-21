@@ -207,7 +207,7 @@ class ForecastEvaluator:
             #
             raise NotImplementedError("Implementation incomplete.")
         else:
-            raise AssertionError(
+            raise ValueError(
                 "Unrecognized option `dollar_neutrality`=%s" % dollar_neutrality
             )
         return target_positions
@@ -238,7 +238,7 @@ class ForecastEvaluator:
     ) -> pd.DataFrame:
         positions = target_positions.shift(1)
         gmv = positions.abs().sum(axis=1, min_count=1)
-        nav = positions.mean(axis=1)
+        nav = positions.sum(axis=1, min_count=1)
         portfolio_pnl = pnl.sum(axis=1, min_count=1)
         stats = pd.DataFrame(
             {

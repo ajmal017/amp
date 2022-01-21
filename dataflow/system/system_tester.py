@@ -72,6 +72,7 @@ class SystemTester:
             result_df,
             target_gmv=target_gmv,
             dollar_neutrality=dollar_neutrality,
+            reindex_like_input=True,
         )
         research_pnl = stats["pnl"]
         actual = "\n".join(map(str, actual))
