@@ -6,6 +6,7 @@ import helpers.hjoblib as hjoblib
 
 import concurrent.futures
 import logging
+import math
 import os
 import pprint
 import random
@@ -17,32 +18,144 @@ from tqdm.autonotebook import tqdm
 
 import helpers.hdatetime as hdateti
 import helpers.hdbg as hdbg
-import helpers.htqdm as htqdm
 import helpers.hio as hio
 import helpers.hprint as hprint
 import helpers.htimer as htimer
+import helpers.htqdm as htqdm
 
 _LOG = logging.getLogger(__name__)
+
+# - Consider a list of `n` invocations of a given `func`
+#   - E.g., `func(param_1), func(param_2), ..., func(param_n)`
+# - A `Workload` is composed of a list of `m` `Tasks` representing the `func`
+#   invocations above
+# - Each `Task` executes a subset of the functions
+# - Tasks are a partition, i.e., each function invocation is executed by one and
+#   only one task
+# - The `m` `Tasks` are then executed on `k` threads in parallel or serially
 
 # #############################################################################
 # Task
 # #############################################################################
 
-# A `Task` contains the parameters to pass to the function, in the forms of a
-# tuple of `*args` and `**kwargs`.
+# A `Task` contains the parameters to pass to the function that needs to be execute
+# in a workload. It is represented by a tuple of `*args` and `**kwargs`. E.g.,
+# ```
+# args=()
+# kwargs={
+#   'asset_col_name': 'asset',
+#   'dst_dir': './tmp.s3_out',
+#   'parquet_file_names': [
+#           './tmp.s3/20220110/data.parquet',
+#           './tmp.s3/20220111/data.parquet',
+#           './tmp.s3/20220112/data.parquet']
+# }
+# ```
 Task = Tuple[Tuple[Any], Dict[str, Any]]
+
+
+# TODO(gp): @Nikola add unit tests
+def split_list_in_tasks(
+    list_in: List[Any],
+    n: int,
+    *,
+    keep_order: bool = False,
+    num_elems_per_task: Optional[int] = None,
+) -> List[List[Any]]:
+    """
+    Split a list in tasks based on the number of threads or elements per partition.
+
+    :param num_elems_per_task: force each task to have the given number of elements
+    :param keep_order: split the list so that consecutive elements of the list
+        are in different tasks. This favors executing the workload in order on `n`
+        threads
+    - E.g., [a, b, c, d, e] executed on 3 threads [1, 2, 3] gives the allocation
+      for `keep_order=True`:
+        ```
+        1 -> [a, d]
+        2 -> [b, e]
+        3 -> [c]
+        ```
+    - For `keep_order=False` the allocation is:
+        ```
+        1 -> [a, b]
+        2 -> [c, d]
+        3 -> [e]
+        ```
+    - For `num_elems_per_task=3` the allocation is:
+        ```
+        1 -> [a, b, c]
+        2 -> [d, e]
+        3 -> []
+        ```
+    """
+    hdbg.dassert_lte(1, n)
+    hdbg.dassert_lte(n, len(list_in), "There are fewer tasks than threads")
+    if keep_order:
+        hdbg.dassert_is(
+            num_elems_per_task,
+            None,
+            "Can't specify num_elems_per_task with keep_order",
+        )
+        list_out = [[] for _ in range(n)]
+        for i in range(len(list_in)):
+            elem = list_in[i]
+            _LOG.debug("%s: %s -> %s", i, elem, i % n)
+            list_out[i % n].append(elem)
+    else:
+        if num_elems_per_task is None:
+            k = int(math.ceil(len(list_in) / n))
+        else:
+            k = num_elems_per_task
+        hdbg.dassert_lte(1, k)
+        list_out = [list_in[i : i + k] for i in range(0, len(list_in), k)]
+    # Ensure that the elements are all distributed.
+    hdbg.dassert_eq(sum(len(l) for l in list_out), len(list_in))
+    return list_out
+
+
+def apply_incremental_mode(
+    src_dst_file_name_map: List[Tuple[str, str]]
+) -> List[Tuple[str, str]]:
+    """
+    Apply the incremental mode, by remove all the tuples in the src_file -> dst_file
+    mapping where the dst file already exists.
+
+    :return: filtered mapping
+    """
+    hdbg.dassert_container_type(src_dst_file_name_map, list, tuple)
+    src_dst_file_name_map_tmp = []
+    for src_dst_file_name in src_dst_file_name_map:
+        # Parse the input.
+        hdbg.dassert_eq(len(src_dst_file_name), 2)
+        src_file_name, dst_file_name = src_dst_file_name
+        #
+        _LOG.debug("%s -> %s", src_file_name, dst_file_name)
+        hdbg.dassert_exists(src_file_name)
+        if os.path.exists(dst_file_name):
+            _LOG.debug("Skipping %s -> %s", src_file_name, dst_file_name)
+        else:
+            src_dst_file_name_map_tmp.append((src_file_name, dst_file_name))
+    _LOG.info(
+        "After applying incremental mode, there are %s / %s files to process",
+        len(src_dst_file_name_map_tmp),
+        len(src_dst_file_name_map),
+    )
+    return src_dst_file_name_map_tmp
 
 
 def validate_task(task: Task) -> bool:
     """
     Assert if the task is malformed, otherwise return True.
     """
+    # The task is a tuple.
     hdbg.dassert_isinstance(task, tuple)
     hdbg.dassert_eq(len(task), 2)
+    # Parse it.
     args, kwargs = task
-    _LOG.debug("task[0]=%s", str(args))
+    _LOG.debug("task.args=%s", pprint.pformat(args))
     hdbg.dassert_isinstance(args, tuple)
-    _LOG.debug("task[1]=%s", str(kwargs))
+    _LOG.debug("task.kwargs=%s", pprint.pformat(kwargs))
     hdbg.dassert_isinstance(kwargs, dict)
     return True
 
@@ -62,12 +175,12 @@ def task_to_string(task: Task) -> str:
 # #############################################################################
 
 # A `Workload` represents multiple executions of a function with different
-# parameters.
+# parameters, i.e., `Tasks`.
 Workload = Tuple[
     # `func`: the function representing the workload to execute
     Callable,
-    # `func_name`: the mnemonic name of the function, which is used for debugging info
-    # and for naming the directory storing the cache
+    # `func_name`: the mnemonic name of the function, which is used for debugging
+    #   info and for naming the directory storing the cache
     # - E.g., `vltbut.get_cached_bar_data_for_date_interval`
     # - Note that the `func_name` can be different than the name of `func`
     #   - E.g., we can call
@@ -85,6 +198,7 @@ def validate_workload(workload: Workload) -> bool:
     """
     Assert if the workload is malformed, otherwise return True.
     """
+    # A valid workload` is a triple.
     hdbg.dassert_isinstance(workload, tuple)
     hdbg.dassert_eq(len(workload), 3)
     # Parse workload.
@@ -101,6 +215,7 @@ def randomize_workload(
     workload: Workload, seed: Optional[int] = None
 ) -> Workload:
     validate_workload(workload)
+    # Parse the workload.
     workload_func, func_name, tasks = workload
     seed = seed or 42
     random.seed(seed)
@@ -111,13 +226,34 @@ def randomize_workload(
 
 
 def workload_to_string(workload: Workload) -> str:
+    """
+    Print the workload.
+
+    E.g.,
+    ```
+    workload_func=_LimeTask317_process_chunk
+    func_name=_LimeTask317_process_chunk
+    # task 1 / 3
+    args=([('./tmp.s3/20220110/data.parquet',
+       './tmp.s3_out/./tmp.s3/20220110/data.parquet')],)
+    kwargs={}
+    # task 2 / 3
+    args=([('./tmp.s3/20220111/data.parquet',
+       './tmp.s3_out/./tmp.s3/20220111/data.parquet')],)
+    kwargs={}
+    # task 3 / 3
+    args=([('./tmp.s3/20220112/data.parquet',
+       './tmp.s3_out/./tmp.s3/20220112/data.parquet')],)
+    kwargs={}
+    ```
+    """
     validate_workload(workload)
     workload_func, func_name, tasks = workload
     txt = []
     txt.append("workload_func=%s" % workload_func.__name__)
     txt.append("func_name=%s" % func_name)
     for i, task in enumerate(tasks):
-        txt.append("\n" + hprint.frame("Task %s / %s" % (i + 1, len(tasks))))
+        txt.append("# task %s / %s" % (i + 1, len(tasks)))
         txt.append(task_to_string(task))
     txt = "\n".join(txt)
     return txt
@@ -162,6 +298,17 @@ def _get_workload(
 # Layer passing information from `parallel_execute` to the function to execute
 # in parallel.
 # #############################################################################
+
+
+def get_num_executors(num_threads: Union[str, int]) -> int:
+    if num_threads == "serial":
+        num_threads = 1
+    else:
+        if num_threads == -1:
+            num_threads = joblib.cpu_count()
+    num_threads = int(num_threads)
+    hdbg.dassert_lte(1, num_threads)
+    return num_threads
 
 
 def _parallel_execute_decorator(
@@ -281,7 +428,6 @@ def parallel_execute(
     Run a workload in parallel.
 
     :param workload: the workload to execute
-
     :param dry_run: if True, print the workload and exit without executing it
     :param num_threads: joblib parameter to control how many threads to use
     :param incremental: parameter passed to the function to execute, to control if
@@ -302,6 +448,8 @@ def parallel_execute(
           is to return the exception of the failing task
     """
     validate_workload(workload)
+    print(hprint.frame("Workload"))
+    print(workload_to_string(workload))
     workload_func, func_name, tasks = workload
     #
     _LOG.info(
@@ -310,10 +458,14 @@ def parallel_execute(
         )
     )
     if dry_run:
-        print(workload_to_string(workload))
         _LOG.warning("Exiting without executing, as per user request")
         return None
     _LOG.info("Saving log info in '%s'", log_file)
+    _LOG.info(
+        "Number of executing threads=%s (%s)",
+        get_num_executors(num_threads),
+        num_threads,
+    )
     _LOG.info("Number of tasks=%s", len(tasks))
     # Run.
     task_len = len(tasks)
