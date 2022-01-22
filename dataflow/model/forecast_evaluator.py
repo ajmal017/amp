@@ -120,8 +120,8 @@ class ForecastEvaluator:
         ForecastEvaluator._write_df(statistics, log_dir, "statistics", file_name)
         return file_name
 
+    @staticmethod
     def read_portfolio(
-        self,
         log_dir: str,
         file_name: str,
         *,

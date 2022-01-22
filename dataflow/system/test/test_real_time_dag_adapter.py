@@ -34,6 +34,7 @@ class TestRealtimeDagAdapter1(hunitest.TestCase):
         # Build a DagAdapter.
         prediction_col = "close"
         volatility_col = "close"
+        returns_col = "close"
         timedelta = pd.Timedelta("5T")
         asset_id_col = "asset_id"
         dag_adapter = dtfsrtdaad.RealTimeDagAdapter(
@@ -41,8 +42,9 @@ class TestRealtimeDagAdapter1(hunitest.TestCase):
             portfolio,
             prediction_col,
             volatility_col,
+            returns_col,
             timedelta,
-            asset_id_col
+            asset_id_col,
         )
         txt.append(hprint.frame("dag_adapter"))
         txt.append(hprint.indent(str(dag_adapter)))

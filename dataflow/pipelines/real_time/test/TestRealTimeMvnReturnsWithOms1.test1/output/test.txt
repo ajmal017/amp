@@ -65,6 +65,7 @@ result_bundles=
       trading_end_time: 16:40:00
       execution_mode: real_time
       log_dir: None
+    evaluate_forecasts_config: None
 result_nid: process_forecasts
 method: predict
 result_df:                           close.ret_0 twap.ret_0 vwap.ret_0 close twap volume  \
@@ -224,6 +225,7 @@ class: ResultBundle, config:
       trading_end_time: 16:40:00
       execution_mode: real_time
       log_dir: None
+    evaluate_forecasts_config: None
 result_nid: process_forecasts
 method: predict
 result_df:                           close.ret_0 twap.ret_0 vwap.ret_0     close  \
@@ -383,6 +385,7 @@ class: ResultBundle, config:
       trading_end_time: 16:40:00
       execution_mode: real_time
       log_dir: None
+    evaluate_forecasts_config: None
 result_nid: process_forecasts
 method: predict
 result_df:                           close.ret_0 twap.ret_0 vwap.ret_0     close  \

@@ -175,6 +175,7 @@ class TestExamplePipeline1(otodh.TestOmsDbHelper):
             base_dag_builder = dtfpiexpip.ExamplePipeline1_ModelBuilder()
             prediction_col = "feature1"
             volatility_col = "vwap.ret_0.vol"
+            returns_col = "vwap.ret_0"
             timedelta = pd.Timedelta("7D")
             asset_id_col = "asset_id"
             dag_builder = dtfsrtdaad.RealTimeDagAdapter(
@@ -182,6 +183,7 @@ class TestExamplePipeline1(otodh.TestOmsDbHelper):
                 portfolio,
                 prediction_col,
                 volatility_col,
+                returns_col,
                 timedelta,
                 asset_id_col,
                 # log_dir="tmp_log_dir",
