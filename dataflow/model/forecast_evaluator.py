@@ -205,6 +205,38 @@ class ForecastEvaluator:
             stats = stats.reindex(idx)
         return positions, pnl, stats
 
+    def annotate_forecasts(
+        self,
+        df: pd.DataFrame,
+        *,
+        target_gmv: Optional[float] = None,
+        dollar_neutrality: str = "no_constraint",
+    ) -> pd.DataFrame:
+        """
+        Wraps `compute_portfolio()`, returns a single multiindexed dataframe.
+
+        :param df: as in `compute_portfolio()`
+        :param target_gmv: as in `compute_portfolio()`
+        :param dollar_neutrality: as in `compute_portfolio()`
+        :return: multiindexed dataframe with level-0 columns
+            "returns", "volatility", "prediction", "position", "pnl"
+        """
+        positions, pnl, _ = self.compute_portfolio(
+            df,
+            target_gmv=target_gmv,
+            dollar_neutrality=dollar_neutrality,
+            reindex_like_input=True,
+        )
+        dfs = {
+            "returns": df[self._returns_col],
+            "volatility": df[self._volatility_col],
+            "prediction": df[self._prediction_col],
+            "position": positions,
+            "pnl": pnl,
+        }
+        portfolio_df = pd.concat(dfs.values(), axis=1, keys=dfs.keys())
+        return portfolio_df
+
     @staticmethod
     def _write_df(
         df: pd.DataFrame,
