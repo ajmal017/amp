@@ -1688,7 +1688,6 @@ def docker_kill(  # type: ignore
     :param sudo: use sudo for the Docker commands
     """
     _report_task(hprint.to_str("all"))
-
     docker_exec = _get_docker_exec(sudo)
     # Last container.
     opts = "-l"
@@ -3423,7 +3422,7 @@ def run_fast_tests(  # type: ignore
     collect_only=False,
     tee_to_file=False,
     git_clean=False,
-    **kwargs
+    **kwargs,
 ):
     """
     Run fast tests.

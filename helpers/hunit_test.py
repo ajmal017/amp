@@ -62,8 +62,7 @@ except ImportError as e:
 
 _LOG = logging.getLogger(__name__)
 # Mute this module unless we want to debug it.
-# _LOG.setLevel(logging.INFO)
-_LOG.setLevel(logging.DEBUG)
+_LOG.setLevel(logging.INFO)
 
 # #############################################################################
 
@@ -914,11 +913,21 @@ def _assert_equal(
         # We always return the variable exactly as this should be, even if we could
         # make it look better through indentation in case of fuzzy match.
         if actual_orig.startswith('"'):
+            # TODO(gp): Switch to expected or expected_result.
             # txt.append(f"expected = r'''{actual_orig}'''")
-            txt.append(f"exp = r'''{actual_orig}'''")
+            exp_var = f"exp = r'''{actual_orig}'''"
         else:
             # txt.append(f"expected = r'''{actual_orig}'''")
-            txt.append(f'exp = r"""{actual_orig}"""')
+            exp_var = f'exp = r"""{actual_orig}"""'
+        # Save the expected variable to files.
+        exp_var_file_name = "%s/tmp.exp_var.txt" % test_dir
+        hio.to_file(exp_var_file_name, exp_var)
+        #
+        exp_var_file_name = "tmp.exp_var.txt"
+        hio.to_file(exp_var_file_name, exp_var)
+        _LOG.info("Saved exp_var in %s", exp_var_file_name)
+        #
+        txt.append(exp_var)
         txt = "\n".join(txt)
         error_msg += txt
         # Select what to save.
@@ -1170,6 +1179,8 @@ class TestCase(unittest.TestCase):
         s3_bucket = hs3.get_path()
         scratch_dir = f"{s3_bucket}/tmp/cache.unit_test/{dir_name}.{test_path}"
         return scratch_dir
+
+    # ///////////////////////////////////////////////////////////////////////
 
     def assert_equal(
         self,
@@ -1448,7 +1459,7 @@ class TestCase(unittest.TestCase):
         _LOG.debug(hprint.to_str("outcome_updated file_exists is_equal"))
         return outcome_updated, file_exists, is_equal
 
-    # #########################################################################
+    # ///////////////////////////////////////////////////////////////////////
 
     # TODO(gp): This needs to be moved to `helper.git` and generalized.
     def _git_add_file(self, file_name: str) -> None:
@@ -1489,7 +1500,7 @@ class TestCase(unittest.TestCase):
         # Add to git repo.
         self._git_add_file(file_name)
 
-    # #########################################################################
+    # ///////////////////////////////////////////////////////////////////////
 
     def _check_df_update_outcome(
         self,
@@ -1568,7 +1579,7 @@ class TestCase(unittest.TestCase):
         _LOG.debug("ret=%s", ret)
         return ret, expected
 
-    # #########################################################################
+    # ///////////////////////////////////////////////////////////////////////
 
     def _get_golden_outcome_file_name(self, tag: str) -> Tuple[str, str]:
         # Get the current dir name.
@@ -1629,6 +1640,9 @@ class TestCase(unittest.TestCase):
     def _to_error(self, msg: str) -> None:
         self._error_msg += msg + "\n"
         _LOG.error(msg)
+
+
+# #############################################################################
 
 
 @pytest.mark.qa

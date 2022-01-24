@@ -6,7 +6,6 @@ from typing import Any, List, Optional, Tuple
 
 import pandas as pd
 import pyarrow
-import pyarrow.dataset as pqdataset
 import pyarrow.parquet as parquet
 
 import helpers.hdbg as hdbg
@@ -213,7 +212,10 @@ class TestPartitionedParquet1(hunitest.TestCase):
     # E.g., "Hive" partitioning scheme "key=vale" dir names
 
     def write_partitioned_dataset_and_check(
-        self, df: pd.DataFrame, partition_cols: List[str], exp_dir_signature: Optional[str]
+        self,
+        df: pd.DataFrame,
+        partition_cols: List[str],
+        exp_dir_signature: Optional[str],
     ) -> str:
         """
         - Write df as a partitioned dataset

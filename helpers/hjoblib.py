@@ -25,21 +25,32 @@ import helpers.htqdm as htqdm
 
 _LOG = logging.getLogger(__name__)
 
-# - Consider a list of `n` invocations of a given `func`
+# - Assume one wants to execute `n` invocations of a given `func`
 #   - E.g., `func(param_1), func(param_2), ..., func(param_n)`
-# - A `Workload` is composed of a list of `m` `Tasks` representing the `func`
-#   invocations above
+#   - Each `param` is a tuple of `*args` and `**kwargs` to apply to `func`
+# - A `Workload` is composed of:
+#   - `workload_func`: the function to execute
+#   - `func_name`: the name / description of the function `func`
+#   - `tasks`: a list of `n` set of parameters `*args`, `**kwargs` to apply
+#      to the function (e.g., `param_1`, ..., `param_n`)
 # - Each `Task` executes a subset of the functions
-# - Tasks are a partition, i.e., each function invocation is executed by one and
-#   only one task
-# - The `m` `Tasks` are then executed on `k` threads in parallel or serially
+# - `Tasks` are a partition of the function invocations, i.e., each function
+#   invocation is executed by one and only one task
+# - The `n` `Tasks` are then executed by `k` threads in parallel or serially
+#   - Note that a single task can correspond to processing of multiple logical
+#     chunks of work, because they need to be processed together or because we
+#     want to enforce that it is executed on a single processor
+#   - E.g., if we want to concatenate files we can map multiple filenames in a
+#     single `Task`. In this case the `Task` contains a list of filenames to
+#     concatenate together
 
 # #############################################################################
 # Task
 # #############################################################################
 
-# A `Task` contains the parameters to pass to the function that needs to be execute
-# in a workload. It is represented by a tuple of `*args` and `**kwargs`. E.g.,
+# A `Task` contains the parameters to pass to the function that needs to be
+# executed.
+# A `Task` is represented by a tuple of `*args` and `**kwargs`, e.g.,
 # ```
 # args=()
 # kwargs={
@@ -69,6 +80,9 @@ def split_list_in_tasks(
     :param keep_order: split the list so that consecutive elements of the list
         are in different tasks. This favors executing the workload in order on `n`
         threads
+    :return: list of lists of elements, where each list can be assigned to an
+        execution thread
+
     - E.g., [a, b, c, d, e] executed on 3 threads [1, 2, 3] gives the allocation
       for `keep_order=True`:
         ```
@@ -118,19 +132,24 @@ def apply_incremental_mode(
     src_dst_file_name_map: List[Tuple[str, str]]
 ) -> List[Tuple[str, str]]:
     """
-    Apply the incremental mode, by remove all the tuples in the src_file -> dst_file
-    mapping where the dst file already exists.
+    Apply incremental mode to a map of source to destination files.
+
+    Often the function in a `Workload` corresponds to reading a file, processing it,
+    and writing the output in a file. In this case, applying the incremental mode
+    means removing the tuples in the src_file -> dst_file mapping where the dst file
+    already exists.
 
     :return: filtered mapping
     """
     hdbg.dassert_container_type(src_dst_file_name_map, list, tuple)
+    #
     src_dst_file_name_map_tmp = []
     for src_dst_file_name in src_dst_file_name_map:
-        # Parse the input.
+        # Parse the element of the mapping.
         hdbg.dassert_eq(len(src_dst_file_name), 2)
         src_file_name, dst_file_name = src_dst_file_name
-        #
         _LOG.debug("%s -> %s", src_file_name, dst_file_name)
+        # Discard the mapping element if the destination file already exists.
         hdbg.dassert_exists(src_file_name)
         if os.path.exists(dst_file_name):
             _LOG.debug("Skipping %s -> %s", src_file_name, dst_file_name)
@@ -146,12 +165,14 @@ def apply_incremental_mode(
 
 def validate_task(task: Task) -> bool:
     """
-    Assert if the task is malformed, otherwise return True.
+    Assert if `Task` is malformed, otherwise return True.
+
+    A valid `Task` is a tuple `(*args, **kwargs)`.
     """
-    # The task is a tuple.
+    # A `Task` is a tuple.
     hdbg.dassert_isinstance(task, tuple)
     hdbg.dassert_eq(len(task), 2)
-    # Parse it.
+    # Parse the `Task`.
     args, kwargs = task
     _LOG.debug("task.args=%s", pprint.pformat(args))
     hdbg.dassert_isinstance(args, tuple)
@@ -174,8 +195,11 @@ def task_to_string(task: Task) -> str:
 # Workload
 # #############################################################################
 
-# A `Workload` represents multiple executions of a function with different
-# parameters, i.e., `Tasks`.
+# A `Workload` consists of multiple executions of a function with different
+# parameters represented by `Tasks`.
+# Note: `joblib_helper` can be used together with caching. The workload function
+# doesn't have to be the one that is cached, but it can trigger caching of function
+# results in the call stack.
 Workload = Tuple[
     # `func`: the function representing the workload to execute
     Callable,
@@ -196,12 +220,14 @@ Workload = Tuple[
 
 def validate_workload(workload: Workload) -> bool:
     """
-    Assert if the workload is malformed, otherwise return True.
+    Assert if the `Workload` is malformed, otherwise return True.
+
+    A valid `Workload` is a triple `(func, func_name, List[Task])`.
     """
     # A valid workload` is a triple.
     hdbg.dassert_isinstance(workload, tuple)
     hdbg.dassert_eq(len(workload), 3)
-    # Parse workload.
+    # Parse.
     workload_func, func_name, tasks = workload
     # Check each component.
     hdbg.dassert_isinstance(workload_func, Callable)
@@ -212,14 +238,16 @@ def validate_workload(workload: Workload) -> bool:
 
 
 def randomize_workload(
-    workload: Workload, seed: Optional[int] = None
+    workload: Workload, *, seed: Optional[int] = None
 ) -> Workload:
     validate_workload(workload)
     # Parse the workload.
     workload_func, func_name, tasks = workload
+    # Randomize `tasks`.
     seed = seed or 42
     random.seed(seed)
     random.shuffle(tasks)
+    # Build a new workload.
     workload = (workload_func, func_name, tasks)
     validate_workload(workload)
     return workload
@@ -300,15 +328,24 @@ def _get_workload(
 # #############################################################################
 
 
-def get_num_executors(num_threads: Union[str, int]) -> int:
-    if num_threads == "serial":
-        num_threads = 1
+def get_num_executing_threads(args_num_threads: Union[str, int]) -> int:
+    """
+    Return the number of executing threads based on the value of `args.num_threads`.
+
+    E.g.,
+        - `serial` corresponds to 1
+        - `-1` corresponds to all available CPUs
+    """
+    if args_num_threads == "serial":
+        num_executing_threads = 1
+    elif args_num_threads == -1:
+        # All CPUs available.
+        num_executing_threads = joblib.cpu_count()
     else:
-        if num_threads == -1:
-            num_threads = joblib.cpu_count()
-    num_threads = int(num_threads)
-    hdbg.dassert_lte(1, num_threads)
-    return num_threads
+        # Assume it's an int.
+        num_executing_threads = int(args_num_threads)
+    hdbg.dassert_lte(1, num_executing_threads)
+    return num_executing_threads
 
 
 def _parallel_execute_decorator(
@@ -318,12 +355,14 @@ def _parallel_execute_decorator(
     abort_on_error: bool,
     num_attempts: int,
     log_file: str,
-    #
+    # TODO(gp): Pass these parameters first.
     workload_func: Callable,
     func_name: str,
     task: Task,
 ) -> Any:
     """
+    Parameters have the same meaning as in `parallel_execute()`.
+
     :param abort_on_error: control whether to abort on `workload_func` function
         that is failing and asserting
         - If `workload_func` fails:
@@ -359,8 +398,7 @@ def _parallel_execute_decorator(
         file_handler = logging.FileHandler(file_name)
         root_logger = logging.getLogger()
         root_logger.addHandler(file_handler)
-
-    # Save some information about the function execution.
+    # Save information about the function to be executed.
     txt = []
     # `start_ts` needs to be before running the function.
     start_ts = hdateti.get_current_timestamp_as_string("naive_ET")
@@ -370,6 +408,7 @@ def _parallel_execute_decorator(
     txt.append("workload_func=%s" % workload_func.__name__)
     txt.append("func_name=%s" % func_name)
     txt.append(task_to_string(task))
+    # Run the workload.
     args, kwargs = task
     kwargs.update({"incremental": incremental, "num_attempts": num_attempts})
     with htimer.TimedScope(
@@ -384,11 +423,13 @@ def _parallel_execute_decorator(
             res = None
             error = True
             _LOG.error("Execution failed")
+    # Save information about the execution of the function.
     elapsed_time = ts.elapsed_time
+    end_ts = hdateti.get_current_timestamp_as_string("naive_ET")
+    # TODO(gp): -> func_result
     txt.append("func_res=\n%s" % hprint.indent(str(res)))
     txt.append("elapsed_time_in_secs=%s" % elapsed_time)
     txt.append("start_ts=%s" % start_ts)
-    end_ts = hdateti.get_current_timestamp_as_string("naive_ET")
     txt.append("end_ts=%s" % end_ts)
     txt.append("error=%s" % error)
     # Update log file.
@@ -425,15 +466,15 @@ def parallel_execute(
     backend: str = "loky",
 ) -> Optional[List[Any]]:
     """
-    Run a workload in parallel.
+    Run a workload in parallel using joblib or asyncio.
 
     :param workload: the workload to execute
     :param dry_run: if True, print the workload and exit without executing it
     :param num_threads: joblib parameter to control how many threads to use
-    :param incremental: parameter passed to the function to execute, to control if
-        we want to re-execute workload already executed or not
-    :param abort_on_error: if True, if one task asserts stop executing the workload
-        and return the exception of the failing task
+    :param incremental: parameter passed to the function to execute to control if
+        we want to re-execute tasks already executed or not
+    :param abort_on_error: when True, if one task asserts then stop executing the
+        workload and return the exception of the failing task
         - If False, the execution continues
     :param num_attempts: number of times to attempt running a function before
         declaring an error
@@ -447,26 +488,28 @@ def parallel_execute(
           the output of the already executed tasks. In this case, the best we can do
           is to return the exception of the failing task
     """
-    validate_workload(workload)
+    # Print the parameters.
     print(hprint.frame("Workload"))
     print(workload_to_string(workload))
-    workload_func, func_name, tasks = workload
-    #
     _LOG.info(
         hprint.to_str(
             "dry_run num_threads incremental num_attempts abort_on_error"
         )
     )
-    if dry_run:
-        _LOG.warning("Exiting without executing, as per user request")
-        return None
+    # Parse the workload.
+    validate_workload(workload)
+    workload_func, func_name, tasks = workload
     _LOG.info("Saving log info in '%s'", log_file)
     _LOG.info(
         "Number of executing threads=%s (%s)",
-        get_num_executors(num_threads),
+        get_num_executing_threads(num_threads),
         num_threads,
     )
     _LOG.info("Number of tasks=%s", len(tasks))
+    #
+    if dry_run:
+        _LOG.warning("Exiting without executing, as per user request")
+        return None
     # Run.
     task_len = len(tasks)
     tqdm_out = htqdm.TqdmToLogger(_LOG, level=logging.INFO)
@@ -477,6 +520,7 @@ def parallel_execute(
         desc=f"num_threads={num_threads} backend={backend}",
     )
     if num_threads == "serial":
+        # Execute the tasks serially.
         res = []
         for task_idx, task in tqdm_iter:
             _LOG.debug(
@@ -497,8 +541,9 @@ def parallel_execute(
             )
             res.append(res_tmp)
     else:
-        # -1 is interpreted by joblib like for all cores.
+        # Execute the tasks in parallel.
         num_threads = int(num_threads)
+        # -1 is interpreted by joblib like for all cores.
         _LOG.info("Using %d threads, backend='%s'", num_threads, backend)
         if backend in ("loky", "threading", "multiprocessing"):
             # from joblib.externals.loky import set_loky_pickler
@@ -571,6 +616,8 @@ def parallel_execute(
 # #############################################################################
 # joblib storage backend for S3.
 # #############################################################################
+
+# This allows to store a joblib cache on S3.
 
 # Adapted from https://github.com/aabadie/joblib-s3
 

@@ -39,6 +39,8 @@ def from_parquet(
         logging.DEBUG, f"# Reading Parquet file '{file_name}'"
     ) as ts:
         filesystem = None
+        # TODO(gp): Generalize for S3.
+        hdbg.dassert_exists(file_name)
         dataset = pq.ParquetDataset(
             file_name,
             filesystem=filesystem,
