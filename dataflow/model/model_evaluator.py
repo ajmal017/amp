@@ -304,11 +304,9 @@ class StrategyEvaluator:
         stats_df = pd.concat(stats_dict, axis=1)
         # Calculate BH adjustment of pvals.
         adj_pvals = costatis.multipletests(
-            stats_df.loc["signal_quality"].loc["sr.pval"], nan_mode="drop"
+            stats_df.loc["ratios"].loc["sr.pval"], nan_mode="drop"
         ).rename("sr.adj_pval")
-        adj_pvals = pd.concat(
-            [adj_pvals.to_frame().transpose()], keys=["signal_quality"]
-        )
+        adj_pvals = pd.concat([adj_pvals.to_frame().transpose()], keys=["ratios"])
         stats_df = pd.concat([stats_df, adj_pvals], axis=0)
         _LOG.info("memory_usage=%s", hloggin.get_memory_usage_as_str(None))
         return stats_df
@@ -601,11 +599,9 @@ class ModelEvaluator:
         stats_df = pd.concat(stats_dict, axis=1)
         # Calculate BH adjustment of pvals.
         adj_pvals = costatis.multipletests(
-            stats_df.loc["signal_quality"].loc["sr.pval"], nan_mode="drop"
+            stats_df.loc["ratios"].loc["sr.pval"], nan_mode="drop"
         ).rename("sr.adj_pval")
-        adj_pvals = pd.concat(
-            [adj_pvals.to_frame().transpose()], keys=["signal_quality"]
-        )
+        adj_pvals = pd.concat([adj_pvals.to_frame().transpose()], keys=["ratios"])
         stats_df = pd.concat([stats_df, adj_pvals], axis=0)
         _LOG.info("memory_usage=%s", hloggin.get_memory_usage_as_str(None))
         return stats_df

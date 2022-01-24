@@ -6,18 +6,18 @@ import dataflow.model.stats_computer as dtfmostcom
 
 import functools
 import logging
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Union
 
 import pandas as pd
 
 import core.finance as cofinanc
 import core.statistics as costatis
+import helpers.hdbg as hdbg
 import helpers.htimer as htimer
 
 _LOG = logging.getLogger(__name__)
 
 
-# TODO(gp): Add unit test.
 class StatsComputer:
     """
     Compute a particular piece of stats instead of the whole stats table.
@@ -27,8 +27,11 @@ class StatsComputer:
         """
         Compute statistics for a non-necessarily financial time series.
         """
+        hdbg.dassert_isinstance(srs, pd.Series)
         # List of pd.Series each with various metrics.
         stats = []
+        with htimer.TimedScope(logging.DEBUG, "Computing ratios"):
+            stats.append(self.compute_ratios(srs))
         with htimer.TimedScope(logging.DEBUG, "Computing samplings stats"):
             stats.append(self.compute_sampling_stats(srs))
         with htimer.TimedScope(logging.DEBUG, "Computing summary stats"):
@@ -41,8 +44,6 @@ class StatsComputer:
         # stats.append(self.compute_autocorrelation_stats(srs))
         with htimer.TimedScope(logging.DEBUG, "Computing spectral stats"):
             stats.append(self.compute_spectral_stats(srs))
-        with htimer.TimedScope(logging.DEBUG, "Computing signal quality stats"):
-            stats.append(self.compute_signal_quality_stats(srs))
         # Concatenate the resulting series into a single multi-index series.
         names = [stat.name for stat in stats]
         result = pd.concat(stats, axis=0, keys=names)
@@ -117,8 +118,8 @@ class StatsComputer:
         ]
         return self._compute_stat_functions(srs, name, functions)
 
-    def compute_signal_quality_stats(self, srs: pd.Series) -> pd.Series:
-        name = "signal_quality"
+    def compute_ratios(self, srs: pd.Series) -> pd.Series:
+        name = "ratios"
         functions = [
             costatis.summarize_sharpe_ratio,
             functools.partial(costatis.ttest_1samp, prefix="sr."),
@@ -127,6 +128,29 @@ class StatsComputer:
         kratio = pd.Series(cofinanc.compute_kratio(srs), index=["kratio"])
         kratio.name = name
         return pd.concat([result, kratio])
+
+    def compute_pnl_stats(
+        self, data: Union[pd.Series, pd.DataFrame]
+    ) -> Union[pd.Series, pd.DataFrame]:
+        is_series = isinstance(data, pd.Series)
+        if is_series:
+            data = data.to_frame()
+        hdbg.dassert_isinstance(data, pd.DataFrame)
+        stats = data.apply(self._compute_pnl_stats)
+        if is_series:
+            stats = stats.squeeze()
+        return stats
+
+    def compute_position_stats(
+        self,
+        df: pd.DataFrame,
+    ) -> pd.DataFrame:
+        results = []
+        # Compute stats related to positions.
+        name = "finance"
+        functions = [costatis.compute_avg_turnover_and_holding_period]
+        stats = self._compute_stat_functions(df, name, functions)
+        results.append(pd.concat([stats], keys=["finance"]))
 
     def compute_finance_stats(
         self,
@@ -151,25 +175,8 @@ class StatsComputer:
             results.append(pd.concat([stats], keys=["finance"]))
         # Compute stats related to PnL.
         if pnl_col is not None:
-            pnl = df[pnl_col]
-            #
-            results.append(self.compute_time_series_stats(pnl))
-            #
-            name = "pnl"
-            functions = [
-                costatis.compute_annualized_return_and_volatility,
-                costatis.compute_max_drawdown,
-                costatis.calculate_hit_rate,
-            ]
-            stats = self._compute_stat_functions(pnl, name, functions)
-            results.append(pd.concat([stats], keys=["finance"]))
-            #
-            corr = pd.Series(
-                costatis.compute_implied_correlation(pnl),
-                index=["prediction_corr_implied_by_pnl"],
-                name=name,
-            )
-            results.append(pd.concat([corr], keys=["correlation"]))
+            pnl_stats = self.compute_pnl_stats(df[pnl_col])
+            results.append(pnl_stats)
         # Currently we do not calculate individual prediction/returns stats.
         if returns_col is not None and predictions_col is not None:
             name = "pnl"
@@ -189,7 +196,7 @@ class StatsComputer:
                 index=["sr_implied_by_prediction_corr"],
                 name=name,
             )
-            results.append(pd.concat([srs], keys=["signal_quality"]))
+            results.append(pd.concat([srs], keys=["ratios"]))
             #
             j_ratio = costatis.compute_jensen_ratio(returns)["jensen_ratio"]
             hit_rate = pd.Series(
@@ -230,6 +237,37 @@ class StatsComputer:
         # No predictions and positions calculations yet.
         # No predictions and PnL calculations yet.
         # No positions and PnL calculations yet.
+        return pd.concat(results, axis=0)
+
+    def _compute_pnl_stats(self, srs: pd.Series) -> pd.Series:
+        """
+        Compute stats for a PnL stream.
+
+        :param srs: PnL stream. If `srs.index.freq` is `None`, then `srs` will
+            be resampled to `B` prior to stats computations.
+        :return: multiindexed series of PnL stats
+        """
+        hdbg.dassert_isinstance(srs, pd.Series)
+        srs = cofinanc.maybe_resample(srs)
+        #
+        results = []
+        results.append(self.compute_time_series_stats(srs))
+        #
+        name = "pnl"
+        functions = [
+            costatis.compute_annualized_return_and_volatility,
+            costatis.compute_max_drawdown,
+            costatis.calculate_hit_rate,
+        ]
+        stats = self._compute_stat_functions(srs, name, functions)
+        results.append(pd.concat([stats], keys=["portfolio"]))
+        #
+        corr = pd.Series(
+            costatis.compute_implied_correlation(srs),
+            index=["prediction_corr_implied_by_pnl"],
+            name=name,
+        )
+        results.append(pd.concat([corr], keys=["correlation"]))
         return pd.concat(results, axis=0)
 
     @staticmethod
