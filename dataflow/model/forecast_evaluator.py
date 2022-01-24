@@ -136,8 +136,12 @@ class ForecastEvaluator:
             log_dir, "statistics", file_name, tz
         )
         if cast_asset_ids_to_int:
-            positions.columns = positions.columns.astype("int64")
-            pnl.columns = pnl.columns.astype("int64")
+            # If integers are converted to floats and then strings, then upon
+            # being read they must be cast to floats before being cast to ints.
+            positions.columns = positions.columns.astype("float64").astype(
+                "int64"
+            )
+            pnl.columns = pnl.columns.astype("float64").astype("int64")
         return positions, pnl, statistics
 
     def compute_portfolio(
