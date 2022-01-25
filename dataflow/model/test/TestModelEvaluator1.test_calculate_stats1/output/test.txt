@@ -1,5 +1,5 @@
                                                                          0                    1                    2                    3                    4                    5                    6                    7
-finance      avg_turnover_(%)                                   139.764843           140.990116           140.320278           143.461111           140.184307           141.935645           141.107129           140.187758
+portfolio    avg_turnover_(%)                                   139.764843           140.990116           140.320278           143.461111           140.184307           141.935645           141.107129           140.187758
              turnover_frequency                              <BusinessDay>        <BusinessDay>        <BusinessDay>        <BusinessDay>        <BusinessDay>        <BusinessDay>        <BusinessDay>        <BusinessDay>
              avg_holding_period                                   0.715488              0.70927             0.712655             0.697053             0.713347             0.704545             0.708681             0.713329
              holding_period_units                            <BusinessDay>        <BusinessDay>        <BusinessDay>        <BusinessDay>        <BusinessDay>        <BusinessDay>        <BusinessDay>        <BusinessDay>

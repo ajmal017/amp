@@ -27,7 +27,6 @@ class StatsComputer:
         """
         Compute statistics for a non-necessarily financial time series.
         """
-        hdbg.dassert_isinstance(srs, pd.Series)
         # List of pd.Series each with various metrics.
         stats = []
         with htimer.TimedScope(logging.DEBUG, "Computing ratios"):
@@ -132,25 +131,20 @@ class StatsComputer:
     def compute_pnl_stats(
         self, data: Union[pd.Series, pd.DataFrame]
     ) -> Union[pd.Series, pd.DataFrame]:
-        is_series = isinstance(data, pd.Series)
-        if is_series:
-            data = data.to_frame()
-        hdbg.dassert_isinstance(data, pd.DataFrame)
-        stats = data.apply(self._compute_pnl_stats)
-        if is_series:
-            stats = stats.squeeze()
-        return stats
+        """
+        Compute PnL-relevant stats.
+        """
+        result = self._apply_func(data, self._compute_pnl_stats)
+        return result
 
     def compute_position_stats(
-        self,
-        df: pd.DataFrame,
-    ) -> pd.DataFrame:
-        results = []
-        # Compute stats related to positions.
-        name = "finance"
-        functions = [costatis.compute_avg_turnover_and_holding_period]
-        stats = self._compute_stat_functions(df, name, functions)
-        results.append(pd.concat([stats], keys=["finance"]))
+        self, data: Union[pd.Series, pd.DataFrame]
+    ) -> Union[pd.Series, pd.DataFrame]:
+        """
+        Compute position-relevant stats (turnover, holding period).
+        """
+        result = self._apply_func(data, self._compute_position_stats)
+        return result
 
     def compute_finance_stats(
         self,
@@ -167,12 +161,8 @@ class StatsComputer:
         results = []
         # Compute stats related to positions.
         if positions_col is not None:
-            positions = df[positions_col]
-            #
-            name = "finance"
-            functions = [costatis.compute_avg_turnover_and_holding_period]
-            stats = self._compute_stat_functions(positions, name, functions)
-            results.append(pd.concat([stats], keys=["finance"]))
+            position_stats = self.compute_position_stats(df[positions_col])
+            results.append(position_stats)
         # Compute stats related to PnL.
         if pnl_col is not None:
             pnl_stats = self.compute_pnl_stats(df[pnl_col])
@@ -247,7 +237,6 @@ class StatsComputer:
             be resampled to `B` prior to stats computations.
         :return: multiindexed series of PnL stats
         """
-        hdbg.dassert_isinstance(srs, pd.Series)
         srs = cofinanc.maybe_resample(srs)
         #
         results = []
@@ -270,6 +259,33 @@ class StatsComputer:
         results.append(pd.concat([corr], keys=["correlation"]))
         return pd.concat(results, axis=0)
 
+    def _compute_position_stats(self, srs: pd.Series) -> pd.Series:
+        results = []
+        # Compute stats related to positions.
+        name = "positions"
+        functions = [costatis.compute_avg_turnover_and_holding_period]
+        stats = self._compute_stat_functions(srs, name, functions)
+        _LOG.info("stats=\n%s", stats)
+        results.append(pd.concat([stats], keys=["portfolio"]))
+        return pd.concat(results, axis=0)
+
+    # TODO(Paul): Make this a decorator.
+    @staticmethod
+    def _apply_func(
+        data: Union[pd.Series, pd.DataFrame],
+        func: Callable,
+    ) -> Union[pd.Series, pd.DataFrame]:
+        is_series = isinstance(data, pd.Series)
+        if is_series:
+            data = data.to_frame()
+        hdbg.dassert_isinstance(data, pd.DataFrame)
+        func_result = data.apply(func)
+        hdbg.dassert_isinstance(func_result, pd.DataFrame)
+        if is_series:
+            func_result = func_result.squeeze()
+            hdbg.dassert_isinstance(func_result, pd.Series)
+        return func_result
+
     @staticmethod
     def _compute_stat_functions(
         srs: pd.Series,
@@ -279,6 +295,7 @@ class StatsComputer:
         """
         Apply a list of functions to a series.
         """
+        hdbg.dassert_isinstance(srs, pd.Series)
         # Apply the functions.
         stats = [function(srs).rename(name) for function in functions]
         # Concat the list of series in a single one.
