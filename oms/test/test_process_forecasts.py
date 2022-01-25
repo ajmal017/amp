@@ -81,17 +81,28 @@ class TestSimulatedProcessForecasts1(hunitest.TestCase):
         )
         actual = str(portfolio)
         expected = r"""# historical holdings=
-asset_id                     101    202        -1
+asset_id                     101    202        -1  
 2000-01-01 09:35:00-05:00   0.00   0.00  1000000.00
 2000-01-01 09:35:01-05:00   0.00   0.00  1000000.00
 2000-01-01 09:40:01-05:00  33.32  66.65   900039.56
 2000-01-01 09:45:01-05:00 -24.99  74.98   950024.38
 # historical holdings marked to market=
-asset_id                        101       202        -1
+asset_id                        101       202        -1  
 2000-01-01 09:35:00-05:00      0.00      0.00  1000000.00
 2000-01-01 09:35:01-05:00      0.00      0.00  1000000.00
 2000-01-01 09:40:01-05:00  33329.65  66659.30   900039.56
 2000-01-01 09:45:01-05:00 -24992.93  74978.79   950024.38
+# historical flows=
+asset_id                        101       202
+2000-01-01 09:35:01-05:00       NaN       NaN
+2000-01-01 09:40:01-05:00 -33320.15 -66640.29
+2000-01-01 09:45:01-05:00  58324.83  -8340.01
+# pnl=
+asset_id                    101    202
+2000-01-01 09:35:00-05:00   NaN    NaN
+2000-01-01 09:35:01-05:00  0.00   0.00
+2000-01-01 09:40:01-05:00  9.50  19.01
+2000-01-01 09:45:01-05:00  2.25 -20.52
 # historical statistics=
                            net_asset_holdings        cash  net_wealth  gross_exposure  leverage    pnl  realized_pnl  unrealized_pnl
 2000-01-01 09:35:00-05:00                0.00  1000000.00    1.00e+06            0.00       0.0    NaN           NaN             NaN
@@ -186,17 +197,28 @@ class TestMockedProcessForecasts1(omtodh.TestOmsDbHelper):
         # TODO(Paul): Factor out a test that compares simulation and mock.
         actual = str(portfolio)
         expected = r"""# historical holdings=
-asset_id                     101    202        -1
+asset_id                     101    202        -1  
 2000-01-01 09:35:00-05:00   0.00   0.00  1000000.00
 2000-01-01 09:35:01-05:00   0.00   0.00  1000000.00
 2000-01-01 09:40:01-05:00  33.32  66.65   900039.56
 2000-01-01 09:45:01-05:00 -24.99  74.98   950024.38
 # historical holdings marked to market=
-asset_id                        101       202        -1
+asset_id                        101       202        -1  
 2000-01-01 09:35:00-05:00      0.00      0.00  1000000.00
 2000-01-01 09:35:01-05:00      0.00      0.00  1000000.00
 2000-01-01 09:40:01-05:00  33329.65  66659.30   900039.56
 2000-01-01 09:45:01-05:00 -24992.93  74978.79   950024.38
+# historical flows=
+asset_id                        101       202
+2000-01-01 09:35:01-05:00       NaN       NaN
+2000-01-01 09:40:01-05:00 -33320.15 -66640.29
+2000-01-01 09:45:01-05:00  58324.83  -8340.01
+# pnl=
+asset_id                    101    202
+2000-01-01 09:35:00-05:00   NaN    NaN
+2000-01-01 09:35:01-05:00  0.00   0.00
+2000-01-01 09:40:01-05:00  9.50  19.01
+2000-01-01 09:45:01-05:00  2.25 -20.52
 # historical statistics=
                            net_asset_holdings        cash  net_wealth  gross_exposure  leverage    pnl  realized_pnl  unrealized_pnl
 2000-01-01 09:35:00-05:00                0.00  1000000.00    1.00e+06            0.00       0.0    NaN           NaN             NaN

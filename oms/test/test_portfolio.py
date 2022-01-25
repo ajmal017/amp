@@ -385,13 +385,20 @@ class TestMockedPortfolio1(omtodh.TestOmsDbHelper):
         # Check.
         actual = str(portfolio)
         expected = r"""# historical holdings=
-asset_id                    101       -1
+asset_id                    101       -1  
 2000-01-01 09:35:00-05:00   0.0  1000000.0
 2000-01-01 09:40:00-05:00  20.0  1000000.0
 # historical holdings marked to market=
-asset_id                        101       -1
+asset_id                        101       -1  
 2000-01-01 09:35:00-05:00      0.00  1000000.0
 2000-01-01 09:40:00-05:00  20004.03  1000000.0
+# historical flows=
+asset_id                    101
+2000-01-01 09:40:00-05:00  -0.0
+# pnl=
+asset_id                        101
+2000-01-01 09:35:00-05:00       NaN
+2000-01-01 09:40:00-05:00  20004.03
 # historical statistics=
                            net_asset_holdings       cash  net_wealth  gross_exposure  leverage       pnl  realized_pnl  unrealized_pnl
 2000-01-01 09:35:00-05:00                0.00  1000000.0    1.00e+06            0.00      0.00       NaN           NaN             NaN
@@ -407,13 +414,20 @@ asset_id                        101       -1
         # Check.
         actual = str(portfolio)
         expected = r"""# historical holdings=
-asset_id                    101        -1
+asset_id                    101        -1  
 2000-01-01 09:35:00-05:00   0.0  1000000.00
 2000-01-01 09:40:00-05:00  20.0   998096.88
 # historical holdings marked to market=
-asset_id                        101        -1
+asset_id                        101        -1  
 2000-01-01 09:35:00-05:00      0.00  1000000.00
 2000-01-01 09:40:00-05:00  20004.03   998096.88
+# historical flows=
+asset_id                        101
+2000-01-01 09:40:00-05:00  -1903.12
+# pnl=
+asset_id                        101
+2000-01-01 09:35:00-05:00       NaN
+2000-01-01 09:40:00-05:00  18100.91
 # historical statistics=
                            net_asset_holdings        cash  net_wealth  gross_exposure  leverage       pnl  realized_pnl  unrealized_pnl
 2000-01-01 09:35:00-05:00                0.00  1000000.00    1.00e+06            0.00      0.00       NaN           NaN             NaN
