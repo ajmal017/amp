@@ -16,12 +16,12 @@ import pandas as pd
 from tqdm.autonotebook import tqdm
 
 import core.config as cconfig
-import helpers.hdbg as hdbg
 import helpers.hasyncio as hasynci
-import helpers.hpandas as hpandas
-import helpers.htqdm as htqdm
+import helpers.hdbg as hdbg
 import helpers.hio as hio
+import helpers.hpandas as hpandas
 import helpers.hprint as hprint
+import helpers.htqdm as htqdm
 import oms.call_optimizer as ocalopti
 import oms.order as omorder
 import oms.portfolio as omportfo
@@ -193,9 +193,7 @@ class ForecastProcessor:
         log_dir: Optional[str] = None,
     ) -> None:
         self._portfolio = portfolio
-        self._get_wall_clock_time = (
-            portfolio.market_data.get_wall_clock_time
-        )
+        self._get_wall_clock_time = portfolio.market_data.get_wall_clock_time
         self._order_config = order_config
         # TODO(Paul): process config with checks.
         self._order_type = self._order_config["order_type"]

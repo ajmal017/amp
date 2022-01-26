@@ -1,19 +1,19 @@
-#import json
-#import logging
+# import json
+# import logging
 #
-#import boto3
-#from botocore.client import BaseClient
-#from moto import mock_secretsmanager
-#import pytest
-#import helpers.hsecrets as hsecret
-#import helpers.hunit_test as hunitest
+# import boto3
+# from botocore.client import BaseClient
+# from moto import mock_secretsmanager
+# import pytest
+# import helpers.hsecrets as hsecret
+# import helpers.hunit_test as hunitest
 #
-#_LOG = logging.getLogger(__name__)
+# _LOG = logging.getLogger(__name__)
 #
 ## mock_secretsmanager decorator ensures the calls to the AWS API are mocked
 #
 #
-#class Test_Create_Client1(hunitest.TestCase):
+# class Test_Create_Client1(hunitest.TestCase):
 #    """
 #    Simple smoke test to verify connection to AWS.
 #    """
@@ -23,7 +23,7 @@
 #        client = hsecret.get_secrets_client()
 #        self.assertIsInstance(client, BaseClient)
 #
-#class Test_Get_Secret1(hunitest.TestCase):
+# class Test_Get_Secret1(hunitest.TestCase):
 #    """
 #    Verify that the secret can be retrieved correctly.
 #    """
@@ -40,7 +40,7 @@
 #        self.assertDictEqual(hsecret.get_secret(secret_name), secret)
 #
 #
-#class Test_Store_Secret1(hunitest.TestCase):
+# class Test_Store_Secret1(hunitest.TestCase):
 #    """
 #    Verify that a secret can be stored correctly.
 #    """

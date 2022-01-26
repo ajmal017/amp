@@ -29,7 +29,7 @@ import helpers.hs3 as hs3
 import im_v2.ccxt.data.client.ccxt_clients as imvcdccccl
 import im_v2.ccxt.universe.universe as imvccunun
 import im_v2.common.data.client as icdc
-import im_v2.cryptodatadownload.data.client.cdd_client as imcdaclcd
+import im_v2.cryptodatadownload.data.client.cdd_client as imvcdccdcl
 import research_amp.cc.statistics as ramccsta
 
 # %%
@@ -186,7 +186,7 @@ root_dir = os.path.join(hs3.get_path(), "data")
 
 # %%
 cdd_data = []
-cdd_loader = imcdaclcd.CddClient(
+cdd_loader = imvcdccdcl.CddClient(
     data_type="ohlcv", root_dir=root_dir, aws_profile="am"
 )
 

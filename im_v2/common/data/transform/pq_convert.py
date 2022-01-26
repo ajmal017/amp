@@ -9,6 +9,10 @@ representation.
     --start_date 2021-11-16 \
     --end_date 2021-11-17 \
     --dst_dir im/transform/test_data_by_date
+
+Import as:
+
+import im_v2.common.data.transform.pq_convert as imvcdtpqco
 """
 
 import argparse

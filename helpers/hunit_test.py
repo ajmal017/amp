@@ -408,6 +408,7 @@ def get_dir_signature(
     # $GIT_ROOT/.../tmp.scratch/dummy_value_1=2/dummy_value_2=B/data.parquet
     ```
     """
+
     def _remove_dir_name(file_name: str) -> str:
         if remove_dir_name:
             res = os.path.relpath(file_name, dir_name)

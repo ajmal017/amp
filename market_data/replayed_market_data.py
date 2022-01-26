@@ -298,5 +298,6 @@ def describe_rt_df(df: pd.DataFrame, *, include_delay_stats: bool) -> None:
         describe_rt_delay(df)
     #
     from IPython.display import display
+
     display(df.head(3))
     display(df.tail(3))

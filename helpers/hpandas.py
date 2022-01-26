@@ -395,9 +395,13 @@ def trim_df(
 # #############################################################################
 
 
-def dassert_is_days(timedelta: pd.Timedelta, *,
-                    min_num_days: Optional[int] = None) -> None:
-    hdbg.dassert((timedelta / pd.Timedelta(days=1)).is_integer(),
-                 "timedelta='%s' is not an integer number of days", timedelta)
+def dassert_is_days(
+    timedelta: pd.Timedelta, *, min_num_days: Optional[int] = None
+) -> None:
+    hdbg.dassert(
+        (timedelta / pd.Timedelta(days=1)).is_integer(),
+        "timedelta='%s' is not an integer number of days",
+        timedelta,
+    )
     if min_num_days is not None:
         hdbg.dassert_lte(1, timedelta.days)

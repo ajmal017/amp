@@ -17,8 +17,8 @@ import psycopg2 as psycop
 import psycopg2.extras as extras
 import psycopg2.sql as psql
 
-import helpers.hdbg as hdbg
 import helpers.hasyncio as hasynci
+import helpers.hdbg as hdbg
 import helpers.hintrospection as hintros
 import helpers.hprint as hprint
 import helpers.htimer as htimer
@@ -528,9 +528,9 @@ def execute_query_to_df(
     if False:
         # Ask the user before executing a query.
         print("query=\n%s", query)
-        import helpers.hsystem as hsysinte
+        import helpers.hsystem as hsystem
 
-        hsysinte.query_yes_no("Ok to execute?")
+        hsystem.query_yes_no("Ok to execute?")
     if limit is not None:
         query += " LIMIT %s" % limit
     if offset is not None:

@@ -341,7 +341,7 @@ def add_parallel_processing_arg(
 
     The default behavior should always be incremental since "incremental mode"
     is not destructive like the non-incremental, i.e., delete and restart
-    
+
     The incremental behavior  is disabled with `--no_incremental`. This implies
     performing the computation in any case
     - It is often implemented by deleting the destination dir and then running

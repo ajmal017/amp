@@ -52,7 +52,7 @@ import helpers.hdbg as hdbg
 import helpers.hio as hio
 import helpers.hparser as hparser
 import helpers.hprint as hprint
-import helpers.hsystem as hsysinte
+import helpers.hsystem as hsystem
 
 # TODO(gp):
 #  - allow to read a cfile with a subset of files / points to replace
@@ -184,7 +184,7 @@ def _replace_with_perl(
     else:
         perl_opts.append(r"-e '%s unless /^\s*#/'" % regex)
     cmd = "perl %s %s" % (" ".join(perl_opts), file_name)
-    hsysinte.system(cmd, suppress_output=False)
+    hsystem.system(cmd, suppress_output=False)
 
 
 def _replace_with_python(
@@ -192,7 +192,7 @@ def _replace_with_python(
 ) -> None:
     if backup:
         cmd = "cp %s %s.bak" % (file_name, file_name)
-        hsysinte.system(cmd)
+        hsystem.system(cmd)
     #
     lines = hio.from_file(file_name, encoding=_ENCODING).split("\n")
     lines_out = []
@@ -428,7 +428,7 @@ def _rename(file_names_to_process: List[str], file_map: Dict[str, str]) -> None:
     for f in file_names_to_process:
         new_name = file_map[f]
         cmd = "git mv %s %s" % (f, new_name)
-        hsysinte.system(cmd)
+        hsystem.system(cmd)
 
 
 # #############################################################################
@@ -514,7 +514,7 @@ def _main(parser: argparse.ArgumentParser) -> None:
         ]
         cmd = " | ".join(cmd)
         print(f"> {cmd}")
-        hsysinte.system(cmd)
+        hsystem.system(cmd)
     if args.custom_flow:
         eval("%s(args)" % args.custom_flow)
     else:

@@ -42,6 +42,7 @@ class CcxtClient(icdc.ImClient, abc.ABC):
     - applying common transformation for all the data from CCXT
         - E.g., `_apply_olhlcv_transformations()`, `_apply_vendor_normalization()`
     """
+
     @staticmethod
     def get_universe() -> List[icdc.FullSymbol]:
         """
