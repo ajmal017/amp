@@ -1018,7 +1018,7 @@ class MockedPortfolio(AbstractPortfolio):
         """
         Convert a snapshot_df from SQL query into a `holdings_df`.
         """
-        holdings_df = snapshot_df[[self._asset_id_col, "current_position"]]
+        holdings_df = snapshot_df[["asset_id", "current_position"]]
         holdings_df.columns = AbstractPortfolio.HOLDINGS_COLS
         holdings_df.index = [as_of_timestamp] * snapshot_df.shape[0]
         holdings_df = holdings_df.convert_dtypes()
@@ -1033,7 +1033,7 @@ class MockedPortfolio(AbstractPortfolio):
         if snapshot_df.empty:
             return pd.Series([], dtype="float64")
         hdbg.dassert_in("net_cost", snapshot_df.columns)
-        net_cost = snapshot_df.set_index(self._asset_id_col)["net_cost"]
+        net_cost = snapshot_df.set_index("asset_id")["net_cost"]
         _LOG.debug("net_cost (cumulative)=%f", net_cost.sum())
         return net_cost
 
