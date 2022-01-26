@@ -188,7 +188,7 @@ class AbstractPortfolio(abc.ABC):
             )
         )
         act.append(
-            "# pnl=\n%s"
+            "# historical pnl=\n%s"
             % hprint.dataframe_to_str(
                 self.get_historical_pnl(),
                 precision=precision,
@@ -404,18 +404,7 @@ class AbstractPortfolio(abc.ABC):
         pnl = pnl.astype("float")
         return pnl
 
-    @staticmethod
-    def _compute_pnl(
-        holdings_marked_to_market: pd.DataFrame,
-        flows: pd.DataFrame,
-    ) -> pd.DataFrame:
-        # Drop the cash balance.
-        holdings_marked_to_market = holdings_marked_to_market.drop(columns=AbstractPortfolio.CASH_ID)
-        # Get per-bar flows and compute PnL.
-        pnl = holdings_marked_to_market.diff().add(flows, fill_value=0.0)
-        return pnl
-
-    def log_state(self, log_dir: str) -> None:
+    def log_state(self, log_dir: str) -> str:
         hdbg.dassert(log_dir, "Must specify `log_dir` to log state.")
         #
         wall_clock_time = self._get_wall_clock_time()
@@ -435,6 +424,7 @@ class AbstractPortfolio(abc.ABC):
         #
         stats_df = self.get_historical_statistics()
         AbstractPortfolio._write_df(stats_df, log_dir, "statistics", file_name)
+        return file_name
 
     @staticmethod
     def read_state(
@@ -450,9 +440,7 @@ class AbstractPortfolio(abc.ABC):
         holdings_mtm_df = AbstractPortfolio._read_df(
             log_dir, "holdings_marked_to_market", file_name, tz
         )
-        flows_df = AbstractPortfolio._read_df(
-            log_dir, "flows", file_name, tz
-        )
+        flows_df = AbstractPortfolio._read_df(log_dir, "flows", file_name, tz)
         stats_df = AbstractPortfolio._read_df(
             log_dir, "statistics", file_name, tz
         )
@@ -498,6 +486,19 @@ class AbstractPortfolio(abc.ABC):
         prices.name = "price"
         hdbg.dassert(not prices.index.has_duplicates)
         return prices
+
+    @staticmethod
+    def _compute_pnl(
+        holdings_marked_to_market: pd.DataFrame,
+        flows: pd.DataFrame,
+    ) -> pd.DataFrame:
+        # Drop the cash balance.
+        holdings_marked_to_market = holdings_marked_to_market.drop(
+            columns=AbstractPortfolio.CASH_ID
+        )
+        # Get per-bar flows and compute PnL.
+        pnl = holdings_marked_to_market.diff().add(flows, fill_value=0.0)
+        return pnl
 
     @staticmethod
     def _write_df(
@@ -1080,6 +1081,4 @@ class MockedPortfolio(AbstractPortfolio):
         self._cash[wall_clock_timestamp] = updated_cash
         self._net_cost[wall_clock_timestamp] = current_net_costs
         flows = -1 * current_net_costs.subtract(prev_net_costs, fill_value=0.0)
-        self._sequential_insert(
-            wall_clock_timestamp, flows, self._flows
-        )
+        self._sequential_insert(wall_clock_timestamp, flows, self._flows)
