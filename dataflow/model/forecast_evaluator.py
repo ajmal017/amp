@@ -115,7 +115,16 @@ class ForecastEvaluator:
         last_time_str = last_timestamp.strftime("%Y%m%d_%H%M%S")
         file_name = f"{last_time_str}.csv"
         #
-        ForecastEvaluator._write_df(positions, log_dir, "positions", file_name)
+        ForecastEvaluator._write_df(
+            df[self._returns_col], log_dir, "returns", file_name
+        )
+        ForecastEvaluator._write_df(
+            df[self._volatility_col], log_dir, "volatility", file_name
+        )
+        ForecastEvaluator._write_df(
+            df[self._prediction_col], log_dir, "prediction", file_name
+        )
+        ForecastEvaluator._write_df(positions, log_dir, "position", file_name)
         ForecastEvaluator._write_df(pnl, log_dir, "pnl", file_name)
         ForecastEvaluator._write_df(statistics, log_dir, "statistics", file_name)
         return file_name
@@ -127,22 +136,30 @@ class ForecastEvaluator:
         *,
         tz: str = "America/New_York",
         cast_asset_ids_to_int: bool = True,
-    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-        positions = ForecastEvaluator._read_df(
-            log_dir, "positions", file_name, tz
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        returns = ForecastEvaluator._read_df(log_dir, "returns", file_name, tz)
+        volatility = ForecastEvaluator._read_df(
+            log_dir, "volatility", file_name, tz
         )
+        prediction = ForecastEvaluator._read_df(
+            log_dir, "prediction", file_name, tz
+        )
+        positions = ForecastEvaluator._read_df(log_dir, "position", file_name, tz)
         pnl = ForecastEvaluator._read_df(log_dir, "pnl", file_name, tz)
+        if cast_asset_ids_to_int:
+            for df in [returns, volatility, prediction, positions, pnl]:
+                ForecastEvaluator._cast_cols_to_int(df)
+        portfolio_df = ForecastEvaluator._build_multiindex_df(
+            returns,
+            volatility,
+            prediction,
+            positions,
+            pnl,
+        )
         statistics = ForecastEvaluator._read_df(
             log_dir, "statistics", file_name, tz
         )
-        if cast_asset_ids_to_int:
-            # If integers are converted to floats and then strings, then upon
-            # being read they must be cast to floats before being cast to ints.
-            positions.columns = positions.columns.astype("float64").astype(
-                "int64"
-            )
-            pnl.columns = pnl.columns.astype("float64").astype("int64")
-        return positions, pnl, statistics
+        return portfolio_df, statistics
 
     def compute_portfolio(
         self,
@@ -227,15 +244,40 @@ class ForecastEvaluator:
             dollar_neutrality=dollar_neutrality,
             reindex_like_input=True,
         )
+        portfolio_df = ForecastEvaluator._build_multiindex_df(
+            df[self._returns_col],
+            df[self._volatility_col],
+            df[self._prediction_col],
+            positions,
+            pnl,
+        )
+        return portfolio_df
+
+    @staticmethod
+    def _build_multiindex_df(
+        returns_df: pd.DataFrame,
+        volatility_df: pd.DataFrame,
+        prediction_df: pd.DataFrame,
+        position_df: pd.DataFrame,
+        pnl_df: pd.DataFrame,
+    ) -> pd.DataFrame:
         dfs = {
-            "returns": df[self._returns_col],
-            "volatility": df[self._volatility_col],
-            "prediction": df[self._prediction_col],
-            "position": positions,
-            "pnl": pnl,
+            "returns": returns_df,
+            "volatility": volatility_df,
+            "prediction": prediction_df,
+            "position": position_df,
+            "pnl": pnl_df,
         }
         portfolio_df = pd.concat(dfs.values(), axis=1, keys=dfs.keys())
         return portfolio_df
+
+    @staticmethod
+    def _cast_cols_to_int(
+        df: pd.DataFrame,
+    ) -> None:
+        # If integers are converted to floats and then strings, then upon
+        # being read they must be cast to floats before being cast to ints.
+        df.columns = df.columns.astype("float64").astype("int64")
 
     @staticmethod
     def _write_df(
