@@ -151,27 +151,43 @@ class StatsComputer:
         df: pd.DataFrame,
         *,
         returns_col: Optional[str] = None,
-        predictions_col: Optional[str] = None,
-        positions_col: Optional[str] = None,
+        volatility_col: Optional[str] = None,
+        prediction_col: Optional[str] = None,
+        position_col: Optional[str] = None,
         pnl_col: Optional[str] = None,
     ) -> pd.DataFrame:
         """
         Compute financially meaningful statistics.
+
+        :param returns_col: returns realized at indexed timestamp
+        :param volatility_col: volatility forecast or realized available at
+            timestamp
+        :param prediction_col: 2-step-ahead predictions of
+            volatility-normalized available returns based on data at indexed
+            timestamp
+        :param position_col: positions at indexed timestamp, informed by
+            predictions from the previous timestamp and subject to returns
+            realized at the next timestamp
+        :param pnl_col: PnL realized at indexed timestamp
         """
         results = []
         # Compute stats related to positions.
-        if positions_col is not None:
-            position_stats = self.compute_position_stats(df[positions_col])
+        if position_col is not None:
+            position_stats = self.compute_position_stats(df[position_col])
             results.append(position_stats)
         # Compute stats related to PnL.
         if pnl_col is not None:
             pnl_stats = self.compute_pnl_stats(df[pnl_col])
             results.append(pnl_stats)
         # Currently we do not calculate individual prediction/returns stats.
-        if returns_col is not None and predictions_col is not None:
+        if (
+            returns_col is not None
+            and volatility_col is not None
+            and prediction_col is not None
+        ):
             name = "pnl"
             returns = df[returns_col]
-            predictions = df[predictions_col]
+            predictions = df[prediction_col].divide(df[volatility_col]).shift(2)
             #
             prediction_corr = predictions.corr(returns)
             corr = pd.Series(
@@ -208,9 +224,9 @@ class StatsComputer:
                 name=name,
             )
             results.append(pd.concat([corr2], keys=["correlation"]))
-        if returns_col is not None and positions_col is not None:
+        if returns_col is not None and position_col is not None:
             returns = df[returns_col]
-            positions = df[positions_col]
+            positions = df[position_col].shift(1)
             #
             name = "pnl"
             bets = costatis.compute_bet_stats(positions, returns)

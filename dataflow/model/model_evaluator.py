@@ -544,7 +544,7 @@ class ModelEvaluator:
         portfolio_dict = {"positions": pos_srs, "pnl": pnl_srs}
         aggregate_stats = self._stats_computer.compute_finance_stats(
             pd.DataFrame.from_dict(portfolio_dict),
-            positions_col="positions",
+            position_col="positions",
             pnl_col="pnl",
         )
         _LOG.info("memory_usage=%s", hloggin.get_memory_usage_as_str(None))
@@ -592,8 +592,8 @@ class ModelEvaluator:
             stats_dict[key] = self._stats_computer.compute_finance_stats(
                 pnl_dict[key],
                 returns_col="returns",
-                predictions_col="predictions",
-                positions_col="positions",
+                prediction_col="predictions",
+                position_col="positions",
                 pnl_col="pnl",
             )
         stats_df = pd.concat(stats_dict, axis=1)

@@ -26,7 +26,8 @@ class TestForecastEvaluator1(hunitest.TestCase):
             prediction_col="pred",
         )
         actual = forecast_evaluator.to_str(data)
-        expected = r"""# holdings marked to market=
+        expected = r"""
+# holdings marked to market=
                             101
 2022-01-03 09:30:00-05:00   NaN
 2022-01-03 09:35:00-05:00   NaN
@@ -45,14 +46,14 @@ class TestForecastEvaluator1(hunitest.TestCase):
 2022-01-03 09:55:00-05:00 -1.32e-04
 2022-01-03 10:00:00-05:00  4.81e-05
 # statistics=
-                           net_asset_holdings  gross_exposure       pnl
-2022-01-03 09:30:00-05:00                 NaN             NaN       NaN
-2022-01-03 09:35:00-05:00                 NaN             NaN       NaN
-2022-01-03 09:40:00-05:00                1.02            1.02       NaN
-2022-01-03 09:45:00-05:00               -0.92            0.92  2.73e-04
-2022-01-03 09:50:00-05:00               -1.04            1.04  2.30e-04
-2022-01-03 09:55:00-05:00                0.06            0.06 -1.32e-04
-2022-01-03 10:00:00-05:00                 NaN             NaN  4.81e-05"""
+                                pnl  gross_volume  net_volume   gmv   nmv
+2022-01-03 09:30:00-05:00       NaN           NaN         NaN   NaN   NaN
+2022-01-03 09:35:00-05:00       NaN           NaN         NaN   NaN   NaN
+2022-01-03 09:40:00-05:00       NaN           NaN         NaN  1.02  1.02
+2022-01-03 09:45:00-05:00  2.73e-04          1.95       -1.95  0.92 -0.92
+2022-01-03 09:50:00-05:00  2.30e-04          0.12       -0.12  1.04 -1.04
+2022-01-03 09:55:00-05:00 -1.32e-04          1.10        1.10  0.06  0.06
+2022-01-03 10:00:00-05:00  4.81e-05           NaN         NaN   NaN   NaN"""
         self.assert_equal(actual, expected, fuzzy_match=True)
 
     def test_to_str_intraday_1_asset_targeted_gmv(self) -> None:
@@ -67,7 +68,8 @@ class TestForecastEvaluator1(hunitest.TestCase):
             prediction_col="pred",
         )
         actual = forecast_evaluator.to_str(data, target_gmv=10000)
-        expected = r"""# holdings marked to market=
+        expected = r"""
+# holdings marked to market=
                                101
 2022-01-03 09:30:00-05:00      NaN
 2022-01-03 09:35:00-05:00      NaN
@@ -86,14 +88,14 @@ class TestForecastEvaluator1(hunitest.TestCase):
 2022-01-03 09:55:00-05:00 -1.26
 2022-01-03 10:00:00-05:00  8.43
 # statistics=
-                           net_asset_holdings  gross_exposure   pnl
-2022-01-03 09:30:00-05:00                 NaN             NaN   NaN
-2022-01-03 09:35:00-05:00                 NaN             NaN   NaN
-2022-01-03 09:40:00-05:00             10000.0         10000.0   NaN
-2022-01-03 09:45:00-05:00            -10000.0         10000.0  2.67
-2022-01-03 09:50:00-05:00            -10000.0         10000.0  2.49
-2022-01-03 09:55:00-05:00             10000.0         10000.0 -1.26
-2022-01-03 10:00:00-05:00                 NaN             NaN  8.43"""
+                            pnl  gross_volume  net_volume      gmv      nmv
+2022-01-03 09:30:00-05:00   NaN           NaN         NaN      NaN      NaN
+2022-01-03 09:35:00-05:00   NaN           NaN         NaN      NaN      NaN
+2022-01-03 09:40:00-05:00   NaN           NaN         NaN  10000.0  10000.0
+2022-01-03 09:45:00-05:00  2.67       20000.0    -20000.0  10000.0 -10000.0
+2022-01-03 09:50:00-05:00  2.49           0.0         0.0  10000.0 -10000.0
+2022-01-03 09:55:00-05:00 -1.26       20000.0     20000.0  10000.0  10000.0
+2022-01-03 10:00:00-05:00  8.43           NaN         NaN      NaN      NaN"""
         self.assert_equal(actual, expected, fuzzy_match=True)
 
     def test_to_str_intraday_3_assets_floating_gmv(self) -> None:
@@ -108,7 +110,8 @@ class TestForecastEvaluator1(hunitest.TestCase):
             prediction_col="pred",
         )
         actual = forecast_evaluator.to_str(data)
-        expected = r"""# holdings marked to market=
+        expected = r"""
+# holdings marked to market=
                             101   201   301
 2022-01-03 09:30:00-05:00   NaN   NaN   NaN
 2022-01-03 09:35:00-05:00   NaN   NaN   NaN
@@ -127,14 +130,14 @@ class TestForecastEvaluator1(hunitest.TestCase):
 2022-01-03 09:55:00-05:00 -1.32e-04  9.42e-05 -6.08e-05
 2022-01-03 10:00:00-05:00  4.81e-05  2.59e-03 -1.37e-05
 # statistics=
-                           net_asset_holdings  gross_exposure       pnl
-2022-01-03 09:30:00-05:00                 NaN             NaN       NaN
-2022-01-03 09:35:00-05:00                 NaN             NaN       NaN
-2022-01-03 09:40:00-05:00               -3.91            5.96       NaN
-2022-01-03 09:45:00-05:00                0.66            2.51  9.39e-03
-2022-01-03 09:50:00-05:00               -0.48            1.61  2.90e-04
-2022-01-03 09:55:00-05:00               -2.75            2.87 -9.85e-05
-2022-01-03 10:00:00-05:00                 NaN             NaN  2.63e-03"""
+                                pnl  gross_volume  net_volume   gmv   nmv
+2022-01-03 09:30:00-05:00       NaN           NaN         NaN   NaN   NaN
+2022-01-03 09:35:00-05:00       NaN           NaN         NaN   NaN   NaN
+2022-01-03 09:40:00-05:00       NaN           NaN         NaN  5.96 -3.91
+2022-01-03 09:45:00-05:00  9.39e-03          8.47        4.57  2.51  0.66
+2022-01-03 09:50:00-05:00  2.90e-04          1.14       -1.14  1.61 -0.48
+2022-01-03 09:55:00-05:00 -9.85e-05          4.48       -2.28  2.87 -2.75
+2022-01-03 10:00:00-05:00  2.63e-03           NaN         NaN   NaN   NaN"""
         self.assert_equal(actual, expected, fuzzy_match=True)
 
     def test_to_str_intraday_3_assets_targeted_gmv(self) -> None:
@@ -149,7 +152,8 @@ class TestForecastEvaluator1(hunitest.TestCase):
             prediction_col="pred",
         )
         actual = forecast_evaluator.to_str(data, target_gmv=100000)
-        expected = r"""# holdings marked to market=
+        expected = r"""
+# holdings marked to market=
                                 101       201       301
 2022-01-03 09:30:00-05:00       NaN       NaN       NaN
 2022-01-03 09:35:00-05:00       NaN       NaN       NaN
@@ -168,14 +172,14 @@ class TestForecastEvaluator1(hunitest.TestCase):
 2022-01-03 09:55:00-05:00 -8.20   5.85  -3.78
 2022-01-03 10:00:00-05:00  1.68  90.39  -0.48
 # statistics=
-                           net_asset_holdings  gross_exposure     pnl
-2022-01-03 09:30:00-05:00                 NaN             NaN     NaN
-2022-01-03 09:35:00-05:00                 NaN             NaN     NaN
-2022-01-03 09:40:00-05:00           -65628.06        100000.0     NaN
-2022-01-03 09:45:00-05:00            26337.78        100000.0  157.49
-2022-01-03 09:50:00-05:00           -29580.40        100000.0   11.56
-2022-01-03 09:55:00-05:00           -96023.64        100000.0   -6.12
-2022-01-03 10:00:00-05:00                 NaN             NaN   91.59"""
+                              pnl  gross_volume  net_volume       gmv       nmv
+2022-01-03 09:30:00-05:00     NaN           NaN         NaN       NaN       NaN
+2022-01-03 09:35:00-05:00     NaN           NaN         NaN       NaN       NaN
+2022-01-03 09:40:00-05:00     NaN           NaN         NaN  100000.0 -65628.06
+2022-01-03 09:45:00-05:00  157.49     200000.00    91965.84  100000.0  26337.78
+2022-01-03 09:50:00-05:00   11.56      55918.18   -55918.18  100000.0 -29580.40
+2022-01-03 09:55:00-05:00   -6.12     200000.00   -66443.24  100000.0 -96023.64
+2022-01-03 10:00:00-05:00   91.59           NaN         NaN       NaN       NaN"""
         self.assert_equal(actual, expected, fuzzy_match=True)
 
     def test_to_str_multiday_1_asset_targeted_gmv(self) -> None:
@@ -191,16 +195,17 @@ class TestForecastEvaluator1(hunitest.TestCase):
             prediction_col="pred",
         )
         actual = forecast_evaluator.to_str(data, target_gmv=100000)
-        expected = r"""# holdings marked to market=
-                                101
-2022-01-03 09:30:00-05:00       NaN
-2022-01-03 10:30:00-05:00       NaN
-2022-01-03 11:30:00-05:00  100000.0
-2022-01-03 12:30:00-05:00 -100000.0
-2022-01-03 13:30:00-05:00 -100000.0
-2022-01-03 14:30:00-05:00  100000.0
-2022-01-03 15:30:00-05:00 -100000.0
-2022-01-04 09:30:00-05:00 -100000.0
+        expected = r"""
+# holdings marked to market=                                                                                                                                                                         
+                                101                                                                                                                                                                            
+2022-01-03 09:30:00-05:00       NaN                                                                                                                                                                            
+2022-01-03 10:30:00-05:00       NaN                                                                                                                                                                            
+2022-01-03 11:30:00-05:00  100000.0                                                                                                                                                                            
+2022-01-03 12:30:00-05:00 -100000.0                                                                                                                                                                            
+2022-01-03 13:30:00-05:00 -100000.0                                                                                                                                                                            
+2022-01-03 14:30:00-05:00  100000.0                                                                                                                                                                            
+2022-01-03 15:30:00-05:00 -100000.0                                                                                                                                                                            
+2022-01-04 09:30:00-05:00 -100000.0                                                                                                                                                                            
 2022-01-04 10:30:00-05:00 -100000.0
 2022-01-04 11:30:00-05:00 -100000.0
 2022-01-04 12:30:00-05:00 -100000.0
@@ -226,22 +231,22 @@ class TestForecastEvaluator1(hunitest.TestCase):
 2022-01-04 15:30:00-05:00   5.14
 2022-01-05 09:30:00-05:00 -97.18
 # statistics=
-                           net_asset_holdings  gross_exposure    pnl
-2022-01-03 09:30:00-05:00                 NaN             NaN    NaN
-2022-01-03 10:30:00-05:00                 NaN             NaN    NaN
-2022-01-03 11:30:00-05:00            100000.0        100000.0    NaN
-2022-01-03 12:30:00-05:00           -100000.0        100000.0  26.70
-2022-01-03 13:30:00-05:00           -100000.0        100000.0  24.85
-2022-01-03 14:30:00-05:00            100000.0        100000.0 -12.65
-2022-01-03 15:30:00-05:00           -100000.0        100000.0  84.34
-2022-01-04 09:30:00-05:00           -100000.0        100000.0 -85.83
-2022-01-04 10:30:00-05:00           -100000.0        100000.0 -47.53
-2022-01-04 11:30:00-05:00           -100000.0        100000.0  45.07
-2022-01-04 12:30:00-05:00           -100000.0        100000.0  75.46
-2022-01-04 13:30:00-05:00           -100000.0        100000.0  81.45
-2022-01-04 14:30:00-05:00           -100000.0        100000.0  34.38
-2022-01-04 15:30:00-05:00            100000.0        100000.0   5.14
-2022-01-05 09:30:00-05:00                 NaN             NaN -97.18"""
+                             pnl  gross_volume  net_volume       gmv       nmv
+2022-01-03 09:30:00-05:00    NaN           NaN         NaN       NaN       NaN
+2022-01-03 10:30:00-05:00    NaN           NaN         NaN       NaN       NaN
+2022-01-03 11:30:00-05:00    NaN           NaN         NaN  100000.0  100000.0
+2022-01-03 12:30:00-05:00  26.70      200000.0   -200000.0  100000.0 -100000.0
+2022-01-03 13:30:00-05:00  24.85           0.0         0.0  100000.0 -100000.0
+2022-01-03 14:30:00-05:00 -12.65      200000.0    200000.0  100000.0  100000.0
+2022-01-03 15:30:00-05:00  84.34      200000.0   -200000.0  100000.0 -100000.0
+2022-01-04 09:30:00-05:00 -85.83           0.0         0.0  100000.0 -100000.0
+2022-01-04 10:30:00-05:00 -47.53           0.0         0.0  100000.0 -100000.0
+2022-01-04 11:30:00-05:00  45.07           0.0         0.0  100000.0 -100000.0
+2022-01-04 12:30:00-05:00  75.46           0.0         0.0  100000.0 -100000.0
+2022-01-04 13:30:00-05:00  81.45           0.0         0.0  100000.0 -100000.0
+2022-01-04 14:30:00-05:00  34.38           0.0         0.0  100000.0 -100000.0
+2022-01-04 15:30:00-05:00   5.14      200000.0    200000.0  100000.0  100000.0
+2022-01-05 09:30:00-05:00 -97.18           NaN         NaN       NaN       NaN"""
         self.assert_equal(actual, expected, fuzzy_match=True)
 
     def test_log_portfolio_read_portfolio(self) -> None:
@@ -287,15 +292,15 @@ class TestForecastEvaluator1(hunitest.TestCase):
         )
         #
         stats_df_str = hprint.dataframe_to_str(stats_df, precision=precision)
-        expected_stats_df_str = r"""
-                           net_asset_holdings  gross_exposure      pnl
-2022-01-03 09:30:00-05:00                 NaN             NaN      NaN
-2022-01-03 09:35:00-05:00                 NaN             NaN      NaN
-2022-01-03 09:40:00-05:00          -656280.62       1000000.0      NaN
-2022-01-03 09:45:00-05:00           263377.75       1000000.0  1574.95
-2022-01-03 09:50:00-05:00          -295804.01       1000000.0   115.63
-2022-01-03 09:55:00-05:00          -960236.43       1000000.0   -61.20
-2022-01-03 10:00:00-05:00                 NaN             NaN   915.93"""
+        expected_stats_df_str = r"""                              
+                               pnl  gross_volume  net_volume        gmv        nmv
+2022-01-03 09:30:00-05:00      NaN           NaN         NaN        NaN        NaN
+2022-01-03 09:35:00-05:00      NaN           NaN         NaN        NaN        NaN
+2022-01-03 09:40:00-05:00      NaN           NaN         NaN  1000000.0 -656280.62
+2022-01-03 09:45:00-05:00  1574.95      2.00e+06   919658.37  1000000.0  263377.75
+2022-01-03 09:50:00-05:00   115.63      5.59e+05  -559181.76  1000000.0 -295804.01
+2022-01-03 09:55:00-05:00   -61.20      2.00e+06  -664432.42  1000000.0 -960236.43
+2022-01-03 10:00:00-05:00   915.93           NaN         NaN        NaN        NaN"""
         self.assert_equal(stats_df_str, expected_stats_df_str, fuzzy_match=True)
 
     @staticmethod

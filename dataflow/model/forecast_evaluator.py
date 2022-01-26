@@ -156,10 +156,10 @@ class ForecastEvaluator:
             positions,
             pnl,
         )
-        statistics = ForecastEvaluator._read_df(
+        statistics_df = ForecastEvaluator._read_df(
             log_dir, "statistics", file_name, tz
         )
-        return portfolio_df, statistics
+        return portfolio_df, statistics_df
 
     def compute_portfolio(
         self,
@@ -228,7 +228,7 @@ class ForecastEvaluator:
         *,
         target_gmv: Optional[float] = None,
         dollar_neutrality: str = "no_constraint",
-    ) -> pd.DataFrame:
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
         Wraps `compute_portfolio()`, returns a single multiindexed dataframe.
 
@@ -238,7 +238,7 @@ class ForecastEvaluator:
         :return: multiindexed dataframe with level-0 columns
             "returns", "volatility", "prediction", "position", "pnl"
         """
-        positions, pnl, _ = self.compute_portfolio(
+        positions, pnl, statistics_df = self.compute_portfolio(
             df,
             target_gmv=target_gmv,
             dollar_neutrality=dollar_neutrality,
@@ -251,7 +251,7 @@ class ForecastEvaluator:
             positions,
             pnl,
         )
-        return portfolio_df
+        return portfolio_df, statistics_df
 
     @staticmethod
     def _build_multiindex_df(
@@ -387,14 +387,25 @@ class ForecastEvaluator:
         pnl: pd.DataFrame,
     ) -> pd.DataFrame:
         positions = target_positions.shift(1)
+        # Gross market value (gross exposure).
         gmv = positions.abs().sum(axis=1, min_count=1)
-        nav = positions.sum(axis=1, min_count=1)
+        # Net market value (net asset value or net exposure).
+        nmv = positions.sum(axis=1, min_count=1)
+        # This is an approximation that does not take into account returns.
+        traded_volume = positions.diff()
+        # Absolute volume traded.
+        gross_volume = traded_volume.abs().sum(axis=1, min_count=1)
+        # Net volume traded.
+        net_volume = traded_volume.sum(axis=1, min_count=1)
+        # Aggregated PnL.
         portfolio_pnl = pnl.sum(axis=1, min_count=1)
         stats = pd.DataFrame(
             {
-                "net_asset_holdings": nav,
-                "gross_exposure": gmv,
                 "pnl": portfolio_pnl,
+                "gross_volume": gross_volume,
+                "net_volume": net_volume,
+                "gmv": gmv,
+                "nmv": nmv,
             }
         )
         return stats
