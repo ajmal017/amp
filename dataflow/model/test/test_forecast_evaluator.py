@@ -7,6 +7,7 @@ import pandas as pd
 import core.artificial_signal_generators as carsigen
 import core.signal_processing as csigproc
 import dataflow.model.forecast_evaluator as dtfmofoeva
+import helpers.hpandas as hpandas
 import helpers.hprint as hprint
 import helpers.hunit_test as hunitest
 
@@ -274,7 +275,7 @@ class TestForecastEvaluator1(hunitest.TestCase):
         self.assertEqual(asset_id_idx.dtype.type, np.int64)
         #
         precision = 2
-        portfolio_df_str = hprint.dataframe_to_str(
+        portfolio_df_str = hpandas.dataframe_to_str(
             portfolio_df, precision=precision
         )
         expected_portfolio_df_str = r"""
@@ -291,7 +292,7 @@ class TestForecastEvaluator1(hunitest.TestCase):
             portfolio_df_str, expected_portfolio_df_str, fuzzy_match=True
         )
         #
-        stats_df_str = hprint.dataframe_to_str(stats_df, precision=precision)
+        stats_df_str = hpandas.dataframe_to_str(stats_df, precision=precision)
         expected_stats_df_str = r"""                              
                                pnl  gross_volume  net_volume        gmv        nmv
 2022-01-03 09:30:00-05:00      NaN           NaN         NaN        NaN        NaN

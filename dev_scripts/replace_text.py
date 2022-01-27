@@ -491,6 +491,12 @@ def _parse() -> argparse.ArgumentParser:
         default=None,
         help="Directories to process",
     )
+    parser.add_argument(
+        "--only_files",
+        action="store",
+        default=None,
+        help="Files to process",
+    )
     hparser.add_verbosity_arg(parser)
     return parser
 
@@ -533,6 +539,15 @@ def _main(parser: argparse.ArgumentParser) -> None:
         _LOG.info("extensions=%s", exts)
         # Find all the files with the correct extension.
         file_names = _get_all_files(dirs, exts)
+        if args.only_files:
+            # Use only specific files.
+            only_files_list = args.only_files.split(" ")
+            file_names = [
+                file_name
+                for file_name in file_names
+                # Remove current directory to match only_files format.
+                if os.path.normpath(file_name) in only_files_list
+            ]
         if args.action == "replace":
             # Replace.
             file_names_to_process, txt = _get_files_to_replace(

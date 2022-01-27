@@ -7,6 +7,7 @@ import pandas as pd
 
 import core.real_time as creatime
 import helpers.hasyncio as hasynci
+import helpers.hpandas as hpandas
 import helpers.hprint as hprint
 import helpers.hsql as hsql
 import helpers.hunit_test as hunitest
@@ -335,7 +336,7 @@ class TestMockedPortfolio1(omtodh.TestOmsDbHelper):
                 # Print the DB status.
                 query = """SELECT * FROM current_positions"""
                 df = hsql.execute_query_to_df(self.connection, query)
-                print(hprint.dataframe_to_str(df))
+                print(hpandas.dataframe_to_str(df))
                 assert 0
             #
             # Create MockedPortfolio with some initial cash.
@@ -364,7 +365,7 @@ class TestMockedPortfolio1(omtodh.TestOmsDbHelper):
                 # Print the DB status.
                 query = """SELECT * FROM current_positions"""
                 df = hsql.execute_query_to_df(self.connection, query)
-                print(hprint.dataframe_to_str(df))
+                print(hpandas.dataframe_to_str(df))
                 assert 0
             #
             # Create MockedPortfolio with some initial cash.
@@ -453,7 +454,7 @@ class TestMockedPortfolio2(omtodh.TestOmsDbHelper):
                 # Print the DB status.
                 query = """SELECT * FROM current_positions"""
                 df = hsql.execute_query_to_df(self.connection, query)
-                print(hprint.dataframe_to_str(df))
+                print(hpandas.dataframe_to_str(df))
                 assert 0
             #
             # Create MockedPortfolio with some initial cash.
@@ -482,7 +483,7 @@ class TestMockedPortfolio2(omtodh.TestOmsDbHelper):
         #
         precision = 2
         #
-        portfolio_df_str = hprint.dataframe_to_str(
+        portfolio_df_str = hpandas.dataframe_to_str(
             portfolio_df, precision=precision
         )
         expected_portfolio_df_str = r"""
@@ -494,7 +495,7 @@ class TestMockedPortfolio2(omtodh.TestOmsDbHelper):
             portfolio_df_str, expected_portfolio_df_str, fuzzy_match=True
         )
         #
-        stats_df_str = hprint.dataframe_to_str(stats_df, precision=precision)
+        stats_df_str = hpandas.dataframe_to_str(stats_df, precision=precision)
         expected_stats_df_str = r"""
                            net_asset_holdings       cash  net_wealth  gross_exposure  leverage       pnl  realized_pnl  unrealized_pnl
 2000-01-01 09:35:00-05:00                0.00  1000000.0    1.00e+06            0.00      0.00       NaN           NaN             NaN

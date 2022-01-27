@@ -15,6 +15,7 @@ import pandas as pd
 import dataflow.core as dtfcore
 import dataflow.model as dtfmod
 import helpers.hdbg as hdbg
+import helpers.hpandas as hpandas
 import helpers.hprint as hprint
 import oms.portfolio as omportfo
 import oms.process_forecasts as oprofore
@@ -74,11 +75,11 @@ class ProcessForecasts(dtfcore.FitPredictNode):
         #  pred_col and vol_col.
         prediction_df = df[self._prediction_col]
         self._prediction_df = prediction_df
-        _LOG.debug("prediction_df=\n%s", hprint.dataframe_to_str(prediction_df))
+        _LOG.debug("prediction_df=\n%s", hpandas.dataframe_to_str(prediction_df))
         #
         volatility_df = df[self._volatility_col]
         self._volatility_df = volatility_df
-        _LOG.debug("volatility_df=\n%s", hprint.dataframe_to_str(volatility_df))
+        _LOG.debug("volatility_df=\n%s", hpandas.dataframe_to_str(volatility_df))
         # Compute stats.
         info = collections.OrderedDict()
         info["df_out_info"] = dtfcore.get_df_info_as_string(df)

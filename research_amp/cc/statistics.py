@@ -15,7 +15,7 @@ import core.config.config_ as cconconf
 import core.statistics as costatis
 import helpers.hdbg as hdbg
 import helpers.hpandas as hpandas
-import im_v2.ccxt.data.client as imvcdcli
+import im_v2.ccxt.data.client as icdcl
 import im_v2.common.data.client as icdc
 import im_v2.cryptodatadownload.data.client.cdd_client as imvcdccdcl
 
@@ -211,7 +211,8 @@ def get_loader_for_vendor(
     root_dir = config["load"]["data_dir"]
     extension = "csv.gz"
     if vendor == "CCXT":
-        loader = imvcdcli.CcxtCsvParquetByAssetClient(
+        loader = icdcl.CcxtCddCsvParquetByAssetClient(
+            vendor,
             root_dir,
             extension,
             aws_profile=config["load"]["aws_profile"],

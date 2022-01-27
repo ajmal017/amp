@@ -9,6 +9,7 @@ import pyarrow
 import pyarrow.parquet as parquet
 
 import helpers.hdbg as hdbg
+import helpers.hpandas as hpandas
 import helpers.hparquet as hparque
 import helpers.hprint as hprint
 import helpers.hunit_test as hunitest
@@ -64,8 +65,8 @@ def _get_df_example1() -> pd.DataFrame:
 
 
 def _compare_dfs(self: Any, df1: pd.DataFrame, df2: pd.DataFrame) -> str:
-    df1_as_str = hprint.df_to_short_str("", df1)
-    df2_as_str = hprint.df_to_short_str("", df2)
+    df1_as_str = hpandas.df_to_short_str("", df1)
+    df2_as_str = hpandas.df_to_short_str("", df2)
     self.assert_equal(df1_as_str, df2_as_str, fuzzy_match=True)
     # When Parquet reads partitioned dataset can convert partitioning columns into
     # categorical variables that can create false positives.
@@ -86,7 +87,7 @@ class TestParquet1(hunitest.TestCase):
         # Prepare data.
         df = _get_df_example1()
         # Check.
-        act = hprint.df_to_short_str("df", df)
+        act = hpandas.df_to_short_str("df", df)
         exp = r"""# df=
         df.index in [2020-01-01 09:30:00-05:00, 2020-01-01 16:00:00-05:00]
         df.columns=idx,instr,val1,val2
@@ -185,7 +186,7 @@ class TestParquet1(hunitest.TestCase):
         filters.append([("idx", "=", 0)])
         df2 = self.read_filtered_parquet(file_name, filters)
         # Check.
-        act = hprint.df_to_short_str("df", df2)
+        act = hpandas.df_to_short_str("df", df2)
         exp = r"""# df=
         df.index in [2020-01-01 09:30:00-05:00, 2020-01-01 16:00:00-05:00]
         df.columns=idx,instr,val1,val2
@@ -395,7 +396,7 @@ class TestPartitionedParquet1(hunitest.TestCase):
         table = dataset.read(columns=columns_to_read)
         df2 = table.to_pandas()
         # Compare.
-        df_as_str = hprint.df_to_short_str("df", df2)
+        df_as_str = hpandas.df_to_short_str("df", df2)
         exp = r"""# df=
         df.index in [0, 78]
         df.columns=idx,instr

@@ -17,13 +17,15 @@ class Test_dassert_is_unique1(hunitest.TestCase):
         Return a df without duplicated index.
         """
         num_rows = 5
-        idx = [pd.Timestamp("2000-01-01 9:00") + pd.Timedelta(minutes=i)
-                for i in range(num_rows)]
+        idx = [
+            pd.Timestamp("2000-01-01 9:00") + pd.Timedelta(minutes=i)
+            for i in range(num_rows)
+        ]
         values = [[i] for i in range(len(idx))]
         df = pd.DataFrame(values, index=idx)
         _LOG.debug("df=\n%s", df)
         #
-        act = hprint.dataframe_to_str(df)
+        act = hpandas.dataframe_to_str(df)
         exp = r"""
                              0
         2000-01-01 09:00:00  0
@@ -43,14 +45,16 @@ class Test_dassert_is_unique1(hunitest.TestCase):
         Return a df with duplicated index.
         """
         num_rows = 4
-        idx = [pd.Timestamp("2000-01-01 9:00") + pd.Timedelta(minutes=i)
-               for i in range(num_rows)]
+        idx = [
+            pd.Timestamp("2000-01-01 9:00") + pd.Timedelta(minutes=i)
+            for i in range(num_rows)
+        ]
         idx.append(idx[0])
         values = [[i] for i in range(len(idx))]
         df = pd.DataFrame(values, index=idx)
         _LOG.debug("df=\n%s", df)
         #
-        act = hprint.dataframe_to_str(df)
+        act = hpandas.dataframe_to_str(df)
         exp = r"""
                              0
         2000-01-01 09:00:00  0
@@ -153,7 +157,7 @@ class Test_trim_df1(hunitest.TestCase):
         """
         df = self.get_df()
         #
-        act = hprint.df_to_short_str("df", df, print_dtypes=True)
+        act = hpandas.df_to_short_str("df", df, print_dtypes=True)
         exp = r"""# df=
         df.index in [4, 44]
         df.columns=start_time,egid,close
@@ -190,7 +194,7 @@ class Test_trim_df1(hunitest.TestCase):
         """
         df = self.get_df_with_parse_dates()
         # Check.
-        act = hprint.df_to_short_str("df", df, print_dtypes=True)
+        act = hpandas.df_to_short_str("df", df, print_dtypes=True)
         exp = r"""# df=
         df.index in [4, 44]
         df.columns=start_time,egid,close
@@ -232,7 +236,7 @@ class Test_trim_df1(hunitest.TestCase):
         """
         df = self.get_df_with_tz_timestamp()
         # Check.
-        act = hprint.df_to_short_str("df", df, print_dtypes=True)
+        act = hpandas.df_to_short_str("df", df, print_dtypes=True)
         exp = r"""# df=
         df.index in [4, 44]
         df.columns=start_time,egid,close
@@ -272,7 +276,7 @@ class Test_trim_df1(hunitest.TestCase):
             df, ts_col_name, start_ts, end_ts, left_close, right_close
         )
         # Check.
-        act = hprint.df_to_short_str("df_trim", df_trim, print_dtypes=True)
+        act = hpandas.df_to_short_str("df_trim", df_trim, print_dtypes=True)
         exp = r"""# df_trim=
         df.index in [4, 38]
         df.columns=start_time,egid,close
@@ -310,7 +314,7 @@ class Test_trim_df1(hunitest.TestCase):
             df, ts_col_name, start_ts, end_ts, left_close, right_close
         )
         # Check.
-        act = hprint.df_to_short_str("df_trim", df_trim, print_dtypes=True)
+        act = hpandas.df_to_short_str("df_trim", df_trim, print_dtypes=True)
         exp = r"""# df_trim=
         df.index in [4, 38]
         df.columns=start_time,egid,close
@@ -348,7 +352,7 @@ class Test_trim_df1(hunitest.TestCase):
             df, ts_col_name, start_ts, end_ts, left_close, right_close
         )
         # Check.
-        act = hprint.df_to_short_str("df_trim", df_trim, print_dtypes=True)
+        act = hpandas.df_to_short_str("df_trim", df_trim, print_dtypes=True)
         exp = r"""# df_trim=
         df.index in [4, 38]
         df.columns=start_time,egid,close
