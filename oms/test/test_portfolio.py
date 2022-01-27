@@ -361,16 +361,16 @@ class TestMockedPortfolio1(omtodh.TestOmsDbHelper):
         actual = str(portfolio)
         expected = r"""
 # historical holdings=
-asset_id                    101       -1
+asset_id                    101       -1  
 2000-01-01 09:35:00-05:00   0.0  1000000.0
 2000-01-01 09:40:00-05:00  20.0  1000000.0
 # historical holdings marked to market=
-asset_id                        101       -1
+asset_id                        101       -1  
 2000-01-01 09:35:00-05:00      0.00  1000000.0
 2000-01-01 09:40:00-05:00  20004.03  1000000.0
 # historical flows=
 asset_id                   101
-2000-01-01 09:40:00-05:00 -0.0
+2000-01-01 09:40:00-05:00  0.0
 # historical pnl=
 asset_id                        101
 2000-01-01 09:35:00-05:00       NaN
@@ -392,24 +392,24 @@ asset_id                        101
         actual = str(portfolio)
         expected = r"""
 # historical holdings=
-asset_id                    101        -1
-2000-01-01 09:35:00-05:00   0.0  1000000.00
-2000-01-01 09:40:00-05:00  20.0   998096.88
+asset_id                    101      -1  
+2000-01-01 09:35:00-05:00   0.0  1.00e+06
+2000-01-01 09:40:00-05:00  20.0  1.00e+06
 # historical holdings marked to market=
-asset_id                        101        -1
-2000-01-01 09:35:00-05:00      0.00  1000000.00
-2000-01-01 09:40:00-05:00  20004.03   998096.88
+asset_id                        101      -1  
+2000-01-01 09:35:00-05:00      0.00  1.00e+06
+2000-01-01 09:40:00-05:00  20004.03  1.00e+06
 # historical flows=
 asset_id                       101
-2000-01-01 09:40:00-05:00 -1903.12
+2000-01-01 09:40:00-05:00  1903.12
 # historical pnl=
 asset_id                        101
 2000-01-01 09:35:00-05:00       NaN
-2000-01-01 09:40:00-05:00  18100.91
+2000-01-01 09:40:00-05:00  21907.15
 # historical statistics=
-                                pnl  gross_volume  net_volume       gmv       nmv        cash  net_wealth  leverage
-2000-01-01 09:35:00-05:00       NaN          0.00        0.00      0.00      0.00  1000000.00    1.00e+06      0.00
-2000-01-01 09:40:00-05:00  18100.91       1903.12     1903.12  20004.03  20004.03   998096.88    1.02e+06      0.02"""
+                                pnl  gross_volume  net_volume       gmv       nmv      cash  net_wealth  leverage
+2000-01-01 09:35:00-05:00       NaN          0.00        0.00      0.00      0.00  1.00e+06    1.00e+06      0.00
+2000-01-01 09:40:00-05:00  21907.15       1903.12    -1903.12  20004.03  20004.03  1.00e+06    1.02e+06      0.02"""
         self.assert_equal(actual, expected, fuzzy_match=True)
 
 
@@ -466,7 +466,7 @@ class TestMockedPortfolio2(omtodh.TestOmsDbHelper):
                           holdings            holdings_marked_to_market            flows       pnl
                                101       -1                         101       -1     101       101
 2000-01-01 09:35:00-05:00      0.0  1000000.0                      0.00  1000000.0   NaN       NaN
-2000-01-01 09:40:00-05:00     20.0  1000000.0                  20004.03  1000000.0  -0.0  20004.03"""
+2000-01-01 09:40:00-05:00     20.0  1000000.0                  20004.03  1000000.0   0.0  20004.03"""
         self.assert_equal(
             portfolio_df_str, expected_portfolio_df_str, fuzzy_match=True
         )

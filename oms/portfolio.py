@@ -1042,7 +1042,8 @@ class MockedPortfolio(AbstractPortfolio):
         if snapshot_df.empty:
             return pd.Series([], dtype="float64")
         hdbg.dassert_in("net_cost", snapshot_df.columns)
-        net_cost = snapshot_df.set_index("asset_id")["net_cost"]
+        # A long position has negative net cost.
+        net_cost = -1 * snapshot_df.set_index("asset_id")["net_cost"]
         _LOG.debug("net_cost (cumulative)=%f", net_cost.sum())
         return net_cost
 
