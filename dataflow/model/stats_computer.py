@@ -12,6 +12,7 @@ import pandas as pd
 
 import core.finance as cofinanc
 import core.statistics as costatis
+import dataflow.core as dtfcore
 import helpers.hdbg as hdbg
 import helpers.htimer as htimer
 
@@ -128,25 +129,59 @@ class StatsComputer:
         kratio.name = name
         return pd.concat([result, kratio])
 
-    def compute_pnl_stats(
-        self, data: Union[pd.Series, pd.DataFrame]
-    ) -> Union[pd.Series, pd.DataFrame]:
+    def compute_portfolio_stats(
+        self,
+        df: pd.DataFrame,
+        freq: str,
+        *,
+        pnl_col: str = "pnl",
+        gross_volume_col: str = "gross_volume",
+        net_volume_col: str = "net_volume",
+        gmv_col: str = "gmv",
+        nmv_col: str = "nmv",
+    ) -> pd.Series:
         """
-        Compute PnL-relevant stats.
+
+        :param df:
+        :param pnl_col:
+        :param gross_volume_col:
+        :param net_volume_col:
+        :param gmv_col:
+        :param nmv_col:
+        :return:
         """
-        result = self._apply_func(data, self._compute_pnl_stats)
+        df = cofinanc.resample_bars(
+            df,
+            freq,
+            resampling_groups=[
+                (
+                    {
+                        pnl_col: "pnl",
+                        gross_volume_col: "gross_volume",
+                        net_volume_col: "net_volume",
+                    },
+                    "sum",
+                    {"min_count": 1},
+                ),
+                (
+                    {
+                        gmv_col: "gmv",
+                        nmv_col: "nmv",
+                    },
+                    "mean",
+                    {},
+                ),
+            ],
+            vwap_groups=[],
+        )
+        results = []
+        ratios = self.compute_ratios(df["pnl"])
+        results.append(ratios)
+        result = pd.concat(results, axis=0).round(2)
+        hdbg.dassert_isinstance(result, pd.Series)
         return result
 
-    def compute_position_stats(
-        self, data: Union[pd.Series, pd.DataFrame]
-    ) -> Union[pd.Series, pd.DataFrame]:
-        """
-        Compute position-relevant stats (turnover, holding period).
-        """
-        result = self._apply_func(data, self._compute_position_stats)
-        return result
-
-    def compute_finance_stats(
+    def compute_per_asset_stats(
         self,
         df: pd.DataFrame,
         *,
@@ -156,6 +191,46 @@ class StatsComputer:
         position_col: Optional[str] = None,
         pnl_col: Optional[str] = None,
     ) -> pd.DataFrame:
+        """
+        Apply `compute_stats()` to each asset and merge results.
+
+        :param df: multiindexed dataframe
+        """
+        dfs = dtfcore.GroupedColDfToDfColProcessor.preprocess(
+            df,
+            [
+                (returns_col,),
+                (volatility_col,),
+                (prediction_col,),
+                (position_col,),
+                (pnl_col,),
+            ],
+        )
+        stats = []
+        for key, value in dfs.items():
+            stat = self.compute_finance_stats(
+                value,
+                returns_col=returns_col,
+                volatility_col=volatility_col,
+                prediction_col=prediction_col,
+                position_col=position_col,
+                pnl_col=pnl_col,
+            )
+            stat.name = key
+            stats.append(stat)
+        return pd.concat(stats, axis=1)
+
+    # TODO(Paul): rename `compute_stats()`.
+    def compute_finance_stats(
+        self,
+        df: pd.DataFrame,
+        *,
+        returns_col: Optional[str] = None,
+        volatility_col: Optional[str] = None,
+        prediction_col: Optional[str] = None,
+        position_col: Optional[str] = None,
+        pnl_col: Optional[str] = None,
+    ) -> pd.Series:
         """
         Compute financially meaningful statistics.
 
@@ -170,14 +245,15 @@ class StatsComputer:
             realized at the next timestamp
         :param pnl_col: PnL realized at indexed timestamp
         """
+        hdbg.dassert(not isinstance(df.columns, pd.MultiIndex))
         results = []
         # Compute stats related to positions.
         if position_col is not None:
-            position_stats = self.compute_position_stats(df[position_col])
+            position_stats = self._compute_position_stats(df[position_col])
             results.append(position_stats)
         # Compute stats related to PnL.
         if pnl_col is not None:
-            pnl_stats = self.compute_pnl_stats(df[pnl_col])
+            pnl_stats = self._compute_pnl_stats(df[pnl_col])
             results.append(pnl_stats)
         # Currently we do not calculate individual prediction/returns stats.
         if (
@@ -243,7 +319,9 @@ class StatsComputer:
         # No predictions and positions calculations yet.
         # No predictions and PnL calculations yet.
         # No positions and PnL calculations yet.
-        return pd.concat(results, axis=0)
+        result = pd.concat(results, axis=0)
+        hdbg.dassert_isinstance(result, pd.Series)
+        return result
 
     def _compute_pnl_stats(self, srs: pd.Series) -> pd.Series:
         """
