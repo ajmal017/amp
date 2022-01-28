@@ -1711,8 +1711,9 @@ def compute_bet_stats(
         not the calendar year, but an approximate number of data points in a
         year
     """
+    # TODO(Paul): Consider requiring `freq` on the index.
     prefix = prefix or ""
-    bet_lengths = cofinanc.compute_signed_bet_lengths(positions)
+    bet_lengths = cofinanc.compute_signed_run_lengths(positions)
     returns_per_bet = cofinanc.compute_returns_per_bet(positions, returns)
     #
     stats = dict()

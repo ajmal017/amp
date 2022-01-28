@@ -141,14 +141,7 @@ class StatsComputer:
         nmv_col: str = "nmv",
     ) -> pd.Series:
         """
-
-        :param df:
-        :param pnl_col:
-        :param gross_volume_col:
-        :param net_volume_col:
-        :param gmv_col:
-        :param nmv_col:
-        :return:
+        Compute standard portfolio metrics.
         """
         df = cofinanc.resample_bars(
             df,
@@ -175,9 +168,52 @@ class StatsComputer:
             vwap_groups=[],
         )
         results = []
-        ratios = self.compute_ratios(df["pnl"])
-        results.append(ratios)
-        result = pd.concat(results, axis=0).round(2)
+        #
+        srs = df["pnl"]
+        # Add Sharpe ratio, K-ratio.
+        ratios = self.compute_ratios(srs)
+        ratios = ratios.round(2)
+        results.append(pd.concat([ratios], keys=["ratios"]))
+        # Add GMV stats.
+        gmv_stats = pd.Series(
+            {
+                "gmv_mean": df["gmv"].mean(),
+                "gmv_stdev": df["gmv"].std(),
+            },
+        )
+        results.append(pd.concat([gmv_stats], keys=["dollar"]))
+        # Add dollar return, volatility, drawdown.
+        name = "dollar"
+        functions = [
+            costatis.compute_annualized_return_and_volatility,
+            costatis.compute_max_drawdown,
+        ]
+        stats = self._compute_stat_functions(srs, name, functions)
+        results.append(pd.concat([stats], keys=["dollar"]))
+        # Add dollar turnover, bias.
+        dollar_turnover_and_bias = cofinanc.compute_turnover_and_bias(
+            df["gross_volume"],
+            df["nmv"],
+        )
+        results.append(pd.concat([dollar_turnover_and_bias], keys=["dollar"]))
+        # Add percentage return, volatility, drawdown.
+        srs = df["pnl"] / df["gmv"]
+        name = "percentage"
+        functions = [
+            costatis.compute_annualized_return_and_volatility,
+            costatis.compute_max_drawdown,
+        ]
+        stats = self._compute_stat_functions(srs, name, functions)
+        results.append(pd.concat([stats], keys=["percentage"]))
+        # Add dollar turnover, bias.
+        percentage_turnover_and_bias = cofinanc.compute_turnover_and_bias(
+            df["gross_volume"] / df["gmv"],
+            df["nmv"] / df["gmv"],
+        )
+        results.append(
+            pd.concat([percentage_turnover_and_bias], keys=["percentage"])
+        )
+        result = pd.concat(results, axis=0).astype("float").round(2)
         hdbg.dassert_isinstance(result, pd.Series)
         return result
 
