@@ -4356,7 +4356,10 @@ def gh_workflow_list(
         # Find the first success.
         num_rows = table.size()[0]
         for i in range(num_rows):
-            status = table_tmp.get_column("status")[i]
+            status_column = table_tmp.get_column("status")
+            _LOG.debug("status_column=%s", str(status_column))
+            hdbg.dassert_lt(i, len(status_column))
+            status = status_column[i]
             if status == "success":
                 print(f"Workflow '{workflow}' for '{branch_name}' is ok")
                 break
