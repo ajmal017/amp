@@ -13,6 +13,7 @@ import im_v2.common.data.client as icdc
 import market_data.abstract_market_data as mdabmada
 
 
+# TODO(gp): ImClientMarketData for symmetry? And so also rename the files.
 class MarketDataImClient(mdabmada.AbstractMarketData):
     """
     Implement a `MarketData` that uses a `ImClient` as backend.

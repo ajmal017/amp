@@ -28,6 +28,7 @@ _LOG.verb_debug = hprint.install_log_verb_debug(_LOG, verbose=False)
 # #############################################################################
 
 
+# TODO(gp): -> MarketData
 class AbstractMarketData(abc.ABC):
     """
     Implement an interface to an historical / real-time source of price data.
@@ -172,6 +173,10 @@ class AbstractMarketData(abc.ABC):
         timestamp.
 
         This is used during real-time execution to evaluate a model.
+
+        Note that we use `asset_ids` from the constructor instead of passing it
+        since the use case is for clients to just ask data that has been
+        configured upstream when this object was built.
         """
         # TODO(gp): If the DB supports asyncio this should become async.
         # Handle `timedelta`.
@@ -253,6 +258,7 @@ class AbstractMarketData(abc.ABC):
         :param left_close, right_close: represent the type of interval
             - E.g., [start_ts, end_ts), or (start_ts, end_ts]
         """
+        _LOG.debug(hprint.to_str("start_ts end_ts ts_col_name asset_ids left_close right_close normalize_data limit"))
         # Resolve the asset ids.
         if asset_ids is None:
             asset_ids = self._asset_ids
@@ -565,7 +571,8 @@ class AbstractMarketData(abc.ABC):
         :param asset_ids: list of asset ids to filter on. `None` for all asset ids.
         :param left_close, right_close: represent the type of interval
             - E.g., [start_ts, end_ts), or (start_ts, end_ts]
-        :param normalize_data: whether to normalize data or not, see `self.process_data()`
+        :param normalize_data: whether to normalize data or not, see
+            `self.process_data()`
         :param limit: keep only top N records
         """
         ...
