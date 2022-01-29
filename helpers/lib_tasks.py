@@ -1053,6 +1053,12 @@ def git_branch_diff_with_master(  # type: ignore
 #   > i lint --dir-name . --only-format
 #   ```
 #
+# - Remove end-spaces
+#   ```
+#   # Remove
+#   > find . -name "*.txt" | xargs perl -pi -e 'chomp if eof'
+#   ```
+#
 # - Align `lib_tasks.py`
 #   ```
 #   > vimdiff ~/src/{amp1,cmamp1}/tasks.py; vimdiff ~/src/{amp1,cmamp1}/helpers/lib_tasks.py
