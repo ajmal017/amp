@@ -433,11 +433,21 @@ class AbstractPortfolio(abc.ABC):
     @staticmethod
     def read_state(
         log_dir: str,
-        file_name: str,
         *,
+        file_name: Optional[str] = None,
         tz: str = "America/New_York",
         cast_asset_ids_to_int: bool = True,
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Read and process logged portfolio state.
+
+        :param file_name: if `None`, find and use the latest
+        """
+        if file_name is None:
+            dir_name = os.path.join(log_dir, "holdings")
+            files = hio.find_all_files(dir_name)
+            files.sort()
+            file_name = files[-1]
         holdings_df = AbstractPortfolio._read_df(
             log_dir, "holdings", file_name, tz
         )
