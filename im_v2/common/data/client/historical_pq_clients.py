@@ -20,27 +20,20 @@ import im_v2.common.data.client.full_symbol as imvcdcfusy
 _LOG = logging.getLogger(__name__)
 
 
-# TODO(gp): Add tests.
+# TODO(gp): @Grisha Add tests. GP to provide an example of files or we can generate
+#  them from CSV.
+# TODO(gp): ByAsset -> ByTile
 class HistoricalPqByAssetClient(imvcdclcl.ImClientReadingMultipleSymbols):
     """
     Provide historical data stored as Parquet by-asset.
     """
 
     def __init__(
-        self, asset_col_name: str, *, root_dir_name: Optional[str] = None
+        self, asset_col_name: str, root_dir_name: str
     ):
-        # TODO(gp): Use central location.
-        hdbg.dassert_is_not(root_dir_name, None)
         # TODO(gp): Check that the dir exists, handling the S3 case.
         self._root_dir_name = root_dir_name
         self._asset_col_name = asset_col_name
-
-    @staticmethod
-    def get_universe(as_assets_ids: bool) -> List[imvcdcfusy.FullSymbol]:
-        """
-        Same as abstract method.
-        """
-        raise NotImplementedError
 
     def _dassert_is_valid_timestamp(self, timestamp: pd.Timestamp) -> None:
         hdbg.dassert_isinstance(timestamp, pd.Timestamp)
@@ -63,6 +56,7 @@ class HistoricalPqByAssetClient(imvcdclcl.ImClientReadingMultipleSymbols):
                 "full_symbols start_ts end_ts full_symbol_col_name columns"
             )
         )
+        # TODO(gp): This should be done by the derived class.
         asset_ids = list(map(int, full_symbols))
         # The filter is an OR of AND conditions:
         # See https://arrow.apache.org/docs/python/generated/pyarrow.parquet.ParquetDataset.html
@@ -98,7 +92,7 @@ class HistoricalPqByAssetClient(imvcdclcl.ImClientReadingMultipleSymbols):
         hdbg.dassert(not df.empty)
         # Convert to datetime.
         df.index = pd.to_datetime(df.index)
-        # The EG id data comes back from Parquet as
+        # The asset data can come back from Parquet as:
         # ```
         # Categories(540, int64): [10025, 10036, 10040, 10045, ..., 82711, 82939,
         #                         83317, 89970]
@@ -123,6 +117,7 @@ class HistoricalPqByAssetClient(imvcdclcl.ImClientReadingMultipleSymbols):
         )
         return df
 
+    # TODO(gp): Remove, if possible.
     @staticmethod
     def _apply_vendor_normalization(df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -134,21 +129,17 @@ class HistoricalPqByAssetClient(imvcdclcl.ImClientReadingMultipleSymbols):
 # #############################################################################
 
 
+# TODO(gp): @Grisha Add tests. GP to provide an example of files or we can generate
+#  them from CSV.
 class HistoricalPqByDateClient(imvcdclcl.ImClientReadingMultipleSymbols):
     """
     Read historical data stored as Parquet by-date.
     """
 
+    # TODO(gp): Do not pass a read_func but use an abstract method.
     def __init__(self, asset_col_name: str, read_func):
         self._asset_col_name = asset_col_name
         self._read_func = read_func
-
-    @staticmethod
-    def get_universe() -> List[imvcdcfusy.FullSymbol]:
-        """
-        Same as abstract method.
-        """
-        raise NotImplementedError
 
     def _read_data_for_multiple_symbols(
         self,
@@ -203,6 +194,7 @@ class HistoricalPqByDateClient(imvcdclcl.ImClientReadingMultipleSymbols):
         )
         return df
 
+    # TODO(gp): Remove, if possible.
     @staticmethod
     def _apply_vendor_normalization(df: pd.DataFrame) -> pd.DataFrame:
         """
