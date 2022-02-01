@@ -511,7 +511,7 @@ class AbstractPortfolio(abc.ABC):
             columns=AbstractPortfolio.CASH_ID
         )
         # Get per-bar flows and compute PnL.
-        pnl = holdings_marked_to_market.diff().add(flows, fill_value=0.0)
+        pnl = holdings_marked_to_market.diff().add(flows)
         return pnl
 
     @staticmethod
