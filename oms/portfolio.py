@@ -350,8 +350,17 @@ class AbstractPortfolio(abc.ABC):
         """
         df = pd.DataFrame(self._statistics).transpose()
         # Add `pnl` by diffing the snapshots of `net_wealth`.
-        pnl = df["net_wealth"].diff().rename("pnl").to_frame()
+        # pnl = df["net_wealth"].diff().rename("pnl").to_frame()
+        # In principle, thw two PnL calculations should agree. However, if
+        # a price for a bar is missing, this second method is more stable.
+        pnl = (
+            self.get_historical_pnl()
+            .sum(axis=1, min_count=1)
+            .rename("pnl")
+            .to_frame()
+        )
         df = pnl.merge(df, how="outer", left_index=True, right_index=True)
+        df = df.astype("float")
         return df
 
     def get_historical_holdings(self) -> pd.DataFrame:
