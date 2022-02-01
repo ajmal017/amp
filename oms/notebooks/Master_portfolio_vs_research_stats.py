@@ -57,7 +57,7 @@ end_timestamp = config["end_timestamp"]
 # %%
 # Load and time-localize Portfolio logged data.
 paper_df, paper_stats_df = oms.AbstractPortfolio.read_state(
-    config["portfolio_data_dir"]
+    config["portfolio_data_dir"],
     file_name=config["portfolio_file_name"],
 )
 paper_df = paper_df.loc[start_timestamp:end_timestamp]
@@ -95,6 +95,35 @@ def compare_stats(research_stats_df: pd.DataFrame, paper_stats_df: pd.DataFrame,
     df = pd.concat([research_stats, paper_stats], axis=1)
     return df
 
+def compute_delay(df: pd.DataFrame, freq: str) -> pd.Series:
+    diff = df.index - df.index.round(freq)
+    srs = pd.Series(
+        [
+            diff.mean(),
+            diff.std(),
+        ],
+        [
+            "mean",
+            "stdev",
+        ],
+        name="delay",
+    )
+    return srs
+
+def plot_pnl(research_stats_df: pd.DataFrame, paper_stats_df: pd.DataFrame, freq: str) -> pd.DataFrame:
+    research_pnl = research_stats_df["pnl"].resample(freq).sum(min_count=1).rename("research")
+    paper_pnl = paper_stats_df["pnl"].resample(freq).sum(min_count=1).rename("paper")
+    df = pd.concat([research_pnl, paper_pnl], axis=1)
+    df.plot()
+    return df
+
+def plot_cumulative_pnl(research_stats_df: pd.DataFrame, paper_stats_df: pd.DataFrame, freq: str) -> pd.DataFrame:
+    research_pnl = research_stats_df["pnl"].resample(freq).sum(min_count=1).rename("research")
+    paper_pnl = paper_stats_df["pnl"].resample(freq).sum(min_count=1).rename("paper")
+    df = pd.concat([research_pnl, paper_pnl], axis=1).cumsum()
+    df.plot()
+    return df
+
 
 # %%
 #
@@ -102,7 +131,7 @@ def compare_stats(research_stats_df: pd.DataFrame, paper_stats_df: pd.DataFrame,
 # %%
 # Display per-asset PnL correlations.
 pnl_corrs = per_asset_pnl_corr(research_df, paper_df, config["freq"])
-display(pnl_corrs)
+pnl_corrs.hist(bins=101)
 
 # %%
 # Display side-by-side research vs paper portfolio stats.
@@ -110,3 +139,14 @@ stats_sxs = compare_stats(research_stats_df, paper_stats_df, config["freq"])
 display(stats_sxs)
 
 # %%
+# Compute delay stats.
+delay_stats = compute_delay(paper_stats_df, config["freq"])
+display(delay_stats)
+
+# %%
+# Plot PnL
+pnl = plot_pnl(research_stats_df, paper_stats_df, config["freq"])
+
+# %%
+# Plot cumulative PnL
+cumulative_pnl = plot_cumulative_pnl(research_stats_df, paper_stats_df, config["freq"])
