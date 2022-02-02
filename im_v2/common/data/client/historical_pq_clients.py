@@ -15,7 +15,7 @@ import helpers.hdbg as hdbg
 import helpers.hpandas as hpandas
 import helpers.hparquet as hparque
 import helpers.hprint as hprint
-import im_v2.common.data.client.clients as imvcdclcl
+import im_v2.common.data.client.base_im_clients as imvcdcbimcl
 import im_v2.common.data.client.full_symbol as imvcdcfusy
 
 _LOG = logging.getLogger(__name__)
@@ -24,15 +24,14 @@ _LOG = logging.getLogger(__name__)
 # TODO(gp): @Grisha Add tests. GP to provide an example of files or we can generate
 #  them from CSV.
 # TODO(gp): ByAsset -> ByTile
-class HistoricalPqByAssetClient(imvcdclcl.ImClientReadingMultipleSymbols,
-                                abc.ABC):
+class HistoricalPqByAssetClient(
+    imvcdcbimcl.ImClientReadingMultipleSymbols, abc.ABC
+):
     """
     Provide historical data stored as Parquet by-asset.
     """
 
-    def __init__(
-        self, asset_col_name: str, root_dir_name: str
-    ):
+    def __init__(self, asset_col_name: str, root_dir_name: str):
         # TODO(gp): Check that the dir exists, handling the S3 case.
         self._root_dir_name = root_dir_name
         self._asset_col_name = asset_col_name
@@ -85,6 +84,7 @@ class HistoricalPqByAssetClient(imvcdclcl.ImClientReadingMultipleSymbols,
         filters = [and_filters]
         _LOG.debug("filters=%s", str(filters))
         # Read the data.
+        # TODO(gp): Add support for S3 passing aws_profile.
         df = hparque.from_parquet(
             self._root_dir_name,
             columns=columns,
@@ -100,6 +100,7 @@ class HistoricalPqByAssetClient(imvcdclcl.ImClientReadingMultipleSymbols,
         #                         83317, 89970]
         # ```
         # which confuses `df.groupby()`. So we convert that column to int.
+        # TODO(gp): Move this to the derived class.
         df[self._asset_col_name] = df[self._asset_col_name].astype(int)
         # Rename column storing asset_ids, if needed.
         hdbg.dassert_in(self._asset_col_name, df.columns)
@@ -133,8 +134,9 @@ class HistoricalPqByAssetClient(imvcdclcl.ImClientReadingMultipleSymbols,
 
 # TODO(gp): @Grisha Add tests. GP to provide an example of files or we can generate
 #  them from CSV.
-class HistoricalPqByDateClient(imvcdclcl.ImClientReadingMultipleSymbols,
-    abc.ABC):
+class HistoricalPqByDateClient(
+    imvcdcbimcl.ImClientReadingMultipleSymbols, abc.ABC
+):
     """
     Read historical data stored as Parquet by-date.
     """
