@@ -15,7 +15,7 @@ class TestStatsComputer1(hunitest.TestCase):
     def test_compute_portfolio_stats1(self) -> None:
         sc = dtfmostcom.StatsComputer()
         portfolio_df = self._get_portfolio()
-        df = sc.compute_portfolio_stats(portfolio_df, "1T")
+        df, _ = sc.compute_portfolio_stats(portfolio_df, "1T")
         actual = hpandas.df_to_str(df, num_rows=None, precision=2)
         expected = r"""
 ratios      sharpe_ratio                         5.78

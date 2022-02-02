@@ -269,6 +269,43 @@ def resample_bars(
     return out_df
 
 
+def resample_portfolio_metrics_bars(
+    df: pd.DataFrame,
+    freq: str,
+    *,
+    pnl_col: str = "pnl",
+    gross_volume_col: str = "gross_volume",
+    net_volume_col: str = "net_volume",
+    gmv_col: str = "gmv",
+    nmv_col: str = "nmv",
+) -> pd.DataFrame:
+    resampled_df = resample_bars(
+        df,
+        freq,
+        resampling_groups=[
+            (
+                {
+                    pnl_col: "pnl",
+                    gross_volume_col: "gross_volume",
+                    net_volume_col: "net_volume",
+                },
+                "sum",
+                {"min_count": 1},
+            ),
+            (
+                {
+                    gmv_col: "gmv",
+                    nmv_col: "nmv",
+                },
+                "mean",
+                {},
+            ),
+        ],
+        vwap_groups=[],
+    )
+    return resampled_df
+
+
 # TODO(Paul): Consider deprecating.
 # This provides some sensible defaults for `resample_bars()`, but may not be
 # worth the additional complexity.
