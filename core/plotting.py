@@ -2342,6 +2342,67 @@ def plot_sharpe_ratio_panel(
     ax.legend()
 
 
+def plot_portfolio_stats(
+    df: pd.DataFrame,
+    *,
+    freq: Optional[str] = None,
+    y_scale: Optional[float] = 5,
+) -> None:
+    hdbg.dassert_isinstance(df, pd.DataFrame)
+    if freq is not None:
+        hdbg.dassert_isinstance(freq, str)
+        df = cofinanc.resample_portfolio_metrics_bars(
+            df,
+            freq,
+        )
+    if df.columns.nlevels == 1:
+        df = pd.concat([df], axis=1, keys=["strategy"])
+    hdbg.dassert_eq(df.columns.nlevels, 2)
+    _, axes = get_multiple_plots(12, 2, y_scale=y_scale)
+    # PnL.
+    pnl = df.T.xs("pnl", level=1).T
+    pnl.plot(ax=axes[0], title="Bar PnL", ylabel="dollars")
+    #
+    gmv = df.T.xs("gmv", level=1).T
+    # TODO(Paul): Make the unit configurable.
+    pnl_rel = pnl.divide(gmv)
+    (1e4 * pnl_rel).plot(ax=axes[1], title="Bar PnL", ylabel="bps")
+    # Cumulative PnL.
+    pnl.cumsum().plot(ax=axes[2], title="Cumulative PnL", ylabel="dollars")
+    (1e2 * pnl_rel).cumsum().plot(
+        ax=axes[3], title="Cumulative PnL", ylabel="% GMV"
+    )
+    # Volume/turnover.
+    gross_volume = df.T.xs("gross_volume", level=1).T
+    gross_volume.cumsum().plot(
+        ax=axes[4],
+        title="Cumulative Gross Volume",
+        ylabel="dollars",
+    )
+    #
+    turnover = 100 * gross_volume.divide(gmv)
+    turnover.plot(ax=axes[5], title="Bar Turnover", ylabel="% GMV")
+    # Net volume/imbalance.
+    net_volume = df.T.xs("net_volume", level=1).T
+    net_volume.cumsum().plot(
+        ax=axes[6],
+        title="Cumulative Net Volume",
+        ylabel="dollars",
+    )
+    imbalance = 100 * net_volume.divide(gmv)
+    imbalance.plot(ax=axes[7], title="Bar Net Volume", ylabel="% GMV")
+    # GMV.
+    gmv.plot(ax=axes[8], title="GMV", ylabel="dollars")
+    (gmv / gmv.mean()).plot(
+        ax=axes[9], title="GMV deviation from mean", ylabel="ratio"
+    )
+    # NMV.
+    nmv = df.T.xs("nmv", level=1).T
+    nmv.plot(ax=axes[10], title="NMV", ylabel="dollars")
+    nmv_rel = 100 * nmv.divide(gmv)
+    nmv_rel.plot(ax=axes[11], title="NMV", ylabel="% GMV")
+
+
 def _choose_scaling_coefficient(unit: str) -> int:
     if unit == "%":
         scale_coeff = 100

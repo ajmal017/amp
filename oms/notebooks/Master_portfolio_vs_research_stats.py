@@ -22,18 +22,21 @@ import logging
 import pandas as pd
 
 import core.config as cconfig
+import core.plotting as coplotti
 import dataflow.model as dtfmod
 import helpers.hdbg as hdbg
+import helpers.henv as henv
+import helpers.hprint as hprint
 import oms as oms
 
-# %%
+# %% run_control={"marked": true}
 hdbg.init_logger(verbosity=logging.INFO)
 
 _LOG = logging.getLogger(__name__)
 
-# _LOG.info("%s", henv.get_system_signature()[0])
+_LOG.info("%s", henv.get_system_signature()[0])
 
-# hprint.config_notebook()
+hprint.config_notebook()
 
 # %%
 dict_ = {
@@ -141,7 +144,4 @@ display(pnl.head())
 pnl.corr()
 
 # %%
-pnl.plot(title="Bar PnL")
-
-# %%
-pnl.cumsum().plot(title="Cumulative PnL")
+coplotti.plot_portfolio_stats(bar_stats_df)

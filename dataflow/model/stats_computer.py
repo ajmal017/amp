@@ -382,10 +382,10 @@ class StatsComputer:
             costatis.compute_annualized_return_and_volatility,
             costatis.compute_max_drawdown,
         ]
-        stats = self._compute_stat_functions(srs, name, functions)
+        stats = 100 * self._compute_stat_functions(srs, name, functions)
         results.append(pd.concat([stats], keys=["percentage"]))
         # Add dollar turnover, bias.
-        percentage_turnover_and_bias = cofinanc.compute_turnover_and_bias(
+        percentage_turnover_and_bias = 100 * cofinanc.compute_turnover_and_bias(
             df["gross_volume"] / df["gmv"],
             df["nmv"] / df["gmv"],
         )

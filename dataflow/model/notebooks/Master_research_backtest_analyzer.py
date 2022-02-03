@@ -20,18 +20,21 @@
 import logging
 
 import core.config as cconfig
+import core.plotting as coplotti
 import dataflow.model as dtfmod
 import helpers.hdbg as hdbg
+import helpers.henv as henv
 import helpers.hparquet as hparque
+import helpers.hprint as hprint
 
 # %%
 hdbg.init_logger(verbosity=logging.INFO)
 
 _LOG = logging.getLogger(__name__)
 
-# _LOG.info("%s", henv.get_system_signature()[0])
+_LOG.info("%s", henv.get_system_signature()[0])
 
-# hprint.config_notebook()
+hprint.config_notebook()
 
 # %% [markdown]
 # # Load tiled backtest
@@ -103,19 +106,4 @@ display(stats)
 # # Plot portfolio metrics
 
 # %%
-stats_df["pnl"].cumsum().plot()
-
-# %%
-stats_df["gross_volume"].cumsum().plot()
-
-# %%
-stats_df["net_volume"].cumsum().plot()
-
-# %%
-stats_df["gmv"].plot()
-
-# %%
-stats_df["nmv"].plot()
-
-# %%
-(stats_df["nmv"] / stats_df["gmv"]).plot()
+coplotti.plot_portfolio_stats(bar_stats_df)

@@ -32,11 +32,11 @@ dollar      gmv_mean                       1000000.00
             turnover_stdev                    9849.70
             market_bias_mean                     0.00
             market_bias_stdev                    0.00
-percentage  annualized_mean_return               0.15
-            annualized_volatility                0.03
-            max_drawdown                         0.00
-            turnover_mean                        0.10
-            turnover_stdev                       0.01
+percentage  annualized_mean_return              14.61
+            annualized_volatility                2.53
+            max_drawdown                         0.44
+            turnover_mean                        9.99
+            turnover_stdev                       0.98
             market_bias_mean                     0.00
             market_bias_stdev                    0.00
 dtype: float64"""
