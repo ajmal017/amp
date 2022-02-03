@@ -274,6 +274,7 @@ def resample_bars(
     return out_df
 
 
+# TODO(Paul): Rename `resample_portfolio_bar_metrics()`.
 def resample_portfolio_metrics_bars(
     df: pd.DataFrame,
     freq: str,
@@ -737,6 +738,7 @@ def compute_spread_cost(
     return out_df
 
 
+# TODO(Paul): Deprecate and delete.
 def compute_pnl(
     df: pd.DataFrame,
     position_intent_col: str,
@@ -860,6 +862,7 @@ def convert_pct_rets_to_log_rets(
     return np.log(pct_rets + 1)
 
 
+# TODO(Paul): Deprecate and delete.
 def rescale_to_target_annual_volatility(
     srs: pd.Series, volatility: float
 ) -> pd.Series:
@@ -907,6 +910,7 @@ def compute_inverse_volatility_weights(df: pd.DataFrame) -> pd.Series:
     return weights
 
 
+# TODO(Paul): Deprecate and delete.
 def aggregate_log_rets(df: pd.DataFrame, weights: pd.Series) -> pd.Series:
     """
     Compute aggregate log returns.
