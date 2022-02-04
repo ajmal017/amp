@@ -1,6 +1,7 @@
 """
 Import as:
 
+import dataflow.model.experiment_config as dtfmoexcon
 """
 import datetime
 import logging
@@ -12,13 +13,13 @@ import helpers.hprint as hprint
 _LOG = logging.getLogger(__name__)
 
 
-# #########################
+# #############################################################################
 
 
 def parse_universe_str(universe_str: str) -> Tuple[str, Optional[int]]:
     """
     Parse a string representing an universe
-    
+
     E.g., "kibot_v1_0-top100", "kibot_v2_0-all".
     """
     data = universe_str.split("-")
@@ -45,7 +46,7 @@ def get_universe_top_n(universe: List[Any], n: Optional[int]) -> List[Any]:
     return universe
 
 
-# #########################
+# #############################################################################
 
 
 def get_period(period: str) -> Tuple[datetime.date, datetime.date]:
@@ -71,7 +72,7 @@ def get_period(period: str) -> Tuple[datetime.date, datetime.date]:
     return start_date, end_date
 
 
-# #########################
+# #############################################################################
 
 
 def parse_experiment_config(experiment_config: str) -> Tuple[str, str, str]:

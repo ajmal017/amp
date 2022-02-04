@@ -1,26 +1,26 @@
 # TODO(gp): @Nikola adapt and get these tests to work.
-#import datetime
-#import logging
-#import os
-#from typing import List, Optional
+# import datetime
+# import logging
+# import os
+# from typing import List, Optional
 #
-#import pandas as pd
+# import pandas as pd
 #
-#import helpers.hdbg as hdbg
-#import helpers.hintrospection as hintros
-#import helpers.hjoblib as hjoblib
-#import helpers.hpandas as hpandas
-#import helpers.hparquet as hparque
-#import helpers.hprint as hprint
-#import helpers.hunit_test as hunitest
-#import im_lime.eg.eg_transform_pq_by_date_to_by_asset as imleetpbdtba
-#import research.universe as reuniver
-#import vendors_lime.taq_bars as vltb
+# import helpers.hdbg as hdbg
+# import helpers.hintrospection as hintros
+# import helpers.hjoblib as hjoblib
+# import helpers.hpandas as hpandas
+# import helpers.hparquet as hparque
+# import helpers.hprint as hprint
+# import helpers.hunit_test as hunitest
+# import im_lime.eg.eg_transform_pq_by_date_to_by_asset as imleetpbdtba
+# import research.universe as reuniver
+# import vendors_lime.taq_bars as vltb
 #
-#_LOG = logging.getLogger(__name__)
+# _LOG = logging.getLogger(__name__)
 #
 #
-#class TestTransformByDateToByAsset1(hunitest.TestCase):
+# class TestTransformByDateToByAsset1(hunitest.TestCase):
 #    @staticmethod
 #    def transform_helper(
 #        asset_ids: List[int],
@@ -176,7 +176,7 @@
 #        df.columns=asset_id,weekofyear
 #        df.shape=(2874, 2)
 #                                    asset_id weekofyear
-#        end_time                                   
+#        end_time
 #        2022-01-03 09:01:00-05:00  10253          1
 #        2022-01-03 09:02:00-05:00  10253          1
 #        2022-01-03 09:03:00-05:00  10253          1
@@ -228,7 +228,7 @@
 #        df.columns=start_time,close,asset_id,year,weekofyear
 #        df.shape=(1916, 5)
 #                                                 start_time  close   asset_id  year weekofyear
-#        end_time                                                                          
+#        end_time
 #        2022-01-03 09:01:00-05:00 2022-01-03 09:00:00-05:00    NaN  10971  2022          1
 #        2022-01-03 09:01:00-05:00 2022-01-03 09:00:00-05:00    NaN  13684  2022          1
 #        2022-01-03 09:02:00-05:00 2022-01-03 09:01:00-05:00    NaN  10971  2022          1
@@ -284,7 +284,7 @@
 #        df.columns=asset_id,year,weekofyear
 #        df.shape=(478, 3)
 #                                    asset_id  year weekofyear
-#        end_time                                         
+#        end_time
 #        2022-01-10 09:02:00-05:00  13684  2022          2
 #        2022-01-10 09:03:00-05:00  13684  2022          2
 #        2022-01-10 09:04:00-05:00  13684  2022          2
