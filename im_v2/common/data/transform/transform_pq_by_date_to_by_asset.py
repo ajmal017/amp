@@ -184,10 +184,9 @@ def lime317_prepare_tasks(
         # Build the (week, year) key.
         if chunk_mode == "by_year_week":
             week_number = date.strftime("%U")
-            year = date.year
-            key = (week_number, year)
+            key = (date.year, week_number)
         elif chunk_mode == "by_year_month":
-            key = (date.month, date.year)
+            key = (date.year, date.month)
         else:
             raise ValueError("Invalid chunk_mode='%s'" % chunk_mode)
         _LOG.debug(hprint.to_str("key"))
