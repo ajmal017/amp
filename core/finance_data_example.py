@@ -28,11 +28,11 @@ def get_forecast_dataframe(
     seed: int = 10,
 ) -> pd.DataFrame:
     """
-        Return a multiindexed dataframe of returns, vol, predictions per asset.
+    Return a multiindexed dataframe of returns, vol, predictions per asset.
 
-        Timestamps are to be regarded as knowledge times. The `prediction` and
-        `volatility` columns are to be interpreted as forecasts for two bars
-        ahead.
+    Timestamps are to be regarded as knowledge times. The `prediction` and
+    `volatility` columns are to be interpreted as forecasts for two bars
+    ahead.
 
         Example output:
                                  prediction           returns          volatility
@@ -91,11 +91,11 @@ def get_portfolio_bar_metrics_dataframe(
     seed: int = 10,
 ) -> pd.DataFrame:
     """
-        Return a dataframe of synthetic per-bar portfolio metrics.
+    Return a dataframe of synthetic per-bar portfolio metrics.
 
-        Timestamps are to be regarded as knowledge times.
+    Timestamps are to be regarded as knowledge times.
 
-        Example output:
+    Example output:
 
                                   pnl  gross_volume  net_volume        gmv     nmv
     2022-01-03 09:30:00-05:00  125.44         49863      -31.10  1000000.0     NaN

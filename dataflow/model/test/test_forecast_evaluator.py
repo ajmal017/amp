@@ -277,6 +277,90 @@ class TestForecastEvaluator1(hunitest.TestCase):
 2022-01-03 10:00:00-05:00  1061.20      5.13e+05    62103.43  1000000.0  -937896.57"""
         self.assert_equal(stats_df_str, expected_stats_df_str, fuzzy_match=True)
 
+    def test_to_str_intraday_4_assets_dollar_neutrality_demean(self) -> None:
+        data = self.get_data(
+            pd.Timestamp("2022-01-03 09:30:00", tz="America/New_York"),
+            pd.Timestamp("2022-01-03 10:00:00", tz="America/New_York"),
+            asset_ids=[101, 201, 301, 401],
+        )
+        forecast_evaluator = dtfmofoeva.ForecastEvaluator(
+            returns_col="returns",
+            volatility_col="volatility",
+            prediction_col="prediction",
+        )
+        actual = forecast_evaluator.to_str(
+            data, target_gmv=100000, dollar_neutrality="demean"
+        )
+        expected = r"""
+# holdings marked to market=
+                                101       201       301       401
+2022-01-03 09:35:00-05:00       NaN       NaN       NaN       NaN
+2022-01-03 09:40:00-05:00   1596.04 -15953.07 -34046.93  48403.96
+2022-01-03 09:45:00-05:00   1107.39  21556.28 -50000.00  27336.33
+2022-01-03 09:50:00-05:00  30974.64 -30610.07  19025.36 -19389.93
+2022-01-03 09:55:00-05:00 -15483.81 -27443.47  -7072.72  50000.00
+2022-01-03 10:00:00-05:00 -28692.80 -21307.20  19427.21  30572.79
+# pnl=
+                            101    201    301    401
+2022-01-03 09:35:00-05:00   NaN    NaN    NaN    NaN
+2022-01-03 09:40:00-05:00   NaN    NaN    NaN    NaN
+2022-01-03 09:45:00-05:00 -1.25  15.51  14.41  29.29
+2022-01-03 09:50:00-05:00  0.30 -24.46 -50.69  -7.01
+2022-01-03 09:55:00-05:00 -7.70  -9.36  18.72  12.88
+2022-01-03 10:00:00-05:00 -1.96  50.82  -4.46 -36.87
+# statistics=
+                             pnl  gross_volume  net_volume       gmv  nmv
+2022-01-03 09:35:00-05:00    NaN           NaN         NaN       NaN  NaN
+2022-01-03 09:40:00-05:00    NaN           NaN         NaN  100000.0  0.0
+2022-01-03 09:45:00-05:00  57.97      75018.70         0.0  100000.0  0.0
+2022-01-03 09:50:00-05:00 -81.87     197785.22         0.0  100000.0  0.0
+2022-01-03 09:55:00-05:00  14.54     145113.06         0.0  100000.0  0.0
+2022-01-03 10:00:00-05:00   7.53      65272.40         0.0  100000.0  0.0"""
+        self.assert_equal(actual, expected, fuzzy_match=True)
+
+    def test_to_str_intraday_4_assets_dollar_neutrality_side_preserving(
+        self,
+    ) -> None:
+        data = self.get_data(
+            pd.Timestamp("2022-01-03 09:30:00", tz="America/New_York"),
+            pd.Timestamp("2022-01-03 10:00:00", tz="America/New_York"),
+            asset_ids=[101, 201, 301, 401],
+        )
+        forecast_evaluator = dtfmofoeva.ForecastEvaluator(
+            returns_col="returns",
+            volatility_col="volatility",
+            prediction_col="prediction",
+        )
+        actual = forecast_evaluator.to_str(
+            data, target_gmv=100000, dollar_neutrality="side_preserving"
+        )
+        expected = r"""
+# holdings marked to market=
+                                101       201       301       401
+2022-01-03 09:35:00-05:00       NaN       NaN       NaN       NaN
+2022-01-03 09:40:00-05:00   7734.32 -10962.44 -39037.56  42265.68
+2022-01-03 09:45:00-05:00   9640.87  18874.57 -50000.00  21484.55
+2022-01-03 09:50:00-05:00  39142.80 -28556.19  10857.20 -21443.81
+2022-01-03 09:55:00-05:00 -15092.17 -31011.59  -3896.24  50000.00
+2022-01-03 10:00:00-05:00 -27211.19 -22788.81   8110.25  41889.75
+# pnl=
+                            101    201    301    401
+2022-01-03 09:35:00-05:00   NaN    NaN    NaN    NaN
+2022-01-03 09:40:00-05:00   NaN    NaN    NaN    NaN
+2022-01-03 09:45:00-05:00 -6.05  10.66  16.53  25.57
+2022-01-03 09:50:00-05:00  2.57 -21.41 -50.69  -5.51
+2022-01-03 09:55:00-05:00 -9.73  -8.73  10.68  14.25
+2022-01-03 10:00:00-05:00 -1.91  57.42  -2.45 -36.87
+# statistics=
+                             pnl  gross_volume  net_volume       gmv  nmv
+2022-01-03 09:35:00-05:00    NaN           NaN         NaN       NaN  NaN
+2022-01-03 09:40:00-05:00    NaN           NaN         NaN  100000.0  0.0
+2022-01-03 09:45:00-05:00  46.71      63487.13         0.0  100000.0  0.0
+2022-01-03 09:50:00-05:00 -75.05     180718.25         0.0  100000.0  0.0
+2022-01-03 09:55:00-05:00   6.47     142887.62         0.0  100000.0  0.0
+2022-01-03 10:00:00-05:00  16.19      40458.55         0.0  100000.0  0.0"""
+        self.assert_equal(actual, expected, fuzzy_match=True)
+
     @staticmethod
     def get_data(
         start_datetime: pd.Timestamp,
