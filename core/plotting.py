@@ -7,6 +7,7 @@ import core.plotting as coplotti
 # TODO(gp): Test with a gallery notebook and/or with unit tests.
 
 import calendar
+import collections
 import logging
 import math
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
@@ -2348,16 +2349,52 @@ def plot_portfolio_stats(
     freq: Optional[str] = None,
     y_scale: Optional[float] = 5,
 ) -> None:
+    """
+    Plots stats of a portfolio bar metrics dataframe, possibly multiindex.
+
+    :param df: `df` should be of the form
+                                      pnl  gross_volume  net_volume        gmv     nmv
+        2022-01-03 09:30:00-05:00  125.44         49863      -31.10  1000000.0     NaN
+        2022-01-03 09:40:00-05:00  174.18        100215       24.68  1000000.0   12.47
+        2022-01-03 09:50:00-05:00  -21.52        100041      -90.39  1000000.0  -55.06
+        2022-01-03 10:00:00-05:00  -16.82         50202       99.19  1000000.0  167.08
+
+        if singly indexed. If multiindexed, column level zero should contain the
+        portfolio name.
+    :param freq: resampling frequency. `None` means no resampling.
+    :param y_scale: controls the size of the figures
+    """
     hdbg.dassert_isinstance(df, pd.DataFrame)
+    # Handle resampling if `freq` is provided.
     if freq is not None:
         hdbg.dassert_isinstance(freq, str)
-        df = cofinanc.resample_portfolio_metrics_bars(
-            df,
-            freq,
-        )
+        if df.columns.nlevels == 1:
+            df = cofinanc.resample_portfolio_metrics_bars(
+                df,
+                freq,
+            )
+        elif df.columns.nlevels == 2:
+            # TODO(Paul): Consider factoring out this idiom.
+            keys = df.columns.levels[0].to_list()
+            resampled_dfs = collections.OrderedDict()
+            for key in keys:
+                resampled_df = cofinanc.resample_portfolio_metrics_bars(
+                    df[key], freq
+                )
+                resampled_dfs[key] = resampled_df
+            df = pd.concat(
+                resampled_dfs.values(), axis=1, keys=resampled_dfs.keys()
+            )
+        else:
+            raise ValueError(
+                "Unexpected number of column levels nlevels=%d",
+                df.columns.nlevels,
+            )
+    # Make the `df` a df with a two-level column index.
     if df.columns.nlevels == 1:
         df = pd.concat([df], axis=1, keys=["strategy"])
     hdbg.dassert_eq(df.columns.nlevels, 2)
+    # Define plot axes.
     _, axes = get_multiple_plots(12, 2, y_scale=y_scale)
     # PnL.
     pnl = df.T.xs("pnl", level=1).T

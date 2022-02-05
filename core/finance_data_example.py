@@ -12,6 +12,7 @@ import pandas as pd
 
 import core.artificial_signal_generators as carsigen
 import core.signal_processing as csigproc
+import helpers.hdbg as hdbg
 
 _LOG = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ def get_forecast_dataframe(
     end_datetime: pd.Timestamp,
     asset_ids: List[int],
     *,
+    num_features: int = 0,
     bar_duration: str = "5T",
     bar_volatility_in_bps: int = 10,
     start_time: datetime.time = datetime.time(9, 31),
@@ -34,14 +36,18 @@ def get_forecast_dataframe(
     `volatility` columns are to be interpreted as forecasts for two bars
     ahead.
 
-        Example output:
+    Example output (with `num_features=0`):
                                  prediction           returns          volatility
                                100      200      100      200        100      200
     2022-01-03 09:35:00   -0.00025 -0.00034 -0.00110  0.00048    0.00110  0.00048
     2022-01-03 09:40:00    0.00013 -0.00005 -0.00073 -0.00045    0.00091  0.00046
     2022-01-03 09:45:00    0.00084 -0.00097 -0.00078 -0.00075    0.00086  0.00060
     2022-01-03 09:50:00    0.00086 -0.00113  0.00027 -0.00081    0.00071  0.00068
+
+    Note that changes to any inputs may change the random output on any
+    overlapping data.
     """
+    hdbg.dassert_lte(0, num_features)
     price_process = carsigen.PriceProcess(seed=seed)
     dfs = {}
     for asset_id in asset_ids:
@@ -64,13 +70,24 @@ def get_forecast_dataframe(
             start_time=start_time,
             end_time=end_time,
         )
-        df = pd.DataFrame(
-            {
-                "returns": rets,
-                "volatility": vol,
-                "prediction": noise,
-            }
-        )
+        dict_ = {
+            "returns": rets,
+            "volatility": vol,
+            "prediction": noise,
+        }
+        if num_features > 0:
+            for idx in range(1, num_features + 1):
+                feature = price_process.generate_log_normal_series(
+                    start_datetime,
+                    end_datetime,
+                    asset_id,
+                    bar_duration=bar_duration,
+                    bar_volatility_in_bps=bar_volatility_in_bps,
+                    start_time=start_time,
+                    end_time=end_time,
+                )
+                dict_[idx] = feature
+        df = pd.DataFrame(dict_)
         dfs[asset_id] = df
     df = pd.concat(dfs.values(), axis=1, keys=dfs.keys())
     # Swap column levels so that symbols are leaves.

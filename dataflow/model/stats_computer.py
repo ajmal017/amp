@@ -147,6 +147,7 @@ class StatsComputer:
         If `df` has multiple column levels, treat the outermost level as
         a portfolio name then compute stats for each portfolio name.
         """
+        hdbg.dassert_isinstance(df, pd.DataFrame)
         if df.columns.nlevels == 1:
             return self._compute_portfolio_stats(
                 df,
@@ -337,6 +338,12 @@ class StatsComputer:
 
         :return: (stats series, `df` resampled at `freq`)
         """
+        hdbg.dassert_isinstance(df, pd.DataFrame)
+        hdbg.dassert(not isinstance(df.columns, pd.MultiIndex))
+        hdbg.dassert_is_subset(
+            [pnl_col, gross_volume_col, net_volume_col, gmv_col, nmv_col],
+            df.columns.to_list(),
+        )
         df = cofinanc.resample_portfolio_metrics_bars(
             df,
             freq,
