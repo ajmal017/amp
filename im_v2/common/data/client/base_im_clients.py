@@ -9,6 +9,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
+from tqdm.autonotebook import tqdm
 
 import helpers.hdatetime as hdateti
 import helpers.hdbg as hdbg
@@ -121,9 +122,10 @@ class ImClient(abc.ABC):
         _LOG.debug("After read_data: df=\n%s", hpandas.df_to_str(df))
         # Normalize data for each symbol.
         hdbg.dassert_in(full_symbol_col_name, df.columns)
-        _LOG.debug("full_symbols=%s", df[full_symbol_col_name].unique())
         dfs = []
-        for full_symbol, df_tmp in df.groupby(full_symbol_col_name):
+        _LOG.debug("full_symbols=%s", df[full_symbol_col_name].unique())
+        iter_ = tqdm(df.groupby(full_symbol_col_name))
+        for full_symbol, df_tmp in iter_:
             _LOG.debug("apply_im_normalization: full_symbol=%s", full_symbol)
             df_tmp = self._apply_im_normalizations(
                 df_tmp, full_symbol_col_name, start_ts, end_ts

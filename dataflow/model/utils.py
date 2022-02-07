@@ -36,6 +36,7 @@ import core.signal_processing as csigproc
 import dataflow.core as dtf
 import helpers.hdbg as hdbg
 import helpers.hio as hio
+import helpers.hlogging as hloggin
 import helpers.hpandas as hpandas
 import helpers.hparser as hparser
 import helpers.hpickle as hpickle

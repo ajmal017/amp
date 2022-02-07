@@ -271,7 +271,29 @@ def reverse_workload(
     # Parse the workload.
     workload_func, func_name, tasks = workload
     # Reverse.
+    _LOG.warning("Reversing the workload as per user request")
     tasks = list(reversed(tasks))
+    # Build a new workload.
+    workload = (workload_func, func_name, tasks)
+    validate_workload(workload)
+    return workload
+
+
+def truncate_workload(
+    workload: Workload,
+    max_num: int,
+) -> Workload:
+    """
+    Limit the workload to the first `max_num` tasks.
+    """
+    validate_workload(workload)
+    # Parse the workload.
+    workload_func, func_name, tasks = workload
+    # Truncate the workload.
+    _LOG.warning("Considering only the first %d / %d tasks", max_num, len(tasks))
+    hdbg.dassert_lte(1, max_num)
+    hdbg.dassert_lte(max_num, len(tasks))
+    tasks = tasks[:max_num]
     # Build a new workload.
     workload = (workload_func, func_name, tasks)
     validate_workload(workload)
