@@ -1,9 +1,3 @@
-"""
-Import as:
-
-import im_v2.ccxt.data.extract.airflow.rt_dag_binance as imvcdeardb
-"""
-
 import datetime
 
 import airflow
@@ -34,7 +28,8 @@ bash_command = [
     "--exchange_id 'binance'",
     "--universe 'v03'",
     "--db_stage 'dev'",
-    "--v DEBUG",
+    "--aws_profile 'ck",
+    "--s3_path s3://cryptokaizen-historical-data/binance/'"
 ]
 
 # Create a DAG.

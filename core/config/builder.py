@@ -54,8 +54,7 @@ def get_configs_from_builder(config_builder: str) -> List[cconconf.Config]:
     # Cast to the right type.
     # TODO(gp): Is this needed?
     # configs = cast(List[cconconf.Config], configs)
-    #
-    # cconutil.validate_configs(configs)
+    cconutil.validate_configs(configs)
     return configs
 
 
