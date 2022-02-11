@@ -78,7 +78,7 @@ def remove_dates_with_no_data(
 # TODO(gp): Active trading hours and days are specific of different futures.
 #  Consider explicitly passing this information instead of using defaults.
 def set_non_ath_to_nan(
-    df: pd.DataFrame,
+    obj: Union[pd.Series, pd.DataFrame],
     start_time: Optional[datetime.time] = None,
     end_time: Optional[datetime.time] = None,
 ) -> pd.DataFrame:
@@ -93,20 +93,30 @@ def set_non_ath_to_nan(
       - `start_time < time`, and
       - `time <= end_time`
     """
-    hdbg.dassert_isinstance(df.index, pd.DatetimeIndex)
-    hpandas.dassert_strictly_increasing_index(df)
+    hdbg.dassert_isinstance(obj.index, pd.DatetimeIndex)
+    hpandas.dassert_strictly_increasing_index(obj)
     if start_time is None:
         start_time = datetime.time(9, 30)
     if end_time is None:
         end_time = datetime.time(16, 0)
     hdbg.dassert_lte(start_time, end_time)
     # Compute the indices to remove.
-    times = df.index.time
+    times = obj.index.time
     to_remove_mask = (times <= start_time) | (end_time < times)
     # Make a copy and filter.
-    df = df.copy()
-    df[to_remove_mask] = np.nan
-    return df
+    obj = obj.copy()
+    # As part of LimeTask2163 we have found out that the naive Pandas approach
+    # to add nan for data outside trading hours, as below:
+    #   obj[to_remove_mask] = np.nan
+    # is 100x slower than the following approach.
+    obj_index = obj.index
+    if isinstance(obj, pd.Series):
+        obj = obj.loc[~to_remove_mask].reindex(obj_index)
+    elif isinstance(obj, pd.DataFrame):
+        obj = obj.loc[~to_remove_mask, :].reindex(obj_index)
+    else:
+        raise ValueError("Invalid obj='%s' of type '%s'" % (obj, type(obj)))
+    return obj
 
 
 def remove_times_outside_window(
