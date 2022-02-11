@@ -52,6 +52,8 @@ class HistoricalPqByAssetClient(
         """
         Same as abstract method.
         """
+        _LOG.info("Loading data for %s full_symbols in [%s, %s]",
+                  len(full_symbols), start_ts, end_ts)
         _LOG.debug(
             hprint.to_str(
                 "full_symbols start_ts end_ts full_symbol_col_name columns"
@@ -62,7 +64,6 @@ class HistoricalPqByAssetClient(
         # The filter is an OR of AND conditions:
         # See https://arrow.apache.org/docs/python/generated/pyarrow.parquet.ParquetDataset.html
         and_filters = []
-        # TODO(gp): Is this efficient? Is there a better way to do it, e.g., `in`?
         # Select the OR of conditions like `asset_col_name == asset_id`.
         and_condition = (self._asset_col_name, "in", asset_ids)
         and_filters.append(and_condition)
