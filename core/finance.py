@@ -796,7 +796,7 @@ def compute_overnight_returns(
     Compute overnight returns.
 
     :param df: dataframe with the following columns:
-        [`asset_id_col`, "date", "open", "close", "total_return",
+        ["asset_id_col", "date", "open", "close", "total_return",
          "previous_total_return"]
       - the "date" column represents the given day (and so the data in the
         row is available at the end of the day rather than the beginning)

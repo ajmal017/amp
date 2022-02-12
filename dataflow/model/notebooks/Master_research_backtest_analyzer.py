@@ -27,6 +27,7 @@ import helpers.henv as henv
 import helpers.hparquet as hparque
 import helpers.hprint as hprint
 
+# %%
 hdbg.init_logger(verbosity=logging.INFO)
 
 _LOG = logging.getLogger(__name__)

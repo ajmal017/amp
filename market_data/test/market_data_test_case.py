@@ -6,51 +6,17 @@ import market_data.test.market_data_test_case as mdtmdtca
 
 import abc
 import logging
-from typing import Any, List, Optional, Union
+from typing import Any, List, Optional
 
 import pandas as pd
 import pytest
 
 import helpers.hdatetime as hdateti
-import helpers.hpandas as hpandas
 import helpers.hprint as hprint
 import helpers.hunit_test as hunitest
 import market_data as mdata
 
 _LOG = logging.getLogger(__name__)
-
-
-def _check_output(
-    self_: Any,
-    actual: Union[pd.DataFrame, pd.Series],
-    expected_signature: str,
-) -> None:
-    """
-    Verify that actual outcome matches the expected one.
-
-    :param actual: actual outcome
-    :param expected_signature: expected outcome as string
-    """
-    # Build signature.
-    if isinstance(actual, pd.DataFrame):
-        actual_signature = hpandas.df_to_str(
-            actual, print_shape_info=True, tag="df"
-        )
-    elif isinstance(actual, pd.Series):
-        actual_signature = hunitest.convert_df_to_string(
-            actual, index=True, decimals=2
-        )
-    else:
-        raise TypeError(
-            f"Unsupported input type {type(actual)}. "
-            f"Supported types are: `pd.DataFrame`, `pd.Series`"
-        )
-    _LOG.debug("\n%s", hpandas.df_to_str(actual))
-    # Check.
-    self_.assert_equal(
-        actual_signature, expected_signature, dedent=True, fuzzy_match=True
-    )
-
 
 # #############################################################################
 # MarketData_get_data_TestCase
@@ -59,7 +25,7 @@ def _check_output(
 
 class MarketData_get_data_TestCase(hunitest.TestCase, abc.ABC):
     """
-    Test `get_data*()` methods for a class derived from `AbstractMarketData`.
+    Test `get_data*()` methods for a class derived from `MarketData`.
     """
 
     @abc.abstractmethod
@@ -73,7 +39,7 @@ class MarketData_get_data_TestCase(hunitest.TestCase, abc.ABC):
 
     @staticmethod
     def _test_get_data_for_last_period(
-        market_data: mdata.AbstractMarketData,
+        market_data: mdata.MarketData,
         timedelta: pd.Timestamp,
     ) -> None:
         """
@@ -96,10 +62,11 @@ class MarketData_get_data_TestCase(hunitest.TestCase, abc.ABC):
 
     def _test_get_data_at_timestamp1(
         self,
-        market_data: mdata.AbstractMarketData,
+        market_data: mdata.MarketData,
         ts: pd.Timestamp,
         asset_ids: Optional[List[int]],
-        exp_df_as_str: str,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """
         Call `get_data_at_timestamp()` for specified parameters.
@@ -115,19 +82,20 @@ class MarketData_get_data_TestCase(hunitest.TestCase, abc.ABC):
         # Run.
         df = market_data.get_data_at_timestamp(ts, ts_col_name, asset_ids)
         # Check output.
-        _check_output(self, df, exp_df_as_str)
+        self.check_df_output(df, *args, **kwargs)
 
     # //////////////////////////////////////////////////////////////////////////////
 
     def _get_data_for_interval_helper(
         self,
-        market_data: mdata.AbstractMarketData,
+        market_data: mdata.MarketData,
         start_ts: pd.Timestamp,
         end_ts: pd.Timestamp,
         asset_ids: Optional[List[int]],
         left_close: bool,
         right_close: bool,
-        exp_df_as_str: str,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """
         Call `get_data_for_interval()` for specified parameters.
@@ -153,14 +121,15 @@ class MarketData_get_data_TestCase(hunitest.TestCase, abc.ABC):
             right_close=right_close,
         )
         # Check output.
-        _check_output(self, df, exp_df_as_str)
+        self.check_df_output(df, *args, **kwargs)
 
     def _test_get_data_for_interval1(
         self,
-        market_data: mdata.AbstractMarketData,
+        market_data: mdata.MarketData,
         start_ts: pd.Timestamp,
         end_ts: pd.Timestamp,
-        exp_df_as_str: str,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """
         Call `get_data_for_interval()` with:
@@ -180,16 +149,18 @@ class MarketData_get_data_TestCase(hunitest.TestCase, abc.ABC):
             asset_ids,
             left_close,
             right_close,
-            exp_df_as_str,
+            *args,
+            **kwargs,
         )
 
     def _test_get_data_for_interval2(
         self,
-        market_data: mdata.AbstractMarketData,
+        market_data: mdata.MarketData,
         start_ts: pd.Timestamp,
         end_ts: pd.Timestamp,
         asset_ids: List[int],
-        exp_df_as_str: str,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """
         Call `get_data_for_interval()` with:
@@ -208,16 +179,18 @@ class MarketData_get_data_TestCase(hunitest.TestCase, abc.ABC):
             asset_ids,
             left_close,
             right_close,
-            exp_df_as_str,
+            *args,
+            **kwargs,
         )
 
     def _test_get_data_for_interval3(
         self,
-        market_data: mdata.AbstractMarketData,
+        market_data: mdata.MarketData,
         start_ts: pd.Timestamp,
         end_ts: pd.Timestamp,
         asset_ids: List[int],
-        exp_df_as_str: str,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """
         Call `get_data_for_interval()` with:
@@ -236,16 +209,18 @@ class MarketData_get_data_TestCase(hunitest.TestCase, abc.ABC):
             asset_ids,
             left_close,
             right_close,
-            exp_df_as_str,
+            *args,
+            **kwargs,
         )
 
     def _test_get_data_for_interval4(
         self,
-        market_data: mdata.AbstractMarketData,
+        market_data: mdata.MarketData,
         start_ts: pd.Timestamp,
         end_ts: pd.Timestamp,
         asset_ids: List[int],
-        exp_df_as_str: str,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """
         Call `get_data_for_interval()` with:
@@ -264,16 +239,18 @@ class MarketData_get_data_TestCase(hunitest.TestCase, abc.ABC):
             asset_ids,
             left_close,
             right_close,
-            exp_df_as_str,
+            *args,
+            **kwargs,
         )
 
     def _test_get_data_for_interval5(
         self,
-        market_data: mdata.AbstractMarketData,
+        market_data: mdata.MarketData,
         start_ts: pd.Timestamp,
         end_ts: pd.Timestamp,
         asset_ids: List[int],
-        exp_df_as_str: str,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """
         Call `get_data_for_interval()` with:
@@ -292,18 +269,20 @@ class MarketData_get_data_TestCase(hunitest.TestCase, abc.ABC):
             asset_ids,
             left_close,
             right_close,
-            exp_df_as_str,
+            *args,
+            **kwargs,
         )
 
     # //////////////////////////////////////////////////////////////////////////////
 
     def _test_get_twap_price1(
         self,
-        market_data: mdata.AbstractMarketData,
+        market_data: mdata.MarketData,
         start_ts: pd.Timestamp,
         end_ts: pd.Timestamp,
         asset_ids: Optional[List[int]],
-        exp_srs_as_str: str,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """
         Call `get_twap_price()` for specified parameters.
@@ -323,13 +302,13 @@ class MarketData_get_data_TestCase(hunitest.TestCase, abc.ABC):
             start_ts, end_ts, ts_col_name, asset_ids, column
         ).round(2)
         # Check output.
-        _check_output(self, srs, exp_srs_as_str)
+        self.check_srs_output(srs, *args, **kwargs)
 
     # //////////////////////////////////////////////////////////////////////////////
 
     def _test_get_last_end_time1(
         self,
-        market_data: mdata.AbstractMarketData,
+        market_data: mdata.MarketData,
         exp_last_end_time: pd.Timestamp,
     ) -> None:
         """
@@ -342,9 +321,10 @@ class MarketData_get_data_TestCase(hunitest.TestCase, abc.ABC):
 
     def _test_get_last_price1(
         self,
-        market_data: mdata.AbstractMarketData,
+        market_data: mdata.MarketData,
         asset_ids: Optional[List[int]],
-        exp_srs_as_str: str,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """
         Call `get_last_price()` for specified parameters.
@@ -360,12 +340,12 @@ class MarketData_get_data_TestCase(hunitest.TestCase, abc.ABC):
         # Run.
         srs = market_data.get_last_price(col_name, asset_ids).round(2)
         # Check output.
-        _check_output(self, srs, exp_srs_as_str)
+        self.check_srs_output(srs, *args, **kwargs)
 
     # //////////////////////////////////////////////////////////////////////////////
 
     def _test_should_be_online1(
-        self, market_data: mdata.AbstractMarketData, wall_clock_time: pd.Timestamp
+        self, market_data: mdata.MarketData, wall_clock_time: pd.Timestamp
     ) -> None:
         """
         Test that the interface is available at the given time.
@@ -378,7 +358,7 @@ class MarketData_get_data_TestCase(hunitest.TestCase, abc.ABC):
     # TODO(GP): Implement test for `wait_for_latest_data()`.
 
 
-def skip_test_since_not_online(market_data: mdata.AbstractMarketData) -> bool:
+def skip_test_since_not_online(market_data: mdata.MarketData) -> bool:
     """
     Return true if a test should be skipped since `market_data` is not on-line.
     """
@@ -397,7 +377,7 @@ def skip_test_since_not_online(market_data: mdata.AbstractMarketData) -> bool:
 #
 # class MarketData_get_data_for_last_period_asyncio_TestCase1(hunitest.TestCase):
 #    """
-#    Test `AbstractMarketData.get_data_for_last_period()` methods in an asyncio
+#    Test `MarketData.get_data_for_last_period()` methods in an asyncio
 #    set-up where time is moving forward.
 #
 #    This can only be tested with
@@ -405,7 +385,7 @@ def skip_test_since_not_online(market_data: mdata.AbstractMarketData) -> bool:
 #
 #    def get_data_helper(
 #        self,
-#        market_data: mdata.AbstractMarketData,
+#        market_data: mdata.MarketData,
 #        get_wall_clock_time: hdatetime.GetWall,
 #        exp_wall_clock_time: str,
 #        exp_get_data_normalize_false: str,
