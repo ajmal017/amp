@@ -104,9 +104,9 @@ class TestMarketDataImClient(mdtmdtca.MarketData_get_data_TestCase):
         ts = pd.Timestamp("2018-08-17T00:05:00+00:00")
         # pylint: disable=line-too-long
         exp_df_as_str = r"""# df=
-        df.index in [2018-08-16 20:05:00-04:00, 2018-08-16 20:05:00-04:00]
-        df.columns=asset_id,full_symbol,open,high,low,close,volume,currency_pair,exchange_id,start_ts
-        df.shape=(2, 10)
+        index=[2018-08-16 20:05:00-04:00, 2018-08-16 20:05:00-04:00]
+        columns=asset_id,full_symbol,open,high,low,close,volume,currency_pair,exchange_id,start_ts
+        shape=(2, 10)
                                      asset_id        full_symbol         open         high          low        close     volume currency_pair exchange_id                  start_ts
         end_ts
         2018-08-16 20:05:00-04:00  1467591036  binance::BTC_USDT  6291.970000  6299.320000  6285.400000  6294.990000  18.986206      BTC_USDT     binance 2018-08-16 20:04:00-04:00
@@ -130,9 +130,9 @@ class TestMarketDataImClient(mdtmdtca.MarketData_get_data_TestCase):
         # pylint: disable=line-too-long
         exp_df_as_str = """
         # df=
-        df.index in [2018-08-16 20:01:00-04:00, 2018-08-16 20:04:00-04:00]
-        df.columns=asset_id,open,high,low,close,volume,currency_pair,exchange_id,start_ts
-        df.shape=(8, 9)
+        index=[2018-08-16 20:01:00-04:00, 2018-08-16 20:04:00-04:00]
+        columns=asset_id,open,high,low,close,volume,currency_pair,exchange_id,start_ts
+        shape=(8, 9)
                                             asset_id         open         high          low        close     volume currency_pair exchange_id                  start_ts
         end_ts
         2018-08-16 20:01:00-04:00  binance::BTC_USDT  6311.640000  6311.770000  6302.810000  6302.810000  16.781206      BTC_USDT     binance 2018-08-16 20:00:00-04:00
@@ -158,9 +158,9 @@ class TestMarketDataImClient(mdtmdtca.MarketData_get_data_TestCase):
         end_ts = pd.Timestamp("2018-08-17T00:05:00+00:00")
         # pylint: disable=line-too-long
         exp_df_as_str = r"""# df=
-        df.index in [2018-08-16 20:01:00-04:00, 2018-08-16 20:04:00-04:00]
-        df.columns=asset_id,full_symbol,open,high,low,close,volume,currency_pair,exchange_id,start_ts
-        df.shape=(8, 10)
+        index=[2018-08-16 20:01:00-04:00, 2018-08-16 20:04:00-04:00]
+        columns=asset_id,full_symbol,open,high,low,close,volume,currency_pair,exchange_id,start_ts
+        shape=(8, 10)
                                      asset_id        full_symbol         open         high          low        close     volume currency_pair exchange_id                  start_ts
         end_ts
         2018-08-16 20:01:00-04:00  1467591036  binance::BTC_USDT  6311.640000  6311.770000  6302.810000  6302.810000  16.781206      BTC_USDT     binance 2018-08-16 20:00:00-04:00
@@ -187,9 +187,9 @@ class TestMarketDataImClient(mdtmdtca.MarketData_get_data_TestCase):
         end_ts = pd.Timestamp("2018-08-17T00:05:00+00:00")
         # pylint: disable=line-too-long
         exp_df_as_str = r"""# df=
-        df.index in [2018-08-16 20:01:00-04:00, 2018-08-16 20:05:00-04:00]
-        df.columns=asset_id,full_symbol,open,high,low,close,volume,currency_pair,exchange_id,start_ts
-        df.shape=(10, 10)
+        index=[2018-08-16 20:01:00-04:00, 2018-08-16 20:05:00-04:00]
+        columns=asset_id,full_symbol,open,high,low,close,volume,currency_pair,exchange_id,start_ts
+        shape=(10, 10)
                                      asset_id        full_symbol         open         high          low        close     volume currency_pair exchange_id                  start_ts
         end_ts
         2018-08-16 20:01:00-04:00  1467591036  binance::BTC_USDT  6311.640000  6311.770000  6302.810000  6302.810000  16.781206      BTC_USDT     binance 2018-08-16 20:00:00-04:00
@@ -216,9 +216,9 @@ class TestMarketDataImClient(mdtmdtca.MarketData_get_data_TestCase):
         end_ts = pd.Timestamp("2018-08-17T00:05:00+00:00")
         # pylint: disable=line-too-long
         exp_df_as_str = r"""# df=
-        df.index in [2018-08-16 20:02:00-04:00, 2018-08-16 20:05:00-04:00]
-        df.columns=asset_id,full_symbol,open,high,low,close,volume,currency_pair,exchange_id,start_ts
-        df.shape=(8, 10)
+        index=[2018-08-16 20:02:00-04:00, 2018-08-16 20:05:00-04:00]
+        columns=asset_id,full_symbol,open,high,low,close,volume,currency_pair,exchange_id,start_ts
+        shape=(8, 10)
                                      asset_id        full_symbol         open         high          low        close     volume currency_pair exchange_id                  start_ts
         end_ts
         2018-08-16 20:02:00-04:00  1467591036  binance::BTC_USDT  6302.810000  6306.000000  6292.790000  6297.260000  55.373226      BTC_USDT     binance 2018-08-16 20:01:00-04:00
@@ -245,9 +245,9 @@ class TestMarketDataImClient(mdtmdtca.MarketData_get_data_TestCase):
         end_ts = pd.Timestamp("2018-08-17T00:05:00+00:00")
         # pylint: disable=line-too-long
         exp_df_as_str = r"""# df=
-        df.index in [2018-08-16 20:02:00-04:00, 2018-08-16 20:04:00-04:00]
-        df.columns=asset_id,full_symbol,open,high,low,close,volume,currency_pair,exchange_id,start_ts
-        df.shape=(6, 10)
+        index=[2018-08-16 20:02:00-04:00, 2018-08-16 20:04:00-04:00]
+        columns=asset_id,full_symbol,open,high,low,close,volume,currency_pair,exchange_id,start_ts
+        shape=(6, 10)
                                      asset_id        full_symbol         open         high          low        close     volume currency_pair exchange_id                  start_ts
         end_ts
         2018-08-16 20:02:00-04:00  1467591036  binance::BTC_USDT  6302.810000  6306.000000  6292.790000  6297.260000  55.373226      BTC_USDT     binance 2018-08-16 20:01:00-04:00

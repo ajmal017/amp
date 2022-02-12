@@ -194,7 +194,7 @@ def build_configs_varying_universe_tiles(
     return configs
 
 
-def build_configs_with_tiled_periods(
+def build_configs_varying_tiled_periods(
     config: cconfig.Config,
     start_timestamp: pd.Timestamp,
     end_timestamp: pd.Timestamp,
