@@ -343,12 +343,14 @@ def get_parquet_filters_from_timestamp_interval(
     )
     # Use hardwired start and end date to represent start_timestamp /
     # end_timestamp = None. This is not very elegant, but it simplifies the code.
+    # TODO(gp): This approach of enumerating seems slow when Parquet reads the data.
+    #  Verify it is and then use a smarter approach like year <= ...
     if start_timestamp is None:
         start_timestamp = pd.Timestamp("2001-01-01 00:00:00+00:00")
     if end_timestamp is None:
         end_timestamp = pd.Timestamp("2030-01-01 00:00:00+00:00")
-    # TODO(gp): If there is an entire year then don't constraint on each month, since
-    #  this slows down things a lot.
+    # TODO(gp): @Nikola, if there is an entire year then don't constraint on each
+    #  month, since this slows down things a lot.
     or_and_filter = []
     if partition_mode == "by_year_month":
         # Partition by year and month.
@@ -361,7 +363,6 @@ def get_parquet_filters_from_timestamp_interval(
             month = date.month
             and_filter = [("year", "=", year), ("month", "=", month)]
             or_and_filter.append(and_filter)
-            _LOG.debug("Adding AND filter %s", str(and_filter))
     elif partition_mode == "by_year_week":
         # Partition by year and week.
         # Include last week in the interval.
@@ -374,7 +375,6 @@ def get_parquet_filters_from_timestamp_interval(
             weekofyear = date.isocalendar()[1]
             and_filter = [("year", "=", year), ("weekofyear", "=", weekofyear)]
             or_and_filter.append(and_filter)
-            _LOG.debug("Adding AND filter %s", str(and_filter))
     else:
         raise ValueError(f"Unknown partition mode `{partition_mode}`!")
     # TODO(Nikola): Partition by week.
