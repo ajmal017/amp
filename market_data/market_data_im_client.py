@@ -102,8 +102,6 @@ class ImClientMarketData(mdabmada.MarketData):
                 asset_ids
             )
         # Load the data using `im_client`.
-        #import im_v2.common.data.client.full_symbol as imvcdcfusy
-        #imvcdcfusy.dassert_valid_full_symbols(full_symbols)
         icdc.dassert_valid_full_symbols(full_symbols)
         market_data = self._im_client.read_data(
             full_symbols,
