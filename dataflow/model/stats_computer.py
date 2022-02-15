@@ -344,7 +344,7 @@ class StatsComputer:
             [pnl_col, gross_volume_col, net_volume_col, gmv_col, nmv_col],
             df.columns.to_list(),
         )
-        df = cofinanc.resample_portfolio_metrics_bars(
+        df = cofinanc.resample_portfolio_bar_metrics(
             df,
             freq,
             pnl_col=pnl_col,

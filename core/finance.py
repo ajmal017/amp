@@ -5,7 +5,7 @@ Import as:
 
 import core.finance as cofinanc
 """
-
+import collections
 import datetime
 import logging
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
@@ -285,8 +285,7 @@ def resample_bars(
     return out_df
 
 
-# TODO(Paul): Rename `resample_portfolio_bar_metrics()`.
-def resample_portfolio_metrics_bars(
+def resample_portfolio_bar_metrics(
     df: pd.DataFrame,
     freq: str,
     *,
@@ -296,37 +295,80 @@ def resample_portfolio_metrics_bars(
     gmv_col: str = "gmv",
     nmv_col: str = "nmv",
 ) -> pd.DataFrame:
-    # TODO(Paul): For this type of resampling, we generally want to
-    # annotate with the left side of the interval. Plumb this through
-    # the call stack.
-    resampled_df = resample_bars(
-        df,
-        freq,
-        resampling_groups=[
-            (
-                {
-                    pnl_col: "pnl",
-                    gross_volume_col: "gross_volume",
-                    net_volume_col: "net_volume",
-                },
-                "sum",
-                {"min_count": 1},
-            ),
-            (
-                {
-                    gmv_col: "gmv",
-                    nmv_col: "nmv",
-                },
-                "mean",
-                {},
-            ),
-        ],
-        vwap_groups=[],
-        resample_kwargs={
-            "closed": None,
-            "label": None,
-        },
-    )
+    def _resample_portfolio_bar_metrics(
+        df: pd.DataFrame,
+        freq: str,
+        pnl_col: str,
+        gross_volume_col: str,
+        net_volume_col: str,
+        gmv_col: str,
+        nmv_col: str,
+    ) -> pd.DataFrame:
+        # TODO(Paul): For this type of resampling, we generally want to
+        # annotate with the left side of the interval. Plumb this through
+        # the call stack.
+        resampled_df = resample_bars(
+            df,
+            freq,
+            resampling_groups=[
+                (
+                    {
+                        pnl_col: "pnl",
+                        gross_volume_col: "gross_volume",
+                        net_volume_col: "net_volume",
+                    },
+                    "sum",
+                    {"min_count": 1},
+                ),
+                (
+                    {
+                        gmv_col: "gmv",
+                        nmv_col: "nmv",
+                    },
+                    "mean",
+                    {},
+                ),
+            ],
+            vwap_groups=[],
+            resample_kwargs={
+                "closed": None,
+                "label": None,
+            },
+        )
+        return resampled_df
+
+    if df.columns.nlevels == 1:
+        resampled_df = _resample_portfolio_bar_metrics(
+            df,
+            freq,
+            pnl_col,
+            gross_volume_col,
+            net_volume_col,
+            gmv_col,
+            nmv_col,
+        )
+    elif df.columns.nlevels == 2:
+        keys = df.columns.levels[0].to_list()
+        resampled_dfs = collections.OrderedDict()
+        for key in keys:
+            resampled_df = _resample_portfolio_bar_metrics(
+                df[key],
+                freq,
+                pnl_col,
+                gross_volume_col,
+                net_volume_col,
+                gmv_col,
+                nmv_col,
+            )
+            resampled_dfs[key] = resampled_df
+        resampled_df = pd.concat(
+            resampled_dfs.values(), axis=1, keys=resampled_dfs.keys()
+        )
+    else:
+        raise ValueError(
+            "Unexpected number of column levels nlevels=%d",
+            df.columns.nlevels,
+        )
     return resampled_df
 
 
@@ -789,7 +831,7 @@ def compute_overnight_returns(
     close_col: str = "close",
     total_return_col: str = "total_return",
     previous_total_return_col: str = "prev_total_return",
-    market_open: pd.Timedelta = pd.Timedelta("9H30T"),
+    market_open: datetime.time = datetime.time(9, 30),
     timezone: str = "America/New_York",
 ) -> pd.DataFrame:
     """
@@ -837,7 +879,10 @@ def compute_overnight_returns(
     )
     # TODO(Paul): Consider moving this step outside of this function.
     # Localize to timestamps.
-    datetime = pd.to_datetime(df[date_col]) + market_open
+    market_open_offset = pd.Timedelta(
+        hours=market_open.hour, minutes=market_open.minute
+    )
+    datetime = pd.to_datetime(df[date_col]) + market_open_offset
     overnight_returns_df = pd.DataFrame(
         {
             "datetime": datetime,

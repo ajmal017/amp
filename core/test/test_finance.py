@@ -827,7 +827,7 @@ datetime,close,vol
         return act
 
 
-class TestResamplePortfolioMetricsBars1(hunitest.TestCase):
+class TestResamplePortfolioBarMetrics1(hunitest.TestCase):
     def test_resampling_invariance(self) -> None:
         """
         Preserve data when resampling at the same frequency.
@@ -841,7 +841,7 @@ class TestResamplePortfolioMetricsBars1(hunitest.TestCase):
         )
         precision = 2
         data_str = hpandas.df_to_str(data, num_rows=None, precision=precision)
-        resampled_data = cofinanc.resample_portfolio_metrics_bars(
+        resampled_data = cofinanc.resample_portfolio_bar_metrics(
             data,
             freq,
         )
@@ -864,7 +864,7 @@ class TestResamplePortfolioMetricsBars1(hunitest.TestCase):
             seed=27,
         )
         resampling_freq = "10T"
-        resampled_data = cofinanc.resample_portfolio_metrics_bars(
+        resampled_data = cofinanc.resample_portfolio_bar_metrics(
             data,
             resampling_freq,
         )
@@ -889,7 +889,7 @@ class TestResamplePortfolioMetricsBars1(hunitest.TestCase):
             seed=27,
         )
         resampling_freq = "B"
-        resampled_data = cofinanc.resample_portfolio_metrics_bars(
+        resampled_data = cofinanc.resample_portfolio_bar_metrics(
             data,
             resampling_freq,
         )

@@ -7,7 +7,6 @@ import core.plotting as coplotti
 # TODO(gp): Test with a gallery notebook and/or with unit tests.
 
 import calendar
-import collections
 import logging
 import math
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
@@ -2368,28 +2367,10 @@ def plot_portfolio_stats(
     # Handle resampling if `freq` is provided.
     if freq is not None:
         hdbg.dassert_isinstance(freq, str)
-        if df.columns.nlevels == 1:
-            df = cofinanc.resample_portfolio_metrics_bars(
-                df,
-                freq,
-            )
-        elif df.columns.nlevels == 2:
-            # TODO(Paul): Consider factoring out this idiom.
-            keys = df.columns.levels[0].to_list()
-            resampled_dfs = collections.OrderedDict()
-            for key in keys:
-                resampled_df = cofinanc.resample_portfolio_metrics_bars(
-                    df[key], freq
-                )
-                resampled_dfs[key] = resampled_df
-            df = pd.concat(
-                resampled_dfs.values(), axis=1, keys=resampled_dfs.keys()
-            )
-        else:
-            raise ValueError(
-                "Unexpected number of column levels nlevels=%d",
-                df.columns.nlevels,
-            )
+        df = cofinanc.resample_portfolio_bar_metrics(
+            df,
+            freq,
+        )
     # Make the `df` a df with a two-level column index.
     if df.columns.nlevels == 1:
         df = pd.concat([df], axis=1, keys=["strategy"])
