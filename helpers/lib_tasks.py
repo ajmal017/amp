@@ -3561,6 +3561,7 @@ def run_slow_tests(  # type: ignore
     collect_only=False,
     tee_to_file=False,
     git_clean=False,
+    **kwargs,
 ):
     """
     Run slow tests.
@@ -3580,6 +3581,7 @@ def run_slow_tests(  # type: ignore
         collect_only,
         tee_to_file,
         git_clean,
+        **kwargs,
     )
     return rc
 
@@ -3595,6 +3597,7 @@ def run_superslow_tests(  # type: ignore
     collect_only=False,
     tee_to_file=False,
     git_clean=False,
+    **kwargs,
 ):
     """
     Run superslow tests.
@@ -3614,6 +3617,7 @@ def run_superslow_tests(  # type: ignore
         collect_only,
         tee_to_file,
         git_clean,
+        **kwargs,
     )
     return rc
 
@@ -3669,6 +3673,95 @@ def run_fast_slow_tests(  # type: ignore
     # Report error, if needed.
     if fast_test_rc != 0 or slow_test_rc != 0:
         raise RuntimeError("Fast / slow tests failed")
+    return fast_test_rc, slow_test_rc
+
+
+@task
+def run_fast_slow_superslow_tests(  # type: ignore
+    ctx,
+    stage="dev",
+    version="",
+    pytest_opts="",
+    skip_submodules=False,
+    coverage=False,
+    collect_only=False,
+    tee_to_file=False,
+    git_clean=False,
+):
+    """
+    Run fast, slow, superslow tests back-to-back.
+
+    Same params as `invoke run_fast_tests`.
+    """
+    _report_task()
+    # Run fast tests but do not fail on error.
+    fast_test_rc = run_fast_tests(
+        ctx,
+        stage,
+        version,
+        pytest_opts,
+        skip_submodules,
+        coverage,
+        collect_only,
+        tee_to_file,
+        git_clean,
+        #
+        warn=True,
+    )
+    if fast_test_rc != 0:
+        _LOG.error("Fast tests failed")
+    # Run slow tests.
+    git_clean = False
+    slow_test_rc = run_slow_tests(
+        ctx,
+        stage,
+        version,
+        pytest_opts,
+        skip_submodules,
+        coverage,
+        collect_only,
+        tee_to_file,
+        git_clean,
+        #
+        warn=True,
+    )
+    if slow_test_rc != 0:
+        _LOG.error("Slow tests failed")
+    # Run superslow tests.
+    git_clean = False
+    superslow_test_rc = run_superslow_tests(
+        ctx,
+        stage,
+        version,
+        pytest_opts,
+        skip_submodules,
+        coverage,
+        collect_only,
+        tee_to_file,
+        git_clean,
+        #
+        warn=True,
+    )
+    if superslow_test_rc != 0:
+        _LOG.error("Super slow tests failed")
+    # Report error, if needed.
+    if fast_test_rc != 0 or slow_test_rc != 0 or superslow_test_rc != 0:
+        if fast_test_rc != 0:
+            _LOG.error("Fast tests failed")
+        else:
+            _LOG.info("Fast tests passed")
+        #
+        if slow_test_rc != 0:
+            _LOG.error("Slow tests failed")
+        else:
+            _LOG.info("Slow tests passed")
+        #
+        if superslow_test_rc != 0:
+            _LOG.error("Superslow tests failed")
+        else:
+            _LOG.info("Superslow tests passed")
+        #
+        raise RuntimeError("Some tests failed")
     return fast_test_rc, slow_test_rc
 
 
