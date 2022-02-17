@@ -13,6 +13,7 @@ from typing import List, Optional, Union
 import pandas as pd
 import seaborn as sns
 
+import core.regression as coregres
 import core.statistics as costatis
 import helpers.hdbg as hdbg
 
@@ -68,7 +69,7 @@ class RegressionAnalyzer:
                 asset_df = features.merge(
                     target, left_index=True, right_index=True
                 )
-            coeff = costatis.compute_regression_coefficients(
+            coeff = coregres.compute_regression_coefficients(
                 asset_df, self._feature_cols, self._target_col
             )
             coeffs[asset_id] = coeff
