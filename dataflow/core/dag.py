@@ -50,6 +50,8 @@ class DAG:
         save_node_interface: str = "",
         profile_execution: bool = False,
         dst_dir: Optional[str] = None,
+        #
+        force_freeing_nodes: bool = False,
     ) -> None:
         """
         Create a DAG.
@@ -61,6 +63,8 @@ class DAG:
             - "loose": deletes old node (also removes edges) and adds new node. This
               is useful for interactive notebooks and debugging
         :param save_node_interface, profile_execution, dst_dir: see `set_debug_mode()`
+        :param force_freeing_nodes: force freeing DAG nodes after they are not
+            needed any more
         """
         self._dag = networ.DiGraph()
         #
@@ -76,6 +80,8 @@ class DAG:
         self._mode = mode
         #
         self.set_debug_mode(save_node_interface, profile_execution, dst_dir)
+        hdbg.dassert_isinstance(force_freeing_nodes, bool)
+        self.force_freeing_nodes = force_freeing_nodes
 
     def __str__(self) -> str:
         """
@@ -317,6 +323,13 @@ class DAG:
                 f"Creating edge {parent_nid} -> {child_nid} introduces a cycle!"
             )
 
+    def insert_at_head(
+        self, node_id: dtfcornode.NodeId, node: dtfcornode.Node
+    ) -> None:
+        source_nid = self.get_unique_source()
+        self.add_node(node)
+        self.connect(node_id, source_nid)
+
     def get_sources(self) -> List[dtfcornode.NodeId]:
         """
         :return: list of nid's of source nodes
@@ -556,6 +569,14 @@ class DAG:
             for input_name, value in kvs.items():
                 # Retrieve output from store.
                 kwargs[input_name] = pred_node.get_output(method, value)
+                if self.force_freeing_nodes:
+                    _LOG.warning(
+                        "Forcing deallocation of pred_node=%s", pred_node
+                    )
+                    # TODO(gp): We should move this after using the data deallocating
+                    # all the nodes whose output has been used. For linear pipelines,
+                    # this check is not needed.
+                    pred_node.free()
             # TODO(gp): Save info for inputs, if needed.
         _LOG.debug("kwargs are %s", kwargs)
         # Execute `node.method()`.

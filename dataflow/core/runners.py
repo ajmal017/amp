@@ -30,6 +30,7 @@ _LOG = logging.getLogger(__name__)
 # #############################################################################
 
 
+# TODO(gp): -> DagRunner
 class AbstractDagRunner(abc.ABC):
     """
     Abstract class with the common code to all `DagRunner`s.
@@ -49,8 +50,10 @@ class AbstractDagRunner(abc.ABC):
         :param dag_builder: `DagBuilder` instance to build a DAG from the config
         """
         # Save input parameters.
+        hdbg.dassert_isinstance(config, cconfig.Config)
         self.config = config
         # Build DAG using DAG builder.
+        hdbg.dassert_is_not(dag_builder, None)
         # TODO(gp): Now a DagRunner builds and runs a DAG. This creates some coupling.
         #  Consider having a DagRunner accept a DAG however built and run it.
         if isinstance(dag_builder, dtfcorbuil.DagBuilder):

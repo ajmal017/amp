@@ -108,6 +108,14 @@ class DagBuilder(abc.ABC):
             self._validate_config_and_dag(config, dag)
         return dag
 
+    def get_fully_built_dag(self) -> dtfcordag.DAG:
+        """
+        Return the DAG for a fully specified (i.e., not template) config.
+        """
+        config = self.get_config_template()
+        dag = self.get_dag(config)
+        return dag
+
     @property
     def methods(self) -> List[str]:
         """

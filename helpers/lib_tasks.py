@@ -889,6 +889,9 @@ def git_branch_next_name(ctx):  # type: ignore
     _report_task()
     _ = ctx
     branch_next_name = hgit.get_branch_next_name()
+    # TODO(gp): We should also check on GH
+    # > gh pr list -s all --limit 10000 | grep AmpTask2163_Implement_tiled_backtesting_1
+    # 347     AmpTask2163_Implement_tiled_backtesting_1       AmpTask2163_Implement_tiled_backtesting_1       MERGED
     print(f"branch_next_name='{branch_next_name}'")
 
 

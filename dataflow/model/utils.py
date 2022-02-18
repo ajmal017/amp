@@ -9,7 +9,8 @@ import dataflow.model.utils as dtfmodutil
 
 # TODO(gp): -> experiment_utils.py
 # TODO(gp): All these functions should be tested. The problem is that these functions
-#  rely on results from experiments and the format of the experiment is still in flux.
+#  rely on results from experiments and the format of the experiment is still in
+#  flux.
 #  One approach is to:
 #  - have unit tests that run short experiments (typically disabled)
 #  - save the results of the experiments on S3 (or on disk)
