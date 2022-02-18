@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 
 import core.artificial_signal_generators as carsigen
-import core.finance as cofinanc
+import core.statistics as costatis
 import core.pandas_helpers as cpanh
 import dataflow.core.node as dtfcornode
 import dataflow.core.nodes.base as dtfconobas
@@ -355,7 +355,7 @@ class MultivariateNormalGenerator(dtfconobas.DataSource):
             return rets
         if fit:
             avg_rets = rets.mean(axis=1)
-            vol = cofinanc.compute_annualized_volatility(avg_rets)
+            vol = costatis.compute_annualized_volatility(avg_rets)
             self._volatility_scale_factor = self._target_volatility / vol
         return rets * self._volatility_scale_factor
 

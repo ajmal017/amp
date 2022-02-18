@@ -13,7 +13,7 @@ import pandas as pd
 import sklearn as sklear
 
 import core.data_adapters as cdatadap
-import core.signal_processing as csigproc
+import core.finance as cofinanc
 import core.statistics as costatis
 import dataflow.core.node as dtfcornode
 import dataflow.core.nodes.base as dtfconobas
@@ -549,7 +549,7 @@ class SkLearnModel(dtfconobas.FitPredictNode, dtfconobas.ColModeMixin):
         pnl_rets = y.multiply(y_hat.rename(columns=lambda x: x.strip("_hat")))
         info["pnl_rets"] = pnl_rets
         info["sr"] = costatis.compute_sharpe_ratio(
-            csigproc.resample(pnl_rets, rule="1B").sum(), time_scaling=252
+            cofinanc.resample(pnl_rets, rule="1B").sum(), time_scaling=252
         )
         return info
 

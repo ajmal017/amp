@@ -11,8 +11,8 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 
-import core.entropy as coentrop
 import core.signal_processing as csigproc
+import core.statistics as costatis
 import helpers.hdbg as hdbg
 
 _LOG = logging.getLogger(__name__)
@@ -595,7 +595,7 @@ def compute_effective_rank(
     _, singular_values, _ = np.linalg.svd(df, full_matrices=False)
     # Compute effective rank
     sq_singular_values = pd.Series(np.square(singular_values))
-    rank = coentrop.compute_cardinality(sq_singular_values, alpha=alpha)
+    rank = costatis.compute_cardinality(sq_singular_values, alpha=alpha)
     return rank
 
 

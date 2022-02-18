@@ -32,7 +32,7 @@ import pandas as pd
 from tqdm.autonotebook import tqdm
 
 import core.config as cconfig
-import core.signal_processing as csigproc
+import core.finance as cofinanc
 import dataflow.core as dtf
 import helpers.hdbg as hdbg
 import helpers.hio as hio
@@ -485,7 +485,7 @@ def _yield_rolling_experiment_out_of_sample_df(
         if dfs:
             df = pd.concat(dfs, axis=0)
             hdbg.dassert_strictly_increasing_index(df)
-            df = csigproc.resample(df, rule=dfs[0].index.freq).sum(min_count=1)
+            df = cofinanc.resample(df, rule=dfs[0].index.freq).sum(min_count=1)
             yield key, df
 
 

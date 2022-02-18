@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import pandas as pd
 
-import core.regression as coregres
+import core.statistics as costatis
 import core.signal_processing as csigproc
 import dataflow.core.node as dtfcornode
 import dataflow.core.nodes.base as dtfconobas
@@ -119,7 +119,7 @@ class LinearRegression(dtfconobas.FitPredictNode, dtfconobas.ColModeMixin):
         forward_y_col = forward_y_cols[0]
         # Regress `forward_y_col` on `x_vars` using `sample_weight_col` weights.
         # This performs one 1-variable regression per x variable.
-        coefficients = coregres.compute_regression_coefficients(
+        coefficients = costatis.compute_regression_coefficients(
             df, x_vars, forward_y_col, sample_weight_col
         )
         if fit:
@@ -161,7 +161,7 @@ class LinearRegression(dtfconobas.FitPredictNode, dtfconobas.ColModeMixin):
         )
         # Compute coefficients of forward y against its prediction.
         # NOTE: This does not use the sample weights.
-        hat_coefficients = coregres.compute_regression_coefficients(
+        hat_coefficients = costatis.compute_regression_coefficients(
             df_out, [forward_y_hat_col], forward_y_col
         )
         info["hat_coefficients"] = hat_coefficients

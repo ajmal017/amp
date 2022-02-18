@@ -1653,7 +1653,7 @@ def plot_rolling_annualized_volatility(
     scale_coeff = _choose_scaling_coefficient(unit)
     annualized_rolling_volatility *= scale_coeff
     # Calculate whole-period target volatility.
-    annualized_volatility = cofinanc.compute_annualized_volatility(srs)
+    annualized_volatility = costatis.compute_annualized_volatility(srs)
     annualized_volatility *= scale_coeff
     # Plot.
     ax = ax or plt.gca()
@@ -1943,7 +1943,7 @@ def plot_drawdown(
     title_suffix = title_suffix or ""
     # scale_coeff = _choose_scaling_coefficient(unit)
     scale_coeff = 1
-    drawdown = -scale_coeff * cofinanc.compute_drawdown(pnl)
+    drawdown = -scale_coeff * costatis.compute_drawdown(pnl)
     label = drawdown.name or "drawdown"
     # title = f"Drawdown ({unit})"
     title = "Drawdown"
@@ -2064,7 +2064,7 @@ def plot_turnover(
     """
     ax = ax or plt.gca()
     scale_coeff = _choose_scaling_coefficient(unit)
-    turnover = cofinanc.compute_turnover(positions)
+    turnover = costatis.compute_turnover(positions)
     turnover = scale_coeff * turnover
     turnover.plot(linewidth=1, ax=ax, label="turnover")
     turnover.resample("M").mean().plot(
@@ -2297,7 +2297,7 @@ def plot_sharpe_ratio_panel(
         _LOG.warning("Input has no frequency and it has been rescaled to 'D'")
         srs_freq = "D"
     # Resample input for assuring input frequency in calculations.
-    log_rets = csigproc.resample(log_rets, rule=srs_freq).sum()
+    log_rets = cofinanc.resample(log_rets, rule=srs_freq).sum()
     # Initiate series for Sharpe ratios of selected frequencies.
     sr_series = pd.Series([], dtype="object")
     # Initiate list for Sharpe ratios' standard errors for error bars.
@@ -2317,7 +2317,7 @@ def plot_sharpe_ratio_panel(
                 freq,
             )
             continue
-        resampled_log_rets = csigproc.resample(log_rets, rule=freq).sum()
+        resampled_log_rets = cofinanc.resample(log_rets, rule=freq).sum()
         if len(resampled_log_rets) == 1:
             _LOG.warning(
                 "Resampling to freq='%s' is blocked because resampled series "
