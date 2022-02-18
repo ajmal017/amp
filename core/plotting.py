@@ -4,6 +4,7 @@ Import as:
 import core.plotting as coplotti
 """
 
+# TODO(Paul): Convert this into a library.
 # TODO(gp): Test with a gallery notebook and/or with unit tests.
 
 import calendar

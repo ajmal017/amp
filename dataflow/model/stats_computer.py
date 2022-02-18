@@ -126,7 +126,7 @@ class StatsComputer:
             functools.partial(costatis.ttest_1samp, prefix="sr."),
         ]
         result = self._compute_stat_functions(srs, name, functions)
-        kratio = pd.Series(cofinanc.compute_kratio(srs), index=["kratio"])
+        kratio = pd.Series(costatis.compute_kratio(srs), index=["kratio"])
         kratio.name = name
         return pd.concat([result, kratio])
 
