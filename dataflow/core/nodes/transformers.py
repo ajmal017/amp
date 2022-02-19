@@ -29,8 +29,7 @@ import helpers.hdbg as hdbg
 
 _LOG = logging.getLogger(__name__)
 
-# TODO(gp): -> _ResamplingRule
-_RESAMPLING_RULE_TYPE = Union[pd.DateOffset, pd.Timedelta, str]
+_ResamplingRule = Union[pd.DateOffset, pd.Timedelta, str]
 
 
 # #############################################################################
@@ -156,7 +155,7 @@ class SeriesTransformer(dtfconobas.Transformer, dtfconobas.ColModeMixin):
     """
     Perform non-index modifying changes of columns.
 
-    TODO(*): Factor out code common with `SeriesToSeriesTransformer`.
+    TODO(Paul): Factor out code common with `SeriesToSeriesTransformer`.
     """
 
     def __init__(
@@ -779,7 +778,7 @@ class TwapVwapComputer(dtfconobas.Transformer):
     def __init__(
         self,
         nid: dtfcornode.NodeId,
-        rule: _RESAMPLING_RULE_TYPE,
+        rule: _ResamplingRule,
         price_col: dtfcorutil.NodeColumn,
         volume_col: dtfcorutil.NodeColumn,
         offset: Optional[str] = None,
@@ -819,7 +818,7 @@ class MultiindexTwapVwapComputer(dtfconobas.Transformer):
     def __init__(
         self,
         nid: dtfcornode.NodeId,
-        rule: _RESAMPLING_RULE_TYPE,
+        rule: _ResamplingRule,
         price_col_group: Tuple[dtfcorutil.NodeColumn],
         volume_col_group: Tuple[dtfcorutil.NodeColumn],
         out_col_group: Tuple[dtfcorutil.NodeColumn],

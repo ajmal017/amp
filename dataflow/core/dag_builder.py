@@ -1,7 +1,7 @@
 """
 Import as:
 
-import dataflow.core.builders as dtfcorbuil
+import dataflow.core.dag_builder as dtfcodabui
 """
 import abc
 import logging
@@ -14,9 +14,6 @@ import helpers.hdbg as hdbg
 import helpers.hprint as hprint
 
 _LOG = logging.getLogger(__name__)
-
-
-# TODO(gp): -> dag_builder.py
 
 
 class DagBuilder(abc.ABC):

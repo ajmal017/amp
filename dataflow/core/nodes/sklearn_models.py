@@ -13,7 +13,7 @@ import pandas as pd
 import sklearn as sklear
 
 import core.data_adapters as cdatadap
-import core.finance as cofinanc
+import core.signal_processing as csigproc
 import core.statistics as costatis
 import dataflow.core.node as dtfcornode
 import dataflow.core.nodes.base as dtfconobas
@@ -292,7 +292,7 @@ class MultiindexPooledSkLearnModel(dtfconobas.FitPredictNode):
         results = {}
         info = collections.OrderedDict()
         if fit:
-            # TODO: compute the shifts first, then stack.
+            # TODO(Paul): compute the shifts first, then stack.
             for key, value in dfs.items():
                 dfs[key] = dtfcorutil.get_x_and_forward_y_fit_df(
                     value, self._x_vars, self._y_vars, self._steps_ahead
