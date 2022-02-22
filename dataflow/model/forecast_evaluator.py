@@ -308,11 +308,8 @@ class ForecastEvaluator:
         # Restrict overnight returns to index range of `df`.
         overnight_returns = overnight_returns.loc[start_loc:end_loc]
         idx = positions.index.union(overnight_returns.index)
-        _LOG.info("positions=\n%s", positions)
         positions = positions.reindex(index=idx)
-        _LOG.info("positions=\n%s", positions)
         positions = positions.shift().dropna(how="all")
-        _LOG.info("positions=\n%s", positions)
         pnl = positions.multiply(overnight_returns)
         stats = pd.DataFrame(
             {

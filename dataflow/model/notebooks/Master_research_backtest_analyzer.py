@@ -32,6 +32,7 @@ import helpers.hdbg as hdbg
 import helpers.henv as henv
 import helpers.hparquet as hparque
 import helpers.hprint as hprint
+import helpers.hsql as hsql
 
 # %%
 hdbg.init_logger(verbosity=logging.INFO)
@@ -55,6 +56,7 @@ dict_ = {
     "volatility_col": "",
     "prediction_col": "",
     "feature_cols": None,
+    "feature_lag": 2,
     "target_gmv": 1e6,
     "dollar_neutrality": "no_constraint",
     "freq": "5T",
@@ -73,6 +75,39 @@ parquet_tile_analyzer.compute_metadata_stats_by_asset_id(parquet_tile_metadata)
 # %%
 parquet_tile_analyzer.compute_universe_size_by_time(parquet_tile_metadata)
 
+# %%
+asset_ids = parquet_tile_metadata.index.levels[0].to_list()
+
+# %% [markdown]
+# # Overnight returns
+
+# %%
+host = ""
+dbname = ""
+port = 1000
+user = ""
+password = ""
+table_name = ""
+connection = hsql.get_connection(host, dbname, port, user, password)
+
+# %%
+query_results = cofinanc.query_by_assets_and_dates(
+    connection,
+    table_name,
+    asset_ids=asset_ids,
+    asset_id_col=config["asset_id_col"],
+    start_date=config["start_date"],
+    end_date=config["end_date"],
+    date_col="date",
+    select_cols=["date", "open_", "close", "total_return", "prev_total_return"],
+)
+
+# %%
+overnight_returns = cofinanc.compute_overnight_returns(
+    query_results,
+    config["asset_id_col"],
+)
+
 # %% [markdown]
 # # Compute portfolio bar metrics
 
@@ -87,6 +122,7 @@ bar_metrics = dtfmod.generate_bar_metrics(
     config["prediction_col"],
     config["target_gmv"],
     config["dollar_neutrality"],
+    overnight_returns["overnight_returns"],
 )
 
 # %%
@@ -105,6 +141,13 @@ portfolio_stats, daily_metrics = stats_computer.compute_portfolio_stats(
 )
 display(portfolio_stats)
 
+# %%
+portfolio_stats_at_freq, _ = stats_computer.compute_portfolio_stats(
+    bar_metrics,
+    config["freq"],
+)
+display(portfolio_stats_at_freq)
+
 # %% [markdown]
 # # Regression analysis
 
@@ -118,8 +161,8 @@ coefficients = dtfmod.regress(
     config["asset_id_col"],
     config["target_col"],
     config["feature_cols"],
-    2,
-    20,
+    config["feature_lag"],
+    50,
 )
 
 # %%
