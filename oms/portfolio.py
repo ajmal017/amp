@@ -62,6 +62,7 @@ class AbstractPortfolio(abc.ABC):
         strategy_id: str,
         account: str,
         broker: ombroker.AbstractBroker,
+        # TODO(Paul): Extract `asset_id_col` from `MarketData` (from `Broker`).
         asset_id_col: str,
         mark_to_market_col: str,
         pricing_method: str,
