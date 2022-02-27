@@ -31,6 +31,7 @@ import helpers.hlist as hlist
 import helpers.hprint as hprint
 import helpers.hsystem as hsystem
 import helpers.htable as htable
+import helpers.htraceback as htraceb
 import helpers.hversion as hversio
 
 _LOG = logging.getLogger(__name__)
@@ -751,10 +752,10 @@ def git_create_branch(  # type: ignore
     _LOG.info("branch_name='%s'", branch_name)
     hdbg.dassert_ne(branch_name, "")
     # Check that the branch is not just a number.
-    m = re.match("^\d+$", branch_name)
+    m = re.match(r"^\d+$", branch_name)
     hdbg.dassert(not m, "Branch names with only numbers are invalid")
     # The valid format of a branch name is `AmpTask1903_Implemented_system_...`.
-    m = re.match("^\S+Task\d+_\S+$", branch_name)
+    m = re.match(r"^\S+Task\d+_\S+$", branch_name)
     hdbg.dassert(m, "Branch name should be '{Amp,...}TaskXYZ_...'")
     hdbg.dassert(
         not hgit.does_branch_exist(branch_name),
@@ -3867,17 +3868,13 @@ def run_coverage_report(  # type: ignore
     )
     # Only target dir is included in the reports.
     include_in_report = f"*/{target_dir}/*"
-    # Test files are excluded from the reports.
-    exclude_from_report = "*/test/*"
     # Generate text report with the coverage stats.
     report_cmd.append(
-        f"coverage report --include={include_in_report} --omit={exclude_from_report} --sort=Cover"
+        f"coverage report --include={include_in_report} --sort=Cover"
     )
     if generate_html_report:
         # Generate HTML report with the coverage stats.
-        report_cmd.append(
-            f"coverage html --include={include_in_report} --omit={exclude_from_report}"
-        )
+        report_cmd.append(f"coverage html --include={include_in_report}")
     # Execute commands above one-by-one inside docker. Coverage tool is not
     # installed outside docker.
     full_report_cmd = " && ".join(report_cmd)
@@ -3963,15 +3960,16 @@ def _get_failed_tests_from_file(file_name: str) -> List[str]:
         tests = [k for k, v in vals.items() if v]
     else:
         # Extract failed tests from the regular text output.
-        tests = re.findall(r"FAILED (.+\.py::.+::.+)\n", txt)
+        tests = re.findall(r"FAILED (\S+\.py::\S+::\S+)[\s|\n]", txt)
     return tests
 
 
 @task
 def pytest_repro(  # type: ignore
     ctx,
-    target_type="tests",
+    mode="tests",
     file_name="./.pytest_cache/v/cache/lastfailed",
+    show_stacktrace=False,
 ):
     """
     Generate commands to reproduce the failed tests after a `pytest` run.
@@ -3987,7 +3985,7 @@ def pytest_repro(  # type: ignore
     server> i pytest_repro
     ```
 
-    :param target_type: the granularity level for generating the commands
+    :param mode: the granularity level for generating the commands
         - "tests" (default): failed test methods, e.g.,
             ```
             pytest helpers/test/test_cache.py::TestCachingOnS3::test_with_caching1
@@ -4004,6 +4002,8 @@ def pytest_repro(  # type: ignore
             pytest helpers/test/test_lib_tasks.py
             ```
     :param file_name: the name of the file containing the pytest output file to parse
+    :param show_stacktrace: whether to show the stacktrace of the failed tests
+      - only if it is available in the pytest output file
     :return: commands to reproduce pytest failures at the requested granularity level
     """
     _report_task()
@@ -4014,6 +4014,9 @@ def pytest_repro(  # type: ignore
     _LOG.info("Reading failed tests from file '%s'", file_name)
     # E.g., vendors/test/test_vendors.py::Test_gp::test1
     tests = _get_failed_tests_from_file(file_name)
+    if len(tests) == 0:
+        _LOG.info("Found 0 failed tests")
+        return ""
     _LOG.debug("tests=%s", str(tests))
     # Process the tests.
     targets = []
@@ -4037,9 +4040,9 @@ def pytest_repro(  # type: ignore
             test_class,
             test_method,
         )
-        if target_type == "tests":
+        if mode == "tests":
             targets.append("pytest " + test)
-        elif target_type == "files":
+        elif mode == "files":
             if test_file_name != "":
                 targets.append("pytest " + test_file_name)
             else:
@@ -4048,7 +4051,7 @@ def pytest_repro(  # type: ignore
                     test,
                     test_file_name,
                 )
-        elif target_type == "classes":
+        elif mode == "classes":
             if test_file_name != "" and test_class != "":
                 targets.append(f"pytest {test_file_name}::{test_class}")
             else:
@@ -4059,19 +4062,57 @@ def pytest_repro(  # type: ignore
                     test_class,
                 )
         else:
-            hdbg.dfatal(f"Invalid target_type='{target_type}'")
+            hdbg.dfatal(f"Invalid mode='{mode}'")
     # Package the output.
     _LOG.debug("res=%s", str(targets))
     targets = hlist.remove_duplicates(targets)
-    _LOG.info(
-        "Found %d failed pytest '%s' target(s); to reproduce run:\n%s",
-        len(targets),
-        target_type,
-        "\n".join(targets),
+    failed_test_output_str = (
+        f"Found {len(targets)} failed pytest '{mode}' target(s); "
+        "to reproduce run:\n" + "\n".join(targets)
     )
     hdbg.dassert_isinstance(targets, list)
     res = " ".join(targets)
     _LOG.debug("res=%s", str(res))
+    #
+    if show_stacktrace:
+        # Get the stacktrace block from the pytest output.
+        txt = hio.from_file(file_name)
+        if (
+            "====== FAILURES ======" not in txt
+            or "====== slowest 3 durations ======" not in txt
+        ):
+            _LOG.info("%s", failed_test_output_str)
+            return res
+        txt = txt.split("====== FAILURES ======")[-1].split(
+            "====== slowest 3 durations ======"
+        )[0]
+        # Get the classes and names of the failed tests, e.g.
+        # "core/dataflow/nodes/test/test_volatility_models.py::TestSmaModel::test5" ->
+        # -> "TestSmaModel.test5".
+        failed_test_names = [
+            test.split("::")[1] + "." + test.split("::")[2] for test in tests
+        ]
+        tracebacks = []
+        for i, name in enumerate(failed_test_names):
+            # Get the stacktrace for the individual test failure.
+            # Its start is marked with the name of the test, e.g.
+            # "___________________ TestSmaModel.test5 ___________________".
+            start_block = "________ " + name + " ________"
+            traceback_block = txt.split(start_block)[-1]
+            if i != len(failed_test_names) - 1:
+                # The end of the traceback for the current failed test is the
+                # start of the traceback for the next failed test.
+                end_block = "________ " + failed_test_names[i + 1] + " ________"
+                traceback_block = traceback_block.split(end_block)[0]
+            _, traceback = htraceb.parse_traceback(
+                traceback_block, purify_from_client=False
+            )
+            tracebacks.append("\n".join(["# " + name, traceback, ""]))
+        # Combine the stacktraces for all the failures.
+        full_traceback = "\n\n" + "\n".join(tracebacks)
+        failed_test_output_str += full_traceback
+        res += full_traceback
+    _LOG.info("%s", failed_test_output_str)
     return res
 
 
@@ -4328,6 +4369,47 @@ def _parse_linter_output(txt: str) -> str:
     output = sorted(output)
     output_as_str = "\n".join(output)
     return output_as_str
+
+
+@task
+def lint_add_init_files(  # type: ignore
+    ctx,
+    dir_name=".",
+    dry_run=True,
+    run_bash=False,
+    stage="prod",
+    as_user=True,
+    out_file_name="lint_add_init_files.output.txt",
+):
+    """
+    Add the missing `__init__.py` in dirs with Python files.
+
+    For param descriptions, see `lint()`.
+
+    :param dir_name: path to the head directory to start the check from
+    :param dry_run:
+      - True: output a warning pointing to the dirs where `__init__.py`
+        files are missing
+      - False: create the required `__init__.py` files
+    """
+    _report_task()
+    # Remove the log file.
+    if os.path.exists(out_file_name):
+        cmd = f"rm {out_file_name}"
+        _run(ctx, cmd)
+    as_user = _run_docker_as_user(as_user)
+    # Prepare the command line.
+    docker_cmd_opts = [dir_name]
+    if dry_run:
+        docker_cmd_opts.append("--dry_run")
+    docker_cmd_ = "/app/linters/add_module_init.py " + _to_single_line_cmd(
+        docker_cmd_opts
+    )
+    # Execute command line.
+    cmd = _get_lint_docker_cmd(docker_cmd_, run_bash, stage, as_user)
+    cmd = f"({cmd}) 2>&1 | tee -a {out_file_name}"
+    # Run.
+    _run(ctx, cmd)
 
 
 @task

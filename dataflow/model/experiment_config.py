@@ -86,6 +86,8 @@ def get_period(period: str) -> Tuple[pd.Timestamp, pd.Timestamp]:
         end_datetime = datetime.datetime(2022, 1, 1)
     else:
         hdbg.dfatal("Invalid period='%s'" % period)
+    _LOG.info("start_datetime=%s end_datetime=%s", start_datetime, end_datetime)
+    hdbg.dassert_lte(start_datetime, end_datetime)
     start_timestamp = pd.Timestamp(start_datetime, tz="UTC")
     end_timestamp = pd.Timestamp(end_datetime, tz="UTC")
     hdbg.dassert_lte(start_timestamp, end_timestamp)
