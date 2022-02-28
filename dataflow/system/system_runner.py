@@ -126,7 +126,7 @@ class SystemWithSimulatedOmsRunner(SystemRunner, abc.ABC):
     """
     A system with a simulated OMS has always:
 
-    - a `SimulatedPortfolio` or a `MockedPortfolio`
+    - a `DataFramePortfolio` or a `MockedPortfolio`
     - an `OrderProcessor`
     """
 

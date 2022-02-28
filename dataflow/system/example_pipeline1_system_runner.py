@@ -70,7 +70,7 @@ class ExamplePipeline1_Dataframe_SystemRunner(ExamplePipeline1_SystemRunner):
         self,
         market_data: mdata.MarketData,
     ) -> oms.AbstractPortfolio:
-        portfolio = oms.get_simulated_portfolio_example1(
+        portfolio = oms.get_DataFramePortfolio_example1(
             self._event_loop,
             market_data=market_data,
             mark_to_market_col="close",
