@@ -256,8 +256,7 @@ def split_positive_and_negative_parts(
 
 
 def compute_weighted_sum(
-    df: pd.DataFrame,
-    weights: pd.Series,
+    df: pd.DataFrame, weights: pd.Series, *, convert_to_dataframe: bool = False
 ) -> pd.Series:
     """
     Perform a weighted sum of the columns of `df` using `weights`.
@@ -275,4 +274,6 @@ def compute_weighted_sum(
     )
     product = df.multiply(weights).sum(axis=1)
     product.name = weights.name
+    if convert_to_dataframe:
+        product = product.to_frame()
     return product

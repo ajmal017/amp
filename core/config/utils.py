@@ -31,13 +31,16 @@ def check_no_dummy_values(config: cconconf.Config) -> bool:
         # (('load_prices', 'source_node_name'), 'kibot_equities')
         # ```
         _LOG.debug(hprint.to_str("key val"))
-        hdbg.dassert_ne(
-            val,
-            cconconf.DUMMY,
-            "DUMMY value %s detected along %s",
-            str(val),
-            str(key),
-        )
+        dummy_type = type(cconconf.DUMMY)
+        _LOG.debug("type(DUMMY)=%s", dummy_type)
+        if type(val) == dummy_type:
+            hdbg.dassert_ne(
+                val,
+                cconconf.DUMMY,
+                "DUMMY value %s detected along %s",
+                str(val),
+                str(key),
+            )
     return True
 
 
