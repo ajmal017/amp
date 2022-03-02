@@ -2435,7 +2435,7 @@ def docker_build_local_image(  # type: ignore
     _report_task()
     _dassert_is_subsequent_version(version)
     version = _resolve_version_value(version)
-    # Update poetry.
+    # Update poetry, if needed.
     if update_poetry:
         cmd = "cd devops/docker_build; poetry lock -v"
         _run(ctx, cmd)
@@ -2466,7 +2466,7 @@ def docker_build_local_image(  # type: ignore
         .
     """
     _run(ctx, cmd)
-    #
+    # Check image and report stats.
     cmd = f"docker image ls {image_local}"
     _run(ctx, cmd)
 

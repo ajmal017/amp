@@ -28,12 +28,12 @@ services:
     # - to mount fstabs.
     privileged: false
     restart: "no"
-    # volumes:
-    #   # TODO(gp): We should pass the value of $HOME from dev.Dockerfile to here.
-    #   # E.g., we might define $HOME in the env file.
-    #   - ~/.aws:/home/.aws
-    #   - ~/.config/gspread_pandas/:/home/.config/gspread_pandas/
-    #   - ~/.config/gh:/home/.config/gh
+    volumes:
+      # TODO(gp): We should pass the value of $HOME from dev.Dockerfile to here.
+      # E.g., we might define $HOME in the env file.
+      - ~/.aws:/home/.aws
+      - ~/.config/gspread_pandas/:/home/.config/gspread_pandas/
+      - ~/.config/gh:/home/.config/gh
     # No need to mount file systems.
     # - ../docker_build/fstab:/etc/fstab
     # deploy:
