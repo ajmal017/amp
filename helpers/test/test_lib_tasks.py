@@ -349,6 +349,7 @@ class TestDryRunTasks2(_LibTasksTestCase, _CheckDryRunTestCase):
         target = "git_branch_files(ctx)"
         self._check_output(target)
 
+    @pytest.mark.slow(reason="Around 7s")
     def test_git_create_branch1(self) -> None:
         target = (
             "git_create_branch(ctx, branch_name='AmpTask123_test', "
@@ -356,6 +357,7 @@ class TestDryRunTasks2(_LibTasksTestCase, _CheckDryRunTestCase):
         )
         self._check_output(target)
 
+    @pytest.mark.slow(reason="Around 7s")
     def test_git_create_branch2(self) -> None:
         target = (
             "git_create_branch(ctx, issue_id=1, repo_short_name='amp', "
