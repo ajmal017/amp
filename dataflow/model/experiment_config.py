@@ -74,6 +74,10 @@ def get_period(period: str) -> Tuple[pd.Timestamp, pd.Timestamp]:
         # 2018.
         start_datetime = datetime.datetime(2018, 1, 1)
         end_datetime = datetime.datetime(2019, 1, 1)
+    elif period == "2018_2019":
+        # 2018.
+        start_datetime = datetime.datetime(2018, 1, 1)
+        end_datetime = datetime.datetime(2020, 1, 1)
     elif period == "2009_2019":
         # Entire 2009-2019 period.
         start_datetime = datetime.datetime(2009, 1, 1)

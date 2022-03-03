@@ -55,7 +55,7 @@ eval_config = cconfig.Config.from_env_var("AM_CONFIG_CODE")
 # Override config.
 if eval_config is None:
     experiment_dir = "/cache/experiments/oos_experiment.RH1E.v2_0-top100.5T"
-    # experiment_dir = "/app/rc_experiment.RH8Ec.v2_0-top2.5T.2009.run1"
+    # experiment_dir = "/app/rc_experiment.E8c.v2_0-top2.5T.2009.run1"
     aws_profile = None
     selected_idxs = None
 
