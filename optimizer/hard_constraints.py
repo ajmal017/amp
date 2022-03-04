@@ -5,7 +5,6 @@ import optimizer.hard_constraints as oharcons
 """
 
 import logging
-from typing import Optional
 
 import cvxpy as cvx
 import pandas as pd
@@ -56,15 +55,11 @@ class TargetGmvHardConstraint(opbase.Expression):
     def __init__(
         self,
         target_gmv: float,
-        # lower_bound_multiple: float,
         upper_bound_multiple: float,
     ) -> None:
         hdbg.dassert_lte(0, target_gmv)
-        # hdbg.dassert_lte(0, lower_bound_multiple)
-        # hdbg.dassert_lte(lower_bound_multiple, 1.0)
         hdbg.dassert_lte(1.0, upper_bound_multiple)
         self._target_gmv = target_gmv
-        # self._lower_bound_multiple = lower_bound_multiple
         self._upper_bound_multiple = upper_bound_multiple
 
     def get_expr(self, target_weights, target_weight_diffs, gmv) -> opbase.EXPR:
@@ -77,38 +72,35 @@ class TargetGmvHardConstraint(opbase.Expression):
 
 class DoNotTradeHardConstraint(opbase.Expression):
     def __init__(self, do_not_trade: pd.Series) -> None:
+        hdbg.dassert_isinstance(do_not_trade, pd.Series)
+        hdbg.dassert(do_not_trade.any())
         self._do_not_trade = do_not_trade
 
     def get_expr(self, target_weights, target_weight_diffs, gmv) -> opbase.EXPR:
         _ = target_weights
         _ = gmv
-        if self._do_not_trade.any():
-            return cvx.multiply(target_weight_diffs, self._do_not_trade) == 0
+        return cvx.multiply(target_weight_diffs, self._do_not_trade) == 0
 
 
 class DoNotBuyHardConstraint(opbase.Expression):
     def __init__(self, do_not_buy: pd.Series) -> None:
+        hdbg.dassert_isinstance(do_not_buy, pd.Series)
+        hdbg.dassert(do_not_buy.any())
         self._do_not_buy = do_not_buy
 
-    def get_expr(
-        self, target_weights, target_weight_diffs, gmv
-    ) -> Optional[opbase.EXPR]:
+    def get_expr(self, target_weights, target_weight_diffs, gmv) -> opbase.EXPR:
         _ = target_weights
         _ = gmv
-        if self._do_not_buy.any():
-            return cvx.multiply(target_weight_diffs, self._do_not_buy.values) <= 0
+        return cvx.multiply(target_weight_diffs, self._do_not_buy.values) <= 0
 
 
 class DoNotSellHardConstraint(opbase.Expression):
     def __init__(self, do_not_sell: pd.Series) -> None:
+        hdbg.dassert_isinstance(do_not_sell, pd.Series)
+        hdbg.dassert(do_not_sell.any())
         self._do_not_sell = do_not_sell
 
-    def get_expr(
-        self, target_weights, target_weight_diffs, gmv
-    ) -> Optional[opbase.EXPR]:
+    def get_expr(self, target_weights, target_weight_diffs, gmv) -> opbase.EXPR:
         _ = target_weights
         _ = gmv
-        if self._do_not_sell.any():
-            return (
-                cvx.multiply(target_weight_diffs, self._do_not_sell.values) >= 0
-            )
+        return cvx.multiply(target_weight_diffs, self._do_not_sell.values) >= 0

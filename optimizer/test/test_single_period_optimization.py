@@ -39,12 +39,12 @@ class Test_SinglePeriodOptimizer1(hunitest.TestCase):
         config = cconfig.get_config_from_nested_dict(dict_)
         df = Test_SinglePeriodOptimizer1.get_prediction_df()
         actual = Test_SinglePeriodOptimizer1.helper(config, df, restrictions=None)
-        expected = r"""
-          target_positions  target_notional_trades  target_weights  target_weight_diffs
-asset_id
-1                 -3.71100             -1003.71100        -0.00124             -0.33457
-2               2962.92836              1462.92836         0.98764              0.48764
-3                 -3.71100               496.28900        -0.00124              0.16543"""
+        expected = r"""          
+          target_position  target_notional_trade  target_weight  target_weight_diff
+asset_id                                                                           
+1                    8.44                -991.56           0.00               -0.33
+2                 3089.38                1589.38           1.03                0.53
+3                    8.44                 508.44           0.00                0.17"""
         self.assert_equal(actual, expected, fuzzy_match=True)
 
     def test_restrictions(self) -> None:
@@ -71,12 +71,12 @@ asset_id
         actual = Test_SinglePeriodOptimizer1.helper(
             config, df, restrictions=restrictions
         )
-        expected = r"""
-          target_positions  target_notional_trades  target_weights  target_weight_diffs
-asset_id
-1               1565.67954               565.67954         0.52189              0.18856
-2               1487.92516               -12.07484         0.49598             -0.00402
-3                  2.82286               502.82286         0.00094              0.16761"""
+        expected = r"""          
+          target_position  target_notional_trade  target_weight  target_weight_diff
+asset_id                                                                           
+1                 1566.10                 566.10           0.52                0.19
+2                 1487.98                 -12.02           0.50               -0.00
+3                    2.75                 502.75           0.00                0.17"""
         self.assert_equal(actual, expected, fuzzy_match=True)
 
     def test_mixed_constraints(self) -> None:
@@ -90,12 +90,12 @@ asset_id
         config = cconfig.get_config_from_nested_dict(dict_)
         df = Test_SinglePeriodOptimizer1.get_prediction_df()
         actual = Test_SinglePeriodOptimizer1.helper(config, df, restrictions=None)
-        expected = r"""
-          target_positions  target_notional_trades  target_weights  target_weight_diffs
-asset_id
-1                 -2.44463             -1002.44463        -0.00081             -0.33415
-2               1523.65440                23.65440         0.50788              0.00788
-3              -1508.57457             -1008.57457        -0.50286             -0.33619"""
+        expected = r"""          
+          target_position  target_notional_trade  target_weight  target_weight_diff
+asset_id                                                                           
+1                    1.10                -998.90            0.0               -0.33
+2                 1496.51                  -3.49            0.5               -0.00
+3                -1488.48                -988.48           -0.5               -0.33"""
         self.assert_equal(actual, expected, fuzzy_match=True)
 
     def test_short_ban(self) -> None:
@@ -122,12 +122,12 @@ asset_id
         actual = Test_SinglePeriodOptimizer1.helper(
             config, df, restrictions=restrictions
         )
-        expected = r"""
-          target_positions  target_notional_trades  target_weights  target_weight_diffs
-asset_id
-1               -967.88563             -1967.88563        -0.32263             -0.65596
-2               1506.87983                 6.87983         0.50229              0.00229
-3               -529.55038               -29.55038        -0.17652             -0.00985"""
+        expected = r"""          
+          target_position  target_notional_trade  target_weight  target_weight_diff
+asset_id                                                                           
+1                -1018.65               -2018.65          -0.34               -0.67
+2                 1515.80                  15.80           0.51                0.01
+3                 -497.69                   2.31          -0.17                0.00"""
         self.assert_equal(actual, expected, fuzzy_match=True)
 
     @staticmethod
@@ -148,7 +148,61 @@ asset_id
         spo = osipeopt.SinglePeriodOptimizer(
             config, df, restrictions=restrictions
         )
-        actual = spo.optimize()
-        precision = 5
-        actual_str = hpandas.df_to_str(actual, precision=precision)
+        optimized = spo.optimize()
+       #  stats = spo.compute_stats(optimized)
+        precision = 2
+        actual_str = hpandas.df_to_str(
+            optimized.round(precision), precision=precision
+        )
         return actual_str
+
+
+@pytest.mark.skip(reason="Requires special docker container.")
+class Test_SinglePeriodOptimizer2(hunitest.TestCase):
+    def test1(self) -> None:
+        dict_ = {
+            "volatility_penalty": 0.75,
+            "dollar_neutrality_penalty": 0.1,
+            "turnover_penalty": 0.0005,
+            "target_gmv": 1e5,
+            "target_gmv_upper_bound_multiple": 1.01,
+        }
+        config = cconfig.get_config_from_nested_dict(dict_)
+        df = Test_SinglePeriodOptimizer2.get_prediction_df()
+        actual = Test_SinglePeriodOptimizer2.helper(config, df)
+        expected = r"""          
+          target_position  target_notional_trade  target_weight  target_weight_diff
+asset_id                                                                           
+101               7618.49                -115.83           0.08               -0.00
+201                -43.19               10919.25          -0.00                0.11
+301             -50135.64              -11098.08          -0.50               -0.11
+401              42599.66                 333.98           0.43                0.00"""
+        self.assert_equal(actual, expected, fuzzy_match=True)
+
+    @staticmethod
+    def get_prediction_df() -> pd.DataFrame:
+        df = pd.DataFrame(
+            [[101,   7734.32,  0.000858, 0.000910],
+             [201, -10962.44,  0.000426, 0.000231],
+             [301, -39037.56, -0.001845, 0.001404],
+             [401,  42265.68,  0.000505, 0.000240]],
+        range(0, 4),
+            ["asset_id", "position", "prediction", "volatility"],
+        )
+        return df
+
+    @staticmethod
+    def helper(
+        config: cconfig.Config,
+        df: pd.DataFrame,
+    ) -> str:
+        spo = osipeopt.SinglePeriodOptimizer(
+            config, df
+        )
+        optimized = spo.optimize()
+        precision = 2
+        actual_str = hpandas.df_to_str(
+            optimized.round(precision), precision=precision
+        )
+        return actual_str
+

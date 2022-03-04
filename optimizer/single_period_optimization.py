@@ -83,11 +83,11 @@ class SinglePeriodOptimizer:
         result_df = self._process_results(target_weights, target_weight_diffs)
         return result_df
 
-    def compute_stats(self, df: pd.DataFrame) -> pd.Series:
-        gross_volume = df["target_notional_trades"].abs().sum()
-        net_volume = df["target_notional_trades"].sum()
-        gmv = df["target_positions"].abs().sum()
-        nmv = df["target_positions"].sum()
+    def compute_stats(self, df: pd.DataFrame) -> pd.DataFrame:
+        gross_volume = df["target_notional_trade"].abs().sum()
+        net_volume = df["target_notional_trade"].sum()
+        gmv = df["target_position"].abs().sum()
+        nmv = df["target_position"].sum()
         notional_stats = pd.Series(
             {
                 "gross_volume": gross_volume,
@@ -96,7 +96,7 @@ class SinglePeriodOptimizer:
                 "nmv": nmv,
             }
         ).rename("notional")
-        gmv_stats = (notional_stats / self._target_gmv).rename("percentage")
+        gmv_stats = 100 * (notional_stats / self._target_gmv).rename("percentage")
         return pd.concat([notional_stats, gmv_stats], axis=1)
 
     @staticmethod
@@ -188,7 +188,7 @@ class SinglePeriodOptimizer:
         soft_constraints = []
         # Add diagonal risk soft constraint.
         volatility = self._df["volatility"]
-        diagonal_risk = osofcons.DiagonalRiskModel(
+        diagonal_risk = osofcons.VolatilityRiskModel(
             volatility, self._volatility_penalty
         )
         soft_constraints.append(diagonal_risk)
@@ -257,28 +257,28 @@ class SinglePeriodOptimizer:
         target_positions = pd.Series(
             index=self._asset_ids,
             data=target_weights.value * self._gmv,
-            name="target_positions",
+            name="target_position",
         )
         srs_list.append(target_positions)
         # Target trades (notional).
         target_trades = pd.Series(
             index=self._asset_ids,
             data=target_weight_diffs.value * self._gmv,
-            name="target_notional_trades",
+            name="target_notional_trade",
         )
         srs_list.append(target_trades)
         # Target weights.
         target_weights = pd.Series(
             index=self._asset_ids,
             data=target_weights.value,
-            name="target_weights",
+            name="target_weight",
         )
         srs_list.append(target_weights)
         # Target weight adjustments.
         target_weight_diffs = pd.Series(
             index=self._asset_ids,
             data=target_weight_diffs.value,
-            name="target_weight_diffs",
+            name="target_weight_diff",
         )
         srs_list.append(target_weight_diffs)
         return pd.concat(srs_list, axis=1)

@@ -64,19 +64,19 @@ class SoftConstraint(abc.ABC):
 # #############################################################################
 
 
-class DiagonalRiskModel(SoftConstraint):
+class VolatilityRiskModel(SoftConstraint):
     """
-    Impose a diagonal risk cost.
+    Impose a diagonal volatility cost.
     """
 
-    def __init__(self, risk: pd.Series, gamma: float = 1.0) -> None:
-        self._sigma_sqrt = np.sqrt(risk)
+    def __init__(self, volatility: pd.Series, gamma: float = 1.0) -> None:
+        self._volatility = volatility
         super().__init__(gamma)
 
     def _estimate(self, target_weights, target_weight_diffs, gmv) -> opbase.EXPR:
         _ = target_weight_diffs
         _ = gmv
-        expr = cvx.sum_squares(target_weights.T @ self._sigma_sqrt.values)
+        expr = cvx.sum_squares(target_weights.T @ self._volatility.values)
         return expr
 
 
@@ -134,13 +134,10 @@ class DollarNeutralitySoftConstraint(SoftConstraint):
 
 class TurnoverSoftConstraint(SoftConstraint):
     """
-    Impose a cost on long and short turnover.
+    Impose a cost on turnover.
     """
 
     def _estimate(self, target_weights, target_weight_diffs, gmv) -> opbase.EXPR:
         _ = target_weights
         _ = gmv
-        pos = cvx.norm(cvx.pos(target_weight_diffs), 1)
-        neg = cvx.norm(cvx.neg(target_weight_diffs), 1)
-        weight = pos + neg
-        return weight
+        return cvx.norm(target_weight_diffs, 1)
