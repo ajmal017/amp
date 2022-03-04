@@ -12,5 +12,6 @@ replace_text.py \
     --new DagBuilder \
     --ext $exts \
     --action $action \
+    --exclude_files $script_name \
     -v DEBUG \
     $*
