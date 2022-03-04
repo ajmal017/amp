@@ -426,7 +426,7 @@ def get_parquet_filters_from_timestamp_interval(
         )
         years = list(set(dates.year))
         if len(years) <= 2:
-            # For ranges up to two years, simple AND statement is enough.
+            # For ranges up to two years, a simple AND statement is enough.
             # `[[('year', '>=', 2020), ('month', '>=', 6),
             # ('year', '<=', 2021), ('month', '<=', 12)]]`
             and_filter = [
@@ -437,8 +437,8 @@ def get_parquet_filters_from_timestamp_interval(
             ]
             or_and_filter.append(and_filter)
         else:
-            # For ranges over two years, OR statements are necessary to bridge the gap
-            # between first and last AND statement.
+            # For ranges over two years, OR statements are necessary to bridge the
+            # gap between first and last AND statement.
             # First AND filter.
             first_and_filter = [
                 ("year", "==", dates[0].year),

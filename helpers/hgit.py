@@ -1226,6 +1226,14 @@ def is_client_clean(
     return is_clean
 
 
+@functools.lru_cache()
+def _get_gh_pr_list() -> str:
+    cmd = "gh pr list -s all --limit 10000"
+    rc, txt = hsystem.system_to_string(cmd)
+    _ = rc
+    return txt
+
+
 def does_branch_exist(
     branch_name: str,
     mode: str,
@@ -1263,8 +1271,7 @@ def does_branch_exist(
         _LOG.debug("branch_name='%s' on git: %s", branch_name, exists)
     # Check on GitHub.
     if mode == "github":
-        cmd = "gh pr list -s all --limit 10000"
-        rc, txt = hsystem.system_to_string(cmd)
+        txt = _get_gh_pr_list()
         # > gh pr list -s all --limit 10000 | grep AmpTask2163
         # 347     AmpTask2163_Implement_tiled_backtesting_1  AmpTask2163 ... MERGED
         # The text is separated by tabs.
