@@ -149,7 +149,7 @@ asset_id
             config, df, restrictions=restrictions
         )
         optimized = spo.optimize()
-       #  stats = spo.compute_stats(optimized)
+        #  stats = spo.compute_stats(optimized)
         precision = 2
         actual_str = hpandas.df_to_str(
             optimized.round(precision), precision=precision
@@ -182,11 +182,13 @@ asset_id
     @staticmethod
     def get_prediction_df() -> pd.DataFrame:
         df = pd.DataFrame(
-            [[101,   7734.32,  0.000858, 0.000910],
-             [201, -10962.44,  0.000426, 0.000231],
-             [301, -39037.56, -0.001845, 0.001404],
-             [401,  42265.68,  0.000505, 0.000240]],
-        range(0, 4),
+            [
+                [101, 7734.32, 0.000858, 0.000910],
+                [201, -10962.44, 0.000426, 0.000231],
+                [301, -39037.56, -0.001845, 0.001404],
+                [401, 42265.68, 0.000505, 0.000240],
+            ],
+            range(0, 4),
             ["asset_id", "position", "prediction", "volatility"],
         )
         return df
@@ -196,13 +198,10 @@ asset_id
         config: cconfig.Config,
         df: pd.DataFrame,
     ) -> str:
-        spo = osipeopt.SinglePeriodOptimizer(
-            config, df
-        )
+        spo = osipeopt.SinglePeriodOptimizer(config, df)
         optimized = spo.optimize()
         precision = 2
         actual_str = hpandas.df_to_str(
             optimized.round(precision), precision=precision
         )
         return actual_str
-

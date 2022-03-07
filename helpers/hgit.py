@@ -57,7 +57,9 @@ def get_branch_name(dir_name: str = ".") -> str:
     return output
 
 
-def get_branch_next_name(dir_name: str = ".", log_verb: int = logging.DEBUG) -> str:
+def get_branch_next_name(
+    dir_name: str = ".", log_verb: int = logging.DEBUG
+) -> str:
     """
     Return a name derived from the branch so that the branch doesn't exist.
 
@@ -72,9 +74,7 @@ def get_branch_next_name(dir_name: str = ".", log_verb: int = logging.DEBUG) -> 
         new_branch_name = f"{curr_branch_name}_{i}"
         _LOG.log(log_verb, "Trying branch name '%s'", new_branch_name)
         mode = "all"
-        exists = does_branch_exist(
-            new_branch_name, mode, dir_name=dir_name
-        )
+        exists = does_branch_exist(new_branch_name, mode, dir_name=dir_name)
         _LOG.log(log_verb, "-> exists=%s", exists)
         if not exists:
             _LOG.log(log_verb, "new_branch_name='%s'", new_branch_name)

@@ -1,3 +1,9 @@
+"""
+Import as:
+
+import optimizer.opt_lib_tasks as ooplitas
+"""
+
 import logging
 import os
 
