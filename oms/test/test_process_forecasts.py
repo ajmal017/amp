@@ -6,6 +6,7 @@ from typing import List, Tuple, Union
 import pandas as pd
 import pytest
 
+import core.config as cconfig
 import core.finance as cofinanc
 import helpers.hasyncio as hasynci
 import helpers.hdbg as hdbg
@@ -35,7 +36,6 @@ class TestSimulatedProcessForecasts1(hunitest.TestCase):
         Run `process_forecasts()` logic with a given prediction df to update a
         Portfolio.
         """
-        config = {}
         (
             market_data,
             get_wall_clock_time,
@@ -65,15 +65,23 @@ class TestSimulatedProcessForecasts1(hunitest.TestCase):
             market_data=market_data,
             asset_ids=[101, 202],
         )
-        config["order_type"] = "price@twap"
-        config["order_duration"] = 5
-        config["ath_start_time"] = datetime.time(9, 30)
-        config["trading_start_time"] = datetime.time(9, 35)
-        config["ath_end_time"] = datetime.time(16, 00)
-        config["trading_end_time"] = datetime.time(15, 55)
-        config["execution_mode"] = "batch"
-        config["target_gmv"] = 1e5
-        config["dollar_neutrality"] = "no_constraint"
+        dict_ = {
+            "order_config": {
+                "order_type": "price@twap",
+                "order_duration": 5,
+            },
+            "optimizer_config": {
+                "backend": "compute_target_positions_in_cash",
+                "target_gmv": 1e5,
+                "dollar_neutrality": "no_constraint",
+            },
+            "execution_mode": "batch",
+            "ath_start_time": datetime.time(9, 30),
+            "trading_start_time": datetime.time(9, 35),
+            "ath_end_time": datetime.time(16, 00),
+            "trading_end_time": datetime.time(15, 55),
+        }
+        config = cconfig.get_config_from_nested_dict(dict_)
         # Run.
         await oprofore.process_forecasts(
             predictions,
@@ -183,15 +191,23 @@ class TestMockedProcessForecasts1(omtodh.TestOmsDbHelper):
             [1, 1],
         ]
         volatility = pd.DataFrame(volatility_data, index, columns)
-        config["order_type"] = "price@twap"
-        config["order_duration"] = 5
-        config["ath_start_time"] = datetime.time(9, 30)
-        config["trading_start_time"] = datetime.time(9, 35)
-        config["ath_end_time"] = datetime.time(16, 00)
-        config["trading_end_time"] = datetime.time(15, 55)
-        config["execution_mode"] = "batch"
-        config["target_gmv"] = 1e5
-        config["dollar_neutrality"] = "no_constraint"
+        dict_ = {
+            "order_config": {
+                "order_type": "price@twap",
+                "order_duration": 5,
+            },
+            "optimizer_config": {
+                "backend": "compute_target_positions_in_cash",
+                "target_gmv": 1e5,
+                "dollar_neutrality": "no_constraint",
+            },
+            "execution_mode": "batch",
+            "ath_start_time": datetime.time(9, 30),
+            "trading_start_time": datetime.time(9, 35),
+            "ath_end_time": datetime.time(16, 00),
+            "trading_end_time": datetime.time(15, 55),
+        }
+        config = cconfig.get_config_from_nested_dict(dict_)
         # Run.
         await oprofore.process_forecasts(
             predictions,
@@ -418,16 +434,23 @@ class TestMockedProcessForecasts2(omtodh.TestOmsDbHelper):
         Run process_forecasts() logic with a given prediction df to update a
         Portfolio.
         """
-        config = {}
-        config["order_type"] = "price@twap"
-        config["order_duration"] = 5
-        config["ath_start_time"] = datetime.time(9, 30)
-        config["trading_start_time"] = datetime.time(9, 35)
-        config["ath_end_time"] = datetime.time(16, 00)
-        config["trading_end_time"] = datetime.time(15, 55)
-        config["execution_mode"] = "batch"
-        config["target_gmv"] = 1e5
-        config["dollar_neutrality"] = "no_constraint"
+        dict_ = {
+            "order_config": {
+                "order_type": "price@twap",
+                "order_duration": 5,
+            },
+            "optimizer_config": {
+                "backend": "compute_target_positions_in_cash",
+                "target_gmv": 1e5,
+                "dollar_neutrality": "no_constraint",
+            },
+            "execution_mode": "batch",
+            "ath_start_time": datetime.time(9, 30),
+            "trading_start_time": datetime.time(9, 35),
+            "ath_end_time": datetime.time(16, 00),
+            "trading_end_time": datetime.time(15, 55),
+        }
+        config = cconfig.get_config_from_nested_dict(dict_)
         # Run.
         await oprofore.process_forecasts(
             predictions,

@@ -33,7 +33,7 @@ async def process_forecasts(
     prediction_df: pd.DataFrame,
     volatility_df: pd.DataFrame,
     portfolio: omportfo.AbstractPortfolio,
-    config: Dict[str, Any],
+    config: cconfig.Config,
 ) -> None:
     """
     Place orders corresponding to the predictions stored in the given df.
@@ -57,37 +57,23 @@ async def process_forecasts(
         - `log_dir`: directory for logging state
     """
     # Check `predictions_df`.
-    hdbg.dassert_isinstance(prediction_df, pd.DataFrame)
-    hpandas.dassert_index_is_datetime(prediction_df)
-    hpandas.dassert_strictly_increasing_index(prediction_df)
+    _validate_df(prediction_df)
     # Check `volatility_df`.
-    hdbg.dassert_isinstance(volatility_df, pd.DataFrame)
-    hpandas.dassert_index_is_datetime(volatility_df)
-    hpandas.dassert_strictly_increasing_index(volatility_df)
+    _validate_df(volatility_df)
     # Check index compatibility.
     hdbg.dassert(prediction_df.index.equals(volatility_df.index))
+    hdbg.dassert(prediction_df.columns.equals(volatility_df.columns))
     # Check `portfolio`.
     hdbg.dassert_isinstance(portfolio, omportfo.AbstractPortfolio)
-    # TODO(*): Make `order_config` a subconfig.
+    hdbg.dassert_isinstance(config, cconfig.Config)
     # Create an `order_config` from `config` elements.
-    order_type = _get_object_from_config(config, "order_type", str)
-    order_duration = _get_object_from_config(config, "order_duration", int)
-    order_config = cconfig.get_config_from_nested_dict(
-        {
-            "order_type": order_type,
-            "order_duration": order_duration,
-        }
-    )
+    order_config = _get_object_from_config(config, "order_config", cconfig.Config)
+    _validate_order_config(order_config)
     #
-    target_gmv = _get_object_from_config(config, "target_gmv", float)
-    dollar_neutrality = _get_object_from_config(config, "dollar_neutrality", str)
-    #
-    optimizer_config = cconfig.get_config_from_nested_dict(
-        {
-            "target_gmv": target_gmv,
-            "dollar_neutrality": dollar_neutrality,
-        }
+    optimizer_config = _get_object_from_config(
+        config, "optimizer_config", cconfig.Config
     )
+    _validate_optimizer_config(optimizer_config)
     # Extract ATH and trading start times from config.
     # TODO(Paul): Add a check for ATH start/end.
     ath_start_time = _get_object_from_config(
@@ -129,7 +115,7 @@ async def process_forecasts(
     get_wall_clock_time = portfolio.market_data.get_wall_clock_time
     tqdm_out = htqdm.TqdmToLogger(_LOG, level=logging.INFO)
     iter_ = enumerate(prediction_df.iterrows())
-    offset_min = pd.DateOffset(minutes=order_duration)
+    offset_min = pd.DateOffset(minutes=order_config["order_duration"])
     # Initialize a `ForecastProcessor` object to perform the heavy lifting.
     forecast_processor = ForecastProcessor(
         portfolio, order_config, optimizer_config, log_dir
@@ -209,14 +195,12 @@ class ForecastProcessor:
         self._portfolio = portfolio
         self._get_wall_clock_time = portfolio.market_data.get_wall_clock_time
         # TODO(Paul): process config with checks.
+        _validate_order_config(order_config)
         self._order_config = order_config
-        self._order_type = self._order_config["order_type"]
-        self._order_duration = self._order_config["order_duration"]
-        self._offset_min = pd.DateOffset(minutes=self._order_duration)
+        self._offset_min = pd.DateOffset(minutes=order_config["order_duration"])
         # Process optimizer config.
+        _validate_optimizer_config(optimizer_config)
         self._optimizer_config = optimizer_config
-        self._target_gmv = self._optimizer_config["target_gmv"]
-        self._dollar_neutrality = self._optimizer_config["dollar_neutrality"]
         #
         self._restrictions = restrictions
         self._log_dir = log_dir
@@ -307,7 +291,7 @@ class ForecastProcessor:
         timestamp_start = wall_clock_timestamp
         timestamp_end = wall_clock_timestamp + self._offset_min
         order_dict_ = {
-            "type_": self._order_type,
+            "type_": self._order_config["order_type"],
             "creation_timestamp": wall_clock_timestamp,
             "start_timestamp": timestamp_start,
             "end_timestamp": timestamp_end,
@@ -355,12 +339,24 @@ class ForecastProcessor:
             predictions, volatility
         )
         # Compute the target positions in cash (call the optimizer).
-        df = ocalopti.compute_target_positions_in_cash(
-            assets_and_predictions,
-            self._portfolio.CASH_ID,
-            target_gmv=self._target_gmv,
-            dollar_neutrality=self._dollar_neutrality,
-        )
+        backend = self._optimizer_config["backend"]
+        if backend == "compute_target_positions_in_cash":
+            target_gmv = _get_object_from_config(
+                self._optimizer_config, "target_gmv", float
+            )
+            dollar_neutrality = _get_object_from_config(
+                self._optimizer_config, "dollar_neutrality", str
+            )
+            df = ocalopti.compute_target_positions_in_cash(
+                assets_and_predictions,
+                self._portfolio.CASH_ID,
+                target_gmv=target_gmv,
+                dollar_neutrality=dollar_neutrality,
+            )
+        elif backend == "optimizer":
+            raise NotImplementedError
+        else:
+            raise ValueError
         # Convert the target positions from cash values to target share counts.
         # Round to nearest integer towards zero.
         # df["diff_num_shares"] = np.fix(df["target_trade"] / df["price"])
@@ -618,10 +614,30 @@ class ForecastProcessor:
         odict[key] = obj
 
 
+def _validate_order_config(config: cconfig.Config) -> None:
+    hdbg.dassert_isinstance(config, cconfig.Config)
+    _ = _get_object_from_config(config, "order_type", str)
+    _ = _get_object_from_config(config, "order_duration", int)
+
+
+def _validate_optimizer_config(config: cconfig.Config) -> None:
+    hdbg.dassert_isinstance(config, cconfig.Config)
+    _ = _get_object_from_config(config, "backend", str)
+    _ = _get_object_from_config(config, "target_gmv", float)
+
+
+def _validate_df(df: pd.DataFrame) -> None:
+    hdbg.dassert_isinstance(df, pd.DataFrame)
+    hpandas.dassert_index_is_datetime(df)
+    hpandas.dassert_strictly_increasing_index(df)
+
+
 # Extract the objects from the config.
 def _get_object_from_config(
     config: cconfig.Config, key: str, expected_type: type
 ) -> Any:
+    hdbg.dassert_isinstance(config, cconfig.Config),
+    hdbg.dassert_isinstance(key, str)
     hdbg.dassert_in(key, config)
     obj = config[key]
     hdbg.dassert_issubclass(obj, expected_type)

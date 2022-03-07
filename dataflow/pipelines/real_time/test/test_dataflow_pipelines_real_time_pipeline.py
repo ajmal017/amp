@@ -2,6 +2,7 @@
 Test pipelines using MarketData.
 """
 import asyncio
+import datetime
 import logging
 
 import pandas as pd
@@ -184,27 +185,27 @@ class TestRealTimePipelineWithOms1(hunitest.TestCase):
                 asset_ids=[1000],
             )
             # Populate place trades.
-            order_type = "price@twap"
             config["process_forecasts", "portfolio"] = portfolio
-            config["process_forecasts"]["process_forecasts_config"] = {
-                "order_type": order_type,
-                "order_duration": 1,
-                "ath_start_time": pd.Timestamp(
-                    "2000-01-01 09:30:00-05:00", tz="America/New_York"
-                ).time(),
-                "trading_start_time": pd.Timestamp(
-                    "2000-01-01 09:35:00-05:00", tz="America/New_York"
-                ).time(),
-                "ath_end_time": pd.Timestamp(
-                    "2000-01-01 16:00:00-05:00", tz="America/New_York"
-                ).time(),
-                "trading_end_time": pd.Timestamp(
-                    "2000-01-01 15:55:00-05:00", tz="America/New_York"
-                ).time(),
+            dict_ = {
+                "order_config": {
+                    "order_type": "price@twap",
+                    "order_duration": 1,
+                },
+                "optimizer_config": {
+                    "backend": "compute_target_positions_in_cash",
+                    "target_gmv": 1e5,
+                    "dollar_neutrality": "no_constraint",
+                },
                 "execution_mode": "real_time",
-                "target_gmv": 1e5,
-                "dollar_neutrality": "no_constraint",
+                "ath_start_time": datetime.time(9, 30),
+                "trading_start_time": datetime.time(9, 35),
+                "ath_end_time": datetime.time(16, 00),
+                "trading_end_time": datetime.time(15, 55),
             }
+            process_forecasts_config = cconfig.get_config_from_nested_dict(dict_)
+            config["process_forecasts"][
+                "process_forecasts_config"
+            ] = process_forecasts_config
             # Set up the event loop.
             sleep_interval_in_secs = 60 * 5
             execute_rt_loop_kwargs = (
