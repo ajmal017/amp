@@ -59,34 +59,26 @@ class AbstractPortfolio(abc.ABC):
 
     def __init__(
         self,
-        strategy_id: str,
-        account: str,
         broker: ombroker.AbstractBroker,
         mark_to_market_col: str,
         pricing_method: str,
-        timestamp_col: str,
         initial_holdings: pd.Series,
     ):
         """
         Constructor.
 
-        :param strategy_id, account: back office information about the strategy
-            driving this portfolio
         :param mark_to_market_col: column name used as price to mark holdings to
             market
         :param pricing_method: pricing methodology to use for valuing assets.
             If e.g. "twap", then we also include the bar duration as a
             pandas-style suffix: "twap.5T"
-        :param timestamp_col: column to use when accessing price data
         """
-        _LOG.debug(
-            hprint.to_str("strategy_id account mark_to_market_col timestamp_col")
-        )
-        self._strategy_id = strategy_id
-        self._account = account
+        _LOG.debug(hprint.to_str("mark_to_market_col"))
         # Set and unpack broker.
         hdbg.dassert_issubclass(broker, ombroker.AbstractBroker)
         self.broker = broker
+        self._account = broker.account
+        self._timestamp_col = broker.timestamp_col
         # Extract `market_data` from `broker`.
         self.market_data = broker.market_data
         # Extract `get_wall_clock_time` from `market_data`.
@@ -109,8 +101,6 @@ class AbstractPortfolio(abc.ABC):
                 "Cannot convert %s to `pd.Timedelta`" % bar_duration,
             )
             self._bar_duration = bar_duration
-        # Timestamp column.
-        self._timestamp_col = timestamp_col
         # Initialize universe and holdings.
         self._validate_initial_holdings(initial_holdings)
         initial_holdings.index.name = "asset_id"

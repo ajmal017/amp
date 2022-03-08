@@ -32,17 +32,12 @@ def get_DataFramePortfolio_example1(
         timestamp_col=timestamp_col,
     )
     # Build DataFramePortfolio.
-    strategy_id = "st1"
-    account = "paper"
     mark_to_market_col = mark_to_market_col
     initial_cash = 1e6
     portfolio = omportfo.DataFramePortfolio.from_cash(
-        strategy_id,
-        account,
         broker,
         mark_to_market_col,
         pricing_method,
-        timestamp_col,
         #
         initial_cash=initial_cash,
         asset_ids=asset_ids,
@@ -72,16 +67,11 @@ def get_mocked_portfolio_example1(
         timestamp_col=timestamp_col,
     )
     # Build MockedPortfolio.
-    strategy_id = "st1"
-    account = "candidate"
     initial_cash = 1e6
     portfolio = omportfo.MockedPortfolio.from_cash(
-        strategy_id,
-        account,
         broker,
         mark_to_market_col,
         pricing_method,
-        timestamp_col,
         db_connection=db_connection,
         table_name=table_name,
         #

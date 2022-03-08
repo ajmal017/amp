@@ -149,6 +149,18 @@ class AbstractBroker(abc.ABC):
         # Track the fills for internal accounting.
         self._fills: List[Fill] = []
 
+    @property
+    def strategy_id(self) -> str:
+        return self._strategy_id
+
+    @property
+    def account(self) -> str:
+        return self._account
+
+    @property
+    def timestamp_col(self) -> str:
+        return self._timestamp_col
+
     async def submit_orders(
         self,
         orders: List[omorder.Order],

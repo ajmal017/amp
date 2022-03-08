@@ -100,19 +100,13 @@ class TestDataFramePortfolio2(hunitest.TestCase):
                 event_loop, market_data=market_data
             )
             # Build Portfolio.
-            strategy_id = "str1"
-            account = "paper"
             mark_to_market_col = "price"
             pricing_method = "last"
-            timestamp_col = "end_datetime"
             holdings_dict = {101: 727.5, 202: 1040.3, -1: 10000}
             portfolio = omportfo.DataFramePortfolio.from_dict(
-                strategy_id,
-                account,
                 broker,
                 mark_to_market_col,
                 pricing_method,
-                timestamp_col,
                 holdings_dict=holdings_dict,
             )
             # Check.
@@ -162,19 +156,13 @@ leverage                            0.0"""
                 event_loop, market_data=market_data
             )
             # Build Portfolio.
-            strategy_id = "str1"
-            account = "paper"
             mark_to_market_col = "price"
             pricing_method = "last"
-            timestamp_col = "end_datetime"
             holdings_dict = {101: 727.5, 202: 1040.3, -1: 10000}
             portfolio = omportfo.DataFramePortfolio.from_dict(
-                strategy_id,
-                account,
                 broker,
                 mark_to_market_col,
                 pricing_method,
-                timestamp_col,
                 holdings_dict=holdings_dict,
             )
             expected = r"""
