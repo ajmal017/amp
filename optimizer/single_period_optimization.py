@@ -72,8 +72,12 @@ class SinglePeriodOptimizer:
         self._asset_ids = self._df["asset_id"]
         self._n_assets = df.shape[0]
         positions = self._df["position"]
+        _LOG.debug("positions=\n%s", hpandas.df_to_str(positions))
         self._gmv = positions.abs().sum()
         self._current_weights = positions / self._gmv
+        _LOG.debug(
+            "current_weights=\n%s", hpandas.df_to_str(self._current_weights)
+        )
 
     def optimize(self) -> pd.DataFrame:
         """
@@ -152,7 +156,9 @@ class SinglePeriodOptimizer:
         # Determine the current GMV and GMV-normalized weights.
         # Create a placeholder for (current) GMV-normalized weight adjustments.
         target_weight_diffs = cvx.Variable(self._n_assets)
-        target_weights = self._current_weights.values + target_weight_diffs
+        current_weights = self._current_weights.to_numpy()
+        _LOG.debug("current_weights=\n%s", current_weights)
+        target_weights = current_weights + target_weight_diffs
         # Create a placeholder for predicted returns (to maximize subject to
         # constraints).
         predictions = self._df["prediction"]

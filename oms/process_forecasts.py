@@ -338,6 +338,9 @@ class ForecastProcessor:
         assets_and_predictions = self._prepare_data_for_optimizer(
             predictions, volatility
         )
+        hdbg.dassert_not_in(
+            self._portfolio.CASH_ID, assets_and_predictions["asset_id"].to_list()
+        )
         # Compute the target positions in cash (call the optimizer).
         backend = self._optimizer_config["backend"]
         if backend == "compute_target_positions_in_cash":
@@ -349,18 +352,39 @@ class ForecastProcessor:
             )
             df = ocalopti.compute_target_positions_in_cash(
                 assets_and_predictions,
-                self._portfolio.CASH_ID,
                 target_gmv=target_gmv,
                 dollar_neutrality=dollar_neutrality,
             )
-        elif backend == "optimizer":
+        elif backend == "batch_optimizer":
+            import optimizer.single_period_optimization as osipeopt
+
+            spo = osipeopt.SinglePeriodOptimizer(
+                self._optimizer_config,
+                assets_and_predictions,
+                restrictions=self._restrictions,
+            )
+            df = spo.optimize()
+            _LOG.debug("df=\n%s", hpandas.df_to_str(df))
+            df = df.merge(
+                assets_and_predictions.set_index("asset_id")[
+                    ["price", "curr_num_shares"]
+                ],
+                how="outer",
+                left_index=True,
+                right_index=True,
+            )
+        elif backend == "dind_optimizer":
+            # Call docker optimizer stub.
+            raise NotImplementedError
+        elif backend == "service_optimizer":
             raise NotImplementedError
         else:
             raise ValueError
         # Convert the target positions from cash values to target share counts.
         # Round to nearest integer towards zero.
         # df["diff_num_shares"] = np.fix(df["target_trade"] / df["price"])
-        df["diff_num_shares"] = df["target_trade"] / df["price"]
+        df["diff_num_shares"] = df["target_notional_trade"] / df["price"]
+        _LOG.debug("df=\n%s", hpandas.df_to_str(df))
         return df
 
     def _prepare_data_for_optimizer(
@@ -385,7 +409,9 @@ class ForecastProcessor:
         df_for_optimizer = self._merge_predictions(
             marked_to_market, predictions, volatility
         )
-        return df_for_optimizer
+        cash_id_filter = df_for_optimizer["asset_id"] == self._portfolio.CASH_ID
+        df_for_optimizer.rename(columns={"value": "position"}, inplace=True)
+        return df_for_optimizer[~cash_id_filter].reset_index(drop=True)
 
     def _get_extended_marked_to_market_df(
         self,
@@ -398,7 +424,6 @@ class ForecastProcessor:
         should be a no-op.
 
         :param predictions: predictions indexed by `asset_id`
-        :return:
         """
         marked_to_market = self._portfolio.mark_to_market().set_index("asset_id")
         # If there are predictions for assets not currently in `marked_to_market`,
@@ -433,11 +458,6 @@ class ForecastProcessor:
     ) -> pd.DataFrame:
         """
         Normalize predictions with `index`, NaN-filling, and df conversion.
-        series.
-
-        :param predictions:
-        :param index:
-        :return:
         """
         _LOG.debug("Number of predictions=%i", predictions.size)
         _LOG.debug("Number of non-NaN predictions=%i", predictions.count())
@@ -466,10 +486,6 @@ class ForecastProcessor:
     ) -> pd.DataFrame:
         """
         Normalize predictions with `index`, NaN-filling, and df conversion.
-
-        :param volatility:
-        :param index:
-        :return:
         """
         # TODO(Paul): Factor out common part with predictions normalization.
         _LOG.debug("Number of volatility forecasts=%i", volatility.size)

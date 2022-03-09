@@ -1,7 +1,7 @@
 """
 Import as:
 
-import dataflow.model.incremental_flows as dtfmoinflo
+import dataflow.model.tiled_flows as dtfmotiflo
 """
 
 import datetime
@@ -12,12 +12,13 @@ import pandas as pd
 _LOG = logging.getLogger(__name__)
 
 from typing import List, Optional, Union
+
 from tqdm.autonotebook import tqdm
 
 import dataflow.model.forecast_evaluator as dtfmofoeva
 import dataflow.model.forecast_mixer as dtfmofomix
-import dataflow.model.parquet_utils as dtfmopauti
 import dataflow.model.parquet_tile_analyzer as dtfmpatian
+import dataflow.model.parquet_utils as dtfmopauti
 import dataflow.model.regression_analyzer as dtfmoreana
 import helpers.hdbg as hdbg
 import helpers.hparquet as hparque
@@ -149,10 +150,13 @@ def regress(
     batch_size: int,
 ) -> pd.DataFrame:
     """
+    
     """
     cols = [asset_id_col, target_col] + feature_cols
     parquet_tile_analyzer = dtfmpatian.ParquetTileAnalyzer()
-    parquet_tile_metadata = parquet_tile_analyzer.collate_parquet_tile_metadata(file_name)
+    parquet_tile_metadata = parquet_tile_analyzer.collate_parquet_tile_metadata(
+        file_name
+    )
     asset_ids = parquet_tile_metadata.index.levels[0].to_list()
     _LOG.debug("Num assets=%d", len(asset_ids))
     ra = dtfmoreana.RegressionAnalyzer(

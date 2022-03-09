@@ -127,7 +127,8 @@ class AbstractBroker(abc.ABC):
         Constructor.
 
         :param column_remap: (optional) remap columns when accessing a
-            `MarketData` to retrieve execution prices
+            `MarketData` to retrieve execution prices. The required columns
+            are "bid", "ask", "price", and "midpoint".
         """
         self._strategy_id = strategy_id
         self._account = account
