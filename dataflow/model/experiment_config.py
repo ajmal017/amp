@@ -118,7 +118,7 @@ def get_period(period: str) -> Tuple[pd.Timestamp, pd.Timestamp]:
 # Experiment config.
 # #############################################################################
 
-# TODO(gp): bm_config -> experiment_config
+# TODO(gp): backtest_config -> experiment_config
 # TODO(gp): build_model_config -> build_experiment_config
 
 

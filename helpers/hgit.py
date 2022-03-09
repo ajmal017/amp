@@ -1243,6 +1243,7 @@ def does_branch_exist(
     """
     Check if a branch with the given name exists in Git or GitHub.
     """
+    _LOG.debug(hprint.to_str("branch_name mode dir_name"))
     # Handle the "all" case by recursion on all the possible modes.
     if mode == "all":
         exists = False
@@ -1268,7 +1269,7 @@ def does_branch_exist(
         cmd = f"cd {dir_name} && git rev-parse --verify {git_branch_name}"
         rc = hsystem.system(cmd, abort_on_error=False)
         exists = rc == 0
-        _LOG.debug("branch_name='%s' on git: %s", branch_name, exists)
+        _LOG.debug("branch_name='%s' on git: exists=%s", branch_name, exists)
     # Check on GitHub.
     if mode == "github":
         txt = _get_gh_pr_list()
@@ -1282,7 +1283,7 @@ def does_branch_exist(
             number, gh_branch_name, git_branch_name, status = fields
             if branch_name == git_branch_name:
                 exists = True
-                _LOG.debug("fields=%s -> found")
+                _LOG.debug("branch_name='%s' on github: exists=%s", branch_name, exists)
     return exists
 
 

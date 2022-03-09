@@ -104,7 +104,7 @@ class Backtest_TestCase(abc.ABC, hunitest.TestCase):
         cmd.append(f"--experiment_builder {experiment_builder}")
         # Config builder.
         # E.g.,
-        # builder = f'build_model_configs("{bm_config}", 1)'
+        # builder = f'build_model_configs("{backtest_config}", 1)'
         # config_builder = f'dataflow_lemonade.RH1E.RH1E_configs.{builder}'
         cmd.append(f"--config_builder '{config_builder}'")
         #
@@ -191,7 +191,7 @@ class TiledBacktest_TestCase(Backtest_TestCase):
         tag = "output_signature"
         output_signature = self.get_dir_signature(run_model_dir)
         # Remove lines like 'log.20220304-200306.txt'.
-        output_signature = hprint.filter_text(r"log\.*\.txt", output_signature)
+        output_signature = hprint.filter_text(r"log\..*\.txt", output_signature)
         self.check_string(output_signature, fuzzy_match=True, tag=tag)
         # 4) Run the analysis.
         tile_output_dir = os.path.join(run_model_dir, "tiled_results")

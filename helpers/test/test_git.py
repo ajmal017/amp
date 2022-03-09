@@ -266,6 +266,7 @@ class Test_git_path1(hunitest.TestCase):
             )
 
 
+@pytest.mark.slow(reason="Around 7s")
 class Test_git_modified_files1(hunitest.TestCase):
     def setUp(self) -> None:
         """
@@ -274,7 +275,6 @@ class Test_git_modified_files1(hunitest.TestCase):
         super().setUp()
         hgit.fetch_origin_master_if_needed()
 
-    @pytest.mark.slow(reason="Around 7s")
     def test_get_modified_files1(self) -> None:
         func_call = "hgit.get_modified_files()"
         _execute_func_call(func_call)

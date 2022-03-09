@@ -227,6 +227,7 @@ class TestDryRunTasks1(hunitest.TestCase):
 # #############################################################################
 
 
+@pytest.mark.slow(reason="Around 7s")
 class TestDryRunTasks2(_LibTasksTestCase, _CheckDryRunTestCase):
     """
     - Call the invoke task directly from Python
@@ -349,7 +350,6 @@ class TestDryRunTasks2(_LibTasksTestCase, _CheckDryRunTestCase):
         target = "git_branch_files(ctx)"
         self._check_output(target)
 
-    @pytest.mark.slow(reason="Around 7s")
     def test_git_create_branch1(self) -> None:
         _gh_login()
         target = (
@@ -358,7 +358,6 @@ class TestDryRunTasks2(_LibTasksTestCase, _CheckDryRunTestCase):
         )
         self._check_output(target)
 
-    @pytest.mark.slow(reason="Around 7s")
     def test_git_create_branch2(self) -> None:
         _gh_login()
         target = (
