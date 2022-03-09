@@ -12,14 +12,12 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
-import core.artificial_signal_generators as carsigen
 import core.real_time as creatime
 import helpers.hdatetime as hdateti
 import helpers.hdbg as hdbg
 import helpers.hnumpy as hnumpy
 import helpers.hpandas as hpandas
 import helpers.hprint as hprint
-import im_v2.ccxt.data.client.ccxt_clients_example as imvcdcccex
 import market_data.market_data_im_client as mdmdimcl
 import market_data.replayed_market_data as mdremada
 
@@ -143,6 +141,8 @@ def generate_random_bars_for_asset(
       - index is an integer index
       - columns include timestamps, asset id, price, volume, and fake features
     """
+    import core.artificial_signal_generators as carsigen
+
     price_process = carsigen.PriceProcess(seed)
     close = price_process.generate_price_series_from_normal_log_returns(
         start_datetime,
@@ -267,7 +267,7 @@ def get_ReplayedTimeMarketData_from_df(
     asset_id_col_name = "asset_id"
     hdbg.dassert_in(asset_id_col_name, df.columns)
     # If the asset ids were not specified, then infer it from the dataframe.
-    asset_ids = df[asset_id_col_name].unique().tolist()
+    asset_ids = list(df[asset_id_col_name].unique())
     start_time_col_name = "start_datetime"
     hdbg.dassert_in(start_time_col_name, df.columns)
     end_time_col_name = "end_datetime"
@@ -425,6 +425,8 @@ def get_ImClientMarketData_example1(
     """
     Build a `ImClientMarketData` backed with loaded test data.
     """
+    import im_v2.ccxt.data.client.ccxt_clients_example as imvcdcccex
+
     ccxt_client = imvcdcccex.get_CcxtCsvClient_example1()
     #
     asset_id_col = "asset_id"
