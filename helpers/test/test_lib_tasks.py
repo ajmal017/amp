@@ -1014,10 +1014,23 @@ class TestLibTasksRunTests1(hunitest.TestCase):
 # #############################################################################
 
 
+@pytest.mark.slow(reason="Around 7s")
 class TestLibTasksGitCreatePatch1(hunitest.TestCase):
     """
     Test `git_create_patch()`.
     """
+
+    @staticmethod
+    def helper(
+        modified: bool, branch: bool, last_commit: bool, files: str
+    ) -> None:
+        ctx = _build_mock_context_returning_ok()
+        #
+        mode = "tar"
+        hlibtask.git_create_patch(ctx, mode, modified, branch, last_commit, files)
+        #
+        mode = "diff"
+        hlibtask.git_create_patch(ctx, mode, modified, branch, last_commit, files)
 
     def test_tar_modified1(self) -> None:
         """
@@ -1032,7 +1045,7 @@ class TestLibTasksGitCreatePatch1(hunitest.TestCase):
         branch = False
         last_commit = False
         files = ""
-        self._helper(modified, branch, last_commit, files)
+        self.helper(modified, branch, last_commit, files)
 
     def test_tar_branch1(self) -> None:
         """
@@ -1044,7 +1057,7 @@ class TestLibTasksGitCreatePatch1(hunitest.TestCase):
         branch = True
         last_commit = False
         files = ""
-        self._helper(modified, branch, last_commit, files)
+        self.helper(modified, branch, last_commit, files)
 
     def test_tar_last_commit1(self) -> None:
         """
@@ -1059,7 +1072,7 @@ class TestLibTasksGitCreatePatch1(hunitest.TestCase):
         branch = False
         last_commit = True
         files = ""
-        self._helper(modified, branch, last_commit, files)
+        self.helper(modified, branch, last_commit, files)
 
     def test_tar_files1(self) -> None:
         """
@@ -1112,18 +1125,6 @@ class TestLibTasksGitCreatePatch1(hunitest.TestCase):
         Specify only one among --modified, --branch, --last-commit
         """
         self.assert_equal(act, exp, fuzzy_match=True)
-
-    @staticmethod
-    def _helper(
-        modified: bool, branch: bool, last_commit: bool, files: str
-    ) -> None:
-        ctx = _build_mock_context_returning_ok()
-        #
-        mode = "tar"
-        hlibtask.git_create_patch(ctx, mode, modified, branch, last_commit, files)
-        #
-        mode = "diff"
-        hlibtask.git_create_patch(ctx, mode, modified, branch, last_commit, files)
 
 
 # #############################################################################

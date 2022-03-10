@@ -284,6 +284,7 @@ class TestRealTimeMvnReturnsWithOms1(otodh.TestOmsDbHelper):
     Run `MvnReturns` pipeline in real-time with mocked OMS objects.
     """
 
+    # TODO(gp): Move to market_data_example.py to reuse?
     @staticmethod
     def get_market_data_df() -> pd.DataFrame:
         """

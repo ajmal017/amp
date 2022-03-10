@@ -619,7 +619,7 @@ def copy_rows_with_copy_from(
 
 
 # TODO(gp): -> table_name, df
-def _create_insert_query(df: pd.DataFrame, table_name: str) -> str:
+def create_insert_query(df: pd.DataFrame, table_name: str) -> str:
     """
     Create an INSERT query to insert data into a DB.
 
@@ -658,7 +658,7 @@ def execute_insert_query(
     # Transform dataframe into list of tuples.
     values = [tuple(v) for v in df.to_numpy()]
     # Generate a query for multiple rows.
-    query = _create_insert_query(df, table_name)
+    query = create_insert_query(df, table_name)
     # Execute query for each provided row.
     cur = connection.cursor()
     extras.execute_values(cur, query, values)
