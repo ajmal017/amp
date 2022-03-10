@@ -384,6 +384,7 @@ class ForecastProcessor:
         # Round to nearest integer towards zero.
         # df["diff_num_shares"] = np.fix(df["target_trade"] / df["price"])
         df["diff_num_shares"] = df["target_notional_trade"] / df["price"]
+        # TODO(Paul): Warn and zero-out any trades that violate restrictions.
         _LOG.debug("df=\n%s", hpandas.df_to_str(df))
         return df
 

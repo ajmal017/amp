@@ -623,3 +623,22 @@ def to_partitioned_parquet(
             partition_filename_cb=partition_filename,
             filesystem=filesystem,
         )
+
+
+def maybe_cast_to_int(string: str) -> Union[str, int]:
+    """
+    Return `string` as an `int` if convertible, otherwise a no-op.
+
+    This is useful for parsing mixed-type dataframe columns that may contain
+    strings and ints. For example, a dataframe with columns
+       feature1 feature2 1 2 3
+    will be written and read back with columns `1`, `2`, `3` as the strings
+    "1", "2", "3" rather than the ints. This function can be used to rectify
+    that in a post-processing column rename.
+    """
+    hdbg.dassert_isinstance(string, str)
+    try:
+        val = int(string)
+    except ValueError:
+        val = string
+    return val
