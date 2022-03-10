@@ -54,6 +54,7 @@ class TestDataFramePortfolio1(hunitest.TestCase):
                 event_loop,
                 market_data=market_data,
             )
+            _ = portfolio.mark_to_market()
             return portfolio
 
 
@@ -75,6 +76,7 @@ class TestDataFramePortfolio2(hunitest.TestCase):
                 event_loop,
                 market_data=market_data,
             )
+            _ = portfolio.mark_to_market()
             # Check.
             expected = pd.DataFrame(
                 {-1: 1000000.0},
@@ -109,6 +111,7 @@ class TestDataFramePortfolio2(hunitest.TestCase):
                 pricing_method,
                 holdings_dict=holdings_dict,
             )
+            _ = portfolio.mark_to_market()
             # Check.
             expected = pd.DataFrame(
                 {101: 727.5, 202: 1040.3, -1: 10000.0},
@@ -131,6 +134,7 @@ class TestDataFramePortfolio2(hunitest.TestCase):
                 event_loop,
                 market_data=market_data,
             )
+            _ = portfolio.mark_to_market()
             # Check.
             expected = r"""
               2000-01-01 09:35:00-05:00
@@ -165,6 +169,7 @@ leverage                            0.0"""
                 pricing_method,
                 holdings_dict=holdings_dict,
             )
+            _ = portfolio.mark_to_market()
             expected = r"""
               2000-01-01 09:35:00-05:00
 pnl                                 NaN
@@ -219,6 +224,7 @@ start_datetime,end_datetime,asset_id,price
                 event_loop,
                 market_data=market_data,
             )
+            _ = portfolio.mark_to_market()
             # Check.
             expected = r"""
               2000-01-01 09:35:00-05:00
@@ -338,6 +344,7 @@ class TestMockedPortfolio1(omtodh.TestOmsDbHelper):
         self,
         portfolio,
     ):
+        portfolio.mark_to_market()
         await asyncio.sleep(60 * 5)
         portfolio.mark_to_market()
         # Check.
@@ -369,6 +376,7 @@ asset_id                        101
         self,
         portfolio,
     ):
+        portfolio.mark_to_market()
         await asyncio.sleep(60 * 5)
         portfolio.mark_to_market()
         # Check.
@@ -430,6 +438,7 @@ class TestMockedPortfolio2(omtodh.TestOmsDbHelper):
         self,
         portfolio,
     ):
+        portfolio.mark_to_market()
         await asyncio.sleep(60 * 5)
         portfolio.mark_to_market()
         log_dir = self.get_scratch_space()
