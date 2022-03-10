@@ -560,8 +560,8 @@ class ForecastProcessor:
         _LOG.debug("After merge: merged_df=\n%s", hpandas.df_to_str(merged_df))
         return merged_df
 
-    @staticmethod
     def _generate_orders(
+        self,
         shares_df: pd.DataFrame,
         order_config: Dict[str, Any],
     ) -> List[omorder.Order]:
@@ -592,6 +592,9 @@ class ForecastProcessor:
                     asset_id,
                 )
                 diff_num_shares = 0.0
+            diff_num_shares = self._enforce_restrictions(
+                asset_id, curr_num_shares, diff_num_shares
+            )
             if diff_num_shares == 0.0:
                 # No need to place trades.
                 continue
@@ -605,6 +608,49 @@ class ForecastProcessor:
             orders.append(order)
         _LOG.debug("Number of orders generated=%i", len(orders))
         return orders
+
+    def _enforce_restrictions(
+        self,
+        asset_id: int,
+        curr_num_shares: float,
+        diff_num_shares: float,
+    ) -> float:
+        if self._restrictions is None:
+            return diff_num_shares
+        filter_ = self._restrictions["asset_id"] == asset_id
+        restrictions = self._restrictions[filter_]
+        if restrictions.empty:
+            return diff_num_shares
+        # Enforce "is_buy_restricted".
+        if (
+            restrictions.loc["is_buy_restricted"]
+            and curr_num_shares >= 0
+            and diff_num_shares > 0
+        ):
+            diff_num_shares = 0.0
+        # Enforce "is_buy_cover_restricted".
+        if (
+            restrictions.loc["is_buy_cover_restricted"]
+            and curr_num_shares < 0
+            and diff_num_shares > 0
+        ):
+            diff_num_shares = 0.0
+        # Enforce "is_sell_short_restricted".
+        if (
+            restrictions.loc["is_sell_short_restricted"]
+            and curr_num_shares <= 0
+            and diff_num_shares < 0
+        ):
+            diff_num_shares = 0.0
+        # Enforce "is_sell_long_restricted".
+        if (
+            restrictions.loc["is_sell_long_restricted"]
+            and curr_num_shares > 0
+            and diff_num_shares < 0
+        ):
+            diff_num_shares = 0.0
+        _LOG.warning("Enforcing restriction for asset_id=%i", asset_id)
+        return diff_num_shares
 
     # TODO(Paul): This is the same as the corresponding method in `Portfolio`.
     @staticmethod

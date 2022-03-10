@@ -21,30 +21,13 @@ import oms.process_forecasts as oprofore
 _LOG = logging.getLogger(__name__)
 
 
-# market_data: mdata.MarketData,
-# strategy_id: str,
-# account: str,
-# timestamp_col: str,
-
-# Build broker and portfolio objects.
-# broker = ombroker.SimulatedBroker(
-#     strategy_id, account, market_data, timestamp_col=timestamp_col
-# )
-# mark_to_market_col = "price"
-# pricing_method = "twap"
-# portfolio = omportfo.DataFramePortfolio(
-#     broker,
-#     mark_to_market_col,
-#     pricing_method,
-# )
-
-
+# TODO(Paul): Move this or make it an example.
 def get_portfolio(market_data: mdata.MarketData) -> omportfo.AbstractPortfolio:
     strategy_id = "strategy"
     account = "account"
     timestamp_col = "end_datetime"
     mark_to_market_col = "close"
-    pricing_method = "twap"
+    pricing_method = "twap.5T"
     initial_holdings = pd.Series([0], [-1])
     column_remap = {
         "bid": "bid",
@@ -63,6 +46,31 @@ def get_portfolio(market_data: mdata.MarketData) -> omportfo.AbstractPortfolio:
         column_remap=column_remap,
     )
     return portfolio
+
+
+# TODO(Paul): Move this and make it an example.
+def get_process_forecasts_config() -> cconfig.Config:
+    dict_ = {
+        "order_config": {
+            "order_type": "price@twap",
+            "order_duration": 5,
+        },
+        "optimizer_config": {
+            "backend": "batch_optimizer",
+            "dollar_neutrality_penalty": 0.1,
+            "volatility_penalty": 0.5,
+            "turnover_penalty": 0.0,
+            "target_gmv": 1e5,
+            "target_gmv_upper_bound_multiple": 1.0,
+        },
+        "execution_mode": "batch",
+        "ath_start_time": datetime.time(9, 30),
+        "trading_start_time": datetime.time(9, 35),
+        "ath_end_time": datetime.time(16, 0),
+        "trading_end_time": datetime.time(15, 55),
+    }
+    config = cconfig.get_config_from_nested_dict(dict_)
+    return config
 
 
 async def run_tiled_process_forecasts(
@@ -91,8 +99,14 @@ async def run_tiled_process_forecasts(
         tile = tile.rename(columns=hparque.maybe_cast_to_int)
         # Extract the prediction and volatility data as dataframes with columns
         # equal to asset ids.
-        prediction_df = tile[prediction_col].pivot(columns=asset_id_col)
-        volatility_df = tile[volatility_col].pivot(columns=asset_id_col)
+        prediction_df = tile[[prediction_col, asset_id_col]].pivot(
+            columns=asset_id_col,
+            values=prediction_col,
+        )
+        volatility_df = tile[[volatility_col, asset_id_col]].pivot(
+            columns=asset_id_col,
+            values=volatility_col,
+        )
         await oprofore.process_forecasts(
             prediction_df,
             volatility_df,

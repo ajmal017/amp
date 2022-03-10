@@ -79,7 +79,7 @@ class SinglePeriodOptimizer:
         positions = self._df["position"]
         _LOG.debug("positions=\n%s", hpandas.df_to_str(positions))
         self._gmv = positions.abs().sum()
-        self._current_weights = positions / self._gmv
+        self._current_weights = positions / self._target_gmv
         _LOG.debug(
             "current_weights=\n%s", hpandas.df_to_str(self._current_weights)
         )
@@ -132,11 +132,15 @@ class SinglePeriodOptimizer:
         hard_constraints = self._get_hard_constraints()
         # Convert constraints into cvxpy expressions.
         soft_constraint_cvx_expr = [
-            constraint.get_expr(target_weights, target_weight_diffs, self._gmv)
+            constraint.get_expr(
+                target_weights, target_weight_diffs, self._target_gmv
+            )
             for constraint in soft_constraints
         ]
         hard_constraint_cvx_expr = [
-            constraint.get_expr(target_weights, target_weight_diffs, self._gmv)
+            constraint.get_expr(
+                target_weights, target_weight_diffs, self._target_gmv
+            )
             for constraint in hard_constraints
         ]
         # Create the cvxpy problem.
@@ -191,12 +195,12 @@ class SinglePeriodOptimizer:
             False
         )
         do_not_buy = ((df["position"] >= 0) & df["is_buy_restricted"]) | (
-            (df["position"] <= 0) & df["is_buy_cover_restricted"]
+            (df["position"] < 0) & df["is_buy_cover_restricted"]
         )
         if do_not_buy.any():
             do_not_buy_constraint = oharcons.DoNotBuyHardConstraint(do_not_buy)
             constraints.append(do_not_buy_constraint)
-        do_not_sell = ((df["position"] >= 0) & df["is_sell_long_restricted"]) | (
+        do_not_sell = ((df["position"] > 0) & df["is_sell_long_restricted"]) | (
             (df["position"] <= 0) & df["is_sell_short_restricted"]
         )
         if do_not_sell.any():
@@ -224,14 +228,14 @@ class SinglePeriodOptimizer:
         # Target positions (notional).
         target_positions = pd.Series(
             index=self._asset_ids,
-            data=target_weights.value * self._gmv,
+            data=target_weights.value * self._target_gmv,
             name="target_position",
         )
         srs_list.append(target_positions)
         # Target trades (notional).
         target_trades = pd.Series(
             index=self._asset_ids,
-            data=target_weight_diffs.value * self._gmv,
+            data=target_weight_diffs.value * self._target_gmv,
             name="target_notional_trade",
         )
         srs_list.append(target_trades)
