@@ -82,6 +82,7 @@ def _compare_dfs(self: Any, df1: pd.DataFrame, df2: pd.DataFrame) -> str:
 
 
 class TestParquet1(hunitest.TestCase):
+
     def test_get_df1(self) -> None:
         """
         Check the output of `_get_df()`.
@@ -486,6 +487,7 @@ class TestPartitionedParquet1(hunitest.TestCase):
 
 
 class TestGetParquetFiltersFromTimestampInterval1(hunitest.TestCase):
+
     def test_by_month_full1(self) -> None:
         """
         Test no interval [None, None].
@@ -672,6 +674,7 @@ class TestGetParquetFiltersFromTimestampInterval1(hunitest.TestCase):
 
 
 class TestAddDatePartitionColumns(hunitest.TestCase):
+
     def add_date_partition_columns_helper(
         self, partition_mode: str, expected: str
     ) -> None:
@@ -728,6 +731,7 @@ class TestAddDatePartitionColumns(hunitest.TestCase):
 
 
 class TestToPartitionedDataset(hunitest.TestCase):
+
     def test_get_test_data1(self) -> None:
         test_data = self.get_test_data1()
         act = hpandas.df_to_str(test_data)

@@ -11,6 +11,7 @@ import im_v2.kibot.data.client.kibot_clients_example as imvkdckcex
 
 
 class TestKibotEquitiesCsvParquetByAssetClient(icdctictc.ImClientTestCase):
+
     def test_read_csv_data1(self) -> None:
         full_symbol = "kibot::HD"
         unadjusted = False
@@ -382,6 +383,7 @@ class TestKibotEquitiesCsvParquetByAssetClient(icdctictc.ImClientTestCase):
 
 
 class TestKibotFuturesCsvParquetByAssetClient(icdctictc.ImClientTestCase):
+
     def test_read_csv_data1(self) -> None:
         full_symbol = "kibot::ZI"
         contract_type = "continuous"
