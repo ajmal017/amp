@@ -73,7 +73,8 @@ def get_branch_next_name(
     hdbg.dassert_ne(curr_branch_name, "master")
     _LOG.log(log_verb, "curr_branch_name='%s'", curr_branch_name)
     #
-    for i in range(1, 10):
+    max_num_ids = 20
+    for i in range(1, max_num_ids):
         new_branch_name = f"{curr_branch_name}_{i}"
         _LOG.log(log_verb, "Trying branch name '%s'", new_branch_name)
         mode = "all"
@@ -82,7 +83,10 @@ def get_branch_next_name(
         if not exists:
             _LOG.log(log_verb, "new_branch_name='%s'", new_branch_name)
             return new_branch_name
-    raise ValueError(f"Can't find the next branch name for '{curr_branch_name}'")
+    raise ValueError(
+        f"Can't find the next branch name for '{curr_branch_name}' within %s ids",
+        max_num_ids,
+    )
 
 
 def get_branch_hash(dir_name: str = ".") -> str:
