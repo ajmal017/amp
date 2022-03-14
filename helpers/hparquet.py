@@ -196,7 +196,10 @@ def yield_parquet_tiles_by_year(
     hdbg.dassert(filters)
     if not isinstance(filters[0], list):
         filters = [filters]
-    columns = [str(col) for col in cols]
+    if cols is not None:
+        columns = [str(col) for col in cols]
+    else:
+        columns = None
     for filter_ in filters:
         tile = from_parquet(
             file_name,

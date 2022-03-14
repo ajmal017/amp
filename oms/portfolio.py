@@ -572,7 +572,7 @@ class AbstractPortfolio(abc.ABC):
         :return: series of asset values
         """
         as_of_timestamp = next(reversed(self._asset_holdings))
-        _LOG.debug("_price_assets `as_of_timestamp`=%s" % as_of_timestamp)
+        _LOG.debug("_price_assets `as_of_timestamp`=%s", as_of_timestamp)
         hdbg.dassert_isinstance(asset_ids, pd.Series)
         asset_ids_list = asset_ids.index.to_list()
         # TODO(*): Get the market as-of timestamp.

@@ -90,7 +90,7 @@ async def process_forecasts(
         config, "trading_end_time", datetime.time
     )
     hdbg.dassert_lte(trading_end_time, ath_end_time)
-    # Get executiom mode ("real_time" or "batch").
+    # Get execution mode ("real_time" or "batch").
     execution_mode = _get_object_from_config(config, "execution_mode", str)
     if execution_mode == "real_time":
         prediction_df = prediction_df.tail(1)

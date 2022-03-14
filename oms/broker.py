@@ -9,6 +9,7 @@ import collections
 import logging
 from typing import Any, Dict, List, Optional, Tuple, cast
 
+import numpy as np
 import pandas as pd
 
 import helpers.hasyncio as hasynci
@@ -290,9 +291,8 @@ class AbstractBroker(abc.ABC):
         """
         Completely fill an order.
 
-        :param wall_clock_timestamp: we pass this value instead of getting the
-            since conceptually the timestamp is when the `_submit_orders` was
-            executed.
+        :param wall_clock_timestamp: we pass this value since conceptually the
+            timestamp is when the `_submit_orders` was executed.
         """
         num_shares = order.diff_num_shares
         # TODO(Paul): The function `get_execution_price()` should be
@@ -303,6 +303,9 @@ class AbstractBroker(abc.ABC):
             timestamp_col=self._timestamp_col,
             column_remap=self._column_remap,
         )
+        if not np.isfinite(price):
+            _LOG.warning("Unable to fill order=\n%s", order)
+            return []
         fill = Fill(order, wall_clock_timestamp, num_shares, price)
         return [fill]
 
