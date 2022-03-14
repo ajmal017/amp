@@ -383,8 +383,10 @@ class ForecastProcessor:
         # Convert the target positions from cash values to target share counts.
         # Round to nearest integer towards zero.
         # df["diff_num_shares"] = np.fix(df["target_trade"] / df["price"])
-        df["diff_num_shares"] = df["target_notional_trade"] / df["price"]
-        # TODO(Paul): Warn and zero-out any trades that violate restrictions.
+        diff_num_shares = df["target_notional_trade"] / df["price"]
+        diff_num_shares.replace([-np.inf, np.inf], np.nan, inplace=True)
+        diff_num_shares = diff_num_shares.fillna(0)
+        df["diff_num_shares"] = diff_num_shares
         _LOG.debug("df=\n%s", hpandas.df_to_str(df))
         return df
 
