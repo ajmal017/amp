@@ -84,11 +84,11 @@ class SinglePeriodOptimizer:
             "current_weights=\n%s", hpandas.df_to_str(self._current_weights)
         )
 
-    def optimize(self) -> pd.DataFrame:
+    def optimize(self, verbose: bool = False) -> pd.DataFrame:
         """
         Get target positions (in units of money).
         """
-        target_weights, target_weight_diffs = self._optimize_weights()
+        target_weights, target_weight_diffs = self._optimize_weights(verbose)
         result_df = self._process_results(target_weights, target_weight_diffs)
         return result_df
 
@@ -108,7 +108,9 @@ class SinglePeriodOptimizer:
         gmv_stats = 100 * (notional_stats / self._target_gmv).rename("percentage")
         return pd.concat([notional_stats, gmv_stats], axis=1)
 
-    def _optimize_weights(self) -> Tuple[cvx.Variable, cvx.Variable]:
+    def _optimize_weights(
+        self, verbose: bool
+    ) -> Tuple[cvx.Variable, cvx.Variable]:
         """
         Create and solve the cvx optimization problem.
 
@@ -149,8 +151,9 @@ class SinglePeriodOptimizer:
             hard_constraint_cvx_expr,
         )
         # Optimize.
-        optimal_value = problem.solve()
-        hdbg.dassert_eq(problem.status, "optimal")
+        optimal_value = problem.solve(verbose=verbose)
+        if problem.status != "optimal":
+            _LOG.warning("problem.status=%s", problem.status)
         _LOG.info("`optimal_value`=%0.2f", optimal_value)
         # TODO(Paul): Compute estimates for PnL, costs.
         return target_weights, target_weight_diffs
@@ -253,7 +256,9 @@ class SinglePeriodOptimizer:
             name="target_weight_diff",
         )
         srs_list.append(target_weight_diffs)
-        return pd.concat(srs_list, axis=1)
+        df = pd.concat(srs_list, axis=1)
+        _LOG.debug("optimizer result=\n%s", hpandas.df_to_str(df, precision=2))
+        return df
 
     @staticmethod
     def _validate_df(df: pd.DataFrame) -> None:

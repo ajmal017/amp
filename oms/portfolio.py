@@ -296,7 +296,7 @@ class AbstractPortfolio(abc.ABC):
             columns=AbstractPortfolio.PRICE_COLS,
             data=[[1.0, self._cash[timestamp]]],
         )
-        marked_to_market = marked_to_market.append(cash_row)
+        marked_to_market = pd.concat([marked_to_market, cash_row])
         marked_to_market.index.name = "asset_id"
         marked_to_market = marked_to_market.reset_index()
         marked_to_market.index = [timestamp] * marked_to_market.index.shape[0]
@@ -334,6 +334,7 @@ class AbstractPortfolio(abc.ABC):
         cash = pd.Series(self._cash)
         asset_holdings[AbstractPortfolio.CASH_ID] = cash
         asset_holdings.columns.name = self._asset_id_col
+        asset_holdings.fillna(0, inplace=True)
         # Explicitly cast to float. This makes the string representation of
         # the dataframe more uniform and better.
         asset_holdings = asset_holdings.astype("float")
@@ -350,6 +351,7 @@ class AbstractPortfolio(abc.ABC):
         cash = pd.Series(self._cash)
         asset_values[AbstractPortfolio.CASH_ID] = cash
         asset_values.columns.name = self._asset_id_col
+        asset_values.fillna(0, inplace=True)
         # Explicitly cast to float. This makes the string representation of
         # the dataframe more uniform and better.
         asset_values = asset_values.astype("float")
@@ -361,6 +363,7 @@ class AbstractPortfolio(abc.ABC):
         """
         flows = pd.DataFrame(self._flows).transpose()
         flows.columns.name = self._asset_id_col
+        flows.fillna(0, inplace=True)
         # Explicitly cast to float. This makes the string representation of
         # the dataframe more uniform and better.
         flows = flows.astype("float")
@@ -480,7 +483,7 @@ class AbstractPortfolio(abc.ABC):
         """
         # Get the timestamp from the wall clock.
         timestamp = self._get_wall_clock_time()
-        _LOG.debug("timestamp=%s" % timestamp)
+        _LOG.debug("timestamp=%s", timestamp)
         _LOG.debug("Setting asset_holdings...")
         asset_holdings = holdings[holdings.index != AbstractPortfolio.CASH_ID]
         asset_holdings.name = timestamp
@@ -530,6 +533,11 @@ class AbstractPortfolio(abc.ABC):
         holdings_marked_to_market = holdings_marked_to_market.drop(
             columns=AbstractPortfolio.CASH_ID
         )
+        cols = holdings_marked_to_market.columns.union(flows.columns)
+        holdings_marked_to_market = holdings_marked_to_market.reindex(
+            columns=cols, fill_value=0
+        )
+        flows = flows.reindex(columns=cols, fill_value=0)
         # Get per-bar flows and compute PnL.
         pnl = holdings_marked_to_market.diff().add(flows)
         return pnl
@@ -612,7 +620,8 @@ class AbstractPortfolio(abc.ABC):
         hdbg.dassert_not_in(cash_ts, self._statistics)
         # Compute value of holdings.
         asset_holdings = self._assets_marked_to_market[assets_ts]["value"]
-        holdings_net_value = asset_holdings.sum()
+        is_finite = asset_holdings.apply(np.isfinite)
+        holdings_net_value = asset_holdings[is_finite].sum()
         hdbg.dassert(
             np.isfinite(holdings_net_value),
             "holdings_net_value=%s",
@@ -625,7 +634,7 @@ class AbstractPortfolio(abc.ABC):
         net_wealth = holdings_net_value + cash
         hdbg.dassert(np.isfinite(net_wealth), "net_value=%s", net_wealth)
         # Compute the gross exposure.
-        gross_exposure = asset_holdings.abs().sum()
+        gross_exposure = asset_holdings[is_finite].abs().sum()
         # Compute the portfolio leverage.
         leverage = gross_exposure / net_wealth
         # Compute the gross and net volume.
@@ -966,7 +975,7 @@ class MockedPortfolio(AbstractPortfolio):
         query = []
         query.append(f"SELECT * FROM {self._table_name}")
         wall_clock_timestamp = self._get_wall_clock_time()
-        _LOG.debug("wall_clock_timestamp=%s" % wall_clock_timestamp)
+        _LOG.debug("wall_clock_timestamp=%s", wall_clock_timestamp)
         trade_date = wall_clock_timestamp.date()
         # Restrict query to portfolio universe.
         hdbg.dassert(self.universe, "Universe is empty.")
@@ -1015,7 +1024,7 @@ class MockedPortfolio(AbstractPortfolio):
             "asset_id"
         )["current_position"]
         hdbg.dassert_isinstance(asset_holdings, pd.Series)
-        _LOG.debug("asset_holdings=%s" % asset_holdings)
+        _LOG.debug("asset_holdings=%s", asset_holdings)
         asset_holdings = asset_holdings.reindex(
             index=self._initial_universe, copy=False
         )
@@ -1023,9 +1032,7 @@ class MockedPortfolio(AbstractPortfolio):
         # If the database does not have an entry for an asset (e.g., as in
         # a mock database without universe initialization), then a NaN is
         # returned.
-        _LOG.debug(
-            "Number of NaN asset_holdings=%d" % asset_holdings.isna().sum()
-        )
+        _LOG.debug("Number of NaN asset_holdings=%d", asset_holdings.isna().sum())
         asset_holdings.fillna(0, inplace=True)
         self._sequential_insert(
             wall_clock_timestamp, asset_holdings, self._asset_holdings
@@ -1100,7 +1107,7 @@ class MockedPortfolio(AbstractPortfolio):
         )
         # The cost of the previous transactions is the difference of net cost.
         cost = current_net_cost - prev_net_cost
-        _LOG.debug("cost (net_cost diff)=%f" % cost)
+        _LOG.debug("cost (net_cost diff)=%f", cost)
         hdbg.dassert(np.isfinite(cost))
         # The current cash is given by the previous cash and the cash spent in the
         # previous transactions.
