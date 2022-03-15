@@ -419,6 +419,10 @@ def trim_df(
         # Convert the column into `pd.Timestamp` to compare it to `start_ts`.
         # This is needed to sidestep the comparison hell involving `numpy.datetime64`
         # vs Pandas objects.
+        # TODO(gp): We should not apply this transformation since it's very slow.
+        #  Either performing once on data on which we call `trim_df` multiple times
+        #  (e.g., in MarketData) or try to rewrite this check converting `start_ts`
+        #  in the data type used by the dataframe instead of the other way around.
         tss = pd.to_datetime(df[ts_col_name])
         hdateti.dassert_tz_compatible(tss.iloc[0], start_ts)
         _LOG.verb_debug("tss=\n%s", df_to_str(tss))

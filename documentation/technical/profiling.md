@@ -244,3 +244,12 @@
   ```python
   %mprun -f func func()
   ```
+
+# Installing profiling tools in Docker
+
+```
+> sudo apt-get install python3-dev
+> sudo apt install libgraphviz-dev
+> sudo apt-get install graphviz
+> pip install gprof2dot
+```
