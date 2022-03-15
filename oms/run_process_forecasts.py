@@ -56,7 +56,7 @@ async def _run_coro(event_loop):
     market_data_tile_config = get_market_data_tile_config()
     backtest_tile_config = get_backtest_tile_config()
     process_forecasts_config = otiprfor.get_process_forecasts_config()
-    await otiprfor.process_forecasts(
+    await otiprfor.run_tiled_process_forecasts(
         event_loop,
         market_data_tile_config,
         backtest_tile_config,

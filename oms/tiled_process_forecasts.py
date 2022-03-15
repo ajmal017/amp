@@ -108,6 +108,7 @@ async def run_tiled_process_forecasts(
         start_time_col,
         end_time_col,
     ]
+    market_data_cols = list(set(market_data_cols))
     market_data_tiles = hparque.yield_parquet_tiles_by_year(
         market_data_file_name,
         start_date,

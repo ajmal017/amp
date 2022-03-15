@@ -118,7 +118,7 @@ async def process_forecasts(
     offset_min = pd.DateOffset(minutes=order_config["order_duration"])
     # Initialize a `ForecastProcessor` object to perform the heavy lifting.
     forecast_processor = ForecastProcessor(
-        portfolio, order_config, optimizer_config, log_dir
+        portfolio, order_config, optimizer_config, log_dir=log_dir
     )
     # `timestamp` is the time when the forecast is available and in the current
     #  setup is also when the order should begin.
