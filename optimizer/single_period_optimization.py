@@ -83,9 +83,17 @@ class SinglePeriodOptimizer:
         _LOG.debug(
             "current_weights=\n%s", hpandas.df_to_str(self._current_weights)
         )
-        #
+        # We pass "solver" as a string to avoid propagating `cvx` dependencies.
         if "solver" in config:
-            self._solver = config["solver"]
+            solver = config["solver"]
+            if solver == "ECOS":
+                self._solver = cvx.ECOS
+            elif solver == "OSQP":
+                self._solver = cvx.OSQP
+            elif solver == "SCS":
+                self._solver = cvx.SCS
+            else:
+                raise ValueError("solver=%s not supported", solver)
         else:
             self._solver = None
         self._verbose = "verbose" in config and config["verbose"]

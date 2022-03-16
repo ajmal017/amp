@@ -12,7 +12,8 @@ _LOG = logging.getLogger(__name__)
 
 
 class Test_SinglePeriodOptimizer1(hunitest.TestCase):
-    def test_only_gmv_constraint(self) -> None:
+    @staticmethod
+    def only_gmv_constraint_helper(solver: Optional[str] = None) -> str:
         dict_ = {
             "volatility_penalty": 0.0,
             "dollar_neutrality_penalty": 0.0,
@@ -20,15 +21,51 @@ class Test_SinglePeriodOptimizer1(hunitest.TestCase):
             "target_gmv": 3000,
             "target_gmv_upper_bound_multiple": 1.00,
         }
+        if solver is not None:
+            dict_["solver"] = solver
         config = cconfig.get_config_from_nested_dict(dict_)
         df = Test_SinglePeriodOptimizer1.get_prediction_df()
         actual = Test_SinglePeriodOptimizer1.helper(config, df, restrictions=None)
+        return actual
+
+    def test_only_gmv_constraint(self) -> None:
+        actual = self.only_gmv_constraint_helper()
         expected = r"""
           target_position  target_notional_trade  target_weight  target_weight_diff
 asset_id
 1                   -0.00               -1000.00           -0.0                -1.0
 2                 2999.94                1499.94            3.0                 1.5
 3                   -0.00                 500.00           -0.0                 0.5"""
+        self.assert_equal(actual, expected, fuzzy_match=True)
+
+    def test_only_gmv_constraint_osqp(self) -> None:
+        actual = self.only_gmv_constraint_helper("OSQP")
+        expected = r"""
+          target_position  target_notional_trade  target_weight  target_weight_diff
+asset_id
+1                   -0.00               -1000.00           -0.0                -1.0
+2                 2999.94                1499.94            3.0                 1.5
+3                   -0.00                 500.00           -0.0                 0.5"""
+        self.assert_equal(actual, expected, fuzzy_match=True)
+
+    def test_only_gmv_constraint_ecos(self) -> None:
+        actual = self.only_gmv_constraint_helper("ECOS")
+        expected = r"""
+          target_position  target_notional_trade  target_weight  target_weight_diff
+asset_id
+1                     0.0                -1000.0            0.0                -1.0
+2                  3000.0                 1500.0            3.0                 1.5
+3                     0.0                  500.0            0.0                 0.5"""
+        self.assert_equal(actual, expected, fuzzy_match=True)
+
+    def test_only_gmv_constraint_scs(self) -> None:
+        actual = self.only_gmv_constraint_helper("SCS")
+        expected = r"""
+          target_position  target_notional_trade  target_weight  target_weight_diff
+asset_id
+1                    -0.0                -1000.0           -0.0                -1.0
+2                  3000.0                 1500.0            3.0                 1.5
+3                     0.0                  500.0            0.0                 0.5"""
         self.assert_equal(actual, expected, fuzzy_match=True)
 
     def test_restrictions(self) -> None:

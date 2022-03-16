@@ -19,6 +19,10 @@ _LOG = logging.getLogger(__name__)
 # #############################################################################
 
 
+# TODO(Paul): Specify
+#   - backtest file name
+#   - asset_id_col
+#   - log_dir
 def _parse() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter

@@ -25,7 +25,7 @@ _LOG = logging.getLogger(__name__)
 def get_portfolio(market_data: mdata.MarketData) -> omportfo.AbstractPortfolio:
     strategy_id = "strategy"
     account = "account"
-    timestamp_col = "end_datetime"
+    timestamp_col = "end_time"
     mark_to_market_col = "close"
     pricing_method = "twap.5T"
     initial_holdings = pd.Series([0], [-1])
@@ -60,8 +60,8 @@ def get_process_forecasts_config() -> cconfig.Config:
             "dollar_neutrality_penalty": 0.1,
             "volatility_penalty": 0.5,
             "turnover_penalty": 0.0,
-            "target_gmv": 1e5,
-            "target_gmv_upper_bound_multiple": 1.0,
+            "target_gmv": 1e6,
+            "target_gmv_upper_bound_multiple": 1.01,
         },
         "execution_mode": "batch",
         "ath_start_time": datetime.time(9, 30),
@@ -69,6 +69,8 @@ def get_process_forecasts_config() -> cconfig.Config:
         "ath_end_time": datetime.time(16, 0),
         "trading_end_time": datetime.time(15, 55),
         "remove_weekends": True,
+        "verbose": True,
+        "solver": "SCS",
     }
     config = cconfig.get_config_from_nested_dict(dict_)
     return config
