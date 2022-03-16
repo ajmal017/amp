@@ -16,6 +16,7 @@ import pandas as pd
 from tqdm.autonotebook import tqdm
 
 import core.config as cconfig
+import core.finance as cofinanc
 import helpers.hasyncio as hasynci
 import helpers.hdbg as hdbg
 import helpers.hio as hio
@@ -98,6 +99,11 @@ async def process_forecasts(
         pass
     else:
         raise ValueError(f"Unrecognized execution mode='{execution_mode}'")
+    # TODO(Paul): Pass in a trading calendar explicitly instead of simply
+    #   filtering out weekends.
+    if "remove_weekends" in config and config["remove_weekends"]:
+        prediction_df = cofinanc.remove_weekends(prediction_df)
+        volatility_df = cofinanc.remove_weekends(volatility_df)
     # Get log dir.
     log_dir = config.get("log_dir", None)
     # We should not have anything left in the config that we didn't extract.

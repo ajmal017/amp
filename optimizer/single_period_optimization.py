@@ -79,16 +79,22 @@ class SinglePeriodOptimizer:
         positions = self._df["position"]
         _LOG.debug("positions=\n%s", hpandas.df_to_str(positions))
         self._gmv = positions.abs().sum()
-        self._current_weights = positions / self._target_gmv
+        self._current_weights = positions * self._n_assets / self._target_gmv
         _LOG.debug(
             "current_weights=\n%s", hpandas.df_to_str(self._current_weights)
         )
+        #
+        if "solver" in config:
+            self._solver = config["solver"]
+        else:
+            self._solver = None
+        self._verbose = "verbose" in config and config["verbose"]
 
-    def optimize(self, verbose: bool = False) -> pd.DataFrame:
+    def optimize(self) -> pd.DataFrame:
         """
         Get target positions (in units of money).
         """
-        target_weights, target_weight_diffs = self._optimize_weights(verbose)
+        target_weights, target_weight_diffs = self._optimize_weights()
         result_df = self._process_results(target_weights, target_weight_diffs)
         return result_df
 
@@ -108,9 +114,7 @@ class SinglePeriodOptimizer:
         gmv_stats = 100 * (notional_stats / self._target_gmv).rename("percentage")
         return pd.concat([notional_stats, gmv_stats], axis=1)
 
-    def _optimize_weights(
-        self, verbose: bool
-    ) -> Tuple[cvx.Variable, cvx.Variable]:
+    def _optimize_weights(self) -> Tuple[cvx.Variable, cvx.Variable]:
         """
         Create and solve the cvx optimization problem.
 
@@ -151,7 +155,7 @@ class SinglePeriodOptimizer:
             hard_constraint_cvx_expr,
         )
         # Optimize.
-        optimal_value = problem.solve(verbose=verbose)
+        optimal_value = problem.solve(self._solver, verbose=self._verbose)
         if problem.status != "optimal":
             _LOG.warning("problem.status=%s", problem.status)
         _LOG.info("`optimal_value`=%0.2f", optimal_value)
@@ -228,17 +232,19 @@ class SinglePeriodOptimizer:
         """
         # Collect series.
         srs_list = []
+        #
+        rescaling = self._target_gmv / self._n_assets
         # Target positions (notional).
         target_positions = pd.Series(
             index=self._asset_ids,
-            data=target_weights.value * self._target_gmv,
+            data=target_weights.value * rescaling,
             name="target_position",
         )
         srs_list.append(target_positions)
         # Target trades (notional).
         target_trades = pd.Series(
             index=self._asset_ids,
-            data=target_weight_diffs.value * self._target_gmv,
+            data=target_weight_diffs.value * rescaling,
             name="target_notional_trade",
         )
         srs_list.append(target_trades)

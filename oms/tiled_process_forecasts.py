@@ -68,6 +68,7 @@ def get_process_forecasts_config() -> cconfig.Config:
         "trading_start_time": datetime.time(9, 35),
         "ath_end_time": datetime.time(16, 0),
         "trading_end_time": datetime.time(15, 55),
+        "remove_weekends": True,
     }
     config = cconfig.get_config_from_nested_dict(dict_)
     return config
