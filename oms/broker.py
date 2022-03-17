@@ -102,6 +102,7 @@ class Fill:
 # #############################################################################
 
 
+# TODO(gp): -> Broker?
 class AbstractBroker(abc.ABC):
     """
     Represent a broker to which we can place orders and receive fills back.
@@ -119,15 +120,16 @@ class AbstractBroker(abc.ABC):
     def __init__(
         self,
         strategy_id: str,
-        account: str,
         market_data: mdata.MarketData,
         *,
+        account: Optional[str] = None,
         timestamp_col: str = "end_datetime",
         column_remap: Optional[Dict[str, str]] = None,
     ) -> None:
         """
         Constructor.
 
+        :param account: allow to have multiple accounts. `None` means not used
         :param column_remap: (optional) remap columns when accessing a
             `MarketData` to retrieve execution prices. The required columns
             are "bid", "ask", "price", and "midpoint".
@@ -385,6 +387,7 @@ class SimulatedBroker(AbstractBroker):
 # #############################################################################
 
 
+# TODO(gp): -> DatabaseBroker?
 class MockedBroker(AbstractBroker):
     """
     An object that mocks a real broker backed by a DB with asynchronous updates

@@ -874,7 +874,7 @@ class DataFramePortfolio(AbstractPortfolio):
 # #############################################################################
 
 
-# TODO(gp): -> DatabasePortfolio, DbPortfolio, DbBasedPortfolio
+# TODO(gp): -> DatabasePortfolio, DbPortfolio, DbPortfolio
 #  The important characteristic is how it's implemented rather than that it's a
 #  mocked version of the implemented system.
 #  In fact the implemented Portfolio and Broker descend from this class because
@@ -899,7 +899,6 @@ class MockedPortfolio(AbstractPortfolio):
         self,
         *args: Any,
         db_connection: hsql.DbConnection,
-        # TODO(gp): -> position_table_name
         table_name: str,
         poll_kwargs: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
@@ -971,11 +970,14 @@ class MockedPortfolio(AbstractPortfolio):
             universe = str(universe)[:-2] + ")"
         else:
             universe = universe
-        # TODO(Paul): Make sure that we do not exclude IDs with a nonzero current/target position.
-        #  (ensure that these are included in the universe).
-        query.append(
-            f"WHERE account='{self._account}' AND tradedate='{trade_date}' AND {self._asset_id_col} IN {universe}"
-        )
+        # TODO(Paul): Make sure that we do not exclude IDs with a nonzero current /
+        #  target position (ensure that these are included in the universe).
+        where_clause = [f"WHERE tradedate='{trade_date}'"]
+        where_clause.append(f"AND {self._asset_id_col} IN {universe}")
+        if self._account is not None:
+            where_clause.append(f"AND account='{self._account}'")
+        query.append(" ".join(where_clause))
+        #
         query.append(f"ORDER BY {self._asset_id_col}")
         query = "\n".join(query)
         _LOG.debug("query=%s", query)
