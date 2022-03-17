@@ -5,7 +5,6 @@ import oms.process_forecasts as oprofore
 """
 
 import asyncio
-import collections
 import datetime
 import logging
 import os
@@ -17,6 +16,7 @@ from tqdm.autonotebook import tqdm
 
 import core.config as cconfig
 import core.finance as cofinanc
+import core.key_sorted_ordered_dict as cksoordi
 import helpers.hasyncio as hasynci
 import helpers.hdbg as hdbg
 import helpers.hio as hio
@@ -229,8 +229,8 @@ class ForecastProcessor:
         self._restrictions = restrictions
         self._log_dir = log_dir
         #
-        self._target_positions = collections.OrderedDict()
-        self._orders = collections.OrderedDict()
+        self._target_positions = cksoordi.KeySortedOrderedDict(pd.Timestamp)
+        self._orders = cksoordi.KeySortedOrderedDict(pd.Timestamp)
 
     def __str__(self) -> str:
         """
@@ -238,15 +238,13 @@ class ForecastProcessor:
         """
         act = []
         if self._target_positions:
-            last_key = next(reversed(self._target_positions))
-            target_positions = self._target_positions[last_key]
+            _, target_positions = self._target_positions.peek()
             target_positions_str = hpandas.df_to_str(target_positions)
         else:
             target_positions_str = "None"
         act.append("# last target positions=\n%s" % target_positions_str)
         if self._orders:
-            last_key = next(reversed(self._orders))
-            orders_str = self._orders[last_key]
+            _, orders_str = self._orders.peek()
         else:
             orders_str = "None"
         act.append("# last orders=\n%s" % orders_str)
@@ -264,8 +262,7 @@ class ForecastProcessor:
         filename = f"{wall_clock_time_str}.csv"
         #
         if self._target_positions:
-            last_key = next(reversed(self._target_positions))
-            last_target_positions = self._target_positions[last_key]
+            last_key, last_target_positions = self._target_positions.peek()
             last_target_positions_filename = os.path.join(
                 self._log_dir, "target_positions", filename
             )
@@ -274,8 +271,7 @@ class ForecastProcessor:
             )
             last_target_positions.to_csv(last_target_positions_filename)
         if self._orders:
-            last_key = next(reversed(self._orders))
-            last_orders = self._orders[last_key]
+            last_key, last_orders = self._orders.peek()
             last_orders_filename = os.path.join(self._log_dir, "orders", filename)
             hio.create_enclosing_dir(last_orders_filename, incremental=True)
             hio.to_file(last_orders_filename, last_orders)
@@ -301,9 +297,7 @@ class ForecastProcessor:
         # Get the wall clock timestamp and internally log `target_positions`.
         wall_clock_timestamp = self._get_wall_clock_time()
         _LOG.debug("wall_clock_timestamp=%s", wall_clock_timestamp)
-        self._sequential_insert(
-            wall_clock_timestamp, target_positions, self._target_positions
-        )
+        self._target_positions[wall_clock_timestamp] = target_positions
         # Generate orders from target positions.
         _LOG.debug(
             "\n%s",
@@ -328,7 +322,7 @@ class ForecastProcessor:
         )
         # Convert orders to a string representation and internally log.
         orders_as_str = omorder.orders_to_string(orders)
-        self._sequential_insert(wall_clock_timestamp, orders_as_str, self._orders)
+        self._orders[wall_clock_timestamp] = orders_as_str
         return orders
 
     async def submit_orders(self, orders) -> None:
@@ -666,30 +660,6 @@ class ForecastProcessor:
             diff_num_shares = 0.0
         _LOG.warning("Enforcing restriction for asset_id=%i", asset_id)
         return diff_num_shares
-
-    # TODO(Paul): This is the same as the corresponding method in `Portfolio`.
-    @staticmethod
-    def _sequential_insert(
-        key: pd.Timestamp,
-        obj: Any,
-        odict: Dict[pd.Timestamp, Any],
-    ) -> None:
-        """
-        Insert `(key, obj)` in `odict` ensuring that keys are in increasing
-        order.
-
-        Assume that `odict` is a dict maintaining the insertion order of
-        the keys.
-        """
-        hdbg.dassert_isinstance(key, pd.Timestamp)
-        hdbg.dassert_isinstance(odict, collections.OrderedDict)
-        # Ensure that timestamps are inserted in increasing order.
-        if odict:
-            last_key = next(reversed(odict))
-            hdbg.dassert_lt(last_key, key)
-        # TODO(Paul): If `obj` is a series or dataframe, ensure that the index is
-        #  unique.
-        odict[key] = obj
 
 
 def _validate_order_config(config: cconfig.Config) -> None:

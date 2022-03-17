@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
+import core.key_sorted_ordered_dict as cksoordi
 import helpers.hasyncio as hasynci
 import helpers.hdbg as hdbg
 import helpers.hio as hio
@@ -101,15 +102,17 @@ class AbstractPortfolio(abc.ABC):
         # perform a sequence of updates to the following dictionaries.
         # We initialize the collection of dictionaries from `holdings_df`.
         # - timestamp to pd.Series of holdings in shares (indexed by asset_id)
-        self._asset_holdings = collections.OrderedDict()
+        self._asset_holdings = cksoordi.KeySortedOrderedDict(pd.Timestamp)
         # - timestamp to float
-        self._cash = collections.OrderedDict()
+        self._cash = cksoordi.KeySortedOrderedDict(pd.Timestamp)
         # - timestamp to pd.DataFrame of price, value (indexed by asset_id)
-        self._assets_marked_to_market = collections.OrderedDict()
+        self._assets_marked_to_market = cksoordi.KeySortedOrderedDict(
+            pd.Timestamp
+        )
         # - timestamp to pd.Series of notional flows (indexed by asset_id)
-        self._flows = collections.OrderedDict()
+        self._flows = cksoordi.KeySortedOrderedDict(pd.Timestamp)
         # - timestamp to pd.Series of statistics
-        self._statistics = collections.OrderedDict()
+        self._statistics = cksoordi.KeySortedOrderedDict(pd.Timestamp)
         # Set the initial universe.
         self._initial_universe = initial_holdings.index.drop(
             AbstractPortfolio.CASH_ID
@@ -248,9 +251,9 @@ class AbstractPortfolio(abc.ABC):
             # Update asset_holdings, cash.
             self._observe_holdings()
             # Get the latest timestamp.
-            ts = next(reversed(self._asset_holdings))
+            timestamp, asset_holdings = self._asset_holdings.peek()
             # Price the assets.
-            self._price_assets(self._asset_holdings[ts])
+            self._price_assets(asset_holdings)
             # Calculate statistics.
             self._compute_statistics()
             # Perform sanity-checks.
@@ -278,10 +281,10 @@ class AbstractPortfolio(abc.ABC):
         # TODO(Paul): Gracefully fail instead of assert.
         hdbg.dassert(self._asset_holdings, "No cached information available.")
         # Get latest timestamp available.
-        timestamp = next(reversed(self._asset_holdings))
+        timestamp, asset_holdings = self._asset_holdings.peek()
         _LOG.debug("Retrieving holdings at timestamp=%s", timestamp)
         # Create a `holdings_df` with assets and cash.
-        holdings_df = self._asset_holdings[timestamp].reset_index()
+        holdings_df = asset_holdings.reset_index()
         cash_df = AbstractPortfolio._create_holdings_df_from_cash(
             self._cash[timestamp], timestamp
         )
@@ -311,7 +314,8 @@ class AbstractPortfolio(abc.ABC):
         """
         Return a dataframe of portfolio statistics over time.
         """
-        df = pd.DataFrame(self._statistics).transpose()
+        stats_odict = self._statistics.get_ordered_dict()
+        df = pd.DataFrame(stats_odict).transpose()
         # Add `pnl` by diffing the snapshots of `net_wealth`.
         # pnl = df["net_wealth"].diff().rename("pnl").to_frame()
         # In principle, thw two PnL calculations should agree. However, if
@@ -330,8 +334,9 @@ class AbstractPortfolio(abc.ABC):
         """
         Return a dataframe of portfolio holdings in shares over time.
         """
-        asset_holdings = pd.DataFrame(self._asset_holdings).transpose()
-        cash = pd.Series(self._cash)
+        asset_holdings_odict = self._asset_holdings.get_ordered_dict()
+        asset_holdings = pd.DataFrame(asset_holdings_odict).transpose()
+        cash = pd.Series(self._cash.get_ordered_dict())
         asset_holdings[AbstractPortfolio.CASH_ID] = cash
         asset_holdings.columns.name = self._asset_id_col
         # Explicitly cast to float. This makes the string representation of
@@ -347,10 +352,10 @@ class AbstractPortfolio(abc.ABC):
         Return a dataframe of portfolio holdings in dollars over time.
         """
         asset_values = collections.OrderedDict()
-        for k, v in self._assets_marked_to_market.items():
+        for k, v in self._assets_marked_to_market.get_ordered_dict().items():
             asset_values[k] = v["value"]
         asset_values = pd.DataFrame(asset_values).transpose()
-        cash = pd.Series(self._cash)
+        cash = pd.Series(self._cash.get_ordered_dict())
         asset_values[AbstractPortfolio.CASH_ID] = cash
         asset_values.columns.name = self._asset_id_col
         # Explicitly cast to float. This makes the string representation of
@@ -365,7 +370,8 @@ class AbstractPortfolio(abc.ABC):
         """
         Return a dataframe of asset cash flows over time.
         """
-        flows = pd.DataFrame(self._flows).transpose()
+        flows_odict = self._flows.get_ordered_dict()
+        flows = pd.DataFrame(flows_odict).transpose()
         flows.columns.name = self._asset_id_col
         # Explicitly cast to float. This makes the string representation of
         # the dataframe more uniform and better.
@@ -498,12 +504,13 @@ class AbstractPortfolio(abc.ABC):
         asset_holdings.name = timestamp
         hdbg.dassert_isinstance(asset_holdings, pd.Series)
         _LOG.debug("`asset_holdings`=\n%s", hpandas.df_to_str(asset_holdings))
-        self._sequential_insert(timestamp, asset_holdings, self._asset_holdings)
+        hdbg.dassert(not asset_holdings.index.has_duplicates)
+        self._asset_holdings[timestamp] = asset_holdings
         _LOG.debug("asset_holdings set.")
         _LOG.debug("Setting cash...")
         cash = holdings.iloc[AbstractPortfolio.CASH_ID]
         _LOG.debug("`cash`=%0.2f", cash)
-        self._sequential_insert(timestamp, cash, self._cash)
+        self._cash[timestamp] = cash
         _LOG.debug("cash set.")
         _LOG.debug("Setting assets_marked_to_market...")
         # Price the assets at the initial timestamp.
@@ -588,7 +595,7 @@ class AbstractPortfolio(abc.ABC):
         :param asset_ids: series of share counts indexed by asset id
         :return: series of asset values
         """
-        as_of_timestamp = next(reversed(self._asset_holdings))
+        as_of_timestamp, _ = self._asset_holdings.peek()
         _LOG.debug("_price_assets `as_of_timestamp`=%s", as_of_timestamp)
         hdbg.dassert_isinstance(asset_ids, pd.Series)
         asset_ids_list = asset_ids.index.to_list()
@@ -610,11 +617,7 @@ class AbstractPortfolio(abc.ABC):
             assets_marked_to_market.columns = AbstractPortfolio.PRICE_COLS
         hdbg.dassert_isinstance(assets_marked_to_market, pd.DataFrame)
         hdbg.dassert(not assets_marked_to_market.index.has_duplicates)
-        self._sequential_insert(
-            as_of_timestamp,
-            assets_marked_to_market,
-            self._assets_marked_to_market,
-        )
+        self._assets_marked_to_market[as_of_timestamp] = assets_marked_to_market
 
     def _compute_statistics(self) -> None:
         """
@@ -623,12 +626,12 @@ class AbstractPortfolio(abc.ABC):
         Return asset/cash values, net wealth, exposure, and leverage for
         the portfolio at a given timestamp.
         """
-        cash_ts = next(reversed(self._cash))
-        assets_ts = next(reversed(self._assets_marked_to_market))
+        cash_ts, _ = self._cash.peek()
+        assets_ts, assets_marked_to_market = self._assets_marked_to_market.peek()
         hdbg.dassert_eq(cash_ts, assets_ts)
         hdbg.dassert_not_in(cash_ts, self._statistics)
         # Compute value of holdings.
-        asset_holdings = self._assets_marked_to_market[assets_ts]["value"]
+        asset_holdings = assets_marked_to_market["value"]
         is_finite = asset_holdings.apply(np.isfinite)
         holdings_net_value = asset_holdings[is_finite].sum()
         hdbg.dassert(
@@ -741,29 +744,6 @@ class AbstractPortfolio(abc.ABC):
         if initial_cash < 0:
             _LOG.warning("Initial cash balance=%0.2f", initial_cash)
 
-    @staticmethod
-    def _sequential_insert(
-        key: pd.Timestamp,
-        obj: Any,
-        odict: Dict[pd.Timestamp, Any],
-    ) -> None:
-        """
-        Insert `(key, obj)` in `odict` ensuring that keys are in increasing
-        order.
-
-        Assume that `odict` is a dict maintaining the insertion order of
-        the keys.
-        """
-        hdbg.dassert_isinstance(key, pd.Timestamp)
-        hdbg.dassert_isinstance(odict, collections.OrderedDict)
-        # Ensure that timestamps are inserted in increasing order.
-        if odict:
-            last_key = next(reversed(odict))
-            hdbg.dassert_lt(last_key, key)
-        if isinstance(obj, pd.Series) or isinstance(obj, pd.DataFrame):
-            hdbg.dassert(not obj.index.has_duplicates)
-        odict[key] = obj
-
 
 # #############################################################################
 # DataFramePortfolio
@@ -789,10 +769,8 @@ class DataFramePortfolio(AbstractPortfolio):
         # Get fills.
         fills_df = self._get_fills()
         # Get latest holdings
-        prev_asset_holdings_ts = next(reversed(self._asset_holdings))
-        prev_asset_holdings = self._asset_holdings[prev_asset_holdings_ts]
-        prev_cash_holdings_ts = next(reversed(self._cash))
-        prev_cash = self._cash[prev_cash_holdings_ts]
+        prev_asset_holdings_ts, prev_asset_holdings = self._asset_holdings.peek()
+        prev_cash_holdings_ts, prev_cash = self._cash.peek()
         wall_clock_timestamp = self._get_wall_clock_time()
         hdbg.dassert_lt(prev_cash_holdings_ts, wall_clock_timestamp)
         new_cash = prev_cash
@@ -813,12 +791,11 @@ class DataFramePortfolio(AbstractPortfolio):
                 holdings_diff, fill_value=0
             )
             new_cash += cash_diff
-        self._sequential_insert(wall_clock_timestamp, flows, self._flows)
+        hdbg.dassert(not flows.index.has_duplicates)
+        self._flows[wall_clock_timestamp] = flows
         hdbg.dassert(not new_asset_holdings_srs.index.has_duplicates)
-        self._sequential_insert(
-            wall_clock_timestamp, new_asset_holdings_srs, self._asset_holdings
-        )
-        self._sequential_insert(wall_clock_timestamp, new_cash, self._cash)
+        self._asset_holdings[wall_clock_timestamp] = new_asset_holdings_srs
+        self._cash[wall_clock_timestamp] = new_cash
 
     def _get_fills(self) -> pd.DataFrame:
         """
@@ -942,7 +919,7 @@ class MockedPortfolio(AbstractPortfolio):
         # the account, without cash).
         self._timestamp_to_snapshot_df = collections.OrderedDict()
         # wall clock timestamp -> total net cost of transactions since the BOD.
-        self._net_cost = collections.OrderedDict()
+        self._net_cost = cksoordi.KeySortedOrderedDict(pd.Timestamp)
 
     def _observe_holdings(self) -> None:
         # The current positions table has the following fields:
@@ -1043,13 +1020,11 @@ class MockedPortfolio(AbstractPortfolio):
         # returned.
         _LOG.debug("Number of NaN asset_holdings=%d", asset_holdings.isna().sum())
         asset_holdings.fillna(0, inplace=True)
-        self._sequential_insert(
-            wall_clock_timestamp, asset_holdings, self._asset_holdings
-        )
+        hdbg.dassert(not asset_holdings.index.has_duplicates)
+        self._asset_holdings[wall_clock_timestamp] = asset_holdings
         # Update snapshot_df.
-        self._sequential_insert(
-            wall_clock_timestamp, snapshot_df, self._timestamp_to_snapshot_df
-        )
+        hdbg.dassert(not snapshot_df.index.has_duplicates)
+        self._timestamp_to_snapshot_df[wall_clock_timestamp] = snapshot_df
 
     def _convert_to_holdings_df(
         self, snapshot_df: pd.DataFrame, as_of_timestamp: pd.Timestamp
@@ -1091,19 +1066,17 @@ class MockedPortfolio(AbstractPortfolio):
         # `snapshot_df` should not have CASH_ID.
         hdbg.dassert_not_in(AbstractPortfolio.CASH_ID, snapshot_df["asset_id"])
         # Get the cash at the previous timestamp.
-        prev_cash_ts = next(reversed(self._cash))
+        prev_cash_ts, prev_cash = self._cash.peek()
         hdbg.dassert_lt(prev_cash_ts, wall_clock_timestamp)
-        prev_cash = self._cash[prev_cash_ts]
         _LOG.debug("prev_cash=%s", prev_cash)
         hdbg.dassert(np.isfinite(prev_cash), "prev_cash=%s", prev_cash)
         # Get the net cost at the previous timestamp.
         if self._net_cost:
-            prev_net_cost_ts = next(reversed(self._net_cost))
+            prev_net_cost_ts, prev_net_costs = self._net_cost.peek()
             hdbg.dassert_eq(prev_net_cost_ts, prev_cash_ts)
-            prev_net_costs = self._net_cost[prev_net_cost_ts]
         else:
-            initial_asset_holdings_ts = next(reversed(self._asset_holdings))
-            idx = self._asset_holdings[initial_asset_holdings_ts].index
+            _, asset_holdings = self._asset_holdings.peek()
+            idx = asset_holdings.index
             prev_net_costs = pd.Series(0, idx)
         prev_net_cost = prev_net_costs.sum()
         # Get the current net cost.
@@ -1126,4 +1099,5 @@ class MockedPortfolio(AbstractPortfolio):
         self._cash[wall_clock_timestamp] = updated_cash
         self._net_cost[wall_clock_timestamp] = current_net_costs
         flows = -1 * current_net_costs.subtract(prev_net_costs, fill_value=0.0)
-        self._sequential_insert(wall_clock_timestamp, flows, self._flows)
+        hdbg.dassert(not flows.index.has_duplicates)
+        self._flows[wall_clock_timestamp] = flows
