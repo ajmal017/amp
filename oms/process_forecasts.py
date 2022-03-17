@@ -415,6 +415,7 @@ class ForecastProcessor:
         diff_num_shares.replace([-np.inf, np.inf], np.nan, inplace=True)
         diff_num_shares = diff_num_shares.fillna(0)
         df["diff_num_shares"] = diff_num_shares
+        df["spread"] = assets_and_predictions["spread"]
         _LOG.debug("df=\n%s", hpandas.df_to_str(df))
         return df
 
@@ -524,33 +525,6 @@ class ForecastProcessor:
         _LOG.debug("df=\n%s", hpandas.df_to_str(df))
         return df
 
-    def _normalize_predictions_srs(
-        self, predictions: pd.Series, index: pd.DatetimeIndex
-    ) -> pd.DataFrame:
-        """
-        Normalize predictions with `index`, NaN-filling, and df conversion.
-        """
-        srs = self._normalize_series(predictions, index, "zero", "prediction")
-        return srs
-
-    def _normalize_volatility_srs(
-        self, volatility: pd.Series, index: pd.DatetimeIndex
-    ) -> pd.DataFrame:
-        """
-        Normalize predictions with `index`, NaN-filling, and df conversion.
-        """
-        srs = self._normalize_series(volatility, index, "mean", "volatility")
-        return srs
-
-    def _normalize_spread_srs(
-        self, spread: pd.Series, index: pd.DatetimeIndex
-    ) -> pd.DataFrame:
-        """
-        Normalize predictions with `index`, NaN-filling, and df conversion.
-        """
-        srs = self._normalize_series(spread, index, "mean", "spread")
-        return srs
-
     def _merge_predictions(
         self,
         marked_to_market: pd.DataFrame,
@@ -573,9 +547,11 @@ class ForecastProcessor:
         idx = predictions.index.union(
             marked_to_market.set_index("asset_id").index
         )
-        predictions = self._normalize_predictions_srs(predictions, idx)
-        volatility = self._normalize_volatility_srs(volatility, idx)
-        spread = self._normalize_spread_srs(spread, idx)
+        predictions = self._normalize_series(
+            predictions, idx, "zero", "prediction"
+        )
+        volatility = self._normalize_series(volatility, idx, "mean", "volatility")
+        spread = self._normalize_series(spread, idx, "mean", "spread")
         # Merge current holdings and predictions.
         merged_df = marked_to_market.merge(
             predictions, on="asset_id", how="outer"

@@ -64,6 +64,7 @@ def get_backtest_tile_config() -> cconfig.Config:
         "end_date": datetime.date(2020, 12, 31),
         "prediction_col": "prediction",
         "volatility_col": "vwap.ret_0.vol",
+        "spread_col": "pct_bar_spread",
     }
     config = cconfig.get_config_from_nested_dict(dict_)
     return config
@@ -87,11 +88,15 @@ def _main(parser: argparse.ArgumentParser) -> None:
     args = parser.parse_args()
     hdbg.init_logger(verbosity=args.log_level, use_exec_path=True)
     market_data_tile_config = get_market_data_tile_config()
+    _LOG.info("market_data_tile_config=\n%s", str(market_data_tile_config))
     backtest_tile_config = get_backtest_tile_config()
     process_forecasts_config = otiprfor.get_process_forecasts_config()
     # TODO(Paul): Warn if we are overriding.
     backtest_tile_config["file_name"] = args.backtest_file_name
+    backtest_tile_config["asset_id_col"] = args.assset_id_col
+    _LOG.info("backtest_tile_config=\n%s", str(backtest_tile_config))
     process_forecasts_config["log_dir"] = args.log_dir
+    _LOG.info("process_forecasts_config=\n%s", str(process_forecasts_config))
     with hasynci.solipsism_context() as event_loop:
         hasynci.run(
             _run_coro(

@@ -390,6 +390,7 @@ class AbstractPortfolio(abc.ABC):
         return pnl
 
     def log_state(self, log_dir: str) -> str:
+        # TODO(Paul): Change this so that it logs only the most recent state.
         hdbg.dassert(log_dir, "Must specify `log_dir` to log state.")
         #
         wall_clock_time = self._get_wall_clock_time()
@@ -424,6 +425,8 @@ class AbstractPortfolio(abc.ABC):
 
         :param file_name: if `None`, find and use the latest
         """
+        # TODO(Paul): Change this so that it parses all files in the
+        # subdirectory.
         if file_name is None:
             dir_name = os.path.join(log_dir, "holdings")
             files = hio.find_all_files(dir_name)

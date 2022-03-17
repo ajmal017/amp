@@ -89,8 +89,9 @@ async def run_tiled_process_forecasts(
     end_date = backtest_tile_config["end_date"]
     prediction_col = backtest_tile_config["prediction_col"]
     volatility_col = backtest_tile_config["volatility_col"]
+    spread_col = backtest_tile_config["spread_col"]
     # Yield backtest tiles.
-    backtest_cols = [asset_id_col, volatility_col, prediction_col]
+    backtest_cols = [asset_id_col, volatility_col, prediction_col, spread_col]
     backtest_tiles = hparque.yield_parquet_tiles_by_year(
         backtest_file_name,
         start_date,
@@ -153,11 +154,18 @@ async def run_tiled_process_forecasts(
             columns=asset_id_col,
             values=volatility_col,
         )
+        spread_df = backtest_tile[[spread_col, asset_id_col]].pivot(
+            columns=asset_id_col,
+            values=spread_col,
+        )
+        restrictions_df = None
         await oprofore.process_forecasts(
             prediction_df,
             volatility_df,
             portfolio,
             process_forecasts_config,
+            spread_df,
+            restrictions_df,
         )
         # TODO(Paul): Save `portfolio` state.
     return portfolio
