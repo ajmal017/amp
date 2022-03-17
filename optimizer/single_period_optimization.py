@@ -96,7 +96,7 @@ class SinglePeriodOptimizer:
                 raise ValueError("solver=%s not supported", solver)
         else:
             self._solver = None
-        self._verbose = "verbose" in config and config["verbose"]
+        self._verbose = config.get("verbose", False)
 
     def optimize(self) -> pd.DataFrame:
         """

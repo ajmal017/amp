@@ -35,6 +35,8 @@ async def process_forecasts(
     volatility_df: pd.DataFrame,
     portfolio: omportfo.AbstractPortfolio,
     config: cconfig.Config,
+    spread_df: Optional[pd.DataFrame],
+    restrictions_df: Optional[pd.DataFrame],
 ) -> None:
     """
     Place orders corresponding to the predictions stored in the given df.
@@ -49,6 +51,7 @@ async def process_forecasts(
     :param prediction_df: a dataframe indexed by timestamps with one column for the
         predictions for each asset
     :param volatility_df: like `prediction_df`, but for volatility
+    :param spread_df: like `prediction_df`, but for the bid-ask spread
     :param portfolio: initialized `Portfolio` object
     :param config:
         - `execution_mode`:
@@ -61,12 +64,18 @@ async def process_forecasts(
     _validate_df(prediction_df)
     # Check `volatility_df`.
     _validate_df(volatility_df)
-    # Check index compatibility.
-    hdbg.dassert(prediction_df.index.equals(volatility_df.index))
-    hdbg.dassert(prediction_df.columns.equals(volatility_df.columns))
+    if spread_df is None:
+        _LOG.info("spread_df is `None`; imputing 0.0 spread")
+        spread_df = pd.DataFrame(0.0, prediction_df.index, prediction_df.columns)
+    # Check index/column compatibility.
+    _validate_compatibility(prediction_df, volatility_df)
+    _validate_compatibility(prediction_df, spread_df)
     # Check `portfolio`.
     hdbg.dassert_isinstance(portfolio, omportfo.AbstractPortfolio)
     hdbg.dassert_isinstance(config, cconfig.Config)
+    #
+    if restrictions_df is None:
+        _LOG.info("restrictions_df is `None`; no restrictions will be enforced")
     # Create an `order_config` from `config` elements.
     order_config = _get_object_from_config(config, "order_config", cconfig.Config)
     _validate_order_config(order_config)
@@ -104,6 +113,7 @@ async def process_forecasts(
     if "remove_weekends" in config and config["remove_weekends"]:
         prediction_df = cofinanc.remove_weekends(prediction_df)
         volatility_df = cofinanc.remove_weekends(volatility_df)
+        spread_df = cofinanc.remove_weekends(spread_df)
     # Get log dir.
     log_dir = config.get("log_dir", None)
     # We should not have anything left in the config that we didn't extract.
@@ -124,7 +134,11 @@ async def process_forecasts(
     offset_min = pd.DateOffset(minutes=order_config["order_duration"])
     # Initialize a `ForecastProcessor` object to perform the heavy lifting.
     forecast_processor = ForecastProcessor(
-        portfolio, order_config, optimizer_config, log_dir=log_dir
+        portfolio,
+        order_config,
+        optimizer_config,
+        restrictions_df,
+        log_dir=log_dir,
     )
     # `timestamp` is the time when the forecast is available and in the current
     #  setup is also when the order should begin.
@@ -183,7 +197,10 @@ async def process_forecasts(
             ),
         )
         volatility = volatility_df.loc[timestamp]
-        orders = forecast_processor.generate_orders(predictions, volatility)
+        spread = spread_df.loc[timestamp]
+        orders = forecast_processor.generate_orders(
+            predictions, volatility, spread
+        )
         await forecast_processor.submit_orders(orders)
         _LOG.debug("ForecastProcessor=\n%s", str(forecast_processor))
     _LOG.debug("Event: exiting process_forecasts() for loop.")
@@ -195,7 +212,8 @@ class ForecastProcessor:
         portfolio: omportfo.AbstractPortfolio,
         order_config: cconfig.Config,
         optimizer_config: cconfig.Config,
-        restrictions: Optional[pd.DataFrame] = None,
+        restrictions: Optional[pd.DataFrame],
+        *,
         log_dir: Optional[str] = None,
     ) -> None:
         self._portfolio = portfolio
@@ -266,17 +284,19 @@ class ForecastProcessor:
         self,
         predictions: pd.Series,
         volatility: pd.Series,
+        spread: pd.Series,
     ) -> List[omorder.Order]:
         """
         Translate returns and volatility forecasts into a list of orders.
 
         :param predictions: returns forecasts
         :param volatility: volatility forecasts
+        :param spread: spread forecasts
         :return: a list of orders to execute
         """
         # Convert forecasts into target positions.
         target_positions = self._compute_target_positions_in_shares(
-            predictions, volatility
+            predictions, volatility, spread
         )
         # Get the wall clock timestamp and internally log `target_positions`.
         wall_clock_timestamp = self._get_wall_clock_time()
@@ -334,15 +354,17 @@ class ForecastProcessor:
         self,
         predictions: pd.Series,
         volatility: pd.Series,
+        spread: pd.Series,
     ) -> pd.DataFrame:
         """
         Compute target holdings in shares.
 
         :param predictions: predictions indexed by `asset_id`
         :param volatility: volatility forecasts indexed by `asset_id`
+        :param spread: spread forecasts indexed by `asset_id`
         """
         assets_and_predictions = self._prepare_data_for_optimizer(
-            predictions, volatility
+            predictions, volatility, spread
         )
         hdbg.dassert_not_in(
             self._portfolio.CASH_ID, assets_and_predictions["asset_id"].to_list()
@@ -400,6 +422,7 @@ class ForecastProcessor:
         self,
         predictions: pd.Series,
         volatility: pd.Series,
+        spread: pd.Series,
     ) -> pd.DataFrame:
         """
         Clean up data for optimization.
@@ -416,7 +439,7 @@ class ForecastProcessor:
         marked_to_market = self._get_extended_marked_to_market_df(predictions)
         # Combine the portfolio `marked_to_market` dataframe with the predictions.
         df_for_optimizer = self._merge_predictions(
-            marked_to_market, predictions, volatility
+            marked_to_market, predictions, volatility, spread
         )
         cash_id_filter = df_for_optimizer["asset_id"] == self._portfolio.CASH_ID
         df_for_optimizer.rename(columns={"value": "position"}, inplace=True)
@@ -462,33 +485,53 @@ class ForecastProcessor:
         )
         return marked_to_market
 
+    def _normalize_series(
+        self,
+        series: pd.Series,
+        index: pd.DatetimeIndex,
+        imputation: str,
+        name: str,
+    ) -> pd.DataFrame:
+        """
+        Normalize series with `index`, NaN-filling, and df conversion.
+        """
+        hdbg.dassert_isinstance(series, pd.Series)
+        _LOG.debug("Number of values=%i", series.size)
+        _LOG.debug("Number of non-NaN values=%i", series.count())
+        _LOG.debug("Number of NaN values=%i", series.isna().sum())
+        # Ensure that `series` does not include the cash id.
+        hdbg.dassert_not_in(self._portfolio.CASH_ID, series.index)
+        # Ensure that `index` includes `series.index`.
+        hdbg.dassert(series.index.difference(index).empty)
+        # Extend `predictions` to `index`.
+        series = series.reindex(index)
+        # Set the "prediction" for cash to 1. This is for the optimizer.
+        series[self._portfolio.CASH_ID] = 1
+        # Impute zero for NaNs.
+        if imputation == "zero":
+            series = series.fillna(0.0)
+        elif imputation == "mean":
+            series_mean = series.mean()
+            series = series.fillna(series_mean)
+        else:
+            raise ValueError("Invalid imputation mode")
+        # Convert to a dataframe.
+        df = pd.DataFrame(series)
+        # Format the predictions dataframe.
+        df.columns = [name]
+        df.index.name = "asset_id"
+        df = df.reset_index()
+        _LOG.debug("df=\n%s", hpandas.df_to_str(df))
+        return df
+
     def _normalize_predictions_srs(
         self, predictions: pd.Series, index: pd.DatetimeIndex
     ) -> pd.DataFrame:
         """
         Normalize predictions with `index`, NaN-filling, and df conversion.
         """
-        _LOG.debug("Number of predictions=%i", predictions.size)
-        _LOG.debug("Number of non-NaN predictions=%i", predictions.count())
-        _LOG.debug("Number of NaN predictions=%i", predictions.isna().sum())
-        # Ensure that `predictions` does not already include the cash id.
-        hdbg.dassert_not_in(self._portfolio.CASH_ID, predictions.index)
-        # Ensure that `index` includes `predictions.index`.
-        hdbg.dassert(predictions.index.difference(index).empty)
-        # Extend `predictions` to `index`.
-        predictions = predictions.reindex(index)
-        # Set the "prediction" for cash to 1. This is for the optimizer.
-        predictions[self._portfolio.CASH_ID] = 1
-        # Impute zero for NaNs.
-        predictions = predictions.fillna(0.0)
-        # Convert to a dataframe.
-        predictions = pd.DataFrame(predictions)
-        # Format the predictions dataframe.
-        predictions.columns = ["prediction"]
-        predictions.index.name = "asset_id"
-        predictions = predictions.reset_index()
-        _LOG.debug("predictions=\n%s", hpandas.df_to_str(predictions))
-        return predictions
+        srs = self._normalize_series(predictions, index, "zero", "prediction")
+        return srs
 
     def _normalize_volatility_srs(
         self, volatility: pd.Series, index: pd.DatetimeIndex
@@ -496,42 +539,24 @@ class ForecastProcessor:
         """
         Normalize predictions with `index`, NaN-filling, and df conversion.
         """
-        # TODO(Paul): Factor out common part with predictions normalization.
-        _LOG.debug("Number of volatility forecasts=%i", volatility.size)
-        _LOG.debug(
-            "Number of non-NaN volatility forecasts=%i", volatility.count()
-        )
-        _LOG.debug(
-            "Number of NaN volatility forecasts=%i", volatility.isna().sum()
-        )
-        # Ensure that `predictions` does not already include the cash id.
-        hdbg.dassert_not_in(self._portfolio.CASH_ID, volatility.index)
-        # Ensure that `index` includes `volatility.index`.
-        hdbg.dassert(volatility.index.difference(index).empty)
-        # Extend `volatility` to `index`.
-        volatility = volatility.reindex(index)
-        # Compute average volatility.
-        mean_volatility = volatility.mean()
-        if not np.isfinite(mean_volatility):
-            mean_volatility = 1.0
-        # Set the "volatility" for cash to 1. This is for the optimizer.
-        volatility[self._portfolio.CASH_ID] = 0
-        # Impute mean volatility.
-        volatility = volatility.fillna(mean_volatility)
-        # Convert to a dataframe.
-        volatility = pd.DataFrame(volatility)
-        # Format the predictions dataframe.
-        volatility.columns = ["volatility"]
-        volatility.index.name = "asset_id"
-        volatility = volatility.reset_index()
-        _LOG.debug("volatility=\n%s", hpandas.df_to_str(volatility))
-        return volatility
+        srs = self._normalize_series(volatility, index, "mean", "volatility")
+        return srs
+
+    def _normalize_spread_srs(
+        self, spread: pd.Series, index: pd.DatetimeIndex
+    ) -> pd.DataFrame:
+        """
+        Normalize predictions with `index`, NaN-filling, and df conversion.
+        """
+        srs = self._normalize_series(spread, index, "mean", "spread")
+        return srs
 
     def _merge_predictions(
         self,
         marked_to_market: pd.DataFrame,
         predictions: pd.Series,
         volatility: pd.Series,
+        spread: pd.Series,
     ) -> pd.DataFrame:
         """
         Merge marked_to_market dataframe with predictions and volatility.
@@ -550,12 +575,18 @@ class ForecastProcessor:
         )
         predictions = self._normalize_predictions_srs(predictions, idx)
         volatility = self._normalize_volatility_srs(volatility, idx)
+        spread = self._normalize_spread_srs(spread, idx)
         # Merge current holdings and predictions.
         merged_df = marked_to_market.merge(
             predictions, on="asset_id", how="outer"
         )
         merged_df = merged_df.merge(
             volatility,
+            on="asset_id",
+            how="outer",
+        )
+        merged_df = merged_df.merge(
+            spread,
             on="asset_id",
             how="outer",
         )
@@ -701,6 +732,13 @@ def _validate_df(df: pd.DataFrame) -> None:
     hdbg.dassert_isinstance(df, pd.DataFrame)
     hpandas.dassert_index_is_datetime(df)
     hpandas.dassert_strictly_increasing_index(df)
+
+
+def _validate_compatibility(df1: pd.DataFrame, df2: pd.DataFrame) -> None:
+    hdbg.dassert_isinstance(df1, pd.DataFrame)
+    hdbg.dassert_isinstance(df2, pd.DataFrame)
+    hdbg.dassert(df1.index.equals(df2.index))
+    hdbg.dassert(df2.columns.equals(df2.columns))
 
 
 # Extract the objects from the config.
