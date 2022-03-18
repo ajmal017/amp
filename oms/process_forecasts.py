@@ -297,11 +297,12 @@ class ForecastProcessor:
             df = pd.read_csv(
                 path, index_col=0, parse_dates=["wall_clock_timestamp"]
             )
-            hpandas.dassert_series_type_is(df["asset_id"], np.int64)
             # Change the index from `asset_id` to the timestamp.
             df = df.reset_index().set_index("wall_clock_timestamp")
+            hpandas.dassert_series_type_is(df["asset_id"], np.int64)
             if not isinstance(df.index, pd.DatetimeIndex):
                 _LOG.info("Skipping file_name=%s", file_name)
+                continue
             df.index = df.index.tz_convert(tz)
             # Pivot to multiple column levels.
             df = df.pivot(columns="asset_id")
