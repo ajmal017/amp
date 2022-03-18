@@ -339,7 +339,6 @@ class ForecastProcessor:
             _LOG.debug("Event: awaiting broker.submit_orders() done.")
         else:
             _LOG.debug("No orders to submit to broker.")
-        _LOG.debug("portfolio=\n%s" % str(self._portfolio))
         if self._log_dir:
             self.log_state()
             self._portfolio.log_state(os.path.join(self._log_dir, "portfolio"))

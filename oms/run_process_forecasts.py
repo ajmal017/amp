@@ -93,7 +93,7 @@ def _main(parser: argparse.ArgumentParser) -> None:
     process_forecasts_config = otiprfor.get_process_forecasts_config()
     # TODO(Paul): Warn if we are overriding.
     backtest_tile_config["file_name"] = args.backtest_file_name
-    backtest_tile_config["asset_id_col"] = args.assset_id_col
+    backtest_tile_config["asset_id_col"] = args.asset_id_col
     _LOG.info("backtest_tile_config=\n%s", str(backtest_tile_config))
     process_forecasts_config["log_dir"] = args.log_dir
     _LOG.info("process_forecasts_config=\n%s", str(process_forecasts_config))

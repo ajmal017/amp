@@ -69,12 +69,12 @@ class KeySortedOrderedDict:
         num_keys = min(num_keys, len(self._odict))
         counter = 0
         tmp_odict = collections.OrderedDict()
-        for key in next(reversed(self._odict)):
+        for key in reversed(self._odict):
             tmp_odict[key] = self._odict[key]
             counter += 1
             if counter >= num_keys:
                 break
         odict = collections.OrderedDict()
-        for key in next(reversed(tmp_odict)):
+        for key in reversed(tmp_odict):
             odict[key] = tmp_odict[key]
         return odict

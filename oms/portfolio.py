@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
+from tqdm.autonotebook import tqdm
 
 import core.key_sorted_ordered_dict as cksoordi
 import helpers.hasyncio as hasynci
@@ -123,17 +124,20 @@ class AbstractPortfolio(abc.ABC):
         Return the state of the Portfolio in terms of the holdings as a string.
         """
         act = []
+        num_periods = None
         precision = 2
         act.append(
             "# historical holdings=\n%s"
             % hpandas.df_to_str(
-                self.get_historical_holdings(), num_rows=None, precision=precision
+                self.get_historical_holdings(num_periods),
+                num_rows=None,
+                precision=precision,
             )
         )
         act.append(
             "# historical holdings marked to market=\n%s"
             % hpandas.df_to_str(
-                self.get_historical_holdings_marked_to_market(),
+                self.get_historical_holdings_marked_to_market(num_periods),
                 num_rows=None,
                 precision=precision,
             )
@@ -141,7 +145,7 @@ class AbstractPortfolio(abc.ABC):
         act.append(
             "# historical flows=\n%s"
             % hpandas.df_to_str(
-                self.get_historical_flows(),
+                self.get_historical_flows(num_periods),
                 num_rows=None,
                 precision=precision,
             )
@@ -149,7 +153,7 @@ class AbstractPortfolio(abc.ABC):
         act.append(
             "# historical pnl=\n%s"
             % hpandas.df_to_str(
-                self.get_historical_pnl(),
+                self.get_historical_pnl(num_periods),
                 num_rows=None,
                 precision=precision,
             )
@@ -321,7 +325,7 @@ class AbstractPortfolio(abc.ABC):
         # In principle, thw two PnL calculations should agree. However, if
         # a price for a bar is missing, this second method is more stable.
         pnl = (
-            self.get_historical_pnl()
+            self.get_historical_pnl(num_periods=None)
             .sum(axis=1, min_count=1)
             .rename("pnl")
             .to_frame()
@@ -330,11 +334,13 @@ class AbstractPortfolio(abc.ABC):
         df = df.astype("float")
         return df
 
-    def get_historical_holdings(self) -> pd.DataFrame:
+    def get_historical_holdings(
+        self, num_periods: Optional[int] = 10
+    ) -> pd.DataFrame:
         """
         Return a dataframe of portfolio holdings in shares over time.
         """
-        asset_holdings_odict = self._asset_holdings.get_ordered_dict()
+        asset_holdings_odict = self._asset_holdings.get_ordered_dict(num_periods)
         asset_holdings = pd.DataFrame(asset_holdings_odict).transpose()
         cash = pd.Series(self._cash.get_ordered_dict())
         asset_holdings[AbstractPortfolio.CASH_ID] = cash
@@ -347,15 +353,19 @@ class AbstractPortfolio(abc.ABC):
         asset_holdings = asset_holdings.astype("float")
         return asset_holdings
 
-    def get_historical_holdings_marked_to_market(self) -> pd.DataFrame:
+    def get_historical_holdings_marked_to_market(
+        self, num_periods: Optional[int] = 10
+    ) -> pd.DataFrame:
         """
         Return a dataframe of portfolio holdings in dollars over time.
         """
         asset_values = collections.OrderedDict()
-        for k, v in self._assets_marked_to_market.get_ordered_dict().items():
+        for k, v in self._assets_marked_to_market.get_ordered_dict(
+            num_periods
+        ).items():
             asset_values[k] = v["value"]
         asset_values = pd.DataFrame(asset_values).transpose()
-        cash = pd.Series(self._cash.get_ordered_dict())
+        cash = pd.Series(self._cash.get_ordered_dict(num_periods))
         asset_values[AbstractPortfolio.CASH_ID] = cash
         asset_values.columns.name = self._asset_id_col
         # Explicitly cast to float. This makes the string representation of
@@ -366,11 +376,13 @@ class AbstractPortfolio(abc.ABC):
         asset_values = asset_values.astype("float")
         return asset_values
 
-    def get_historical_flows(self) -> pd.DataFrame:
+    def get_historical_flows(
+        self, num_periods: Optional[int] = 10
+    ) -> pd.DataFrame:
         """
         Return a dataframe of asset cash flows over time.
         """
-        flows_odict = self._flows.get_ordered_dict()
+        flows_odict = self._flows.get_ordered_dict(num_periods)
         flows = pd.DataFrame(flows_odict).transpose()
         flows.columns.name = self._asset_id_col
         # Explicitly cast to float. This makes the string representation of
@@ -381,21 +393,27 @@ class AbstractPortfolio(abc.ABC):
         flows = flows.astype("float")
         return flows
 
-    def get_historical_pnl(self) -> pd.DataFrame:
+    def get_historical_pnl(self, num_periods: Optional[int] = 10) -> pd.DataFrame:
         """
         Return a dataframe of per-asset PnL over time.
         """
+        # Because the pnl calculation takes a diff, we extract an extra period
+        # for this operation.
+        if num_periods is not None:
+            num_periods += 1
         # Get snapshots of assets marked to market.
-        mtm = self.get_historical_holdings_marked_to_market()
-        flows = self.get_historical_flows()
+        mtm = self.get_historical_holdings_marked_to_market(num_periods)
+        flows = self.get_historical_flows(num_periods)
         # Compute PnL.
         pnl = self._compute_pnl(mtm, flows)
         #
         pnl.columns.name = self._asset_id_col
         pnl = pnl.astype("float")
+        if num_periods is not None:
+            pnl = pnl.tail(num_periods - 1)
         return pnl
 
-    def log_state(self, log_dir: str) -> str:
+    def log_state(self, log_dir: str, num_periods: Optional[int] = 1) -> str:
         # TODO(Paul): Change this so that it logs only the most recent state.
         hdbg.dassert(log_dir, "Must specify `log_dir` to log state.")
         #
@@ -403,15 +421,17 @@ class AbstractPortfolio(abc.ABC):
         wall_clock_time_str = wall_clock_time.strftime("%Y%m%d_%H%M%S")
         file_name = f"{wall_clock_time_str}.csv"
         #
-        holdings_df = self.get_historical_holdings()
+        holdings_df = self.get_historical_holdings(num_periods)
         AbstractPortfolio._write_df(holdings_df, log_dir, "holdings", file_name)
         #
-        holdings_mtm_df = self.get_historical_holdings_marked_to_market()
+        holdings_mtm_df = self.get_historical_holdings_marked_to_market(
+            num_periods
+        )
         AbstractPortfolio._write_df(
             holdings_mtm_df, log_dir, "holdings_marked_to_market", file_name
         )
         #
-        flows_df = self.get_historical_flows()
+        flows_df = self.get_historical_flows(num_periods)
         AbstractPortfolio._write_df(flows_df, log_dir, "flows", file_name)
         #
         stats_df = self.get_historical_statistics()
@@ -422,7 +442,6 @@ class AbstractPortfolio(abc.ABC):
     def read_state(
         log_dir: str,
         *,
-        file_name: Optional[str] = None,
         tz: str = "America/New_York",
         cast_asset_ids_to_int: bool = True,
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -431,20 +450,17 @@ class AbstractPortfolio(abc.ABC):
 
         :param file_name: if `None`, find and use the latest
         """
-        # TODO(Paul): Change this so that it parses all files in the
-        # subdirectory.
-        if file_name is None:
-            dir_name = os.path.join(log_dir, "holdings")
-            files = hio.find_all_files(dir_name)
-            files.sort()
-            file_name = files[-1]
-        holdings_df = AbstractPortfolio._read_df(
-            log_dir, "holdings", file_name, tz
+        holdings_df = AbstractPortfolio._load_df_from_files(
+            log_dir, "holdings", tz
         )
-        holdings_mtm_df = AbstractPortfolio._read_df(
-            log_dir, "holdings_marked_to_market", file_name, tz
+        holdings_mtm_df = AbstractPortfolio._load_df_from_files(
+            log_dir, "holdings_marked_to_market", tz
         )
-        flows_df = AbstractPortfolio._read_df(log_dir, "flows", file_name, tz)
+        flows_df = AbstractPortfolio._load_df_from_files(log_dir, "flows", tz)
+        dir_name = os.path.join(log_dir, "statistics")
+        files = hio.find_all_files(dir_name)
+        files.sort()
+        file_name = files[-1]
         stats_df = AbstractPortfolio._read_df(
             log_dir, "statistics", file_name, tz
         )
@@ -487,6 +503,22 @@ class AbstractPortfolio(abc.ABC):
         prices.name = "price"
         hdbg.dassert(not prices.index.has_duplicates)
         return prices
+
+    @staticmethod
+    def _load_df_from_files(
+        log_dir: str,
+        name: str,
+        tz: str,
+    ) -> pd.DataFrame:
+        dir_name = os.path.join(log_dir, name)
+        files = hio.find_all_files(dir_name)
+        files.sort()
+        dfs = []
+        for file_name in tqdm(files, desc=f"Loading `{name}` files..."):
+            df = AbstractPortfolio._read_df(log_dir, name, file_name, tz)
+            dfs.append(df)
+        df = pd.concat(dfs)
+        return df
 
     def _set_holdings(self, holdings: pd.Series) -> None:
         """
@@ -578,7 +610,10 @@ class AbstractPortfolio(abc.ABC):
     ) -> pd.DataFrame:
         path = os.path.join(log_dir, name, file_name)
         df = pd.read_csv(path, index_col=0, parse_dates=True)
-        df.index = df.index.tz_convert(tz)
+        # TODO(Paul): Add better checks. The first `flows` dataframe has no
+        # rows, and so when parsed it does not have a DatetimeIndex.
+        if isinstance(df.index, pd.DatetimeIndex):
+            df.index = df.index.tz_convert(tz)
         return df
 
     @abc.abstractmethod
