@@ -127,6 +127,7 @@ class ImClient(abc.ABC):
             msg="Not all the requested symbols were retrieved",
             only_warning=True,
         )
+        hdbg.dassert_lte(1, df.shape[0])
         #
         hdateti.dassert_timestamp_lte(start_ts, df.index.min())
         hdateti.dassert_timestamp_lte(df.index.max(), end_ts)
@@ -295,7 +296,7 @@ class ImClient(abc.ABC):
         # - some data sources can be only queried at day resolution so we get
         #   a date range and then we trim
         # - we want to guarantee that no derived class returns data outside the
-        #   requested #   interval
+        #   requested interval
         ts_col_name = None
         left_close = True
         right_close = True
