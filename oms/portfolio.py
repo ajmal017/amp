@@ -447,8 +447,6 @@ class AbstractPortfolio(abc.ABC):
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
         Read and process logged portfolio state.
-
-        :param file_name: if `None`, find and use the latest
         """
         holdings_df = AbstractPortfolio._load_df_from_files(
             log_dir, "holdings", tz
