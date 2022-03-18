@@ -65,6 +65,8 @@ class AbstractPortfolio(abc.ABC):
         mark_to_market_col: str,
         pricing_method: str,
         initial_holdings: pd.Series,
+        *,
+        max_num_bars: Optional[int] = 100,
     ):
         """
         Constructor.
@@ -76,6 +78,8 @@ class AbstractPortfolio(abc.ABC):
             pandas-style suffix: "twap.5T"
         :param initial_holdings: initial positions in shares indexed by integer
             asset_ids
+        :param max_num_bars: maximum number of bars to store in memory; if
+            `None`, then impose no restriction.
         """
         _LOG.debug(hprint.to_str("mark_to_market_col"))
         # Set and unpack broker.
@@ -103,17 +107,26 @@ class AbstractPortfolio(abc.ABC):
         # perform a sequence of updates to the following dictionaries.
         # We initialize the collection of dictionaries from `holdings_df`.
         # - timestamp to pd.Series of holdings in shares (indexed by asset_id)
-        self._asset_holdings = cksoordi.KeySortedOrderedDict(pd.Timestamp)
+        self._max_num_bars = max_num_bars
+        self._asset_holdings = cksoordi.KeySortedOrderedDict(
+            pd.Timestamp, self._max_num_bars
+        )
         # - timestamp to float
-        self._cash = cksoordi.KeySortedOrderedDict(pd.Timestamp)
+        self._cash = cksoordi.KeySortedOrderedDict(
+            pd.Timestamp, self._max_num_bars
+        )
         # - timestamp to pd.DataFrame of price, value (indexed by asset_id)
         self._assets_marked_to_market = cksoordi.KeySortedOrderedDict(
-            pd.Timestamp
+            pd.Timestamp, self._max_num_bars
         )
         # - timestamp to pd.Series of notional flows (indexed by asset_id)
-        self._flows = cksoordi.KeySortedOrderedDict(pd.Timestamp)
+        self._flows = cksoordi.KeySortedOrderedDict(
+            pd.Timestamp, self._max_num_bars
+        )
         # - timestamp to pd.Series of statistics
-        self._statistics = cksoordi.KeySortedOrderedDict(pd.Timestamp)
+        self._statistics = cksoordi.KeySortedOrderedDict(
+            pd.Timestamp, self._max_num_bars
+        )
         # Set the initial universe.
         self._initial_universe = initial_holdings.index.drop(
             AbstractPortfolio.CASH_ID
@@ -161,7 +174,7 @@ class AbstractPortfolio(abc.ABC):
         act.append(
             "# historical statistics=\n%s"
             % hpandas.df_to_str(
-                self.get_historical_statistics(),
+                self.get_historical_statistics(num_periods),
                 num_rows=None,
                 precision=precision,
             )
@@ -314,18 +327,20 @@ class AbstractPortfolio(abc.ABC):
         df = df.convert_dtypes()
         return df
 
-    def get_historical_statistics(self) -> pd.DataFrame:
+    def get_historical_statistics(
+        self, num_periods: Optional[int] = 10
+    ) -> pd.DataFrame:
         """
         Return a dataframe of portfolio statistics over time.
         """
-        stats_odict = self._statistics.get_ordered_dict()
+        stats_odict = self._statistics.get_ordered_dict(num_periods)
         df = pd.DataFrame(stats_odict).transpose()
         # Add `pnl` by diffing the snapshots of `net_wealth`.
         # pnl = df["net_wealth"].diff().rename("pnl").to_frame()
         # In principle, thw two PnL calculations should agree. However, if
         # a price for a bar is missing, this second method is more stable.
         pnl = (
-            self.get_historical_pnl(num_periods=None)
+            self.get_historical_pnl(num_periods=num_periods)
             .sum(axis=1, min_count=1)
             .rename("pnl")
             .to_frame()
@@ -342,8 +357,10 @@ class AbstractPortfolio(abc.ABC):
         """
         asset_holdings_odict = self._asset_holdings.get_ordered_dict(num_periods)
         asset_holdings = pd.DataFrame(asset_holdings_odict).transpose()
-        cash = pd.Series(self._cash.get_ordered_dict())
-        asset_holdings[AbstractPortfolio.CASH_ID] = cash
+        cash_odict = self._cash.get_ordered_dict(num_periods)
+        cash = pd.DataFrame(cash_odict.values(), cash_odict.keys())
+        cash.columns = [AbstractPortfolio.CASH_ID]
+        asset_holdings = pd.concat([asset_holdings, cash], axis=1)
         asset_holdings.columns.name = self._asset_id_col
         # Explicitly cast to float. This makes the string representation of
         # the dataframe more uniform and better.
@@ -365,8 +382,10 @@ class AbstractPortfolio(abc.ABC):
         ).items():
             asset_values[k] = v["value"]
         asset_values = pd.DataFrame(asset_values).transpose()
-        cash = pd.Series(self._cash.get_ordered_dict(num_periods))
-        asset_values[AbstractPortfolio.CASH_ID] = cash
+        cash_odict = self._cash.get_ordered_dict(num_periods)
+        cash = pd.DataFrame(cash_odict.values(), cash_odict.keys())
+        cash.columns = [AbstractPortfolio.CASH_ID]
+        asset_values = pd.concat([asset_values, cash], axis=1)
         asset_values.columns.name = self._asset_id_col
         # Explicitly cast to float. This makes the string representation of
         # the dataframe more uniform and better.
@@ -434,7 +453,7 @@ class AbstractPortfolio(abc.ABC):
         flows_df = self.get_historical_flows(num_periods)
         AbstractPortfolio._write_df(flows_df, log_dir, "flows", file_name)
         #
-        stats_df = self.get_historical_statistics()
+        stats_df = self.get_historical_statistics(num_periods)
         AbstractPortfolio._write_df(stats_df, log_dir, "statistics", file_name)
         return file_name
 
@@ -455,12 +474,8 @@ class AbstractPortfolio(abc.ABC):
             log_dir, "holdings_marked_to_market", tz
         )
         flows_df = AbstractPortfolio._load_df_from_files(log_dir, "flows", tz)
-        dir_name = os.path.join(log_dir, "statistics")
-        files = hio.find_all_files(dir_name)
-        files.sort()
-        file_name = files[-1]
-        stats_df = AbstractPortfolio._read_df(
-            log_dir, "statistics", file_name, tz
+        stats_df = AbstractPortfolio._load_df_from_files(
+            log_dir, "statistics", tz
         )
         if cast_asset_ids_to_int:
             holdings_df.columns = holdings_df.columns.astype("int64")
@@ -516,6 +531,12 @@ class AbstractPortfolio(abc.ABC):
             df = AbstractPortfolio._read_df(log_dir, name, file_name, tz)
             dfs.append(df)
         df = pd.concat(dfs)
+        hdbg.dassert(
+            not df.index.has_duplicates,
+            "Duplicated indices for `%s`=\n%s",
+            name,
+            df.index[df.index.duplicated()],
+        )
         return df
 
     def _set_holdings(self, holdings: pd.Series) -> None:

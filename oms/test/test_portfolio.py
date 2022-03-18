@@ -468,7 +468,6 @@ class TestMockedPortfolio2(omtodh.TestOmsDbHelper):
         stats_df_str = hpandas.df_to_str(stats_df, precision=precision)
         expected_stats_df_str = r"""
                                 pnl  gross_volume  net_volume       gmv       nmv       cash  net_wealth  leverage
-2000-01-01 09:35:00-05:00       NaN           0.0         0.0      0.00      0.00  1000000.0    1.00e+06      0.00
 2000-01-01 09:40:00-05:00  20004.03           0.0         0.0  20004.03  20004.03  1000000.0    1.02e+06      0.02
 2000-01-01 09:45:00-05:00     -5.66           0.0         0.0  19998.37  19998.37  1000000.0    1.02e+06      0.02"""
         self.assert_equal(stats_df_str, expected_stats_df_str, fuzzy_match=True)
