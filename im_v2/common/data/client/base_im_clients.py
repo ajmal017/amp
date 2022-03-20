@@ -127,7 +127,6 @@ class ImClient(abc.ABC):
             msg="Not all the requested symbols were retrieved",
             only_warning=True,
         )
-        hdbg.dassert_lte(1, df.shape[0])
         #
         hdateti.dassert_timestamp_lte(start_ts, df.index.min())
         hdateti.dassert_timestamp_lte(df.index.max(), end_ts)

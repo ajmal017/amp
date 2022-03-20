@@ -4,7 +4,7 @@ Import as:
 import helpers.hpandas as hpandas
 """
 import logging
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -292,6 +292,60 @@ def resample_df(df: pd.DataFrame, frequency: str) -> pd.DataFrame:
     return df_reindex
 
 
+def find_gaps_in_dataframes(
+    df1: pd.DataFrame, df2: pd.DataFrame
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Find data present in one dataframe and missing in the other one.
+
+    :param df1: first dataframe for comparison
+    :param df2: second dataframe for comparison
+    :return: two dataframes with missing data
+    """
+    # Get data present in first, but not present in second dataframe.
+    first_missing_indices = df2.index.difference(df1.index)
+    first_missing_data = df2.loc[first_missing_indices]
+    # Get data present in second, but not present in first dataframe.
+    second_missing_indices = df1.index.difference(df2.index)
+    second_missing_data = df1.loc[second_missing_indices]
+    return first_missing_data, second_missing_data
+
+
+def compare_dataframe_rows(df1: pd.DataFrame, df2: pd.DataFrame) -> pd.DataFrame:
+    """
+    Compare contents of rows with same indices.
+
+    Index is set to default sequential integer values because compare is
+    sensitive to multi index (probably because new multi indexes are created
+    for each difference in `compare`). Multi index columns are regular columns now.
+    Excess columns are removed so both dataframes are always same shape because
+    `compare` expects identical dataframes (same number of rows, columns, etc.).
+
+    :param df1: first dataframe for comparison
+    :param df2: second dataframe for comparison
+    :return: dataframe with data with same indices and different contents
+    """
+    # Get rows on which the two dataframe indices match.
+    idx_intersection = df1.index.intersection(df2.index)
+    # Remove excess columns and reset indexes.
+    trimmed_second = df2.loc[idx_intersection].reset_index()
+    trimmed_first = df1.loc[idx_intersection].reset_index()
+    # Get difference between second and first dataframe.
+    data_difference = trimmed_second.compare(trimmed_first)
+    # Update data difference with original dataframe index names
+    # for easier identification.
+    index_names = tuple(df2.index.names)
+    # If index or multi index is named, it will be visible in data difference.
+    if index_names != (None,):
+        for index in data_difference.index:
+            for column in index_names:
+                data_difference.loc[index, column] = trimmed_second.loc[index][
+                    column
+                ]
+        data_difference = data_difference.convert_dtypes()
+    return data_difference
+
+
 def drop_duplicates(
     data: Union[pd.Series, pd.DataFrame],
     *args: Any,
@@ -342,7 +396,7 @@ def reindex_on_unix_epoch(
     return df
 
 
-def get_df_signature(df: pd.DataFrame, num_rows: int = 3) -> str:
+def get_df_signature(df: pd.DataFrame, num_rows: int = 6) -> str:
     """
     Compute a simple signature of a dataframe in string format.
 
@@ -351,15 +405,19 @@ def get_df_signature(df: pd.DataFrame, num_rows: int = 3) -> str:
     testing purposes.
     """
     hdbg.dassert_isinstance(df, pd.DataFrame)
-    txt: List[str] = []
-    txt.append("df.shape=%s" % str(df.shape))
+    text: List[str] = ["df.shape=%s" % str(df.shape)]
     with pd.option_context(
         "display.max_colwidth", int(1e6), "display.max_columns", None
     ):
-        txt.append("df.head=\n%s" % df.head(num_rows))
-        txt.append("df.tail=\n%s" % df.tail(num_rows))
-    txt = "\n".join(txt)
-    return txt
+        # If dataframe size exceeds number of rows, show only subset in form of
+        # first and last rows. Otherwise, whole dataframe is shown.
+        if len(df) > num_rows:
+            text.append("df.head=\n%s" % df.head(num_rows // 2))
+            text.append("df.tail=\n%s" % df.tail(num_rows // 2))
+        else:
+            text.append("df.full=\n%s" % df)
+    text: str = "\n".join(text)
+    return text
 
 
 # #############################################################################
@@ -419,10 +477,6 @@ def trim_df(
         # Convert the column into `pd.Timestamp` to compare it to `start_ts`.
         # This is needed to sidestep the comparison hell involving `numpy.datetime64`
         # vs Pandas objects.
-        # TODO(gp): We should not apply this transformation since it's very slow.
-        #  Either performing once on data on which we call `trim_df` multiple times
-        #  (e.g., in MarketData) or try to rewrite this check converting `start_ts`
-        #  in the data type used by the dataframe instead of the other way around.
         tss = pd.to_datetime(df[ts_col_name])
         hdateti.dassert_tz_compatible(tss.iloc[0], start_ts)
         _LOG.verb_debug("tss=\n%s", df_to_str(tss))
