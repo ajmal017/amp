@@ -1,7 +1,7 @@
 """
 Import as:
 
-import oms.process_forecasts as oprofore
+import oms.process_forecasts_ as oprofore
 """
 
 import asyncio
