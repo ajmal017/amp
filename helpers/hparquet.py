@@ -237,7 +237,7 @@ def yield_parquet_tiles_by_assets(
     cols: List[Union[int, str]],
 ) -> Iterator[pd.DataFrame]:
     """
-    Yield Parquet data in tiles up to one year in length.
+    Yield Parquet data in tiles batched by asset ids.
 
     :param file_name: as in `from_parquet()`
     :param cols: if an `int` is supplied, it is cast to a string before reading
@@ -247,7 +247,10 @@ def yield_parquet_tiles_by_assets(
         asset_ids[i : i + asset_batch_size]
         for i in range(0, len(asset_ids), asset_batch_size)
     ]
-    columns = [str(col) for col in cols]
+    if cols is not None:
+        columns = [str(col) for col in cols]
+    else:
+        columns = None
     for batch in tqdm(batches):
         _LOG.debug("assets=%s", batch)
         filter_ = build_asset_id_filter(batch, asset_id_col)

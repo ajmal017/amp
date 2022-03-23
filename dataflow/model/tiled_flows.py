@@ -191,6 +191,44 @@ def regress(
     return df
 
 
+def compute_bar_col_abs_stats(
+    file_name: str,
+    asset_id_col: str,
+    cols: List[str],
+    batch_size: int,
+) -> pd.DataFrame:
+    cols = [asset_id_col] + cols
+    parquet_tile_analyzer = dtfmpatian.ParquetTileAnalyzer()
+    parquet_tile_metadata = parquet_tile_analyzer.collate_parquet_tile_metadata(
+        file_name
+    )
+    asset_ids = parquet_tile_metadata.index.levels[0].to_list()
+    _LOG.debug("Num assets=%d", len(asset_ids))
+    results = []
+    tile_iter = hparque.yield_parquet_tiles_by_assets(
+        file_name,
+        asset_ids,
+        asset_id_col,
+        batch_size,
+        cols,
+    )
+    for tile in tile_iter:
+        df = process_parquet_read_df(
+            tile,
+            asset_id_col,
+        )
+        grouped_df = df.abs().groupby(lambda x: x.time())
+        mean = grouped_df.mean().stack(asset_id_col)
+        mean = mean.swaplevel(axis=0)
+        stdev = grouped_df.std().stack(asset_id_col)
+        stdev = stdev.swaplevel(axis=0)
+        stats_df = pd.concat([mean, stdev], axis=1, keys=["mean", "stdev"])
+        results.append(stats_df)
+    df = pd.concat(results)
+    df.sort_index(inplace=True)
+    return df
+
+
 def process_parquet_read_df(
     df: pd.DataFrame,
     asset_id_col: str,
