@@ -570,9 +570,9 @@ def get_execution_prices(
         # If perc == 1, we buy at the ask and sell at the bid
         # (we cross the spread).
         buy_prices = (1.0 - perc) * bids + perc * asks
-        _LOG.info("buy_prices=\n%s", buy_prices)
+        # _LOG.debug("buy_prices=\n%s", buy_prices)
         sell_prices = perc * bids + (1.0 - perc) * asks
-        _LOG.info("sell_prices=\n%s", sell_prices)
+        # _LOG.debug("sell_prices=\n%s", sell_prices)
         prices = is_buy * buy_prices + is_sell * sell_prices
     else:
         raise ValueError(f"Invalid type='{order_type}'")

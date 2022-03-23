@@ -337,6 +337,7 @@ def generate_random_top_of_book_bars_for_asset(
         .abs()
     )
     ask = (bid + spread).rename("ask")
+    midpoint = (0.5 * (bid + ask)).rename("midpoint")
     volume = price_process.generate_volume_series_from_poisson_process(
         start_datetime,
         end_datetime,
@@ -353,7 +354,7 @@ def generate_random_top_of_book_bars_for_asset(
         bar_delay,
     )
     df = pd.concat(
-        [df, bid, ask, volume],
+        [df, bid, ask, midpoint, volume],
         axis=1,
     )
     df["asset_id"] = asset_id

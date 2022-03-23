@@ -45,42 +45,42 @@ class TestSimulatedBroker1(hunitest.TestCase):
 
 
 class TestSimulatedBroker2(hunitest.TestCase):
-    def test_no_spread_buy(self) -> None:
+    def test_collect_spread_buy(self) -> None:
         order = oordexam.get_order_example3(0.0)
         expected = r"""Fill: asset_id=101 fill_id=0 timestamp=2000-01-01 09:35:00-05:00 num_shares=100.0 price=998.0308407941129"""
         self.helper(order, expected)
 
-    def test_no_spread_sell(self) -> None:
+    def test_collect_spread_sell(self) -> None:
         order = oordexam.get_order_example3(0.0, -100)
         expected = r"""Fill: asset_id=101 fill_id=0 timestamp=2000-01-01 09:35:00-05:00 num_shares=-100.0 price=998.0311059094466"""
         self.helper(order, expected)
 
-    def test_quarter_spread_buy(self) -> None:
-        order = oordexam.get_order_example3(0.25)
-        expected = r"""Fill: asset_id=101 fill_id=0 timestamp=2000-01-01 09:35:00-05:00 num_shares=100.0 price=998.0309070729463"""
-        self.helper(order, expected)
-
-    def test_quarter_spread_sell(self) -> None:
-        order = oordexam.get_order_example3(0.25, -100)
-        expected = r"""Fill: asset_id=101 fill_id=0 timestamp=2000-01-01 09:35:00-05:00 num_shares=-100.0 price=998.0310396306132"""
-        self.helper(order, expected)
-
-    def test_half_spread_buy(self) -> None:
+    def test_midpoint_buy(self) -> None:
         order = oordexam.get_order_example3(0.5)
         expected = r"""Fill: asset_id=101 fill_id=0 timestamp=2000-01-01 09:35:00-05:00 num_shares=100.0 price=998.0309733517797"""
         self.helper(order, expected)
 
-    def test_half_spread_sell(self) -> None:
+    def test_midpoint_sell(self) -> None:
         order = oordexam.get_order_example3(0.5, -100)
         expected = r"""Fill: asset_id=101 fill_id=0 timestamp=2000-01-01 09:35:00-05:00 num_shares=-100.0 price=998.0309733517797"""
         self.helper(order, expected)
 
-    def test_full_spread_buy(self) -> None:
+    def test_quarter_spread_buy(self) -> None:
+        order = oordexam.get_order_example3(0.75)
+        expected = r"""Fill: asset_id=101 fill_id=0 timestamp=2000-01-01 09:35:00-05:00 num_shares=100.0 price=998.0310396306132"""
+        self.helper(order, expected)
+
+    def test_quarter_spread_sell(self) -> None:
+        order = oordexam.get_order_example3(0.75, -100)
+        expected = r"""Fill: asset_id=101 fill_id=0 timestamp=2000-01-01 09:35:00-05:00 num_shares=-100.0 price=998.0309070729463"""
+        self.helper(order, expected)
+
+    def test_cross_spread_buy(self) -> None:
         order = oordexam.get_order_example3(1.0)
         expected = r"""Fill: asset_id=101 fill_id=0 timestamp=2000-01-01 09:35:00-05:00 num_shares=100.0 price=998.0311059094466"""
         self.helper(order, expected)
 
-    def test_full_spread_sell(self) -> None:
+    def test_cross_spread_sell(self) -> None:
         order = oordexam.get_order_example3(1.0, -100)
         expected = r"""Fill: asset_id=101 fill_id=0 timestamp=2000-01-01 09:35:00-05:00 num_shares=-100.0 price=998.0308407941129"""
         self.helper(order, expected)
