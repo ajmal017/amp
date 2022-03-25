@@ -151,6 +151,7 @@ def regress(
     feature_cols: List[Union[int, str]],
     feature_lag: int,
     batch_size: int,
+    sigma_cut: float,
 ) -> pd.DataFrame:
     """
     Perform per-asset regressions over a tiled backtest.
@@ -182,6 +183,12 @@ def regress(
             tile,
             asset_id_col,
         )
+        if sigma_cut > 0:
+            stdevs = df[feature_cols].std().groupby(level=0).mean()
+            for feature_col in feature_cols:
+                left_tail = df[feature_col] < -sigma_cut * stdevs[feature_col]
+                right_tail = df[feature_col] > sigma_cut * stdevs[feature_col]
+                df[feature_col] = df[feature_col][left_tail | right_tail]
         coeffs = ra.compute_regression_coefficients(
             df,
         )
@@ -218,11 +225,20 @@ def compute_bar_col_abs_stats(
             asset_id_col,
         )
         grouped_df = df.abs().groupby(lambda x: x.time())
+        # TODO(Paul): Factor out these manipulations.
+        count = grouped_df.count().stack(asset_id_col)
+        count = count.swaplevel(axis=0)
+        median = grouped_df.median().stack(asset_id_col)
+        median = median.swaplevel(axis=0)
         mean = grouped_df.mean().stack(asset_id_col)
         mean = mean.swaplevel(axis=0)
         stdev = grouped_df.std().stack(asset_id_col)
         stdev = stdev.swaplevel(axis=0)
-        stats_df = pd.concat([mean, stdev], axis=1, keys=["mean", "stdev"])
+        stats_df = pd.concat(
+            [count, median, mean, stdev],
+            axis=1,
+            keys=["count", "median", "mean", "stdev"],
+        )
         results.append(stats_df)
     df = pd.concat(results)
     df.sort_index(inplace=True)
