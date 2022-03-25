@@ -11,7 +11,7 @@ import pandas as pd
 
 _LOG = logging.getLogger(__name__)
 
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 
 from tqdm.autonotebook import tqdm
 
@@ -145,19 +145,30 @@ def load_mix_evaluate(
 
 
 def regress(
-    file_name: str,
+    file_name: str,  # TODO(Paul): change to `dir_name`.
     asset_id_col: str,
     target_col: str,
     feature_cols: List[Union[int, str]],
     feature_lag: int,
     batch_size: int,
-    sigma_cut: float,
-) -> pd.DataFrame:
+    *,
+    num_autoregression_lags=0,
+    sigma_cut: float = 0.0,
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Perform per-asset regressions over a tiled backtest.
 
     For each asset, the regression is performed over the entire time window.
     """
+    # Perform sanity-checks.
+    hdbg.dassert_dir_exists(file_name)
+    hdbg.dassert_isinstance(asset_id_col, str)
+    hdbg.dassert_isinstance(target_col, str)
+    hdbg.dassert_isinstance(feature_cols, list)
+    hdbg.dassert_not_in(target_col, feature_cols)
+    hdbg.dassert_lt(0, batch_size)
+    hdbg.dassert_lte(0, sigma_cut)
+    #
     cols = [asset_id_col, target_col] + feature_cols
     parquet_tile_analyzer = dtfmpatian.ParquetTileAnalyzer()
     parquet_tile_metadata = parquet_tile_analyzer.collate_parquet_tile_metadata(
@@ -165,12 +176,21 @@ def regress(
     )
     asset_ids = parquet_tile_metadata.index.levels[0].to_list()
     _LOG.debug("Num assets=%d", len(asset_ids))
+    if num_autoregression_lags > 0:
+        lagged_cols = [
+            target_col + f"_lag_{lag}"
+            for lag in range(0, num_autoregression_lags)
+        ]
+        feature_cols = feature_cols + lagged_cols
+    #
     ra = dtfmoreana.RegressionAnalyzer(
         target_col=target_col,
         feature_cols=feature_cols,
         feature_lag=feature_lag,
     )
     results = []
+    corrs = {}
+    # TODO(Paul): Add sign correlation.
     tile_iter = hparque.yield_parquet_tiles_by_assets(
         file_name,
         asset_ids,
@@ -183,6 +203,15 @@ def regress(
             tile,
             asset_id_col,
         )
+        if num_autoregression_lags > 0:
+            lagged_dfs = {}
+            for lag in range(0, num_autoregression_lags):
+                col_name = target_col + f"_lag_{lag}"
+                lagged_dfs[col_name] = df[target_col].shift(lag)
+            lagged_df = pd.concat(
+                lagged_dfs.values(), axis=1, keys=lagged_dfs.keys()
+            )
+            df = df.merge(lagged_df, left_index=True, right_index=True)
         if sigma_cut > 0:
             stdevs = df[feature_cols].std().groupby(level=0).mean()
             for feature_col in feature_cols:
@@ -192,10 +221,14 @@ def regress(
         coeffs = ra.compute_regression_coefficients(
             df,
         )
+        col_swapped_df = df.swaplevel(axis=1).sort_index(axis=1)
+        for col in col_swapped_df.columns.levels[0]:
+            corrs[col] = col_swapped_df[col].corr()
         results.append(coeffs)
     df = pd.concat(results)
     df.sort_index(inplace=True)
-    return df
+    corr_df = pd.concat(corrs.values(), axis=0, keys=corrs.keys())
+    return df, corr_df
 
 
 def compute_bar_col_abs_stats(
