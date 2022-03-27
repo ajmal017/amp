@@ -34,8 +34,6 @@ services:
       - ~/.aws:/home/.aws
       - ~/.config/gspread_pandas/:/home/.config/gspread_pandas/
       - ~/.config/gh:/home/.config/gh
-      # Shared cache. This is specific of lime.
-      - /local/home/share/cache:/cache
     # No need to mount file systems.
     # - ../docker_build/fstab:/etc/fstab
     # deploy:
@@ -54,8 +52,6 @@ services:
     # See CmTask988 and https://stackoverflow.com/questions/24319662
     #network_mode: ${NETWORK_MODE:-host}
     volumes:
-      # To make lm* visible use this.
-      # - ../../../../:/app
       - ../../../:/app
 
   jupyter_server:

@@ -36,8 +36,10 @@ class ImClientTestCase(hunitest.TestCase):
         Test:
         - reading data for one full symbol
         - start_ts = end_ts = None
+        - resample_1min = True
         """
         full_symbols = [full_symbol]
+        im_client.resample_1min = True
         start_ts = None
         end_ts = None
         actual_df = im_client.read_data(full_symbols, start_ts, end_ts)
@@ -54,6 +56,7 @@ class ImClientTestCase(hunitest.TestCase):
         Test:
         - reading data for two or more full symbols
         - start_ts = end_ts = None
+        - resample_1min = True
         """
         start_ts = None
         end_ts = None
@@ -73,6 +76,7 @@ class ImClientTestCase(hunitest.TestCase):
         - reading data for two or more symbols
         - specified start_ts
         - end_ts = None
+        - resample_1min = True
         """
         end_ts = None
         actual_df = im_client.read_data(full_symbols, start_ts, end_ts)
@@ -91,6 +95,7 @@ class ImClientTestCase(hunitest.TestCase):
         - reading data for two or more symbols
         - start_ts = None
         - specified end_ts
+        - resample_1min = True
         """
         start_ts = None
         actual_df = im_client.read_data(full_symbols, start_ts, end_ts)
@@ -109,6 +114,7 @@ class ImClientTestCase(hunitest.TestCase):
         Test:
         - reading data for two or more symbols
         - specified start_ts and end_ts
+        - resample_1min = True
         """
         actual_df = im_client.read_data(full_symbols, start_ts, end_ts)
         self.check_df_output(actual_df, *args, **kwargs)
@@ -120,6 +126,7 @@ class ImClientTestCase(hunitest.TestCase):
         Test:
         - error is raised when an unsupported full symbol is provided
         - start_ts = end_ts = None
+        - resample_1min = True
         """
         full_symbols = [full_symbol]
         start_ts = None
@@ -128,6 +135,25 @@ class ImClientTestCase(hunitest.TestCase):
         #  check part of the exception as a string.
         with self.assertRaises(AssertionError):
             im_client.read_data(full_symbols, start_ts, end_ts)
+
+    def _test_read_data7(
+        self,
+        im_client: icdc.ImClient,
+        full_symbols: List[icdc.FullSymbol],
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        """
+        Test:
+        - reading data for two or more full symbols
+        - reading not resampled data
+        - start_ts = end_ts = None
+        - resample_1min = False
+        """
+        start_ts = None
+        end_ts = None
+        actual_df = im_client.read_data(full_symbols, start_ts, end_ts)
+        self.check_df_output(actual_df, *args, **kwargs)
 
     # ////////////////////////////////////////////////////////////////////////
 
