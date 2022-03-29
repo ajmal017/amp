@@ -29,63 +29,43 @@ class HistoricalPqByTileClient(
 
     def __init__(
         self,
+        # TODO(gp): We could use *args, **kwargs as params for ImClient.
         vendor: str,
         root_dir: str,
         resample_1min: bool,
         partition_mode: str,
         *,
         aws_profile: Optional[str] = None,
+        full_symbol_col_name: Optional[str] = None,
     ):
         """
         Constructor.
 
-        :param root_dir: either a local root path (e.g., "/app/im") or
-            an S3 root path (e.g., "s3://cryptokaizen-data/historical")
-            to the tiled Parquet data
+        :param root_dir: either a local root path (e.g., "/app/im") or an S3 root
+            path (e.g., "s3://ck-data/historical") to the tiled Parquet data
         :param partition_mode: how the data is partitioned, e.g., "by_year_month"
         :param aws_profile: AWS profile name (e.g., "ck")
         """
-        super().__init__(vendor, resample_1min)
+        super().__init__(
+            vendor, resample_1min, full_symbol_col_name=full_symbol_col_name
+        )
         self._root_dir = root_dir
         self._partition_mode = partition_mode
         self._aws_profile = aws_profile
 
-    def get_metadata(self) -> pd.DataFrame:
-        """
-        See description in the parent class.
-        """
-        raise NotImplementedError
-
-    def get_universe(self) -> List[icdc.FullSymbol]:
+    @staticmethod
+    def get_universe() -> List[icdc.FullSymbol]:
         """
         See description in the parent class.
         """
         return []
 
     @staticmethod
-    def _get_columns_for_query() -> Optional[List[str]]:
+    def get_metadata() -> pd.DataFrame:
         """
-        Get columns for Parquet data query.
-
-        For base implementation the columns are `None`
+        See description in the parent class.
         """
-        return None
-
-    @staticmethod
-    def _apply_transformations(
-        df: pd.DataFrame, full_symbol_col_name: str
-    ) -> pd.DataFrame:
-        """
-        Apply transformations to loaded data.
-        """
-        # The asset data can come back from Parquet as:
-        # ```
-        # Categories(540, int64): [10025, 10036, 10040, 10045, ..., 82711, 82939,
-        #                         83317, 89970]
-        # ```
-        # which confuses `df.groupby()`, so we force that column to str.
-        df[full_symbol_col_name] = df[full_symbol_col_name].astype(str)
-        return df
+        raise NotImplementedError
 
     def _read_data_for_multiple_symbols(
         self,
@@ -165,6 +145,31 @@ class HistoricalPqByTileClient(
         symbol_filter = (full_symbol_col_name, "in", full_symbols)
         return root_dir, symbol_filter
 
+    @staticmethod
+    def _get_columns_for_query() -> Optional[List[str]]:
+        """
+        Get columns for Parquet data query.
+
+        For base implementation the columns are `None`
+        """
+        return None
+
+    @staticmethod
+    def _apply_transformations(
+        df: pd.DataFrame, full_symbol_col_name: str
+    ) -> pd.DataFrame:
+        """
+        Apply transformations to loaded data.
+        """
+        # The asset data can come back from Parquet as:
+        # ```
+        # Categories(540, int64): [10025, 10036, 10040, 10045, ..., 82711, 82939,
+        #                         83317, 89970]
+        # ```
+        # which confuses `df.groupby()`, so we force that column to str.
+        df[full_symbol_col_name] = df[full_symbol_col_name].astype(str)
+        return df
+
 
 # #############################################################################
 
@@ -178,8 +183,17 @@ class HistoricalPqByDateClient(
     """
 
     # TODO(gp): Do not pass a read_func but use an abstract method.
-    def __init__(self, full_symbol_col_name: str, read_func):
-        self._full_symbol_col_name = full_symbol_col_name
+    def __init__(
+        self,
+        vendor: str,
+        resample_1min: bool,
+        read_func,
+        *,
+        full_symbol_col_name: Optional[str] = None,
+    ):
+        super().__init__(
+            vendor, resample_1min, full_symbol_col_name=full_symbol_col_name
+        )
         self._read_func = read_func
 
     def _read_data_for_multiple_symbols(

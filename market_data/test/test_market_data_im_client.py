@@ -13,12 +13,14 @@ class TestImClientMarketData(mdtmdtca.MarketData_get_data_TestCase):
     the parent class.
     """
 
+    # //////////////////////////////////////////////////////////////////////////////
+
     def test_is_online1(self) -> None:
         # Prepare inputs.
         asset_ids = [1467591036]
         columns: List[str] = []
         columns_remap = None
-        market_data = self._build_client(asset_ids, columns, columns_remap)
+        market_data = self.build_client(asset_ids, columns, columns_remap)
         # Run.
         actual = market_data.is_online()
         self.assertTrue(actual)
@@ -30,7 +32,7 @@ class TestImClientMarketData(mdtmdtca.MarketData_get_data_TestCase):
         asset_ids = [3187272957, 1467591036]
         columns: List[str] = []
         columns_remap = None
-        market_data = self._build_client(asset_ids, columns, columns_remap)
+        market_data = self.build_client(asset_ids, columns, columns_remap)
         timedelta = pd.Timedelta("1D")
         # Run.
         self._test_get_data_for_last_period(market_data, timedelta)
@@ -40,7 +42,7 @@ class TestImClientMarketData(mdtmdtca.MarketData_get_data_TestCase):
         asset_ids = [3187272957, 1467591036]
         columns: List[str] = []
         columns_remap = None
-        market_data = self._build_client(asset_ids, columns, columns_remap)
+        market_data = self.build_client(asset_ids, columns, columns_remap)
         timedelta = pd.Timedelta("2D")
         # Run.
         self._test_get_data_for_last_period(market_data, timedelta)
@@ -50,7 +52,7 @@ class TestImClientMarketData(mdtmdtca.MarketData_get_data_TestCase):
         asset_ids = [3187272957, 1467591036]
         columns: List[str] = []
         columns_remap = None
-        market_data = self._build_client(asset_ids, columns, columns_remap)
+        market_data = self.build_client(asset_ids, columns, columns_remap)
         timedelta = pd.Timedelta("1W")
         # Run.
         self._test_get_data_for_last_period(market_data, timedelta)
@@ -60,7 +62,7 @@ class TestImClientMarketData(mdtmdtca.MarketData_get_data_TestCase):
         asset_ids = [3187272957, 1467591036]
         columns: List[str] = []
         columns_remap = None
-        market_data = self._build_client(asset_ids, columns, columns_remap)
+        market_data = self.build_client(asset_ids, columns, columns_remap)
         timedelta = pd.Timedelta("10T")
         # Run.
         self._test_get_data_for_last_period(market_data, timedelta)
@@ -70,7 +72,7 @@ class TestImClientMarketData(mdtmdtca.MarketData_get_data_TestCase):
         asset_ids = [3187272957, 1467591036]
         columns: List[str] = []
         columns_remap = None
-        market_data = self._build_client(asset_ids, columns, columns_remap)
+        market_data = self.build_client(asset_ids, columns, columns_remap)
         timedelta = pd.Timedelta("5T")
         # Run.
         self._test_get_data_for_last_period(market_data, timedelta)
@@ -80,7 +82,7 @@ class TestImClientMarketData(mdtmdtca.MarketData_get_data_TestCase):
         asset_ids = [3187272957, 1467591036]
         columns: List[str] = []
         columns_remap = None
-        market_data = self._build_client(asset_ids, columns, columns_remap)
+        market_data = self.build_client(asset_ids, columns, columns_remap)
         timedelta = pd.Timedelta("1T")
         # Run.
         self._test_get_data_for_last_period(market_data, timedelta)
@@ -90,7 +92,7 @@ class TestImClientMarketData(mdtmdtca.MarketData_get_data_TestCase):
         asset_ids = [3187272957, 1467591036]
         columns: List[str] = []
         columns_remap = None
-        market_data = self._build_client(asset_ids, columns, columns_remap)
+        market_data = self.build_client(asset_ids, columns, columns_remap)
         timedelta = pd.Timedelta("365D")
         # Run.
         self._test_get_data_for_last_period(market_data, timedelta)
@@ -100,11 +102,11 @@ class TestImClientMarketData(mdtmdtca.MarketData_get_data_TestCase):
         asset_ids = [3187272957, 1467591036]
         columns: List[str] = []
         columns_remap = None
-        market_data = self._build_client(asset_ids, columns, columns_remap)
+        market_data = self.build_client(asset_ids, columns, columns_remap)
         ts = pd.Timestamp("2018-08-17T00:05:00+00:00")
         #
         expected_length = 2
-        expected_column_names = self._get_expected_column_names()
+        expected_column_names = self.get_expected_column_names()
         expected_column_unique_values = {
             "full_symbol": ["binance::BTC_USDT", "kucoin::ETH_USDT"]
         }
@@ -137,12 +139,12 @@ class TestImClientMarketData(mdtmdtca.MarketData_get_data_TestCase):
         asset_ids = None
         columns: List[str] = []
         columns_remap = None
-        market_data = self._build_client(asset_ids, columns, columns_remap)
+        market_data = self.build_client(asset_ids, columns, columns_remap)
         start_ts = pd.Timestamp("2018-08-17T00:01:00+00:00")
         end_ts = pd.Timestamp("2018-08-17T00:05:00+00:00")
         #
         expected_length = 8
-        expected_column_names = self._get_expected_column_names()
+        expected_column_names = self.get_expected_column_names()
         expected_column_unique_values = {
             "full_symbol": ["binance::BTC_USDT", "kucoin::ETH_USDT"]
         }
@@ -179,12 +181,12 @@ class TestImClientMarketData(mdtmdtca.MarketData_get_data_TestCase):
         asset_ids = [3187272957, 1467591036]
         columns: List[str] = []
         columns_remap = None
-        market_data = self._build_client(asset_ids, columns, columns_remap)
+        market_data = self.build_client(asset_ids, columns, columns_remap)
         start_ts = pd.Timestamp("2018-08-17T00:01:00+00:00")
         end_ts = pd.Timestamp("2018-08-17T00:05:00+00:00")
         #
         expected_length = 8
-        expected_column_names = self._get_expected_column_names()
+        expected_column_names = self.get_expected_column_names()
         expected_column_unique_values = {
             "full_symbol": ["binance::BTC_USDT", "kucoin::ETH_USDT"]
         }
@@ -222,12 +224,12 @@ class TestImClientMarketData(mdtmdtca.MarketData_get_data_TestCase):
         asset_ids = [3187272957, 1467591036]
         columns: List[str] = []
         columns_remap = None
-        market_data = self._build_client(asset_ids, columns, columns_remap)
+        market_data = self.build_client(asset_ids, columns, columns_remap)
         start_ts = pd.Timestamp("2018-08-17T00:01:00+00:00")
         end_ts = pd.Timestamp("2018-08-17T00:05:00+00:00")
         #
         expected_length = 10
-        expected_column_names = self._get_expected_column_names()
+        expected_column_names = self.get_expected_column_names()
         expected_column_unique_values = {
             "full_symbol": ["binance::BTC_USDT", "kucoin::ETH_USDT"]
         }
@@ -265,12 +267,12 @@ class TestImClientMarketData(mdtmdtca.MarketData_get_data_TestCase):
         asset_ids = [3187272957, 1467591036]
         columns: List[str] = []
         columns_remap = None
-        market_data = self._build_client(asset_ids, columns, columns_remap)
+        market_data = self.build_client(asset_ids, columns, columns_remap)
         start_ts = pd.Timestamp("2018-08-17T00:01:00+00:00")
         end_ts = pd.Timestamp("2018-08-17T00:05:00+00:00")
         #
         expected_length = 8
-        expected_column_names = self._get_expected_column_names()
+        expected_column_names = self.get_expected_column_names()
         expected_column_unique_values = {
             "full_symbol": ["binance::BTC_USDT", "kucoin::ETH_USDT"]
         }
@@ -308,12 +310,12 @@ class TestImClientMarketData(mdtmdtca.MarketData_get_data_TestCase):
         asset_ids = [3187272957, 1467591036]
         columns: List[str] = []
         columns_remap = None
-        market_data = self._build_client(asset_ids, columns, columns_remap)
+        market_data = self.build_client(asset_ids, columns, columns_remap)
         start_ts = pd.Timestamp("2018-08-17T00:01:00+00:00")
         end_ts = pd.Timestamp("2018-08-17T00:05:00+00:00")
         #
         expected_length = 6
-        expected_column_names = self._get_expected_column_names()
+        expected_column_names = self.get_expected_column_names()
         expected_column_unique_values = {
             "full_symbol": ["binance::BTC_USDT", "kucoin::ETH_USDT"]
         }
@@ -352,7 +354,7 @@ class TestImClientMarketData(mdtmdtca.MarketData_get_data_TestCase):
         asset_ids = [3187272957, 1467591036]
         columns: List[str] = []
         columns_remap = None
-        market_data = self._build_client(asset_ids, columns, columns_remap)
+        market_data = self.build_client(asset_ids, columns, columns_remap)
         start_ts = pd.Timestamp("2018-08-17T00:01:00+00:00")
         end_ts = pd.Timestamp("2018-08-17T00:05:00+00:00")
         #
@@ -382,7 +384,7 @@ class TestImClientMarketData(mdtmdtca.MarketData_get_data_TestCase):
         asset_ids = [1467591036]
         columns: List[str] = []
         columns_remap = None
-        market_data = self._build_client(asset_ids, columns, columns_remap)
+        market_data = self.build_client(asset_ids, columns, columns_remap)
         exp_last_end_time = pd.Timestamp("2018-08-17T01:39:00+00:00")
         # Run.
         self._test_get_last_end_time1(market_data, exp_last_end_time)
@@ -392,7 +394,7 @@ class TestImClientMarketData(mdtmdtca.MarketData_get_data_TestCase):
         asset_ids = [3187272957, 1467591036]
         columns: List[str] = []
         columns_remap = None
-        market_data = self._build_client(asset_ids, columns, columns_remap)
+        market_data = self.build_client(asset_ids, columns, columns_remap)
         #
         expected_length = 2
         expected_unique_values = None
@@ -418,15 +420,13 @@ class TestImClientMarketData(mdtmdtca.MarketData_get_data_TestCase):
         asset_ids = [1467591036]
         columns: List[str] = []
         columns_remap = None
-        market_data = self._build_client(asset_ids, columns, columns_remap)
+        market_data = self.build_client(asset_ids, columns, columns_remap)
         wall_clock_time = pd.Timestamp("2018-08-17T00:01:00")
         # Run.
         self._test_should_be_online1(market_data, wall_clock_time)
 
-    # //////////////////////////////////////////////////////////////////////////////
-
     @staticmethod
-    def _build_client(
+    def build_client(
         asset_ids: Optional[List[int]],
         columns: Optional[List[str]],
         column_remap: Optional[Dict[str, str]],
@@ -440,7 +440,7 @@ class TestImClientMarketData(mdtmdtca.MarketData_get_data_TestCase):
         return market_data
 
     @staticmethod
-    def _get_expected_column_names() -> List[str]:
+    def get_expected_column_names() -> List[str]:
         """
         Return a list of expected column names.
         """

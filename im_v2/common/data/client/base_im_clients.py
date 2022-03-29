@@ -60,48 +60,32 @@ class ImClient(abc.ABC):
     ```
     """
 
-    def __init__(self, vendor: str, resample_1min: bool) -> None:
+    def __init__(
+        self,
+        vendor: str,
+        resample_1min: bool,
+        *,
+        full_symbol_col_name: Optional[str] = None,
+    ) -> None:
         """
         Constructor.
 
         :param vendor: price data provider
         :param resample_1min: whether to resample data to 1 minute or not
+        :param full_symbol_col_name: the name of the column storing the symbol
+            name. It can be overridden by other methods
         """
         self._vendor = vendor
         self._resample_1min = resample_1min
+        # TODO(gp): This is the name of the column of the asset_id in the data
+        #  as it is read by the derived classes (e.g., `igid`, `asset_id`).
+        #  We should rename this as "full_symbol" so that all the code downstream
+        #  knows how to call it and / or we can add a column_remap.
+        self._full_symbol_col_name = full_symbol_col_name
+        #
         self._asset_id_to_full_symbol_mapping = (
             self._build_asset_id_to_full_symbol_mapping()
         )
-
-    @staticmethod
-    @abc.abstractmethod
-    def get_universe() -> List[imvcdcfusy.FullSymbol]:
-        """
-        Return the entire universe of valid full symbols.
-        """
-
-    @staticmethod
-    @abc.abstractmethod
-    def get_metadata() -> pd.DataFrame:
-        """
-        Return metadata.
-        """
-
-    @staticmethod
-    def get_asset_ids_from_full_symbols(
-        full_symbols: List[imvcdcfusy.FullSymbol],
-    ) -> List[int]:
-        """
-        Convert full symbols into asset ids.
-
-        :param full_symbols: assets as full symbols
-        :return: assets as numerical ids
-        """
-        numerical_asset_id = [
-            imvcuunut.string_to_numerical_id(full_symbol)
-            for full_symbol in full_symbols
-        ]
-        return numerical_asset_id
 
     def read_data(
         self,
@@ -109,7 +93,7 @@ class ImClient(abc.ABC):
         start_ts: Optional[pd.Timestamp],
         end_ts: Optional[pd.Timestamp],
         *,
-        full_symbol_col_name: str = "full_symbol",
+        full_symbol_col_name: Optional[str] = None,
         **kwargs: Dict[str, Any],
     ) -> pd.DataFrame:
         """
@@ -139,6 +123,9 @@ class ImClient(abc.ABC):
             start_ts, end_ts, left_close, right_close
         )
         # Delegate to the derived classes to retrieve the data.
+        full_symbol_col_name = self._get_full_symbol_col_name(
+            full_symbol_col_name
+        )
         df = self._read_data(
             full_symbols,
             start_ts,
@@ -193,6 +180,9 @@ class ImClient(abc.ABC):
         df = df.reset_index()
         df = df.sort_values(by=["timestamp", full_symbol_col_name])
         df = df.set_index("timestamp", drop=True)
+        # The full_symbol should be a string.
+        if not df.empty:
+            hdbg.dassert_isinstance(df[full_symbol_col_name].values[0], str)
         _LOG.debug("After sorting: df=\n%s", hpandas.df_to_str(df))
         return df
 
@@ -237,6 +227,111 @@ class ImClient(abc.ABC):
             for asset_id in asset_ids
         ]
         return full_symbols
+
+    # TODO(gp): Why static?
+    @staticmethod
+    @abc.abstractmethod
+    def get_universe() -> List[imvcdcfusy.FullSymbol]:
+        """
+        Return the entire universe of valid full symbols.
+        """
+
+    # TODO(gp): Why static?
+    @staticmethod
+    @abc.abstractmethod
+    def get_metadata() -> pd.DataFrame:
+        """
+        Return metadata.
+        """
+
+    @staticmethod
+    def get_asset_ids_from_full_symbols(
+        full_symbols: List[imvcdcfusy.FullSymbol],
+    ) -> List[int]:
+        """
+        Convert full symbols into asset ids.
+
+        :param full_symbols: assets as full symbols
+        :return: assets as numerical ids
+        """
+        numerical_asset_id = [
+            imvcuunut.string_to_numerical_id(full_symbol)
+            for full_symbol in full_symbols
+        ]
+        return numerical_asset_id
+
+    # //////////////////////////////////////////////////////////////////////////
+
+    def _get_full_symbol_col_name(
+        self, full_symbol_col_name: Optional[str]
+    ) -> str:
+        """
+        Resolve the name of the `full_symbol_col_name` using the value in the ctor
+        and the one passed to the function.
+        """
+        ret = self._full_symbol_col_name
+        if full_symbol_col_name is not None:
+            # The function has specified it, so this value overwrites the
+            # constructor value.
+            hdbg.dassert_isinstance(full_symbol_col_name, str)
+            ret = full_symbol_col_name
+        else:
+            if self._full_symbol_col_name is None:
+                # Both constructor and method have not specified the value, so
+                # use the default value.
+                ret = "full_symbol"
+        hdbg.dassert_is_not(
+            ret,
+            None,
+            "No value for 'full_symbol_col_name' was specified: ctor value='%s', method value='%s'",
+            self._full_symbol_col_name,
+            full_symbol_col_name,
+        )
+        return ret
+
+    @abc.abstractmethod
+    def _read_data(
+        self,
+        full_symbols: List[imvcdcfusy.FullSymbol],
+        start_ts: Optional[pd.Timestamp],
+        end_ts: Optional[pd.Timestamp],
+        *,
+        full_symbol_col_name: Optional[str] = None,
+        **kwargs: Dict[str, Any],
+    ) -> pd.DataFrame:
+        ...
+
+    def _build_asset_id_to_full_symbol_mapping(self) -> Dict[int, str]:
+        """
+        Build asset id to full symbol mapping.
+        """
+        # Get full symbol universe.
+        full_symbol_universe = self.get_universe()
+        # Build the mapping.
+        asset_id_to_full_symbol_mapping = (
+            imvcuunut.build_numerical_to_string_id_mapping(full_symbol_universe)
+        )
+        return asset_id_to_full_symbol_mapping  # type: ignore[no-any-return]
+
+    def _get_start_end_ts_for_symbol(
+        self, full_symbol: imvcdcfusy.FullSymbol, mode: str
+    ) -> pd.Timestamp:
+        _LOG.debug(hprint.to_str("full_symbol"))
+        # Read data for the entire period of time available.
+        start_timestamp = None
+        end_timestamp = None
+        data = self.read_data([full_symbol], start_timestamp, end_timestamp)
+        # Assume that the timestamp is always stored as index.
+        if mode == "start":
+            timestamp = data.index.min()
+        elif mode == "end":
+            timestamp = data.index.max()
+        else:
+            raise ValueError("Invalid mode='%s'" % mode)
+        #
+        hdbg.dassert_isinstance(timestamp, pd.Timestamp)
+        hdateti.dassert_has_specified_tz(timestamp, ["UTC"])
+        return timestamp
 
     # /////////////////////////////////////////////////////////////////////////
 
@@ -322,52 +417,6 @@ class ImClient(abc.ABC):
         if end_ts:
             hdbg.dassert_lte(df.index.max(), end_ts)
 
-    # //////////////////////////////////////////////////////////////////////////
-
-    @abc.abstractmethod
-    def _read_data(
-        self,
-        full_symbols: List[imvcdcfusy.FullSymbol],
-        start_ts: Optional[pd.Timestamp],
-        end_ts: Optional[pd.Timestamp],
-        *,
-        full_symbol_col_name: str = "full_symbol",
-        **kwargs: Dict[str, Any],
-    ) -> pd.DataFrame:
-        ...
-
-    def _build_asset_id_to_full_symbol_mapping(self) -> Dict[int, str]:
-        """
-        Build asset id to full symbol mapping.
-        """
-        # Get full symbol universe.
-        full_symbol_universe = self.get_universe()
-        # Build the mapping.
-        asset_id_to_full_symbol_mapping = (
-            imvcuunut.build_numerical_to_string_id_mapping(full_symbol_universe)
-        )
-        return asset_id_to_full_symbol_mapping  # type: ignore[no-any-return]
-
-    def _get_start_end_ts_for_symbol(
-        self, full_symbol: imvcdcfusy.FullSymbol, mode: str
-    ) -> pd.Timestamp:
-        _LOG.debug(hprint.to_str("full_symbol"))
-        # Read data for the entire period of time available.
-        start_timestamp = None
-        end_timestamp = None
-        data = self.read_data([full_symbol], start_timestamp, end_timestamp)
-        # Assume that the timestamp is always stored as index.
-        if mode == "start":
-            timestamp = data.index.min()
-        elif mode == "end":
-            timestamp = data.index.max()
-        else:
-            raise ValueError("Invalid mode='%s'" % mode)
-        #
-        hdbg.dassert_isinstance(timestamp, pd.Timestamp)
-        hdateti.dassert_has_specified_tz(timestamp, ["UTC"])
-        return timestamp
-
 
 # #############################################################################
 # ImClientReadingOneSymbol
@@ -387,7 +436,7 @@ class ImClientReadingOneSymbol(ImClient, abc.ABC):
         start_ts: Optional[pd.Timestamp],
         end_ts: Optional[pd.Timestamp],
         *,
-        full_symbol_col_name: str = "full_symbol",
+        full_symbol_col_name: Optional[str] = None,
         **kwargs: Dict[str, Any],
     ) -> pd.DataFrame:
         """
@@ -409,6 +458,9 @@ class ImClientReadingOneSymbol(ImClient, abc.ABC):
             right_close=right_close,
         )
         # Load the data for each symbol.
+        full_symbol_col_name = self._get_full_symbol_col_name(
+            full_symbol_col_name
+        )
         full_symbol_to_df = {}
         for full_symbol in sorted(full_symbols):
             df = self._read_data_for_one_symbol(
@@ -462,7 +514,7 @@ class ImClientReadingMultipleSymbols(ImClient, abc.ABC):
         start_ts: Optional[pd.Timestamp],
         end_ts: Optional[pd.Timestamp],
         *,
-        full_symbol_col_name: str = "full_symbol",
+        full_symbol_col_name: Optional[str] = None,
         **kwargs: Dict[str, Any],
     ) -> pd.DataFrame:
         """
@@ -472,6 +524,9 @@ class ImClientReadingMultipleSymbols(ImClient, abc.ABC):
             hprint.to_str(
                 "full_symbols start_ts end_ts full_symbol_col_name kwargs"
             )
+        )
+        full_symbol_col_name = self._get_full_symbol_col_name(
+            full_symbol_col_name
         )
         df = self._read_data_for_multiple_symbols(
             full_symbols, start_ts, end_ts, full_symbol_col_name, **kwargs
