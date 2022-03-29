@@ -67,6 +67,31 @@ class HistoricalPqByTileClient(
         """
         raise NotImplementedError
 
+    @staticmethod
+    def _get_columns_for_query() -> Optional[List[str]]:
+        """
+        Get columns for Parquet data query.
+
+        For base implementation the columns are `None`
+        """
+        return None
+
+    @staticmethod
+    def _apply_transformations(
+        df: pd.DataFrame, full_symbol_col_name: str
+    ) -> pd.DataFrame:
+        """
+        Apply transformations to loaded data.
+        """
+        # The asset data can come back from Parquet as:
+        # ```
+        # Categories(540, int64): [10025, 10036, 10040, 10045, ..., 82711, 82939,
+        #                         83317, 89970]
+        # ```
+        # which confuses `df.groupby()`, so we force that column to str.
+        df[full_symbol_col_name] = df[full_symbol_col_name].astype(str)
+        return df
+
     def _read_data_for_multiple_symbols(
         self,
         full_symbols: List[icdc.FullSymbol],
@@ -144,31 +169,6 @@ class HistoricalPqByTileClient(
         # Add a filter on full symbols.
         symbol_filter = (full_symbol_col_name, "in", full_symbols)
         return root_dir, symbol_filter
-
-    @staticmethod
-    def _get_columns_for_query() -> Optional[List[str]]:
-        """
-        Get columns for Parquet data query.
-
-        For base implementation the columns are `None`
-        """
-        return None
-
-    @staticmethod
-    def _apply_transformations(
-        df: pd.DataFrame, full_symbol_col_name: str
-    ) -> pd.DataFrame:
-        """
-        Apply transformations to loaded data.
-        """
-        # The asset data can come back from Parquet as:
-        # ```
-        # Categories(540, int64): [10025, 10036, 10040, 10045, ..., 82711, 82939,
-        #                         83317, 89970]
-        # ```
-        # which confuses `df.groupby()`, so we force that column to str.
-        df[full_symbol_col_name] = df[full_symbol_col_name].astype(str)
-        return df
 
 
 # #############################################################################

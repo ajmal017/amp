@@ -1045,6 +1045,18 @@ class TestLibTasksGitCreatePatch1(hunitest.TestCase):
     Test `git_create_patch()`.
     """
 
+    @staticmethod
+    def helper(
+        modified: bool, branch: bool, last_commit: bool, files: str
+    ) -> None:
+        ctx = _build_mock_context_returning_ok()
+        #
+        mode = "tar"
+        hlibtask.git_create_patch(ctx, mode, modified, branch, last_commit, files)
+        #
+        mode = "diff"
+        hlibtask.git_create_patch(ctx, mode, modified, branch, last_commit, files)
+
     def test_tar_modified1(self) -> None:
         """
         Exercise the code for:
@@ -1138,18 +1150,6 @@ class TestLibTasksGitCreatePatch1(hunitest.TestCase):
         Specify only one among --modified, --branch, --last-commit
         """
         self.assert_equal(act, exp, fuzzy_match=True)
-
-    @staticmethod
-    def helper(
-        modified: bool, branch: bool, last_commit: bool, files: str
-    ) -> None:
-        ctx = _build_mock_context_returning_ok()
-        #
-        mode = "tar"
-        hlibtask.git_create_patch(ctx, mode, modified, branch, last_commit, files)
-        #
-        mode = "diff"
-        hlibtask.git_create_patch(ctx, mode, modified, branch, last_commit, files)
 
 
 # #############################################################################
@@ -1899,6 +1899,24 @@ class TestPytestRenameClass(hunitest.TestCase):
     Test renaming functionality.
     """
 
+    @staticmethod
+    def helper() -> str:
+        """
+        Create file content.
+        """
+        content = """
+class TestCases(hunitest.TestCase):
+    def test_assert_equal1(self) -> None:
+        actual = "hello world"
+        expected = actual
+        self.assert_equal(actual, expected)
+
+    def test_check_string1(self) -> None:
+        actual = "hello world"
+        self.check_string(actual)
+        """
+        return content
+
     def test_rename_class1(self) -> None:
         """
         Test renaming of existing class.
@@ -1927,29 +1945,31 @@ class TestNewCase(hunitest.TestCase):
         # Check if the content of the file was not changed.
         self.assert_equal(actual, content)
 
-    @staticmethod
-    def helper() -> str:
-        """
-        Create file content.
-        """
-        content = """
-class TestCases(hunitest.TestCase):
-    def test_assert_equal1(self) -> None:
-        actual = "hello world"
-        expected = actual
-        self.assert_equal(actual, expected)
-
-    def test_check_string1(self) -> None:
-        actual = "hello world"
-        self.check_string(actual)
-        """
-        return content
-
 
 class TestPytestRenameOutcomes(hunitest.TestCase):
     """
     Test golden outcomes directory renaming.
     """
+
+    @staticmethod
+    def helper(toy_test: str) -> None:
+        """
+        Create the temporal outcome to rename.
+
+        :param toy_test: the name of the toy directory
+        """
+        outcomes_paths = [
+            "TestCase.test_check_string1",
+            "TestCase.test_rename",
+            "TestCases.test_rename2",
+            "TestRename.test_rename1",
+        ]
+        for path in outcomes_paths:
+            outcomes = os.path.join(toy_test, "test/outcomes", path)
+            os.makedirs(outcomes)
+            hio.to_file(f"{outcomes}/test.txt", "Test files.")
+        cmd = f"git add {toy_test}/"
+        hsystem.system(cmd, abort_on_error=False, suppress_output=False)
 
     def test_rename_class_outcomes(self) -> None:
         """
@@ -1985,26 +2005,6 @@ class TestPytestRenameOutcomes(hunitest.TestCase):
         ]
         self.assertEqual(actual, expected)
         self._clean_up(toy_test)
-
-    @staticmethod
-    def helper(toy_test: str) -> None:
-        """
-        Create the temporal outcome to rename.
-
-        :param toy_test: the name of the toy directory
-        """
-        outcomes_paths = [
-            "TestCase.test_check_string1",
-            "TestCase.test_rename",
-            "TestCases.test_rename2",
-            "TestRename.test_rename1",
-        ]
-        for path in outcomes_paths:
-            outcomes = os.path.join(toy_test, "test/outcomes", path)
-            os.makedirs(outcomes)
-            hio.to_file(f"{outcomes}/test.txt", "Test files.")
-        cmd = f"git add {toy_test}/"
-        hsystem.system(cmd, abort_on_error=False, suppress_output=False)
 
     def _clean_up(self, toy_test: str) -> None:
         """

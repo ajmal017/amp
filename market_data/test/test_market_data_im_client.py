@@ -13,6 +13,37 @@ class TestImClientMarketData(mdtmdtca.MarketData_get_data_TestCase):
     the parent class.
     """
 
+    @staticmethod
+    def build_client(
+        asset_ids: Optional[List[int]],
+        columns: Optional[List[str]],
+        column_remap: Optional[Dict[str, str]],
+    ) -> mdata.MarketData:
+        """
+        Build `ImClientMarketData` client.
+        """
+        market_data = mdata.get_ImClientMarketData_example1(
+            asset_ids, columns=columns, column_remap=column_remap
+        )
+        return market_data
+
+    @staticmethod
+    def get_expected_column_names() -> List[str]:
+        """
+        Return a list of expected column names.
+        """
+        expected_column_names = [
+            "asset_id",
+            "full_symbol",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "start_ts",
+        ]
+        return expected_column_names
+
     # //////////////////////////////////////////////////////////////////////////////
 
     def test_is_online1(self) -> None:
@@ -424,34 +455,3 @@ class TestImClientMarketData(mdtmdtca.MarketData_get_data_TestCase):
         wall_clock_time = pd.Timestamp("2018-08-17T00:01:00")
         # Run.
         self._test_should_be_online1(market_data, wall_clock_time)
-
-    @staticmethod
-    def build_client(
-        asset_ids: Optional[List[int]],
-        columns: Optional[List[str]],
-        column_remap: Optional[Dict[str, str]],
-    ) -> mdata.MarketData:
-        """
-        Build `ImClientMarketData` client.
-        """
-        market_data = mdata.get_ImClientMarketData_example1(
-            asset_ids, columns=columns, column_remap=column_remap
-        )
-        return market_data
-
-    @staticmethod
-    def get_expected_column_names() -> List[str]:
-        """
-        Return a list of expected column names.
-        """
-        expected_column_names = [
-            "asset_id",
-            "full_symbol",
-            "open",
-            "high",
-            "low",
-            "close",
-            "volume",
-            "start_ts",
-        ]
-        return expected_column_names

@@ -3,9 +3,9 @@ from typing import List
 import pandas as pd
 
 import im_v2.common.data.client.test.im_client_test_case as icdctictc
+import im_v2.common.db.db_utils as imvcddbut
 import im_v2.talos.data.client.talos_clients as imvtdctacl
 import im_v2.talos.data.client.talos_clients_example as imvtdctcex
-import im_v2.common.db.db_utils as imvcddbut
 
 # #############################################################################
 # TestTalosParquetByTileClient1
@@ -314,10 +314,10 @@ class TestTalosParquetByTileClient1(icdctictc.ImClientTestCase):
 # #############################################################################
 
 
-class TestRealTimeSqlTalosClient1(icdctictc.ImClientTestCase, imvcddbut.TestImDbHelper):
-    """
-
-    """
+class TestRealTimeSqlTalosClient1(
+    icdctictc.ImClientTestCase, imvcddbut.TestImDbHelper
+):
+    """"""
 
     def test_build_select_query1(self) -> None:
         """
@@ -402,7 +402,7 @@ class TestRealTimeSqlTalosClient1(icdctictc.ImClientTestCase, imvcddbut.TestImDb
         self.assertEqual(actual_outcome, expected_outcome, message)
 
     def setup_talos_sql_client(
-            self,
+        self,
     ) -> imvtdctacl.RealTimeSqlTalosClient:
         """
         Initialize Talos SQL Client.

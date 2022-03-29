@@ -50,7 +50,6 @@ def _generate_test_data(
 
 
 class MockHistoricalByTile(imvcdchpcl.HistoricalPqByTileClient):
-
     def get_universe(self) -> List[str]:
         return ["binance::BTC_USDT", "kucoin::FIL_USDT"]
 

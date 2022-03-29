@@ -69,36 +69,6 @@ class TalosHistoricalPqByTileClient(imvcdchpcl.HistoricalPqByTileClient):
         # TODO(Danya): CmTask1420.
         return []
 
-    def _get_root_dir_and_symbol_filter(
-        self, full_symbols: List[icdc.FullSymbol], full_symbol_col_name: str
-    ) -> Tuple[str, hparque.ParquetFilter]:
-        """
-        Get the root dir of the `Talos` data and filtering condition on
-        currency pair column.
-        """
-        # Get the lists of exchange ids and currency pairs.
-        exchange_ids, currency_pairs = tuple(
-            zip(
-                *[
-                    icdc.parse_full_symbol(full_symbol)
-                    for full_symbol in full_symbols
-                ]
-            )
-        )
-        # TODO(Dan) Extend functionality to load data for multiple exchange
-        #  ids in one query when data partitioning on S3 is changed.
-        # Verify that all full symbols in a query belong to one exchange id
-        # since dataset is partitioned only by currency pairs.
-        hdbg.dassert_eq(1, len(set(exchange_ids)))
-        # Extend the root dir to include the exchange dir, e.g.,
-        # "s3://cryptokaizen-data/historical/talos/latest/binance"
-        root_dir = os.path.join(
-            self._root_dir, self._vendor, self._data_snapshot, exchange_ids[0]
-        )
-        # Add a filter on currency pairs.
-        symbol_filter = ("currency_pair", "in", currency_pairs)
-        return root_dir, symbol_filter
-
     @staticmethod
     def _get_columns_for_query() -> List[str]:
         """
@@ -131,6 +101,36 @@ class TalosHistoricalPqByTileClient(imvcdchpcl.HistoricalPqByTileClient):
         df = df[columns]
         return df
 
+    def _get_root_dir_and_symbol_filter(
+        self, full_symbols: List[icdc.FullSymbol], full_symbol_col_name: str
+    ) -> Tuple[str, hparque.ParquetFilter]:
+        """
+        Get the root dir of the `Talos` data and filtering condition on
+        currency pair column.
+        """
+        # Get the lists of exchange ids and currency pairs.
+        exchange_ids, currency_pairs = tuple(
+            zip(
+                *[
+                    icdc.parse_full_symbol(full_symbol)
+                    for full_symbol in full_symbols
+                ]
+            )
+        )
+        # TODO(Dan) Extend functionality to load data for multiple exchange
+        #  ids in one query when data partitioning on S3 is changed.
+        # Verify that all full symbols in a query belong to one exchange id
+        # since dataset is partitioned only by currency pairs.
+        hdbg.dassert_eq(1, len(set(exchange_ids)))
+        # Extend the root dir to include the exchange dir, e.g.,
+        # "s3://cryptokaizen-data/historical/talos/latest/binance"
+        root_dir = os.path.join(
+            self._root_dir, self._vendor, self._data_snapshot, exchange_ids[0]
+        )
+        # Add a filter on currency pairs.
+        symbol_filter = ("currency_pair", "in", currency_pairs)
+        return root_dir, symbol_filter
+
 
 # #############################################################################
 # RealTimeSqlTalosClient
@@ -153,13 +153,6 @@ class RealTimeSqlTalosClient(icdc.ImClient):
         self._db_connection = db_connection
         self._table_name = table_name
 
-    def get_universe(self) -> List[icdc.FullSymbol]:
-        """
-        See description in the parent class.
-        """
-        # TODO(Danya): CmTask1420.
-        return []
-
     @staticmethod
     def should_be_online() -> bool:
         """
@@ -172,6 +165,80 @@ class RealTimeSqlTalosClient(icdc.ImClient):
         """
         Return metadata.
         """
+        raise NotImplementedError
+
+    def get_universe(self) -> List[icdc.FullSymbol]:
+        """
+        See description in the parent class.
+        """
+        # TODO(Danya): CmTask1420.
+        return []
+
+    @staticmethod
+    def _apply_talos_normalization(
+        data: pd.DataFrame,
+        *,
+        full_symbol_col_name: Optional[str] = None,
+    ) -> pd.DataFrame:
+        """
+        Apply Talos-specific normalization:
+
+        - Convert `timestamp` column to a UTC timestamp and set index.
+        - Drop extra columns (e.g. `id` created by the DB).
+        """
+        # Convert timestamp column with Unix epoch to timestamp format.
+        data["timestamp"] = data["timestamp"].apply(
+            hdateti.convert_unix_epoch_to_timestamp
+        )
+        data = data.set_index("timestamp")
+        # Specify OHLCV columns.
+        full_symbol_col_name = self._get_full_symbol_col_name(
+            full_symbol_col_name
+        )
+        ohlcv_columns = [
+            # "timestamp",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            full_symbol_col_name,
+        ]
+        # Verify that dataframe contains OHLCV columns.
+        hdbg.dassert_is_subset(ohlcv_columns, data.columns)
+        # Rearrange the columns.
+        data = data.loc[:, ohlcv_columns]
+        return data
+
+    @staticmethod
+    # TODO(Danya): Move up to hsql.
+    def _create_in_operator(values: List[str], column_name: str) -> str:
+        """
+        Transform a list of possible values into an IN operator clause.
+
+        Example:
+            (`["binance", "ftx"]`, 'exchange_id') =>
+            "exchange_id IN ('binance', 'ftx')"
+        """
+        in_operator = (
+            f"{column_name} IN ("
+            + ",".join([f"'{value}'" for value in values])
+            + ")"
+        )
+        return in_operator
+
+    @staticmethod
+    def _build_select_query(
+        query: str,
+        exchange_id: str,
+        currency_pair: str,
+        start_unix_epoch: int,
+        end_unix_epoch: int,
+    ) -> str:
+        """
+        Append a WHERE clause to the query.
+        """
+        # TODO(Danya): Depending on the implementation, can be moved out to helpers.
         raise NotImplementedError
 
     def _read_data(
@@ -317,71 +384,4 @@ class RealTimeSqlTalosClient(icdc.ImClient):
         )
         # TODO(Danya): Convert timestamps to int when reading.
         # TODO(Danya): add a full symbol column to the output
-        raise NotImplementedError
-
-    @staticmethod
-    def _apply_talos_normalization(
-        data: pd.DataFrame,
-        *,
-        full_symbol_col_name: Optional[str] = None,
-    ) -> pd.DataFrame:
-        """
-        Apply Talos-specific normalization:
-
-        - Convert `timestamp` column to a UTC timestamp and set index.
-        - Drop extra columns (e.g. `id` created by the DB).
-        """
-        # Convert timestamp column with Unix epoch to timestamp format.
-        data["timestamp"] = data["timestamp"].apply(
-            hdateti.convert_unix_epoch_to_timestamp
-        )
-        data = data.set_index("timestamp")
-        # Specify OHLCV columns.
-        full_symbol_col_name = self._get_full_symbol_col_name(
-            full_symbol_col_name
-        )
-        ohlcv_columns = [
-            # "timestamp",
-            "open",
-            "high",
-            "low",
-            "close",
-            "volume",
-            full_symbol_col_name,
-        ]
-        # Verify that dataframe contains OHLCV columns.
-        hdbg.dassert_is_subset(ohlcv_columns, data.columns)
-        # Rearrange the columns.
-        data = data.loc[:, ohlcv_columns]
-        return data
-
-    @staticmethod
-    # TODO(Danya): Move up to hsql.
-    def _create_in_operator(values: List[str], column_name: str) -> str:
-        """
-        Transform a list of possible values into an IN operator clause.
-
-        Example:
-            (`["binance", "ftx"]`, 'exchange_id') =>
-            "exchange_id IN ('binance', 'ftx')"
-        """
-        in_operator = (
-            f"{column_name} IN ("
-            + ",".join([f"'{value}'" for value in values])
-            + ")"
-        )
-        return in_operator
-
-    @staticmethod
-    def _build_select_query(
-        query: str,
-        exchange_id: str,
-        currency_pair: str,
-        start_unix_epoch: int,
-        end_unix_epoch: int,
-    ) -> str:
-        """
-        Append a WHERE clause to the query.
-        """
-        # TODO(Danya): Depending on the implementation, can be moved out to helpers.
         raise NotImplementedError
