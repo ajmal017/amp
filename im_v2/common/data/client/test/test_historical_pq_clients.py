@@ -25,6 +25,7 @@ def _generate_test_data(
     """
     test_dir: str = instance.get_scratch_space()
     tiled_bar_data_dir = os.path.join(test_dir, "tiled.bar_data")
+    # TODO(gp): @all replace the script with calling the library directly.
     cmd = []
     file_path = os.path.join(
         hgit.get_amp_abs_path(),
@@ -50,6 +51,7 @@ def _generate_test_data(
 
 
 class MockHistoricalByTile(imvcdchpcl.HistoricalPqByTileClient):
+
     def get_universe(self) -> List[str]:
         return ["binance::BTC_USDT", "kucoin::FIL_USDT"]
 
@@ -81,7 +83,7 @@ class TestHistoricalPqByTileClient1(icdctictc.ImClientTestCase):
         resample_1min = True
         vendor = "mock"
         im_client = MockHistoricalByTile(
-            vendor, test_dir, resample_1min, partition_mode
+            vendor, resample_1min, test_dir, partition_mode
         )
         # Compare the expected values.
         full_symbol = "binance::BTC_USDT"
@@ -133,7 +135,7 @@ class TestHistoricalPqByTileClient1(icdctictc.ImClientTestCase):
         resample_1min = True
         vendor = "mock"
         im_client = MockHistoricalByTile(
-            vendor, test_dir, resample_1min, partition_mode
+            vendor, resample_1min, test_dir, partition_mode
         )
         # Compare the expected values.
         full_symbols = ["binance::BTC_USDT", "kucoin::FIL_USDT"]
@@ -187,7 +189,7 @@ class TestHistoricalPqByTileClient1(icdctictc.ImClientTestCase):
         resample_1min = True
         vendor = "mock"
         im_client = MockHistoricalByTile(
-            vendor, test_dir, resample_1min, partition_mode
+            vendor, resample_1min, test_dir, partition_mode
         )
         # Compare the expected values.
         full_symbols = ["binance::BTC_USDT", "kucoin::FIL_USDT"]
@@ -243,7 +245,7 @@ class TestHistoricalPqByTileClient1(icdctictc.ImClientTestCase):
         resample_1min = True
         vendor = "mock"
         im_client = MockHistoricalByTile(
-            vendor, test_dir, resample_1min, partition_mode
+            vendor, resample_1min, test_dir, partition_mode
         )
         # Compare the expected values.
         full_symbols = ["binance::BTC_USDT", "kucoin::FIL_USDT"]
@@ -299,7 +301,7 @@ class TestHistoricalPqByTileClient1(icdctictc.ImClientTestCase):
         resample_1min = True
         vendor = "mock"
         im_client = MockHistoricalByTile(
-            vendor, test_dir, resample_1min, partition_mode
+            vendor, resample_1min, test_dir, partition_mode
         )
         # Compare the expected values.
         full_symbols = ["binance::BTC_USDT", "kucoin::FIL_USDT"]
@@ -388,7 +390,7 @@ class TestHistoricalPqByTileClient1(icdctictc.ImClientTestCase):
         resample_1min = False
         vendor = "mock"
         im_client = MockHistoricalByTile(
-            vendor, test_dir, resample_1min, partition_mode
+            vendor, resample_1min, test_dir, partition_mode
         )
         # Compare the expected values.
         full_symbols = ["binance::BTC_USDT", "kucoin::FIL_USDT"]
@@ -444,7 +446,7 @@ class TestHistoricalPqByTileClient1(icdctictc.ImClientTestCase):
         resample_1min = True
         vendor = "mock"
         im_client = MockHistoricalByTile(
-            vendor, test_dir, resample_1min, partition_mode
+            vendor, resample_1min, test_dir, partition_mode
         )
         # Compare the expected values.
         full_symbol = "binance::BTC_USDT"
@@ -476,7 +478,7 @@ class TestHistoricalPqByTileClient1(icdctictc.ImClientTestCase):
         resample_1min = True
         vendor = "mock"
         im_client = MockHistoricalByTile(
-            vendor, test_dir, resample_1min, partition_mode
+            vendor, resample_1min, test_dir, partition_mode
         )
         # Compare the expected values.
         full_symbol = "binance::BTC_USDT"

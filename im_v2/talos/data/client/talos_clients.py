@@ -35,8 +35,8 @@ class TalosHistoricalPqByTileClient(imvcdchpcl.HistoricalPqByTileClient):
 
     def __init__(
         self,
-        root_dir: str,
         resample_1min: bool,
+        root_dir: str,
         partition_mode: str,
         *,
         data_snapshot: str = "latest",
@@ -46,11 +46,10 @@ class TalosHistoricalPqByTileClient(imvcdchpcl.HistoricalPqByTileClient):
         Load `Talos` data from local or S3 filesystem.
         """
         vendor = "talos"
-        imvcdchpcl.HistoricalPqByTileClient.__init__(
-            self,
+        super().__init__(
             vendor,
-            root_dir,
             resample_1min,
+            root_dir,
             partition_mode,
             aws_profile=aws_profile,
         )
@@ -144,9 +143,9 @@ class RealTimeSqlTalosClient(icdc.ImClient):
 
     def __init__(
         self,
+        resample_1min: bool,
         db_connection: hsql.DbConnection,
         table_name: str,
-        resample_1min: bool,
     ) -> None:
         vendor = "talos"
         super().__init__(vendor, resample_1min)
@@ -174,8 +173,8 @@ class RealTimeSqlTalosClient(icdc.ImClient):
         # TODO(Danya): CmTask1420.
         return []
 
-    @staticmethod
     def _apply_talos_normalization(
+        self,
         data: pd.DataFrame,
         *,
         full_symbol_col_name: Optional[str] = None,
@@ -280,7 +279,8 @@ class RealTimeSqlTalosClient(icdc.ImClient):
         )
         # Remove extra columns and create a timestamp index.
         # TODO(Danya): The normalization may change depending on use of the class.
-        data = self._apply_talos_normalization(data, full_symbol_col_name)
+        data = self._apply_talos_normalization(data,
+                full_symbol_col_name=full_symbol_col_name)
         return data
 
     def _build_select_query(

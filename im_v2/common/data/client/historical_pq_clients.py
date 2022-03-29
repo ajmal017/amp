@@ -31,8 +31,8 @@ class HistoricalPqByTileClient(
         self,
         # TODO(gp): We could use *args, **kwargs as params for ImClient.
         vendor: str,
-        root_dir: str,
         resample_1min: bool,
+        root_dir: str,
         partition_mode: str,
         *,
         aws_profile: Optional[str] = None,
@@ -41,8 +41,9 @@ class HistoricalPqByTileClient(
         """
         Constructor.
 
-        :param root_dir: either a local root path (e.g., "/app/im") or an S3 root
-            path (e.g., "s3://ck-data/historical") to the tiled Parquet data
+        :param root_dir: either a local root path (e.g., "/app/im") or
+            an S3 root path (e.g., "s3://cryptokaizen-data/historical")
+            to the tiled Parquet data
         :param partition_mode: how the data is partitioned, e.g., "by_year_month"
         :param aws_profile: AWS profile name (e.g., "ck")
         """
@@ -118,7 +119,7 @@ class HistoricalPqByTileClient(
             self._partition_mode,
             start_ts,
             end_ts,
-            additional_filter=symbol_filter,
+            additional_filters=[symbol_filter],
         )
         kwargs["filters"] = filters
         # Get columns and add them to kwargs if they were not specified.

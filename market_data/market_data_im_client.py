@@ -121,17 +121,12 @@ class ImClientMarketData(mdabmada.MarketData):
         transformed_asset_ids = self._im_client.get_asset_ids_from_full_symbols(
             market_data[full_symbol_col_name]
         )
-
         if self._asset_id_col in market_data.columns:
-            # _LOG.debug("No need to add self._asset_id_col=%s since it's already" +
-            #           "present in the columns %s", self._asset_id_col,
-            #           market_data.columns.to_list())
             _LOG.debug(
                 "Overwriting column '%s' with asset_ids", self._asset_id_col
             )
             market_data[self._asset_id_col] = transformed_asset_ids
         else:
-            # market_data.rename(columns={full_symbol_col_name, self._asset_id_col})
             market_data.insert(
                 0,
                 self._asset_id_col,
