@@ -11,11 +11,12 @@ import pandas as pd
 
 _LOG = logging.getLogger(__name__)
 
-from typing import List, Optional, Tuple, Union
+from typing import Iterator, List, Optional, Tuple, Union
 
 from tqdm.autonotebook import tqdm
 
 import dataflow.model.forecast_evaluator as dtfmofoeva
+import dataflow.model.forecast_evaluator_from_prices as dtfmfefrpr
 import dataflow.model.forecast_mixer as dtfmofomix
 import dataflow.model.parquet_tile_analyzer as dtfmpatian
 import dataflow.model.regression_analyzer as dtfmoreana
@@ -24,34 +25,43 @@ import helpers.hpandas as hpandas
 import helpers.hparquet as hparque
 
 
-def generate_bar_metrics(
-    file_name: str,
+def yield_processed_parquet_tiles_by_year(
+    dir_name: str,
     start_date: datetime.date,
     end_date: datetime.date,
     asset_id_col: str,
-    returns_col: str,
-    volatility_col: str,
-    prediction_col: str,
-    target_gmv: Optional[float] = None,
-    dollar_neutrality: str = "no_constraint",
-    overnight_returns: Optional[pd.DataFrame] = None,
-) -> pd.DataFrame:
+    data_cols: List[Union[int, str]],
+    *,
+    asset_ids: Optional[List[int]] = None,
+) -> Iterator[pd.DataFrame]:
     """
-    Generate "research" portfolio bar metrics over a tiled backtest.
+    Process parquet tiles as dataflow multi-indexed column dataframes.
+
+    :param dir_name: dir of tiled results
+    :param start_date: date specifying first month/year to read
+    :param end_date: date specifying last month/year to read
+    :param asset_id_col: name of the asset id column
+    :param data_cols: names of data columns to load
+    :param asset_ids: if `None`, load all available; otherwise load specified
+        subset
+    :return: dataframe with multi-indexed columns
     """
-    columns = [asset_id_col, returns_col, volatility_col, prediction_col]
+    hdbg.dassert_isinstance(asset_id_col, str)
+    hdbg.dassert_isinstance(data_cols, list)
+    cols = [asset_id_col] + data_cols
+    #
+    hdbg.dassert_isinstance(start_date, datetime.date)
+    hdbg.dassert_isinstance(end_date, datetime.date)
+    hdbg.dassert_lte(start_date, end_date)
+    #
     tiles = hparque.yield_parquet_tiles_by_year(
-        file_name,
+        dir_name,
         start_date,
         end_date,
-        columns,
+        cols,
+        asset_ids=asset_ids,
+        asset_id_col=asset_id_col,
     )
-    forecast_evaluator = dtfmofoeva.ForecastEvaluator(
-        returns_col=returns_col,
-        volatility_col=volatility_col,
-        prediction_col=prediction_col,
-    )
-    results = []
     num_years = end_date.year - start_date.year + 1
     for tile in tqdm(tiles, total=num_years):
         # Convert the `from_parquet()` dataframe to a dataflow-style dataframe.
@@ -59,6 +69,108 @@ def generate_bar_metrics(
             tile,
             asset_id_col,
         )
+        yield df
+
+
+def process_parquet_read_df(
+    df: pd.DataFrame,
+    asset_id_col: str,
+) -> pd.DataFrame:
+    """
+    Post-process a multiindex dataflow result dataframe re-read from parquet.
+
+    :param df: dataframe in "long" format
+    :param asset_id_col: asset id column to pivot on
+    :return: multiindexed dataframe with asset id's at the inner column level
+    """
+    # Convert the asset it column to an integer column.
+    df = hpandas.convert_col_to_int(df, asset_id_col)
+    # If a (non-asset id) column can be represented as an int, then do so.
+    df = df.rename(columns=hparque.maybe_cast_to_int)
+    # Convert from long format to column-multiindexed format.
+    df = df.pivot(columns=asset_id_col)
+    # NOTE: the asset ids may already be sorted and so this may not be needed.
+    df.sort_index(axis=1, level=-2, inplace=True)
+    return df
+
+
+def generate_bar_metrics_from_price(
+    file_name: str,
+    start_date: datetime.date,
+    end_date: datetime.date,
+    asset_id_col: str,
+    price_col: str,
+    volatility_col: str,
+    prediction_col: str,
+    asset_ids: Optional[List[int]] = None,
+    target_gmv: Optional[float] = 1e7,
+    dollar_neutrality: str = "gaussian_rank",
+    quantization: str = "nearest_share",
+) -> pd.DataFrame:
+    """
+    Generate "research" portfolio bar metrics over a tiled backtest.
+    """
+    data_cols = [price_col, volatility_col, prediction_col]
+    df_iter = yield_processed_parquet_tiles_by_year(
+        file_name,
+        start_date,
+        end_date,
+        asset_id_col,
+        data_cols,
+        asset_ids=asset_ids,
+    )
+    forecast_evaluator = dtfmfefrpr.ForecastEvaluatorFromPrices(
+        price_col=price_col,
+        volatility_col=volatility_col,
+        prediction_col=prediction_col,
+    )
+    results = []
+    for df in df_iter:
+        _, bar_metrics = forecast_evaluator.annotate_forecasts(
+            df,
+            target_gmv=target_gmv,
+            dollar_neutrality=dollar_neutrality,
+            quantization=quantization,
+        )
+        results.append(bar_metrics)
+    df = pd.concat(results)
+    hdbg.dassert(not df.index.has_duplicates)
+    df.sort_index(inplace=True)
+    return df
+
+
+def generate_bar_metrics_from_returns(
+    file_name: str,
+    start_date: datetime.date,
+    end_date: datetime.date,
+    asset_id_col: str,
+    returns_col: str,
+    volatility_col: str,
+    prediction_col: str,
+    asset_ids: Optional[List[int]] = None,
+    target_gmv: Optional[float] = None,
+    dollar_neutrality: str = "no_constraint",
+    overnight_returns: Optional[pd.DataFrame] = None,
+) -> pd.DataFrame:
+    """
+    Generate "research" portfolio bar metrics over a tiled backtest.
+    """
+    data_cols = [returns_col, volatility_col, prediction_col]
+    df_iter = yield_processed_parquet_tiles_by_year(
+        file_name,
+        start_date,
+        end_date,
+        asset_id_col,
+        data_cols,
+        asset_ids=asset_ids,
+    )
+    forecast_evaluator = dtfmofoeva.ForecastEvaluator(
+        returns_col=returns_col,
+        volatility_col=volatility_col,
+        prediction_col=prediction_col,
+    )
+    results = []
+    for df in df_iter:
         _, bar_metrics = forecast_evaluator.annotate_forecasts(
             df,
             target_gmv=target_gmv,
@@ -112,12 +224,14 @@ def load_mix_evaluate(
     """
     hdbg.dassert_isinstance(weights, pd.DataFrame)
     hdbg.dassert_set_eq(weights.index, feature_cols)
-    columns = [asset_id_col, returns_col, volatility_col] + feature_cols
-    tiles = hparque.yield_parquet_tiles_by_year(
+    #
+    data_cols = [returns_col, volatility_col] + feature_cols
+    df_iter = yield_processed_parquet_tiles_by_year(
         file_name,
         start_date,
         end_date,
-        columns,
+        asset_id_col,
+        data_cols,
     )
     fm = dtfmofomix.ForecastMixer(
         returns_col=returns_col,
@@ -125,13 +239,7 @@ def load_mix_evaluate(
         prediction_cols=feature_cols,
     )
     results = []
-    num_years = end_date.year - start_date.year + 1
-    for tile in tqdm(tiles, total=num_years):
-        # Convert the `from_parquet()` dataframe to a dataflow-style dataframe.
-        df = process_parquet_read_df(
-            tile,
-            asset_id_col,
-        )
+    for df in df_iter:
         bar_metrics = fm.generate_portfolio_bar_metrics_df(
             df,
             weights,
@@ -275,26 +383,4 @@ def compute_bar_col_abs_stats(
         results.append(stats_df)
     df = pd.concat(results)
     df.sort_index(inplace=True)
-    return df
-
-
-def process_parquet_read_df(
-    df: pd.DataFrame,
-    asset_id_col: str,
-) -> pd.DataFrame:
-    """
-    Post-process a multiindex dataflow result dataframe re-read from parquet.
-
-    :param df: dataframe in "long" format
-    :param asset_id_col: asset id column to pivot on
-    :return: multiindexed dataframe with asset id's at the inner column level
-    """
-    # Convert the asset it column to an integer column.
-    df = hpandas.convert_col_to_int(df, asset_id_col)
-    # If a (non-asset id) column can be represented as an int, then do so.
-    df = df.rename(columns=hparque.maybe_cast_to_int)
-    # Convert from long format to column-multiindexed format.
-    df = df.pivot(columns=asset_id_col)
-    # NOTE: the asset ids may already be sorted and so this may not be needed.
-    df.sort_index(axis=1, level=-2, inplace=True)
     return df
