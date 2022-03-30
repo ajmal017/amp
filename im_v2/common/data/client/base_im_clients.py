@@ -75,12 +75,16 @@ class ImClient(abc.ABC):
         :param full_symbol_col_name: the name of the column storing the symbol
             name. It can be overridden by other methods
         """
+        hdbg.dassert_isinstance(vendor, str)
         self._vendor = vendor
+        hdbg.dassert_isinstance(resample_1min, bool)
         self._resample_1min = resample_1min
         # TODO(gp): This is the name of the column of the asset_id in the data
         #  as it is read by the derived classes (e.g., `igid`, `asset_id`).
         #  We should rename this as "full_symbol" so that all the code downstream
         #  knows how to call it and / or we can add a column_remap.
+        if full_symbol_col_name is not None:
+            hdbg.dassert_isinstance(full_symbol_col_name, str)
         self._full_symbol_col_name = full_symbol_col_name
         #
         self._asset_id_to_full_symbol_mapping = (
