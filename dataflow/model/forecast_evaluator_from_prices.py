@@ -424,6 +424,9 @@ class ForecastEvaluatorFromPrices:
         )
         # Drop rows with no prices (this is an approximate way to handle half-days).
         df = df.dropna(how="all")
+        # Forward fill to mitigate spurious artifacts at the portfolio bar
+        # level.
+        df = df.ffill()
         return df
 
     def _compute_holdings_and_flows(
@@ -436,38 +439,52 @@ class ForecastEvaluatorFromPrices:
         """
         Compute holdings in shares from price and dollar position targets.
         """
-        # NOTE: We pull prices from the next bar to handle overnight splits
-        # more easily. The intraday price difference is unlikely to make a
-        # difference with respect to trading, at least post-quantization.
-        price_shift = -1
-        target_holdings = target_positions.divide(price.shift(price_shift))
+        # Compute target holdings based on prices available now.
+        target_holdings = target_positions.divide(price)
+        # Quantize.
         target_holdings = ForecastEvaluatorFromPrices._apply_quantization(
             target_holdings, quantization
         )
-        # Compute first approximation of current holdings in shares.
+        # Assume target shares are obtained.
         holdings = target_holdings.shift(1)
-        # Handle overnight period.
+        # Handle overnight period specially.
+        # 1. Make beginning-of-day-holdings NaN.
         first_bar_of_day_close_idx = holdings.index.indexer_between_time(
             start_time=self._first_bar_of_day_close,
             end_time=self._first_bar_of_day_close,
         )
         holdings.iloc[first_bar_of_day_close_idx] = np.nan
-        # Compute first approximation of positions in dollars, excluding the
-        # first bar of the day.
-        positions = holdings.multiply(price)
-        # Forward fill the dollar positions to estimate next-day first bar
-        # holdings.
-        ffill_positions = positions.ffill()
-        holdings = ffill_positions.divide(price)
-        # Re-quantize (to quantize first-bar holdings).
-        # NOTE: We have estimated the beginning-of-day share holdings based on
-        # previous day holdings in dollars and next day end-of-opening bar
-        # price. This enables us to approximately handle corporate actions, but
-        # at the cost of mitigating the impact of large overnight price
-        # movements.
-        holdings = ForecastEvaluatorFromPrices._apply_quantization(
-            holdings, quantization
+        # 2. Compute overnight bar-to-bar price change.
+        day_rollover_price_bars = price.between_time(
+            self._last_bar_of_day_close, self._first_bar_of_day_close
         )
+        overnight_price_change_multiple = 1 + day_rollover_price_bars.pct_change()
+        # 3. Infer one-to-many splits by rounding to the nearest integer the
+        #    inverse of the price change multiple.
+        # NOTE: This heuristic does not properly handle reverse splits. There
+        # may also be false positives and false negatives for other types of
+        # splits.
+        # TODO(Paul): log and reports inferred split factors that are not 1.0.
+        inferred_split = (
+            1
+            / overnight_price_change_multiple.between_time(
+                self._first_bar_of_day_close, self._first_bar_of_day_close
+            )
+        ).round()
+        _LOG.debug(
+            "inferred_split=\n%s",
+            hpandas.df_to_str(inferred_split, num_rows=None),
+        )
+        # 4. Compute beginning-of-day holdings from previous end-of-day
+        #    holdings and the inferred split factors.
+        bod_holdings = (
+            holdings.shift(1)
+            .between_time(
+                self._first_bar_of_day_close, self._first_bar_of_day_close
+            )
+            .multiply(inferred_split)
+        )
+        holdings = holdings.add(bod_holdings, fill_value=0)
         # Change in shares priced at end of bar. Only valid intraday.
         flows = -1 * holdings.subtract(holdings.shift(1), fill_value=0).multiply(
             price
