@@ -11,11 +11,10 @@ import pandas as pd
 
 _LOG = logging.getLogger(__name__)
 
-from typing import Iterator, List, Optional, Tuple, Union
+from typing import Dict, Iterator, List, Optional, Tuple, Union
 
 from tqdm.autonotebook import tqdm
 
-import dataflow.model.forecast_evaluator as dtfmofoeva
 import dataflow.model.forecast_evaluator_from_prices as dtfmfefrpr
 import dataflow.model.forecast_mixer as dtfmofomix
 import dataflow.model.parquet_tile_analyzer as dtfmpatian
@@ -70,6 +69,143 @@ def yield_processed_parquet_tiles_by_year(
             asset_id_col,
         )
         yield df
+
+
+def yield_processed_parquet_tile_dict(
+    simulations: pd.DataFrame,
+    start_date: datetime.date,
+    end_date: datetime.date,
+    asset_id_col: str,
+    *,
+    asset_ids: Optional[List[int]] = None,
+) -> Iterator[Dict[str, pd.DataFrame]]:
+    """
+    Yield a dictionary of processed dataframes, keyed by simulation.
+    """
+    # Sanity-check the simulation dataframe.
+    hdbg.dassert_isinstance(simulations, pd.DataFrame)
+    hdbg.dassert_is_subset(["dir_name", "prediction_col"], simulations.columns)
+    hdbg.dassert(not simulations.index.has_duplicates)
+    # Build time filters.
+    # TODO(Paul): Allow loading smaller tiles once we are memory-constrained.
+    time_filters = hparque.build_year_month_filter(start_date, end_date)
+    hdbg.dassert_isinstance(time_filters, list)
+    hdbg.dassert(time_filters)
+    if not isinstance(time_filters[0], list):
+        time_filters = [time_filters]
+    # Build asset id filter.
+    if asset_ids is None:
+        asset_ids = []
+    asset_id_filter = hparque.build_asset_id_filter(asset_ids, asset_id_col)
+    # Iterate through time slices.
+    for time_filter in time_filters:
+        # Create a single parquet filter by combining `time_filter` and, if
+        # one exists, the `asset_id_filter`.
+        if asset_id_filter:
+            combined_filter = [
+                id_filter + time_filter for id_filter in asset_id_filter
+            ]
+        else:
+            combined_filter = time_filter
+        # Create a dictionary of processed dataframes, indexed by simulation.
+        dfs = {}
+        for idx, row in simulations.iterrows():
+            dir_name = row["dir_name"]
+            prediction_col = row["prediction_col"]
+            columns = [asset_id_col] + [prediction_col]
+            tile = hparque.from_parquet(
+                dir_name,
+                columns=columns,
+                filters=combined_filter,
+            )
+            df = process_parquet_read_df(
+                tile,
+                asset_id_col,
+            )[prediction_col]
+            # Normalize the scale of the predictions. Note that this scale
+            # estimate is non-causual.
+            df = df / df.std()
+            dfs[idx] = df
+        yield dfs
+
+
+def evaluate_weighted_forecasts(
+    simulations: pd.DataFrame,
+    weights: pd.DataFrame,
+    market_data_and_volatility: pd.DataFrame,
+    start_date: datetime.date,
+    end_date: datetime.date,
+    asset_id_col: str,
+    *,
+    asset_ids: Optional[List[int]] = None,
+    annotate_forecasts_kwargs: Optional[dict] = None,
+) -> pd.DataFrame:
+    forecast_evaluator = dtfmfefrpr.ForecastEvaluatorFromPrices(
+        "price",
+        "volatility",
+        "prediction",
+    )
+    pred_dict_iter = yield_processed_parquet_tile_dict(
+        simulations, start_date, end_date, asset_id_col, asset_ids=asset_ids
+    )
+    #
+    hdbg.dassert_isinstance(market_data_and_volatility, pd.DataFrame)
+    hdbg.dassert_is_subset(["dir_name", "col"], market_data_and_volatility.columns)
+    hdbg.dassert(not simulations.index.has_duplicates)
+    hdbg.dassert_is_subset(["price", "volatility"], market_data_and_volatility.index)
+    #
+    if annotate_forecasts_kwargs is None:
+        annotate_forecasts_kwargs = {}
+        annotate_forecasts_kwargs["target_gmv"] = 1e6
+        annotate_forecasts_kwargs["dollar_neutrality"] = "gaussian_rank"
+        annotate_forecasts_kwargs["quantization"] = "nearest_share"
+    # Create volatility time slice iterator.
+    vol_dir = market_data_and_volatility.loc["volatility"]["dir_name"]
+    vol_col = market_data_and_volatility.loc["volatility"]["col"]
+    volatility_iter = yield_processed_parquet_tiles_by_year(
+        vol_dir,
+        start_date,
+        end_date,
+        asset_id_col,
+        [vol_col],
+        asset_ids=asset_ids,
+    )
+    # Create price time slice iterator.
+    price_dir = market_data_and_volatility.loc["price"]["dir_name"]
+    price_col = market_data_and_volatility.loc["price"]["col"]
+    price_iter = yield_processed_parquet_tiles_by_year(
+        price_dir,
+        start_date,
+        end_date,
+        asset_id_col,
+        [price_col],
+        asset_ids=asset_ids,
+    )
+    bar_metrics = []
+    for dfs in pred_dict_iter:
+        bar_metrics_dict = {}
+        weighted_sum = hpandas.compute_weighted_sum(dfs, weights)
+        volatility = next(volatility_iter)[vol_col]
+        price = next(price_iter)[price_col]
+        for key, val in weighted_sum.items():
+            df = pd.concat(
+                [val, volatility, price],
+                axis=1,
+                keys=["prediction", "volatility", "price"],
+            )
+            _, stats = forecast_evaluator.annotate_forecasts(
+                df,
+                **annotate_forecasts_kwargs,
+            )
+            bar_metrics_dict[key] = stats
+        bar_metrics_df = pd.concat(
+            bar_metrics_dict.values(),
+            axis=1,
+            keys=bar_metrics_dict.keys(),
+        )
+        bar_metrics.append(bar_metrics_df)
+    bar_metrics = pd.concat(bar_metrics)
+    return bar_metrics
 
 
 def process_parquet_read_df(

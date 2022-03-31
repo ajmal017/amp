@@ -11,9 +11,9 @@ from typing import List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
-import sklearn
 
 import core.finance as cofinanc
+import core.signal_processing as sigproc
 import helpers.hdbg as hdbg
 import helpers.hio as hio
 import helpers.hpandas as hpandas
@@ -544,15 +544,8 @@ class ForecastEvaluatorFromPrices:
         if dollar_neutrality == "no_constraint":
             pass
         elif dollar_neutrality == "gaussian_rank":
-            quantile_transformer = sklearn.preprocessing.QuantileTransformer(
-                n_quantiles=200,
-                output_distribution="normal",
-            )
-            vals = quantile_transformer.fit_transform(target_positions.T.values).T
-            target_positions = pd.DataFrame(
-                vals,
-                target_positions.index,
-                target_positions.columns,
+            target_positions = sigproc.gaussian_rank(
+                target_positions, n_quantiles=200
             )
         elif dollar_neutrality == "demean":
             # Cross-sectionally demean signals on a per-bar basis.
