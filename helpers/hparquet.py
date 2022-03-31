@@ -255,6 +255,8 @@ def yield_parquet_tiles_by_assets(
     :param cols: if an `int` is supplied, it is cast to a string before reading
     :return: a generator of `from_parquet()` dataframes
     """
+    hdbg.dassert_isinstance(asset_id_col, str)
+    hdbg.dassert(asset_id_col, "`asset_id_col` must be nonempty")
     batches = [
         asset_ids[i : i + asset_batch_size]
         for i in range(0, len(asset_ids), asset_batch_size)

@@ -7,7 +7,7 @@ import dataflow.model.forecast_evaluator_from_prices as dtfmfefrpr
 import datetime
 import logging
 import os
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -341,6 +341,14 @@ class ForecastEvaluatorFromPrices:
         )
         return portfolio_df, statistics_df
 
+    def get_cols(self) -> List[str]:
+        cols = [
+            self._price_col,
+            self._volatility_col,
+            self._prediction_col,
+        ]
+        return cols
+
     def _validate_df(self, df: pd.DataFrame) -> None:
         hdbg.dassert_isinstance(df, pd.DataFrame)
         hdbg.dassert_isinstance(df.index, pd.DatetimeIndex)
@@ -426,6 +434,9 @@ class ForecastEvaluatorFromPrices:
         df = df.dropna(how="all")
         # Forward fill to mitigate spurious artifacts at the portfolio bar
         # level.
+        # TODO(Paul): Make this optional, or only apply to assets for which we
+        # have predictions (e.g., the universe may change over the time window
+        # of interest).
         df = df.ffill()
         return df
 
@@ -447,6 +458,8 @@ class ForecastEvaluatorFromPrices:
         )
         # Assume target shares are obtained.
         holdings = target_holdings.shift(1)
+        # TODO(Paul): Give the user the option of supplying the share
+        # adjustment factors. Infer as below if they are not supplied.
         # Handle overnight period specially.
         # 1. Make beginning-of-day-holdings NaN.
         first_bar_of_day_close_idx = holdings.index.indexer_between_time(
