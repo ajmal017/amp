@@ -123,8 +123,6 @@ def yield_processed_parquet_tile_dict(
                 tile,
                 asset_id_col,
             )[prediction_col]
-            # Cross-sectionally normalize the predictions.
-            df = csigproc.gaussian_rank(df)
             dfs[idx] = df
         yield dfs
 
@@ -139,7 +137,26 @@ def evaluate_weighted_forecasts(
     *,
     asset_ids: Optional[List[int]] = None,
     annotate_forecasts_kwargs: Optional[dict] = None,
+    target_freq_str: Optional[str] = None,
 ) -> pd.DataFrame:
+    """
+    Mix forecasts with weights and evaluate the portfolio.
+
+    :param simulations: df indexed by backtest id; columns are "dir_name" and
+        "prediction_col"
+    :param weights: df indexed by backtest id; columns are weights
+    :param market_data_and_volatility: df with "price" and "volatility" in
+        index; columns are "dir_name" and "col"
+    :param start_date: start date for tile loading
+    :param end_date: end date for tile loading
+    :param asset_id_col: name of column with asset ids in tiles
+    :param asset_ids: if `None`, select all available
+    :param annotate_forecasts_kwargs: options for
+        `ForecastEvaluatorFromPrice.annotate_forecasts()`
+    :param target_freq_str: if not `None`, resample all forecasts to target
+        frequency
+    :return: bar metrics dataframe
+    """
     forecast_evaluator = dtfmfefrpr.ForecastEvaluatorFromPrices(
         "price",
         "volatility",
@@ -157,12 +174,15 @@ def evaluate_weighted_forecasts(
     hdbg.dassert_is_subset(
         ["price", "volatility"], market_data_and_volatility.index
     )
-    #
+    # Set forecast annotation defaults.
     if annotate_forecasts_kwargs is None:
         annotate_forecasts_kwargs = {}
         annotate_forecasts_kwargs["target_gmv"] = 1e6
         annotate_forecasts_kwargs["dollar_neutrality"] = "gaussian_rank"
         annotate_forecasts_kwargs["quantization"] = "nearest_share"
+    #
+    if target_freq_str is not None:
+        hdbg.dassert_isinstance(target_freq_str, str)
     # Create volatility time slice iterator.
     vol_dir = market_data_and_volatility.loc["volatility"]["dir_name"]
     vol_col = market_data_and_volatility.loc["volatility"]["col"]
@@ -187,10 +207,34 @@ def evaluate_weighted_forecasts(
     )
     bar_metrics = []
     for dfs in pred_dict_iter:
-        bar_metrics_dict = {}
-        weighted_sum = hpandas.compute_weighted_sum(dfs, weights)
         volatility = next(volatility_iter)[vol_col]
         price = next(price_iter)[price_col]
+        idx = volatility.index
+        if target_freq_str is not None:
+            bar_length = pd.Series(idx).diff().min()
+            _LOG.info("bar_length=%s", bar_length)
+            hdbg.dassert_eq(
+                bar_length,
+                pd.Timedelta(target_freq_str),
+                "bar length of market and volatility data must equal `target_freq_str`",
+            )
+        # Cross-sectionally normalize the predictions.
+        for key, val in dfs.items():
+            # Resample provided `target_freq_str` is not `None`.
+            if target_freq_str is not None:
+                # TODO(Paul): Revisit this scale factor.
+                # freq = pd.Series(val.index).diff().min()
+                # scale_factor = np.sqrt(pd.Timedelta(target_freq_str) / freq)
+                val = val.resample(target_freq_str).ffill().reindex(idx)
+                val.index = idx
+            # Cross-sectionally normalize.
+            val = csigproc.gaussian_rank(val)
+            # TODO(Paul): Enable should we set `scale_factor` above.
+            # if target_freq_str is not None:
+            #     val *= scale_factor
+            dfs[key] = val
+        bar_metrics_dict = {}
+        weighted_sum = hpandas.compute_weighted_sum(dfs, weights)
         for key, val in weighted_sum.items():
             df = pd.concat(
                 [val, volatility, price],
