@@ -17,7 +17,7 @@ _LOG = logging.getLogger(__name__)
 def gaussian_rank(
     df: pd.DataFrame,
     *,
-    n_quantiles=1000,
+    n_quantiles=1001,
 ) -> pd.DataFrame:
     """
     Perform row-wise Gaussian ranking.

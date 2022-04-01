@@ -15,6 +15,7 @@ from typing import Dict, Iterator, List, Optional, Tuple, Union
 
 from tqdm.autonotebook import tqdm
 
+import core.signal_processing as csigproc
 import dataflow.model.forecast_evaluator_from_prices as dtfmfefrpr
 import dataflow.model.forecast_mixer as dtfmofomix
 import dataflow.model.parquet_tile_analyzer as dtfmpatian
@@ -122,9 +123,8 @@ def yield_processed_parquet_tile_dict(
                 tile,
                 asset_id_col,
             )[prediction_col]
-            # Normalize the scale of the predictions. Note that this scale
-            # estimate is non-causual.
-            df = df / df.std()
+            # Cross-sectionally normalize the predictions.
+            df = csigproc.gaussian_rank(df)
             dfs[idx] = df
         yield dfs
 
@@ -150,9 +150,13 @@ def evaluate_weighted_forecasts(
     )
     #
     hdbg.dassert_isinstance(market_data_and_volatility, pd.DataFrame)
-    hdbg.dassert_is_subset(["dir_name", "col"], market_data_and_volatility.columns)
+    hdbg.dassert_is_subset(
+        ["dir_name", "col"], market_data_and_volatility.columns
+    )
     hdbg.dassert(not simulations.index.has_duplicates)
-    hdbg.dassert_is_subset(["price", "volatility"], market_data_and_volatility.index)
+    hdbg.dassert_is_subset(
+        ["price", "volatility"], market_data_and_volatility.index
+    )
     #
     if annotate_forecasts_kwargs is None:
         annotate_forecasts_kwargs = {}

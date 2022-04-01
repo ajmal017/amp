@@ -544,9 +544,7 @@ class ForecastEvaluatorFromPrices:
         if dollar_neutrality == "no_constraint":
             pass
         elif dollar_neutrality == "gaussian_rank":
-            target_positions = sigproc.gaussian_rank(
-                target_positions, n_quantiles=200
-            )
+            target_positions = sigproc.gaussian_rank(target_positions)
         elif dollar_neutrality == "demean":
             # Cross-sectionally demean signals on a per-bar basis.
             # This is equivalent to a dollar neutralizing linear projection.
