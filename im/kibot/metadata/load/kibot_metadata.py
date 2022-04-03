@@ -20,7 +20,7 @@ import helpers.hio as hio
 import helpers.hpandas as hpandas
 import helpers.hs3 as hs3
 import im.common.data.types as imcodatyp
-import im.kibot.data.load.kibot_s3_data_loader as ikdlksdlo
+import im.kibot.data.load.kibot_s3_data_loader as imkdlksdlo
 import im.kibot.metadata.load.expiry_contract_mapper as imkmlecoma
 import im.kibot.metadata.load.s3_backend as imkmls3ba
 import im.kibot.metadata.types as imkimetyp
@@ -410,7 +410,7 @@ class KibotTradingActivityContractLifetimeComputer(ContractLifetimeComputer):
         self.end_timedelta_days = end_timedelta_days
 
     def compute_lifetime(self, contract_name: str) -> imkimetyp.ContractLifetime:
-        df = ikdlksdlo.KibotS3DataLoader().read_data(
+        df = imkdlksdlo.KibotS3DataLoader().read_data(
             "Kibot",
             contract_name,
             imcodatyp.AssetClass.Futures,
@@ -548,7 +548,7 @@ class FuturesContractLifetimes:
         symbol_to_contracts: _SymbolToContracts = {}
         for symbol in symbols:
             file_name = os.path.join(self._get_dir_name(), symbol + ".csv")
-            hdbg.dassert_exists(file_name)
+            hdbg.dassert_path_exists(file_name)
             if hs3.is_s3_path(file_name):
                 s3fs = hs3.get_s3fs("am")
                 kwargs = {"s3fs": s3fs}

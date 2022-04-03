@@ -13,6 +13,7 @@ import pandas as pd
 import helpers.hdatetime as hdateti
 import helpers.hdbg as hdbg
 import helpers.hparquet as hparque
+import helpers.hprint as hprint
 import helpers.hsql as hsql
 import im_v2.common.data.client as icdc
 import im_v2.common.data.client.full_symbol as imvcdcfusy
@@ -31,6 +32,26 @@ class TalosHistoricalPqByTileClient(imvcdchpcl.HistoricalPqByTileClient):
     Read historical data for `Talos` assets stored as Parquet dataset.
 
     It can read data from local or S3 filesystem as backend.
+
+    The timing semantic of several clients is described below:
+    1) Talos DB client
+    2) Talos Parquet client
+    3) CCXT CSV / Parquet client
+
+    In a query for data in the interval `[a, b]`, the extremes `a` and b are
+    rounded to the floor of the minute to retrieve the data.
+    - E.g., for all the 3 clients:
+        - [10:00:00, 10:00:36] retrieves data for [10:00:00, 10:00:00]
+        - [10:07:00, 10:08:24] retrieves data for [10:07:00, 10:08:00]
+
+    Note that for Talos DB if `b` is already a round minute, it's rounded down
+    to the previous minute.
+    - E.g., [10:06:00, 10:08:00]
+        - For Talos DB client, retrieved data is in [10:06:00, 10:07:00]
+        - For CCXT Client and Talos Client the data is in [10:06:00, 10:08:00]
+
+    # TODO(gp): Change the Talos DB implementation to uniform the semantics,
+    # since `MarketData` will not be happy with rewinding one minute.
     """
 
     def __init__(
@@ -173,6 +194,23 @@ class RealTimeSqlTalosClient(icdc.ImClient):
         # TODO(Danya): CmTask1420.
         return []
 
+    @staticmethod
+    # TODO(Danya): Move up to hsql.
+    def _create_in_operator(values: List[str], column_name: str) -> str:
+        """
+        Transform a list of possible values into an IN operator clause.
+
+        Example:
+            (`["binance", "ftx"]`, 'exchange_id') =>
+            "exchange_id IN ('binance', 'ftx')"
+        """
+        in_operator = (
+            f"{column_name} IN ("
+            + ",".join([f"'{value}'" for value in values])
+            + ")"
+        )
+        return in_operator
+
     def _apply_talos_normalization(
         self,
         data: pd.DataFrame,
@@ -208,37 +246,6 @@ class RealTimeSqlTalosClient(icdc.ImClient):
         # Rearrange the columns.
         data = data.loc[:, ohlcv_columns]
         return data
-
-    @staticmethod
-    # TODO(Danya): Move up to hsql.
-    def _create_in_operator(values: List[str], column_name: str) -> str:
-        """
-        Transform a list of possible values into an IN operator clause.
-
-        Example:
-            (`["binance", "ftx"]`, 'exchange_id') =>
-            "exchange_id IN ('binance', 'ftx')"
-        """
-        in_operator = (
-            f"{column_name} IN ("
-            + ",".join([f"'{value}'" for value in values])
-            + ")"
-        )
-        return in_operator
-
-    @staticmethod
-    def _build_select_query(
-        query: str,
-        exchange_id: str,
-        currency_pair: str,
-        start_unix_epoch: int,
-        end_unix_epoch: int,
-    ) -> str:
-        """
-        Append a WHERE clause to the query.
-        """
-        # TODO(Danya): Depending on the implementation, can be moved out to helpers.
-        raise NotImplementedError
 
     def _read_data(
         self,
@@ -279,8 +286,9 @@ class RealTimeSqlTalosClient(icdc.ImClient):
         )
         # Remove extra columns and create a timestamp index.
         # TODO(Danya): The normalization may change depending on use of the class.
-        data = self._apply_talos_normalization(data,
-                full_symbol_col_name=full_symbol_col_name)
+        data = self._apply_talos_normalization(
+            data, full_symbol_col_name=full_symbol_col_name
+        )
         return data
 
     def _build_select_query(
@@ -385,3 +393,41 @@ class RealTimeSqlTalosClient(icdc.ImClient):
         # TODO(Danya): Convert timestamps to int when reading.
         # TODO(Danya): add a full symbol column to the output
         raise NotImplementedError
+
+    def _get_start_end_ts_for_symbol(
+        self, full_symbol: imvcdcfusy.FullSymbol, mode: str
+    ) -> pd.Timestamp:
+        """
+        Select a maximum/minimum timestamp for the given symbol.
+
+        Overrides the method in parent class to utilize
+        the MIN/MAX SQL operators.
+
+        :param full_symbol: unparsed full_symbol value
+        :param mode: 'start' or 'end'
+        :return: min or max value of 'timestamp' column.
+        """
+        _LOG.debug(hprint.to_str("full_symbol"))
+        exchange, currency_pair = imvcdcfusy.parse_full_symbol(full_symbol)
+        # Build a MIN/MAX query.
+        if mode == "start":
+            query = (
+                f"SELECT MIN(timestamp) from {self._table_name}"
+                f" WHERE currency_pair='{currency_pair}'"
+                f" AND exchange_id='{exchange}'"
+            )
+        elif mode == "end":
+            query = (
+                f"SELECT MAX(timestamp) from {self._table_name}"
+                f" WHERE currency_pair='{currency_pair}'"
+                f" AND exchange_id='{exchange}'"
+            )
+        else:
+            raise ValueError("Invalid mode='%s'" % mode)
+        # TODO(Danya): factor out min/max as helper function.
+        # Load the target timestamp as unix epoch.
+        timestamp = hsql.execute_query_to_df(self._db_connection, query).loc[0][0]
+        # Convert to `pd.Timestamp` type.
+        timestamp = hdateti.convert_unix_epoch_to_timestamp(timestamp)
+        hdateti.dassert_has_specified_tz(timestamp, ["UTC"])
+        return timestamp

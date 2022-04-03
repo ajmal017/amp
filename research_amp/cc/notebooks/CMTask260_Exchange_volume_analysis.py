@@ -75,7 +75,9 @@ print(config)
 
 # %%
 vendor_universe = imvcounun.get_vendor_universe(
-    config["data"]["vendor"], version=config["data"]["universe_version"], as_full_symbol=True
+    config["data"]["vendor"],
+    version=config["data"]["universe_version"],
+    as_full_symbol=True,
 )
 vendor_universe
 
@@ -211,10 +213,10 @@ def plot_ath_volumes_comparison(df_list):
 
 # %%
 # get the list of all coin paires for each exchange
-binance_coins = imvcounun.get_vendor_universe("CCXT", version="v03")["binance"]
-ftx_coins = imvcounun.get_vendor_universe("CCXT", version="v03")["ftx"]
-gateio_coins = imvcounun.get_vendor_universe("CCXT", version="v03")["gateio"]
-kucoin_coins = imvcounun.get_vendor_universe("CCXT", version="v03")["kucoin"]
+binance_coins = imvcounun.get_vendor_universe("CCXT", version="v3")["binance"]
+ftx_coins = imvcounun.get_vendor_universe("CCXT", version="v3")["ftx"]
+gateio_coins = imvcounun.get_vendor_universe("CCXT", version="v3")["gateio"]
+kucoin_coins = imvcounun.get_vendor_universe("CCXT", version="v3")["kucoin"]
 
 # load all the dataframes
 binance_1 = get_initial_df_with_volumes(
