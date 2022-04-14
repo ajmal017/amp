@@ -596,9 +596,9 @@ class CrossSectionalDfToDfColProcessor:
         0 1 2 3
         ```
     2.  If we perform residualization on `df` as given above instead of
-        principcal component projection, then column names are preserved
+        principal component projection, then column names are preserved
         after the residualization, and we may apply `postprocess()` with
-        `col_group = "residual"` to obtian
+        `col_group = "residual"` to obtain
         ```
         residual
         MN0 MN1 MN2 MN3
