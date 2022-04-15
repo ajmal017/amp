@@ -49,7 +49,7 @@ services:
     # a database container pointing to localhost:5432.
     # In tests we use dind so we need set back to the default "bridge".
     # See CmTask988 and https://stackoverflow.com/questions/24319662
-    network_mode: ${NETWORK_MODE:-host}
+    #network_mode: ${NETWORK_MODE:-host}
     volumes:
       - ../../:/app
 
