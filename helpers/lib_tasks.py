@@ -2106,10 +2106,14 @@ def _generate_compose_file(
     # - AM_ENABLE_DIND=$AM_ENABLE_DIND
     # ```
     # but we prefer to inline it.
+    if use_privileged_mode:
+        am_enable_dind = 1
+    else:
+        am_enable_dind = 0
     # We could do the same also with IMAGE for symmetry.
     # Use % instead of f-string since `${IMAGE}` confuses f-string as a variable.
     txt_tmp = (
-        """
+    """
     version: '3'
 
     services:
@@ -2120,6 +2124,7 @@ def _generate_compose_file(
           - AM_AWS_PROFILE=$AM_AWS_PROFILE
           - AM_ECR_BASE_PATH=$AM_ECR_BASE_PATH
           - AM_ENABLE_DIND=%s
+          - AM_FORCE_TEST_FAIL=$AM_FORCE_TEST_FAIL
           - AM_PUBLISH_NOTEBOOK_LOCAL_PATH=$AM_PUBLISH_NOTEBOOK_LOCAL_PATH
           - AM_S3_BUCKET=$AM_S3_BUCKET
           - AM_TELEGRAM_TOKEN=$AM_TELEGRAM_TOKEN
@@ -2131,7 +2136,7 @@ def _generate_compose_file(
           - CI=$CI
         image: ${IMAGE}
     """
-        % use_privileged_mode
+        % am_enable_dind
     )
     indent_level = 0
     append(txt_tmp, indent_level)

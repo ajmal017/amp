@@ -132,15 +132,15 @@ default_params = {
     # "BASE_IMAGE": "amp_tmp",
     "BASE_IMAGE": DOCKER_BASE_IMAGE_NAME,
     "QA_TEST_FUNCTION": _run_qa_tests,
-    # TODO(gp): This should be made function of the system.
-    # The Docker user.
-    "DOCKER_USER": "spm-sasm",
-    # The group shared by users and docker.
-    "SHARED_GROUP": "spm-sasm-fileshare",
-    #
+    # TODO(gp): -> USE_DOCKER_PRIVILEGED_MODE
     "USE_PRIVILEGED_MODE": rconf.has_dind_support(),
     "USE_SIBLING_CONTAINER": rconf.use_docker_sibling_containers(),
     "USE_SHARED_CACHE": rconf.use_docker_shared_cache(),
+    # The Docker user.
+    "DOCKER_USER": rconf.get_docker_user(),
+    # The group shared by users and docker.
+    # TODO(gp): -> DOCKER_SHARED_GROUP.
+    "SHARED_GROUP": rconf.get_docker_shared_user()
 }
 
 

@@ -48,28 +48,28 @@ def is_inside_ci() -> bool:
     return ret
 
 
-def run_docker_as_root() -> bool:
-    """
-    Return whether Docker should be run with root user.
-    """
-    # We want to run as user anytime we can.
-    res = False
-    if is_inside_ci():
-        # When running as user in GH action we get an error:
-        # ```
-        # /home/.config/gh/config.yml: permission denied
-        # ```
-        # see https://github.com/alphamatic/amp/issues/1864
-        # So we run as root in GH actions.
-        res = True
-    return res
+# #############################################################################
 
 
-# TODO(gp): use_docker_privileged_mode
+# //amp runs on:
+# - MacOS
+#   - Supports Docker privileged mode
+#   - The same user and group is used inside the container
+#   - Root can also be used
+# - Linux (dev server, GitHub CI)
+#   - Supports Docker privileged mode
+#   - The same user and group is used inside the container
+# - Linux (spm-dev4)
+#   - Doesn't support Docker privileged mode
+#   - A different user and group is used inside the container
+# TODO(gp): -> use_docker_privileged_mode
+
+
 def has_dind_support() -> bool:
     """
     Return whether this repo image supports Docker-in-Docker.
     """
+    # `//amp` is executed on systems that can run Docker in privileged mode.
     host_name = os.uname()[1]
     _LOG.debug("host_name=%s", host_name)
     if host_name == "cf-spm-dev4":
@@ -90,8 +90,50 @@ def use_docker_shared_cache() -> bool:
     """ """
     host_name = os.uname()[1]
     if host_name == "cf-spm-dev4":
-        # Unclear
         val = True
     else:
         val = False
+    return val
+
+
+def run_docker_as_root() -> bool:
+    """
+    Return whether Docker should be run with root user.
+    """
+    # We want to run as user anytime we can.
+    res = False
+    if is_inside_ci():
+        # When running as user in GH action we get an error:
+        # ```
+        # /home/.config/gh/config.yml: permission denied
+        # ```
+        # see https://github.com/alphamatic/amp/issues/1864
+        # So we run as root in GH actions.
+        res = True
+    return res
+
+
+def get_docker_user() -> str:
+    """
+    Return the user that runs Docker, if any.
+    """
+    host_name = os.uname()[1]
+    _LOG.debug("host_name=%s", host_name)
+    if host_name == "cf-spm-dev4":
+        val = "spm-sasm",
+    else:
+        val = ""
+    return val
+
+
+def get_docker_shared_user() -> str:
+    """
+    Return the group of the user running Docker, if any.
+    """
+    host_name = os.uname()[1]
+    _LOG.debug("host_name=%s", host_name)
+    if host_name == "cf-spm-dev4":
+        val = "spm-sasm-fileshare",
+    else:
+        val = ""
     return val
