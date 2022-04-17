@@ -47,7 +47,8 @@ def _export_env_var(val_name: str, vals: List[Any]) -> List[str]:
     """
     Create a snippet of bash script equivalent to the following:
 
-    # Update variable.
+    - Update variables:
+
     ```
     PYTHONPATH=$CURR_DIR:$PYTHONPATH
     # Remove redundant paths.

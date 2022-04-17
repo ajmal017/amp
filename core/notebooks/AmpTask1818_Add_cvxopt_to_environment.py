@@ -13,12 +13,10 @@
 # ---
 
 # # !pip install cvxopt
-import cvxopt
 import cvxpy as cp
 
 # %%
 import numpy as np
-import pandas as pd
 
 # %% [markdown]
 # # Example 1

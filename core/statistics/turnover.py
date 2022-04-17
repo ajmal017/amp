@@ -155,7 +155,7 @@ def apply_smoothing_parameters(
     """
     rhos = []
     turns = []
-    tsq = turn ** 2
+    tsq = turn**2
     for param in parameters:
         rho_num = np.square(np.linalg.norm(tsq.pow(-1 * param / 4).multiply(rho)))
         # TODO(Paul): Cross-check.

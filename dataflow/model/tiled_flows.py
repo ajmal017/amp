@@ -83,10 +83,13 @@ def yield_processed_parquet_tile_dict(
     """
     Yield a dictionary of processed dataframes, keyed by simulation.
 
-    `simulations` should like like
+    `simulations` should like like:
+
+    ```
              dir_name   prediction_col
     sim1    dir_name1         col_name
     sim2    dir_name2         col_name
+    ```
     """
     # Sanity-check the simulation dataframe.
     hdbg.dassert_isinstance(simulations, pd.DataFrame)
@@ -367,7 +370,8 @@ def regress(
     """
     Perform per-asset regressions over a tiled backtest.
 
-    For each asset, the regression is performed over the entire time window.
+    For each asset, the regression is performed over the entire time
+    window.
     """
     # Perform sanity-checks.
     hdbg.dassert_dir_exists(file_name)

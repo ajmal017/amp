@@ -14,6 +14,15 @@ _LOG = logging.getLogger(__name__)
 
 
 class Test_evaluate_weighted_forecasts(hunitest.TestCase):
+    @staticmethod
+    def convert_to_parquet_format(df: pd.DataFrame) -> pd.DataFrame:
+        df = df.stack()
+        df.index.names = ["end_ts", "asset_id"]
+        df = df.reset_index(level=1)
+        df["year"] = df.index.year
+        df["month"] = df.index.month
+        return df
+
     def test_combine_two_signals(self) -> None:
         base_dir = self.get_scratch_space()
         start_datetime = pd.Timestamp(
@@ -91,12 +100,3 @@ end_ts
 2022-01-10 15:30:00-05:00 -1568.34     1.85e+06    4565.56  1.00e+06   928.72   768.81     1.00e+06   -3175.92  999979.96  -780.47  -956.01     1.00e+06    1282.36  9.99e+05  473.19
 2022-01-10 16:00:00-05:00    79.23     1.00e+06   -1592.03  1.00e+06  -584.09 -1115.89     9.99e+05    2990.87  999795.16  1094.52 -1186.80     2.00e+06    1385.63  9.99e+05  672.02"""
         self.assert_equal(actual, expected, fuzzy_match=True)
-
-    @staticmethod
-    def convert_to_parquet_format(df: pd.DataFrame) -> pd.DataFrame:
-        df = df.stack()
-        df.index.names = ["end_ts", "asset_id"]
-        df = df.reset_index(level=1)
-        df["year"] = df.index.year
-        df["month"] = df.index.month
-        return df

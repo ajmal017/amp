@@ -133,6 +133,32 @@ class TestSqlDataLoader1(hunitest.TestCase):
         with self.assertRaises(AssertionError):
             self._loader._read_data("CME", "", imcodatyp.Frequency.Minutely)
 
+    @staticmethod
+    def _generate_test_data(seed: int) -> pd.DataFrame:
+        """
+        Generate dataframe with some data based on symbol.
+        """
+        nrows = 5
+        df = pd.DataFrame(
+            {
+                "trade_symbol_id": [seed] * nrows,
+                "date": [
+                    datetime.date(2021, 1, i + 1).isoformat()
+                    for i in range(nrows)
+                ],
+                "datetime": [
+                    datetime.datetime(2021, 1, 1, 1, i + 1, 0).isoformat()
+                    for i in range(nrows)
+                ],
+                "open": [seed + i for i in range(nrows)],
+                "high": [seed + 2 * i for i in range(nrows)],
+                "low": [seed - i for i in range(nrows)],
+                "close": [seed] * nrows,
+                "volume": [seed * 100] * nrows,
+            }
+        )
+        return df
+
     @classmethod
     def _prepare_tables(cls, writer: imkisqwri.KibotSqlWriter) -> None:
         """
@@ -195,29 +221,3 @@ class TestSqlDataLoader1(hunitest.TestCase):
                     writer.insert_bulk_minute_data(
                         generated_data.drop(columns=["date"])
                     )
-
-    @staticmethod
-    def _generate_test_data(seed: int) -> pd.DataFrame:
-        """
-        Generate dataframe with some data based on symbol.
-        """
-        nrows = 5
-        df = pd.DataFrame(
-            {
-                "trade_symbol_id": [seed] * nrows,
-                "date": [
-                    datetime.date(2021, 1, i + 1).isoformat()
-                    for i in range(nrows)
-                ],
-                "datetime": [
-                    datetime.datetime(2021, 1, 1, 1, i + 1, 0).isoformat()
-                    for i in range(nrows)
-                ],
-                "open": [seed + i for i in range(nrows)],
-                "high": [seed + 2 * i for i in range(nrows)],
-                "low": [seed - i for i in range(nrows)],
-                "close": [seed] * nrows,
-                "volume": [seed * 100] * nrows,
-            }
-        )
-        return df

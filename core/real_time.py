@@ -17,7 +17,6 @@ import helpers.hasyncio as hasynci
 import helpers.hdatetime as hdateti
 import helpers.hdbg as hdbg
 import helpers.hnumpy as hnumpy
-import helpers.hpandas as hpandas
 import helpers.hprint as hprint
 
 _LOG = logging.getLogger(__name__)

@@ -64,10 +64,8 @@ def get_dag_runner(config: cconfig.Config) -> dtfcore.AbstractDagRunner:
     Build a DAG runner from a config.
     """
     # Create MarketData.
-    event_loop = None
     start_datetime = pd.Timestamp("2020-01-01 09:30:00-05:00")
     end_datetime = pd.Timestamp("2020-03-01 09:30:00-05:00")
-    initial_replayed_delay = 0
     asset_ids = [1000]
     # market_data, _ = mdata.get_ReplayedTimeMarketData_example2(
     #     event_loop,

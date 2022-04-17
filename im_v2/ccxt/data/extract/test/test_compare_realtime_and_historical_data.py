@@ -50,7 +50,7 @@ class TestCompareRealtimeAndHistoricalData1(imvcddbut.TestImDbHelper):
             )
             # Matching exact timespan as in test function call.
             self._ohlcv_dataframe_sample = ohlcv_sample.loc[
-                "2021-12-31 23:55:00":"2022-01-01 00:05:00"
+                "2021-12-31 23:55:00":"2022-01-01 00:05:00"  # type: ignore[misc]
             ]
         # Deep copy (which is default for `pd.DataFrame.copy()`) is used to
         # preserve original data for each test.
@@ -83,7 +83,6 @@ class TestCompareRealtimeAndHistoricalData1(imvcddbut.TestImDbHelper):
         # Check output.
         actual = str(fail.value)
         expected = r"""
-        ################################################################################
         Missing real time data:
         df.shape=(9, 5)
         df.full=
@@ -97,8 +96,7 @@ class TestCompareRealtimeAndHistoricalData1(imvcddbut.TestImDbHelper):
         1640995320000 SOL_USDT       170.46  170.60  170.33  170.53   520.30
         1640995380000 SOL_USDT       170.53  170.60  170.27  170.34  1175.03
         1640995440000 SOL_USDT       170.33  170.49  170.31  170.40   318.96
-        1640995500000 SOL_USDT       170.41  170.73  170.25  170.65   612.02
-        ################################################################################"""
+        1640995500000 SOL_USDT       170.41  170.73  170.25  170.65   612.02"""
         self.assert_equal(actual, expected, fuzzy_match=True)
 
     def test_function_call3(self) -> None:
@@ -137,7 +135,6 @@ class TestCompareRealtimeAndHistoricalData1(imvcddbut.TestImDbHelper):
         # Check output.
         actual = str(fail.value)
         expected = r"""
-        ################################################################################
         Missing daily data:
         df.shape=(9, 5)
         df.full=
@@ -151,8 +148,7 @@ class TestCompareRealtimeAndHistoricalData1(imvcddbut.TestImDbHelper):
         1640995200000 ADA_USDT       1.308  1.310  1.307  1.310   98266.8
         1640995260000 ADA_USDT       1.310  1.314  1.308  1.312  132189.4
         1640995320000 ADA_USDT       1.312  1.318  1.311  1.317  708964.2
-        1640995380000 ADA_USDT       1.317  1.317  1.315  1.315  219213.9
-        ################################################################################"""
+        1640995380000 ADA_USDT       1.317  1.317  1.315  1.315  219213.9"""
         self.assert_equal(actual, expected, fuzzy_match=True)
 
     def test_function_call4(self) -> None:
@@ -189,7 +185,6 @@ class TestCompareRealtimeAndHistoricalData1(imvcddbut.TestImDbHelper):
         # Check output.
         actual = str(fail.value)
         expected = r"""
-        ################################################################################
         Missing real time data:
         df.shape=(4, 5)
         df.full=
@@ -218,8 +213,7 @@ class TestCompareRealtimeAndHistoricalData1(imvcddbut.TestImDbHelper):
         46    999.000    3.033
         51    999.000  109.750
         67      1.317  666.000
-        83    999.000    1.315
-        ################################################################################"""
+        83    999.000    1.315"""
         self.assert_equal(actual, expected, fuzzy_match=True)
 
     def test_parser(self) -> None:

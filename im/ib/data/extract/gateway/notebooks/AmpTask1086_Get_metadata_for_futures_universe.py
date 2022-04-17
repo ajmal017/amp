@@ -51,7 +51,6 @@ df
 # %%
 import copy
 
-
 # %%
 def create_contracts(ib, contract, symbols):
     contracts = []

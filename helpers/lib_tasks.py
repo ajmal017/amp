@@ -2113,7 +2113,7 @@ def _generate_compose_file(
     # We could do the same also with IMAGE for symmetry.
     # Use % instead of f-string since `${IMAGE}` confuses f-string as a variable.
     txt_tmp = (
-    """
+        """
     version: '3'
 
     services:

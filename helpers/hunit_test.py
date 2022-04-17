@@ -1727,7 +1727,9 @@ class TestCase(unittest.TestCase):
     ) -> str:
         """
         Return the name of the directory containing the input / output data
-        (e.g., ./core/dataflow/test/outcomes/TestContinuousSarimaxModel.test_compare)
+        
+        E.g.,
+        `./core/dataflow/test/outcomes/TestContinuousSarimaxModel.test_compare`
 
         The parameters have the same meaning as in `get_input_dir()`.
         """
@@ -1769,5 +1771,3 @@ class QaTestCase(TestCase, abc.ABC):
     This unit test is used for QA to test functionalities (e.g., invoke tasks)
     that run the dev / prod container.
     """
-
-    pass

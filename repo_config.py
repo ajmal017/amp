@@ -120,7 +120,7 @@ def get_docker_user() -> str:
     host_name = os.uname()[1]
     _LOG.debug("host_name=%s", host_name)
     if host_name == "cf-spm-dev4":
-        val = "spm-sasm",
+        val = "spm-sasm"
     else:
         val = ""
     return val
@@ -133,7 +133,7 @@ def get_docker_shared_user() -> str:
     host_name = os.uname()[1]
     _LOG.debug("host_name=%s", host_name)
     if host_name == "cf-spm-dev4":
-        val = "spm-sasm-fileshare",
+        val = "spm-sasm-fileshare"
     else:
         val = ""
     return val
