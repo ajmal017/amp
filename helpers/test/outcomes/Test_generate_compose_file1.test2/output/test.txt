@@ -1,3 +1,4 @@
+use_privileged_mode=False, use_sibling_container=False, use_shared_cache=True, mount_as_submodule=False
 version: '3'
 
 services:
@@ -7,7 +8,7 @@ services:
     environment:
       - AM_AWS_PROFILE=$AM_AWS_PROFILE
       - AM_ECR_BASE_PATH=$AM_ECR_BASE_PATH
-      - AM_ENABLE_DIND=True
+      - AM_ENABLE_DIND=False
       - AM_PUBLISH_NOTEBOOK_LOCAL_PATH=$AM_PUBLISH_NOTEBOOK_LOCAL_PATH
       - AM_S3_BUCKET=$AM_S3_BUCKET
       - AM_TELEGRAM_TOKEN=$AM_TELEGRAM_TOKEN
@@ -19,11 +20,6 @@ services:
       - CI=$CI
     image: ${IMAGE}
 
-    # This is needed:
-    # - for Docker-in-docker (dind)
-    # - to mount fstabs
-    privileged: true
-
     restart: "no"
     volumes:
       # TODO(gp): We should pass the value of $HOME from dev.Dockerfile to here.
@@ -32,22 +28,15 @@ services:
       - ~/.config/gspread_pandas/:/home/.config/gspread_pandas/
       - ~/.config/gh:/home/.config/gh
 
-  # Mount `amp` when it is used as submodule. In this case we need to
-  # mount the super project in the container (to make git work with the
-  # supermodule) and then change dir to `amp`.
+      # Shared cache. This is specific of lime.
+      - /local/home/share/cache:/cache
+
+  # Mount `amp` when it is used as supermodule.
   app:
     extends:
       base_app
-    # Default network mode set to host so we can reach e.g.
-    # a database container pointing to localhost:5432.
-    # In tests we use dind so we need set back to the default "bridge".
-    # See CmTask988 and https://stackoverflow.com/questions/24319662
-    #network_mode: ${NETWORK_MODE:-host}
     volumes:
-      # Move one dir up to include the entire git repo (see AmpTask1017).
-      - ../../../:/app
-    # Move one dir down to include the entire git repo (see AmpTask1017).
-    working_dir: /app/amp
+      - ../../:/app
 
   jupyter_server:
     command: devops/docker_run/run_jupyter_server.sh

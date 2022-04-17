@@ -1,3 +1,30 @@
+# amp-1.0.9
+- 2022-03-15
+- Update `docker-compose` version
+
+# amp-1.0.8
+- 2022-03-09
+- Add more docker users
+
+# amp-1.0.7
+- 2022-02-16
+- Remove useless Python packages
+- Update `pandas`
+- See CMTask #1028 for details
+
+# amp-1.0.6
+- 2022-01-13
+- Add more docker users
+
+# amp-1.0.5
+- 2022-01-05
+- Add `importlib-resources` Python package
+- Unfreeze the `jsonschema` version
+
+# amp-1.0.4
+- 2021-12-30
+- Add `moto` Python package
+
 # amp-1.0.3
 - 2021-12-11
 - Add `python-dotenv` Python package

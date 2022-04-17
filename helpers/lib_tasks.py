@@ -62,14 +62,27 @@ def set_default_params(params: Dict[str, Any]) -> None:
     _LOG.debug("Assigning:\n%s", pprint.pformat(params))
 
 
-def get_default_param(key: str) -> Any:
-    hdbg.dassert_in(key, _DEFAULT_PARAMS)
-    hdbg.dassert_isinstance(key, str)
-    return _DEFAULT_PARAMS[key]
-
-
 def has_default_param(key: str) -> bool:
+    hdbg.dassert_isinstance(key, str)
     return key in _DEFAULT_PARAMS
+
+
+def get_default_param(key: str, *, override_value: Any = None) -> Any:
+    """
+    Return the value from the default parameters dictionary, optionally
+    overriding it.
+    """
+    hdbg.dassert_isinstance(key, str)
+    value = None
+    if has_default_param(key):
+        value = _DEFAULT_PARAMS[key]
+    if override_value:
+        _LOG.info("Overriding value %s with %s", value, override_value)
+        value = override_value
+    hdbg.dassert_is_not(
+        value, None, "key='%s' not defined from %s", key, _DEFAULT_PARAMS
+    )
+    return value
 
 
 def reset_default_params() -> None:
@@ -1242,8 +1255,8 @@ def _dassert_current_dir_matches(expected_dir_basename: str) -> None:
     """
     Ensure that the name of the current dir is the one expected.
 
-    E.g., `/Users/saggese/src/cmamp1` is a valid dir for an integration branch for
-    `cmamp1`.
+    E.g., `/Users/saggese/src/cmamp1` is a valid dir for an integration
+    branch for `cmamp1`.
     """
     _LOG.debug(hprint.to_str("expected_dir_basename"))
     # Get the basename of the current dir.
@@ -1263,7 +1276,8 @@ def _dassert_is_integration_branch(abs_dir: str) -> None:
     """
     Ensure that the branch in `abs_dir` is a valid integration or lint branch.
 
-    E.g., `AmpTask1786_Integrate_20220402` is a valid integration branch.
+    E.g., `AmpTask1786_Integrate_20220402` is a valid integration
+    branch.
     """
     _LOG.debug(hprint.to_str("abs_dir"))
     branch_name = hgit.get_branch_name(dir_name=abs_dir)
@@ -1294,8 +1308,8 @@ def _clean_both_integration_dirs(abs_dir1: str, abs_dir2: str) -> None:
 @task
 def integrate_create_branch(ctx, dir_basename, dry_run=False):  # type: ignore
     """
-    Create the branch for integration of `dir_basename` (e.g., amp1) in the current
-    dir.
+    Create the branch for integration of `dir_basename` (e.g., amp1) in the
+    current dir.
 
     :param dir_basename: specify the dir name (e.g., `amp1`) to ensure the set-up is
         correct.
@@ -1684,7 +1698,8 @@ def integrate_find_files(  # type: ignore
     subdir="",
 ):
     """
-    Find the files that are touched in the current branch since last integration.
+    Find the files that are touched in the current branch since last
+    integration.
     """
     _report_task()
     _ = ctx
@@ -1704,8 +1719,9 @@ def integrate_diff_overlapping_files(  # type: ignore
     ctx, src_dir_basename, dst_dir_basename, subdir=""
 ):
     """
-    Find the files modified in both branches `src_dir_basename` and `dst_dir_basename`
-    Compare these files from HEAD to master version before the branch point.
+    Find the files modified in both branches `src_dir_basename` and
+    `dst_dir_basename` Compare these files from HEAD to master version before
+    the branch point.
 
     This is used to check what changes were made to files modified by
     both branches.
@@ -2039,9 +2055,230 @@ def docker_login(ctx):  # type: ignore
     _run(ctx, cmd, use_system=True)
 
 
+# ////////////////////////////////////////////////////////////////////////////////
+# Compose files.
+# ////////////////////////////////////////////////////////////////////////////////
+
+# There are several combinations to consider:
+# - whether the Docker host can run with / without privileged mode
+# - amp as submodule / as supermodule
+# - different supermodules for amp
+
+
+# TODO(gp): The right approach is to programmatically generate a docker-compose
+#  file for each of the combination, instead of using the combination of multiple
+#  docker compose.
+#  For now we will copy / paste all the files.
+
+
+import io
+
+import yaml
+
+# TODO(gp): use_privileged_mode -> use_docker_privileged_mode
+#  use_sibling_container -> use_docker_containers_containers
+
+
+def _generate_compose_file(
+    use_privileged_mode: bool,
+    use_sibling_container: bool,
+    use_shared_cache: bool,
+    mount_as_submodule: bool,
+    file_name: Optional[str],
+) -> str:
+    _LOG.debug(
+        hprint.to_str(
+            "use_privileged_mode use_sibling_container "
+            "use_shared_cache mount_as_submodule file_name"
+        )
+    )
+    txt = []
+
+    def append(txt_tmp: str, indent_level: int) -> None:
+        # txt_tmp = txt_tmp.rstrip("\n").lstrip("\n")
+        txt_tmp = hprint.dedent(txt_tmp, remove_empty_leading_trailing_lines=True)
+        num_spaces = 2 * indent_level
+        txt_tmp = hprint.indent(txt_tmp, num_spaces=num_spaces)
+        txt.append(txt_tmp)
+
+    # We could pass the env var directly, like:
+    # ```
+    # - AM_ENABLE_DIND=$AM_ENABLE_DIND
+    # ```
+    # but we prefer to inline it.
+    # We could do the same also with IMAGE for symmetry.
+    # Use % instead of f-string since `${IMAGE}` confuses f-string as a variable.
+    txt_tmp = (
+        """
+    version: '3'
+
+    services:
+      base_app:
+        cap_add:
+          - SYS_ADMIN
+        environment:
+          - AM_AWS_PROFILE=$AM_AWS_PROFILE
+          - AM_ECR_BASE_PATH=$AM_ECR_BASE_PATH
+          - AM_ENABLE_DIND=%s
+          - AM_PUBLISH_NOTEBOOK_LOCAL_PATH=$AM_PUBLISH_NOTEBOOK_LOCAL_PATH
+          - AM_S3_BUCKET=$AM_S3_BUCKET
+          - AM_TELEGRAM_TOKEN=$AM_TELEGRAM_TOKEN
+          - AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+          - AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION
+          - AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+          - GH_ACTION_ACCESS_TOKEN=$GH_ACTION_ACCESS_TOKEN
+          # This env var is used by GH Action to signal that we are inside the CI.
+          - CI=$CI
+        image: ${IMAGE}
+    """
+        % use_privileged_mode
+    )
+    indent_level = 0
+    append(txt_tmp, indent_level)
+    #
+    if use_privileged_mode:
+        txt_tmp = """
+        # This is needed:
+        # - for Docker-in-docker (dind)
+        # - to mount fstabs
+        privileged: true
+        """
+        # This is at the level of `services.app`.
+        indent_level = 2
+        append(txt_tmp, indent_level)
+    #
+    if True:
+        txt_tmp = """
+        restart: "no"
+        volumes:
+          # TODO(gp): We should pass the value of $HOME from dev.Dockerfile to here.
+          # E.g., we might define $HOME in the env file.
+          - ~/.aws:/home/.aws
+          - ~/.config/gspread_pandas/:/home/.config/gspread_pandas/
+          - ~/.config/gh:/home/.config/gh
+        """
+        # This is at the level of `services.app`.
+        indent_level = 2
+        append(txt_tmp, indent_level)
+    #
+    if use_shared_cache:
+        # TODO(gp): Generalize by passing a dictionary.
+        txt_tmp = """
+        # Shared cache. This is specific of lime.
+        - /local/home/share/cache:/cache
+        """
+        # This is at the level of `services.app.volumes`.
+        indent_level = 3
+        append(txt_tmp, indent_level)
+    #
+    if False:
+        txt_tmp = """
+        # No need to mount file systems.
+        - ../docker_build/fstab:/etc/fstab
+        """
+        # This is at the level of `services.app.volumes`.
+        indent_level = 3
+        append(txt_tmp, indent_level)
+    #
+    if use_sibling_container:
+        txt_tmp = """
+        # Use sibling-container approach.
+        - /var/run/docker.sock:/var/run/docker.sock
+        """
+        # This is at the level of `services.app.volumes`.
+        indent_level = 3
+        append(txt_tmp, indent_level)
+    #
+    if False:
+        txt_tmp = """
+        deploy:
+          resources:
+            limits:
+              # This should be passed from command line depending on how much
+              # memory is available.
+              memory: 60G
+        """
+    #
+    if mount_as_submodule:
+        txt_tmp = """
+        # Mount `amp` when it is used as submodule. In this case we need to
+        # mount the super project in the container (to make git work with the
+        # supermodule) and then change dir to `amp`.
+        app:
+          extends:
+            base_app
+          volumes:
+            # Move one dir up to include the entire git repo (see AmpTask1017).
+            - ../../../:/app
+          # Move one dir down to include the entire git repo (see AmpTask1017).
+          working_dir: /app/amp
+        """
+    else:
+        txt_tmp = """
+        # Mount `amp` when it is used as supermodule.
+        app:
+          extends:
+            base_app
+          volumes:
+            - ../../:/app
+        """
+    if False:
+        txt_tmp = """
+        # Default network mode set to host so we can reach e.g.
+        # a database container pointing to localhost:5432.
+        # In tests we use dind so we need set back to the default "bridge".
+        # See CmTask988 and https://stackoverflow.com/questions/24319662
+        network_mode: ${NETWORK_MODE:-host}
+        """
+    # This is at the level of `services`.
+    indent_level = 1
+    append(txt_tmp, indent_level)
+    #
+    if True:
+        txt_tmp = """
+        jupyter_server:
+          command: devops/docker_run/run_jupyter_server.sh
+          environment:
+            - PORT=${PORT}
+          extends:
+            app
+          ports:
+            # TODO(gp): Rename `AM_PORT`.
+            - "${PORT}:${PORT}"
+
+        # TODO(gp): For some reason the following doesn't work.
+        #  jupyter_server_test:
+        #    command: jupyter notebook -h 2>&1 >/dev/null
+        #    extends:
+        #      jupyter_server
+
+        jupyter_server_test:
+          command: jupyter notebook -h 2>&1 >/dev/null
+          environment:
+            - PORT=${PORT}
+          extends:
+            app
+          ports:
+            - "${PORT}:${PORT}"
+        """
+        # This is at the level of `services`.
+        indent_level = 1
+        append(txt_tmp, indent_level)
+    # Save file.
+    txt = "\n".join(txt)
+    if file_name:
+        hio.to_file(file_name, txt)
+    # Sanity check of the YAML file.
+    stream = io.StringIO(txt)
+    _ = yaml.safe_load(stream)
+    return txt
+
+
 def get_base_docker_compose_path() -> str:
     """
-    Return the base docker compose `devops/compose/docker-compose.yml`.
+    Return the absolute path to base docker compose.
+
+    E.g., `devops/compose/docker-compose.yml`.
     """
     # Add the default path.
     dir_name = "devops/compose"
@@ -2054,10 +2291,12 @@ def get_base_docker_compose_path() -> str:
 
 def _get_amp_docker_compose_path() -> Optional[str]:
     """
-    Return the docker compose for `amp` as supermodule or as submodule.
+    Return the docker compose to use for `amp`, depending whether it is a
+    supermodule or as submodule.
 
-    E.g., `devops/compose/docker-compose_as_submodule.yml` and
-    `devops/compose/docker-compose_as_supermodule.yml`
+    E.g.,
+    - for submodule -> `devops/compose/docker-compose_as_submodule.yml`
+    - for supermodule -> None
     """
     path, _ = hgit.get_path_from_supermodule()
     docker_compose_path: Optional[str]
@@ -2071,6 +2310,79 @@ def _get_amp_docker_compose_path() -> Optional[str]:
     else:
         docker_compose_path = None
     return docker_compose_path
+
+
+def _get_docker_compose_paths(
+    extra_docker_compose_files: List[str],
+) -> List[str]:
+    """
+    Return the list of the needed docker compose path.
+    """
+    docker_compose_files = []
+    # Get the repo short name (e.g., amp).
+    dir_name = hgit.get_repo_full_name_from_dirname(".", include_host_name=False)
+    repo_short_name = hgit.get_repo_name(dir_name, in_mode="full_name")
+    _LOG.debug("repo_short_name=%s", repo_short_name)
+    # Check submodule status, if needed.
+    mount_as_submodule = False
+    if repo_short_name == "amp":
+        # Check if `amp` is a submodule.
+        path, _ = hgit.get_path_from_supermodule()
+        docker_compose_path: Optional[str]
+        if path != "":
+            _LOG.warning("amp is a submodule")
+            mount_as_submodule = True
+    # Write Docker compose file.
+    file_name = get_base_docker_compose_path()
+    use_privileged_mode = get_default_param("USE_PRIVILEGED_MODE")
+    use_sibling_container = get_default_param("USE_SIBLING_CONTAINER")
+    use_shared_cache = get_default_param("USE_SHARED_CACHE")
+    _generate_compose_file(
+        use_privileged_mode,
+        use_sibling_container,
+        use_shared_cache,
+        mount_as_submodule,
+        file_name,
+    )
+    docker_compose_files.append(file_name)
+    # if False:
+    # docker_compose_files = []
+    # if has_default_param("USE_ONLY_ONE_DOCKER_COMPOSE"):
+    #     # Use only one docker compose file, instead of two.
+    #     # TODO(gp): Hacky fix for CmampTask386 "Clean up docker compose".
+    #     if repo_short_name == "amp":
+    #         # For amp use only
+    #         docker_compose_file_tmp = _get_amp_docker_compose_path()
+    #     else:
+    #         docker_compose_file_tmp = get_base_docker_compose_path()
+    #     docker_compose_files.append(docker_compose_file_tmp)
+    # else:
+    #     # Typically we use one or two docker compose files, depending if we need
+    #     # submodule behavior or not.
+    #     docker_compose_files.append(get_base_docker_compose_path())
+    #     if repo_short_name == "amp":
+    #         docker_compose_file_tmp = _get_amp_docker_compose_path()
+    #         if docker_compose_file_tmp:
+    #             docker_compose_files.append(docker_compose_file_tmp)
+
+    # Add the compose files from command line.
+    if extra_docker_compose_files:
+        hdbg.dassert_isinstance(extra_docker_compose_files, list)
+        docker_compose_files.extend(extra_docker_compose_files)
+    # Add the compose files from the global params.
+    key = "DOCKER_COMPOSE_FILES"
+    if has_default_param(key):
+        docker_compose_files.append(get_default_param(key))
+    #
+    _LOG.debug(hprint.to_str("docker_compose_files"))
+    for docker_compose in docker_compose_files:
+        hdbg.dassert_path_exists(docker_compose)
+    return docker_compose_files
+
+
+# ////////////////////////////////////////////////////////////////////////////////
+# Version.
+# ////////////////////////////////////////////////////////////////////////////////
 
 
 _IMAGE_VERSION_RE = r"\d+\.\d+\.\d+"
@@ -2119,6 +2431,11 @@ def _dassert_is_subsequent_version(
     if version != _IMAGE_VERSION_FROM_CHANGELOG:
         current_version = hversio.get_changelog_version(container_dir_name)
         hdbg.dassert_lt(current_version, version)
+
+
+# ////////////////////////////////////////////////////////////////////////////////
+# Image.
+# ////////////////////////////////////////////////////////////////////////////////
 
 
 _INTERNET_ADDRESS_RE = r"([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{2,}"
@@ -2253,6 +2570,11 @@ def get_image(
     return image
 
 
+# ////////////////////////////////////////////////////////////////////////////////
+# Misc.
+# ////////////////////////////////////////////////////////////////////////////////
+
+
 def _run_docker_as_user(as_user_from_cmd_line: bool) -> bool:
     as_root = hgit.execute_repo_config_code("run_docker_as_root()")
     as_user = as_user_from_cmd_line
@@ -2344,39 +2666,7 @@ def _get_docker_base_cmd(
         r"""
         docker-compose"""
     )
-    # - Handle the docker compose files.
-    dir_name = hgit.get_repo_full_name_from_dirname(".", include_host_name=False)
-    repo_short_name = hgit.get_repo_name(dir_name, in_mode="full_name")
-    _LOG.debug("repo_short_name=%s", repo_short_name)
-    #
-    docker_compose_files = []
-    if has_default_param("USE_ONLY_ONE_DOCKER_COMPOSE"):
-        # Use only one docker compose file.
-        # TODO(gp): Hacky fix for CmampTask386.
-        if repo_short_name == "amp":
-            docker_compose_file_tmp = _get_amp_docker_compose_path()
-        else:
-            docker_compose_file_tmp = get_base_docker_compose_path()
-        docker_compose_files.append(docker_compose_file_tmp)
-    else:
-        # Use one or two docker compose files.
-        docker_compose_files.append(get_base_docker_compose_path())
-        if repo_short_name == "amp":
-            docker_compose_file_tmp = _get_amp_docker_compose_path()
-            if docker_compose_file_tmp:
-                docker_compose_files.append(docker_compose_file_tmp)
-    # Add the compose files from command line.
-    if extra_docker_compose_files:
-        hdbg.dassert_isinstance(extra_docker_compose_files, list)
-        docker_compose_files.extend(extra_docker_compose_files)
-    # Add the compose files from the global params.
-    key = "DOCKER_COMPOSE_FILES"
-    if has_default_param(key):
-        docker_compose_files.append(get_default_param(key))
-    #
-    _LOG.debug(hprint.to_str("docker_compose_files"))
-    for docker_compose in docker_compose_files:
-        hdbg.dassert_path_exists(docker_compose)
+    docker_compose_files = _get_docker_compose_paths(extra_docker_compose_files)
     file_opts = " ".join([f"--file {dcf}" for dcf in docker_compose_files])
     _LOG.debug(hprint.to_str("file_opts"))
     # TODO(gp): Use something like `.append(rf"{space}{...}")`
@@ -2512,6 +2802,11 @@ def _get_docker_cmd(
     return docker_cmd_
 
 
+# ////////////////////////////////////////////////////////////////////////////////
+# bash and cmd.
+# ////////////////////////////////////////////////////////////////////////////////
+
+
 def _docker_cmd(
     ctx: Any,
     docker_cmd_: str,
@@ -2539,6 +2834,8 @@ def docker_bash(  # type: ignore
 ):
     """
     Start a bash shell inside the container corresponding to a stage.
+
+    TODO(gp): Add description of non-obvious interface params.
     """
     _report_task(container_dir_name=container_dir_name)
     cmd = "bash"
@@ -2561,6 +2858,8 @@ def docker_cmd(  # type: ignore
 ):
     """
     Execute the command `cmd` inside a container corresponding to a stage.
+
+    TODO(gp): Add description of non-obvious interface params.
     """
     _report_task(container_dir_name=container_dir_name)
     hdbg.dassert_ne(cmd, "")
@@ -2574,6 +2873,11 @@ def docker_cmd(  # type: ignore
         use_bash=use_bash,
     )
     _docker_cmd(ctx, docker_cmd_)
+
+
+# ////////////////////////////////////////////////////////////////////////////////
+# Jupyter.
+# ////////////////////////////////////////////////////////////////////////////////
 
 
 def _get_docker_jupyter_cmd(
@@ -2695,6 +2999,7 @@ def docker_build_local_image(  # type: ignore
     base_image="",
     update_poetry=False,
     container_dir_name=".",
+    just_do_it=False,
 ):
     """
     Build a local image (i.e., a release candidate "dev" image).
@@ -2703,9 +3008,15 @@ def docker_build_local_image(  # type: ignore
     :param cache: use the cache
     :param base_image: e.g., *****.dkr.ecr.us-east-1.amazonaws.com/amp
     :param update_poetry: run poetry lock to update the packages
+    :param just_do_it: execute the action ignoring the checks
     """
     _report_task(container_dir_name=container_dir_name)
-    _dassert_is_subsequent_version(version, container_dir_name=container_dir_name)
+    if just_do_it:
+        _LOG.warning("Skipping subsequent version check")
+    else:
+        _dassert_is_subsequent_version(
+            version, container_dir_name=container_dir_name
+        )
     version = _resolve_version_value(
         version, container_dir_name=container_dir_name
     )
@@ -3341,7 +3652,7 @@ def _find_short_import(iterator: Iterator, short_import: str) -> _FindResults:
     """
     # E.g.,
     # `import dataflow.core.dag_runner as dtfcodarun`
-    regex = fr"import\s+(\S+)\s+as\s+({short_import})"
+    regex = rf"import\s+(\S+)\s+as\s+({short_import})"
     regex = re.compile(regex)
     #
     results: _FindResults = []
@@ -3365,9 +3676,9 @@ def _find_func_class_uses(iterator: Iterator, regex: str) -> _FindResults:
     regexs = []
     # E.g.,
     # `dag_runner = dtfsys.RealTimeDagRunner(**dag_runner_kwargs)`
-    regexs.append(fr"\s+(\w+)\.(\w*{regex})\(")
+    regexs.append(rf"\s+(\w+)\.(\w*{regex})\(")
     # `dag_builder: dtfcodabui.DagBuilder`
-    regexs.append(fr":\s*(\w+)\.(\w*{regex})")
+    regexs.append(rf":\s*(\w+)\.(\w*{regex})")
     #
     _LOG.debug("regexs=%s", str(regexs))
     regexs = [re.compile(regex_) for regex_ in regexs]

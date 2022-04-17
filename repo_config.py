@@ -1,8 +1,14 @@
 """
-This file contains info specific of this repo.
+This file contains info specific of `//amp` repo.
 """
 
+import logging
+import os
 from typing import Dict, List
+
+_LOG = logging.getLogger(__name__)
+# We can't use `__file__` since this file is imported with an exec.
+_LOG.debug("Importing //amp/repo_config.py")
 
 
 def get_repo_map() -> Dict[str, str]:
@@ -59,8 +65,33 @@ def run_docker_as_root() -> bool:
     return res
 
 
+# TODO(gp): use_docker_privileged_mode
 def has_dind_support() -> bool:
     """
     Return whether this repo image supports Docker-in-Docker.
     """
-    return True
+    host_name = os.uname()[1]
+    _LOG.debug("host_name=%s", host_name)
+    if host_name == "cf-spm-dev4":
+        val = False
+    else:
+        val = True
+    return val
+
+
+def use_docker_sibling_containers() -> bool:
+    """ """
+    # Typically we use either sibling or children containers.
+    val = not has_dind_support()
+    return val
+
+
+def use_docker_shared_cache() -> bool:
+    """ """
+    host_name = os.uname()[1]
+    if host_name == "cf-spm-dev4":
+        # Unclear
+        val = True
+    else:
+        val = False
+    return val

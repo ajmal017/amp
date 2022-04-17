@@ -19,6 +19,8 @@ import helpers.lib_tasks as hlibtask
 
 _LOG = logging.getLogger(__name__)
 
+import repo_config as rconf
+
 
 def _get_default_params() -> Dict[str, str]:
     """
@@ -30,6 +32,9 @@ def _get_default_params() -> Dict[str, str]:
         "ECR_BASE_PATH": ecr_base_path,
         "BASE_IMAGE": "amp_test",
         "DEV_TOOLS_IMAGE_PROD": f"{ecr_base_path}/dev_tools:prod",
+        "USE_PRIVILEGED_MODE": rconf.has_dind_support(),
+        "USE_SIBLING_CONTAINER": rconf.use_docker_sibling_containers(),
+        "USE_SHARED_CACHE": rconf.use_docker_shared_cache(),
     }
     return default_params
 
@@ -472,6 +477,48 @@ class TestDryRunTasks2(_LibTasksTestCase, _CheckDryRunTestCase):
 # #############################################################################
 
 
+class Test_generate_compose_file1(hunitest.TestCase):
+    def helper(
+        self,
+        use_privileged_mode: bool = False,
+        use_sibling_container: bool = False,
+        use_shared_cache: bool = False,
+        mount_as_submodule: bool = False,
+    ) -> None:
+        txt = []
+        #
+        params = [
+            "use_privileged_mode",
+            "use_sibling_container",
+            "use_shared_cache",
+            "mount_as_submodule",
+        ]
+        txt_tmp = hprint.to_str(" ".join(params))
+        txt.append(txt_tmp)
+        #
+        file_name = None
+        txt_tmp = hlibtask._generate_compose_file(
+            use_privileged_mode,
+            use_sibling_container,
+            use_shared_cache,
+            mount_as_submodule,
+            file_name,
+        )
+        txt.append(txt_tmp)
+        #
+        txt = "\n".join(txt)
+        self.check_string(txt)
+
+    def test1(self) -> None:
+        self.helper(use_privileged_mode=True)
+
+    def test2(self) -> None:
+        self.helper(use_shared_cache=True)
+
+
+# #############################################################################
+
+
 class TestLibTasks1(hunitest.TestCase):
     """
     Test some auxiliary functions, e.g., `_get_gh_issue_title()`.
@@ -543,6 +590,9 @@ class TestLibTasksGetDockerCmd1(_LibTasksTestCase):
     Test `_get_docker_cmd()`.
     """
 
+    # TODO(gp): After using a single docker file as part of AmpTask2308
+    #  "Update_amp_container" we can probably run these tests in any repo, so
+    #  we should be able to remove this `skipif`.
     @pytest.mark.skipif(
         not hgit.is_in_amp_as_submodule(), reason="Only run in amp as submodule"
     )
@@ -569,7 +619,7 @@ class TestLibTasksGetDockerCmd1(_LibTasksTestCase):
         exp = r"""
         IMAGE=$AM_ECR_BASE_PATH/amp_test:dev-1.0.0 \
             docker-compose \
-            --file $GIT_ROOT/devops/compose/docker-compose.yml --file $GIT_ROOT/devops/compose/docker-compose_as_submodule.yml \
+            --file $GIT_ROOT/devops/compose/docker-compose.yml \
             --env-file devops/env/default.env \
             run \
             --rm \
@@ -600,7 +650,7 @@ class TestLibTasksGetDockerCmd1(_LibTasksTestCase):
         )
         exp = r"""IMAGE=$AM_ECR_BASE_PATH/amp_test:local-$USER_NAME-1.0.0 \
                 docker-compose \
-                --file $GIT_ROOT/devops/compose/docker-compose.yml --file $GIT_ROOT/devops/compose/docker-compose_as_submodule.yml \
+                --file $GIT_ROOT/devops/compose/docker-compose.yml \
                 --env-file devops/env/default.env \
                 run \
                 --rm \
@@ -635,7 +685,7 @@ class TestLibTasksGetDockerCmd1(_LibTasksTestCase):
         PORT=9999 \
         SKIP_RUN=1 \
             docker-compose \
-            --file $GIT_ROOT/devops/compose/docker-compose.yml --file $GIT_ROOT/devops/compose/docker-compose_as_submodule.yml \
+            --file $GIT_ROOT/devops/compose/docker-compose.yml \
             --env-file devops/env/default.env \
             run \
             --rm \
@@ -732,7 +782,7 @@ class TestLibTasksGetDockerCmd1(_LibTasksTestCase):
         IMAGE=$AM_ECR_BASE_PATH/amp_test:dev-1.0.0 \
         PORT=9999 \
             docker-compose \
-            --file $GIT_ROOT/devops/compose/docker-compose.yml --file $GIT_ROOT/devops/compose/docker-compose_as_submodule.yml \
+            --file $GIT_ROOT/devops/compose/docker-compose.yml \
             --env-file devops/env/default.env \
             run \
             --rm \

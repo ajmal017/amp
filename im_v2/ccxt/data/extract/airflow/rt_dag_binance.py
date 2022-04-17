@@ -1,3 +1,9 @@
+"""
+Import as:
+
+import im_v2.ccxt.data.extract.airflow.rt_dag_binance as imvcdeardb
+"""
+
 import datetime
 
 import airflow
@@ -59,7 +65,7 @@ downloading_task = ECSOperator(
                 "command": bash_command,
                 "environment": [
                     {
-                        "name": "ENABLE_DIND",
+                        "name": "AM_ENABLE_DIND",
                         "value": "0",
                     },
                 ],

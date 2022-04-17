@@ -21,7 +21,10 @@ def _get_default_params() -> Dict[str, str]:
         "ECR_BASE_PATH": ecr_base_path,
         "BASE_IMAGE": "opt_test",
         "DEV_TOOLS_IMAGE_PROD": f"{ecr_base_path}/dev_tools:prod",
-        "USE_ONLY_ONE_DOCKER_COMPOSE": True,
+        # "USE_ONLY_ONE_DOCKER_COMPOSE": True,
+        "USE_PRIVILEGED_MODE": True,
+        "USE_SIBLING_CONTAINER": False,
+        "USE_SHARED_CACHE": False,
     }
     return default_params
 

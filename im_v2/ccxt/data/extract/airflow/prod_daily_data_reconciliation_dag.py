@@ -71,7 +71,7 @@ downloading_task = ECSOperator(
                 "command": download_command,
                 "environment": [
                     {
-                        "name": "ENABLE_DIND",
+                        "name": "AM_ENABLE_DIND",
                         "value": "0",
                     }
                 ],
@@ -105,7 +105,7 @@ comparing_task = ECSOperator(
                 "command": compare_command,
                 "environment": [
                     {
-                        "name": "ENABLE_DIND",
+                        "name": "AM_ENABLE_DIND",
                         "value": "0",
                     }
                 ],

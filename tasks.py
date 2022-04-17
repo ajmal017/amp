@@ -107,14 +107,18 @@ ECR_BASE_PATH = os.environ["AM_ECR_BASE_PATH"]
 DOCKER_BASE_IMAGE_NAME = rconf.get_docker_base_image_name()
 
 
-# pylint: disable=unused-argument
 def _run_qa_tests(ctx: Any, stage: str, version: str) -> bool:
     """
     Run QA tests to verify that the invoke tasks are working properly.
 
     This is used when qualifying a docker image before releasing.
     """
-    cmd = f"pytest -m qa test --image_stage {stage}"
+    _ = ctx
+    # The QA tests are in `qa_test_dir` and are marked with `qa_test_tag`.
+    # qa_test_dir = "test"
+    qa_test_dir = "test/test_tasks.py::TestExecuteTasks1::test_docker_bash"
+    qa_test_tag = "qa and not superslow"
+    cmd = f'pytest -m "{qa_test_tag}" {qa_test_dir} --image_stage {stage}'
     if version:
         cmd = f"{cmd} --image_version {version}"
     ctx.run(cmd)
@@ -128,6 +132,15 @@ default_params = {
     # "BASE_IMAGE": "amp_tmp",
     "BASE_IMAGE": DOCKER_BASE_IMAGE_NAME,
     "QA_TEST_FUNCTION": _run_qa_tests,
+    # TODO(gp): This should be made function of the system.
+    # The Docker user.
+    "DOCKER_USER": "spm-sasm",
+    # The group shared by users and docker.
+    "SHARED_GROUP": "spm-sasm-fileshare",
+    #
+    "USE_PRIVILEGED_MODE": rconf.has_dind_support(),
+    "USE_SIBLING_CONTAINER": rconf.use_docker_sibling_containers(),
+    "USE_SHARED_CACHE": rconf.use_docker_shared_cache(),
 }
 
 
