@@ -638,6 +638,7 @@ class TestMockedProcessForecasts2(omtodh.TestOmsDbHelper):
         predictions, volatility = self._get_predictions_and_volatility2(data)
         self._run_coroutines(data, predictions, volatility)
 
+    # TODO(gp): Move to core/finance/market_data_example.py or reuse some of those functions.
     @staticmethod
     def _get_market_data_df1() -> pd.DataFrame:
         """
@@ -652,13 +653,14 @@ class TestMockedProcessForecasts2(omtodh.TestOmsDbHelper):
         )
         bar_duration = "1T"
         bar_delay = "0T"
-        data = mdata.build_timestamp_df(idx, bar_duration, bar_delay)
+        data = cofinanc.build_timestamp_df(idx, bar_duration, bar_delay)
         price_pattern = [101.0] * 5 + [100.0] * 5
         price = price_pattern * 2 + [101.0] * 5
         data["price"] = price
         data["asset_id"] = 101
         return data
 
+    # TODO(gp): Move to core/finance/market_data_example.py or reuse some of those functions.
     @staticmethod
     def _get_market_data_df2() -> pd.DataFrame:
         idx = pd.date_range(
@@ -670,7 +672,7 @@ class TestMockedProcessForecasts2(omtodh.TestOmsDbHelper):
         )
         bar_duration = "1T"
         bar_delay = "0T"
-        data = mdata.build_timestamp_df(idx, bar_duration, bar_delay)
+        data = cofinanc.build_timestamp_df(idx, bar_duration, bar_delay)
         data["price"] = 100
         data["asset_id"] = 101
         return data

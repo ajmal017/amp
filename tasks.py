@@ -92,6 +92,7 @@ from helpers.lib_tasks import (  # isort: skip # noqa: F401  # pylint: disable=u
     run_qa_tests,
     run_slow_tests,
     run_superslow_tests,
+    run_tests,
     traceback,
 )
 

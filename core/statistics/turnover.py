@@ -1,7 +1,7 @@
 """
 Import as:
 
-import core.turnover as coturnov
+import core.statistics.turnover as cstaturn
 """
 
 import logging

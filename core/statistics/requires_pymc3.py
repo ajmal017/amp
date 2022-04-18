@@ -1,7 +1,7 @@
 """
 Import as:
 
-import core.bayesian as cobayesi
+import core.statistics.requires_pymc3 as cstrepym
 """
 
 import logging

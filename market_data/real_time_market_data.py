@@ -5,7 +5,7 @@ import market_data.real_time_market_data as mdrtmada
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 
 import pandas as pd
 
@@ -13,6 +13,7 @@ import helpers.hdatetime as hdateti
 import helpers.hdbg as hdbg
 import helpers.hprint as hprint
 import helpers.hsql as hsql
+import im_v2.talos.data.client.talos_clients as imvtdctacl
 import market_data.abstract_market_data as mdabmada
 
 _LOG = logging.getLogger(__name__)
@@ -38,8 +39,8 @@ class RealTimeMarketData(mdabmada.MarketData):
         where_clause: Optional[str],
         valid_id: Any,
         # Params from `MarketData`.
-        *args: List[Any],
-        **kwargs: Dict[str, Any],
+        *args: Any,
+        **kwargs: Any,
     ):
         """
         Constructor.
@@ -247,3 +248,82 @@ class RealTimeMarketData(mdabmada.MarketData):
             query.append(f"LIMIT {limit}")
         query = " ".join(query)
         return query
+
+
+class RealTimeMarketData2(mdabmada.MarketData):
+    """
+    Interface for real-time market data accessed through Talos API.
+
+    Note: RealTimeSqlTalosClient is passed at the initialization.
+    """
+
+    def __init__(
+        self, client: imvtdctacl.RealTimeSqlTalosClient, *args, **kwargs
+    ):
+        super().__init__(*args, **kwargs)
+        hdbg.dassert_eq(
+            client._mode,
+            "market_data",
+            msg="Requires a RealTimeSqlTalosClient in 'market_data' mode.",
+        )
+        self._client = client
+
+    # TODO(Danya): A copy of the Talos client method.
+    def should_be_online(self, wall_clock_time: pd.Timestamp) -> bool:
+        return self._client.should_be_online()
+
+    #
+    def _get_last_end_time(self) -> Optional[pd.Timestamp]:
+        # Note: Getting the end time for one symbol as a placeholder.
+        # TODO(Danya): CMTask1622: "Return `last_end_time` for all symbols".
+        return self._client.get_end_ts_for_symbol("binance::BTC_USDT")
+
+    def _get_data(
+        self,
+        start_ts: Optional[pd.Timestamp],
+        end_ts: Optional[pd.Timestamp],
+        ts_col_name: str,
+        asset_ids: Optional[List[int]],
+        left_close: bool,
+        right_close: bool,
+        limit: Optional[int],
+    ) -> pd.DataFrame:
+        """
+        Build a query and load SQL data in MarketData format.
+        """
+        # Convert asset ids to full symbols for passing to the DB.
+        if asset_ids:
+            full_symbols = [
+                self._client._asset_id_to_full_symbol_mapping[asset_id]
+                for asset_id in asset_ids
+            ]
+        else:
+            full_symbols = None
+        data = self._client.read_data(
+            full_symbols,
+            start_ts,
+            end_ts,
+            ts_col_name=ts_col_name,
+            left_close=left_close,
+            right_close=right_close,
+            limit=limit,
+        )
+        # Rename the index to fit the MarketData format.
+        # TODO(Danya): The client requires the data to have a `timestamp` index,
+        #  while AbstractMarketData requires to have integer index.
+        #  This conversion is redundant, but necessary to combine
+        #  the client and AbstractMarketData.
+        data.index.name = "end_timestamp"
+        data = data.reset_index()
+        market_data_columns = [
+            "end_timestamp",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "start_timestamp",
+            "asset_id",
+        ]
+        data = data[market_data_columns]
+        return data

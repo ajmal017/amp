@@ -1,7 +1,7 @@
 """
 Import as:
 
-import core.entropy as coentrop
+import core.statistics.entropy as cstaentr
 """
 
 

@@ -151,14 +151,20 @@ def evaluate_weighted_forecasts(
     Mix forecasts with weights and evaluate the portfolio.
 
     `weights` should look like
+
+    ```
              weights1   weights2   weights3 ...
     sim1
     sim2
+    ```
 
     `market_data_and_volatility` should look like
+
+    ```
                    dir_name              col
     price         dir_name1         col_name
     volatility    dir_name2         col_name
+    ```
 
     :param simulations: df indexed by backtest id; columns are "dir_name" and
         "prediction_col"

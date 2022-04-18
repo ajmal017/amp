@@ -8,7 +8,7 @@ import asyncio
 import collections
 import datetime
 import logging
-from typing import Any, AsyncGenerator, Callable, Dict, List, Optional, Tuple
+from typing import Any, AsyncGenerator, Callable, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -406,7 +406,7 @@ async def execute_with_real_time_loop(
 
 
 async def execute_all_with_real_time_loop(
-    *args: Tuple[Any], **kwargs: Dict[str, Any]
+    *args: Any, **kwargs: Any
 ) -> Tuple[List[Event], List[Any]]:
     """
     Execute the entire event loop until the end.

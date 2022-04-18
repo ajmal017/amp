@@ -1,7 +1,7 @@
 """
 Import as:
 
-import core.covariance_shrinkage as ccovshri
+import core.statistics.covariance_shrinkage as cstcoshr
 """
 
 import logging
