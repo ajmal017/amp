@@ -348,6 +348,7 @@ class TestTalosHistoricalPqByTileClient1(icdctictc.ImClientTestCase):
 # #############################################################################
 
 
+@pytest.mark.skip()
 @pytest.mark.skipif(
     hsystem.is_inside_ci(),
     reason="Extend AWS authentication system CmTask #1666.",

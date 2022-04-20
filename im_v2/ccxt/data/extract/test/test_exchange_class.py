@@ -14,6 +14,7 @@ import im_v2.ccxt.data.extract.exchange_class as imvcdeexcl
 _LOG = logging.getLogger(__name__)
 
 
+@pytest.mark.skip
 @pytest.mark.skipif(
     hsystem.is_inside_ci(),
     reason="Extend AWS authentication system CmTask #1292/1666.",
