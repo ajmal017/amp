@@ -5,7 +5,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.13.7
+#       jupytext_version: 1.13.3
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -104,7 +104,6 @@ fep_dict = {
     "volatility_col": "vwap.ret_0.vol",
     "prediction_col": "prediction",
     "first_bar_of_day_open": datetime.time(9, 30),
-    "first_bar_of_day_close": datetime.time(9, 45),
     "last_bar_of_day_close": datetime.time(16, 0),
     "target_gmv": 1e6,
     "dollar_neutrality": "gaussian_rank",
@@ -118,7 +117,6 @@ fep = dtfmod.ForecastEvaluatorFromPrices(
     fep_config["volatility_col"],
     fep_config["prediction_col"],
     first_bar_of_day_open=fep_config["first_bar_of_day_open"],
-    first_bar_of_day_close=fep_config["first_bar_of_day_close"],
     last_bar_of_day_close=fep_config["last_bar_of_day_close"],
 )
 

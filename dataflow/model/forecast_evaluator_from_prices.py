@@ -33,7 +33,6 @@ class ForecastEvaluatorFromPrices:
         prediction_col: str,
         *,
         first_bar_of_day_open: datetime.time = datetime.time(9, 30),
-        first_bar_of_day_close: datetime.time = datetime.time(9, 45),
         last_bar_of_day_close: datetime.time = datetime.time(16, 00),
         remove_weekends: bool = True,
     ) -> None:
@@ -61,8 +60,6 @@ class ForecastEvaluatorFromPrices:
         #
         hdbg.dassert_isinstance(first_bar_of_day_open, datetime.time)
         self._first_bar_of_day_open = first_bar_of_day_open
-        hdbg.dassert_isinstance(first_bar_of_day_close, datetime.time)
-        self._first_bar_of_day_close = first_bar_of_day_close
         hdbg.dassert_isinstance(last_bar_of_day_close, datetime.time)
         self._last_bar_of_day_close = last_bar_of_day_close
         #
@@ -352,6 +349,20 @@ class ForecastEvaluatorFromPrices:
         ]
         return cols
 
+    def compute_counts(self, df: pd.DataFrame) -> pd.DataFrame:
+        self._validate_df(df)
+
+        def _compute_counts(df: pd.DataFrame, col: str) -> pd.DataFrame:
+            return df[col].groupby(lambda x: x.time()).count()
+
+        dfs = {
+            "price_count": _compute_counts(df, self._price_col),
+            "volatility_count": _compute_counts(df, self._volatility_col),
+            "prediction_count": _compute_counts(df, self._prediction_col),
+        }
+        count_df = pd.concat(dfs.values(), axis=1, keys=dfs.keys())
+        return count_df
+
     @staticmethod
     def _build_multiindex_df(
         price: pd.DataFrame,
@@ -580,6 +591,15 @@ class ForecastEvaluatorFromPrices:
         """
         Compute holdings in shares from price and dollar position targets.
         """
+        price_counts = price.groupby(lambda x: x.time()).count()
+        price_bars = price_counts.index.to_list()
+        hdbg.dassert_lte(self._first_bar_of_day_open, price_bars[0])
+        hdbg.dassert_lte(price_bars[-1], self._last_bar_of_day_close)
+        for bar in price_bars:
+            if bar > self._first_bar_of_day_open:
+                first_bar_of_day_close = bar
+                break
+        _LOG.info("close of first bar of day=%s", first_bar_of_day_close)
         # Compute target holdings based on prices available now.
         target_holdings = target_positions.divide(price)
         # Quantize.
@@ -593,13 +613,18 @@ class ForecastEvaluatorFromPrices:
         # Handle overnight period specially.
         # 1. Make beginning-of-day-holdings NaN.
         first_bar_of_day_close_idx = holdings.index.indexer_between_time(
-            start_time=self._first_bar_of_day_close,
-            end_time=self._first_bar_of_day_close,
+            start_time=first_bar_of_day_close,
+            end_time=first_bar_of_day_close,
         )
         holdings.iloc[first_bar_of_day_close_idx] = np.nan
         # 2. Compute overnight bar-to-bar price change.
         day_rollover_price_bars = price.between_time(
-            self._last_bar_of_day_close, self._first_bar_of_day_close
+            self._last_bar_of_day_close, first_bar_of_day_close
+        )
+        _LOG.info(
+            "Computing overnight returns using prices from %s to %s",
+            self._last_bar_of_day_close,
+            first_bar_of_day_close,
         )
         overnight_price_change_multiple = 1 + day_rollover_price_bars.pct_change()
         # 3. Infer one-to-many splits by rounding to the nearest integer the
@@ -611,20 +636,21 @@ class ForecastEvaluatorFromPrices:
         inferred_split = (
             1
             / overnight_price_change_multiple.between_time(
-                self._first_bar_of_day_close, self._first_bar_of_day_close
+                first_bar_of_day_close, first_bar_of_day_close
             )
         ).round()
-        _LOG.debug(
-            "inferred_split=\n%s",
-            hpandas.df_to_str(inferred_split, num_rows=None),
+        nontrivial_inferred_splits = inferred_split[inferred_split != 1].dropna(
+            how="all"
+        )
+        _LOG.info(
+            "nontrivial_inferred_splits=\n%s",
+            hpandas.df_to_str(nontrivial_inferred_splits, num_rows=None),
         )
         # 4. Compute beginning-of-day holdings from previous end-of-day
         #    holdings and the inferred split factors.
         bod_holdings = (
             holdings.shift(1)
-            .between_time(
-                self._first_bar_of_day_close, self._first_bar_of_day_close
-            )
+            .between_time(first_bar_of_day_close, first_bar_of_day_close)
             .multiply(inferred_split)
         )
         holdings = holdings.add(bod_holdings, fill_value=0)
@@ -635,8 +661,8 @@ class ForecastEvaluatorFromPrices:
         # Set the overnight flow to zero (since we do not trade and since
         # the share count may change due to corporate actions).
         first_bar_of_day_close_idx = flows.index.indexer_between_time(
-            start_time=self._first_bar_of_day_close,
-            end_time=self._first_bar_of_day_close,
+            start_time=first_bar_of_day_close,
+            end_time=first_bar_of_day_close,
         )
         flows.iloc[first_bar_of_day_close_idx] = np.nan
         return holdings, flows
