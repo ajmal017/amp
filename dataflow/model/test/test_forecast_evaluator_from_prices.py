@@ -159,7 +159,11 @@ class TestForecastEvaluatorFromPrices1(hunitest.TestCase):
         #
         log_dir = self.get_scratch_space()
         _ = forecast_evaluator.log_portfolio(
-            data, log_dir, target_gmv=1e6, quantization="nearest_share"
+            data,
+            log_dir,
+            target_gmv=1e6,
+            quantization="nearest_share",
+            burn_in_bars=0,
         )
         #
         portfolio_df, stats_df = forecast_evaluator.read_portfolio(log_dir)
