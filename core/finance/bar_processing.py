@@ -54,7 +54,7 @@ def infer_splits(df: pd.DataFrame) -> pd.DataFrame:
     bod = retrieve_beginning_of_day_values(df)
     eod = retrieve_end_of_day_values(df)
     overnight_pct_change = (bod - eod.shift(1)) / eod.shift(1)
-    inferred_splits = 1 / (1 + overnight_pct_change).round()
+    inferred_splits = (1 / (1 + overnight_pct_change)).round()
     return inferred_splits
 
 
