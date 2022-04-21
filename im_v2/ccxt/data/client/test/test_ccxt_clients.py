@@ -1031,6 +1031,7 @@ class TestCcxtHistoricalPqByTileClient1(icdctictc.ImClientTestCase):
     method in the parent class.
     """
 
+    @pytest.mark.skip()
     @pytest.mark.skipif(
         hsystem.is_inside_ci(),
         reason="Extend AWS authentication system CmTask #1666.",

@@ -37,6 +37,7 @@ class TestCcxtExchange1(hunitest.TestCase):
         hdbg.dassert_container_type(curr_list, list, str)
         self.assertGreater(len(curr_list), 0)
 
+    @pytest.mark.skip()
     @pytest.mark.slow()
     @umock.patch.object(imvcdeexcl.hdateti, "get_current_time")
     def test_download_ohlcv_data1(
