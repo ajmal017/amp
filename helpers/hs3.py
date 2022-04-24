@@ -561,7 +561,7 @@ def get_aws_credentials(
         result["aws_session_token"] = None
         # TODO(gp): @all support also other S3 profiles. We can derive the names
         #  of the env vars from aws_profile. E.g., "am" -> AM_AWS_ACCESS_KEY.
-        hdbg.dassert_in(aws_profile, ("am", "ck"))
+        #        hdbg.dassert_in(aws_profile, ("am", "ck"))
     else:
         _LOG.debug("Using AWS credentials from files")
         # > more ~/.aws/credentials

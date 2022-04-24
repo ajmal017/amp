@@ -77,6 +77,7 @@ from helpers.lib_tasks import (  # isort: skip # noqa: F401  # pylint: disable=u
     lint_check_python_files_in_docker,
     lint_create_branch,
     lint_detect_cycles,
+    print_env,
     print_setup,
     print_tasks,
     pytest_clean,

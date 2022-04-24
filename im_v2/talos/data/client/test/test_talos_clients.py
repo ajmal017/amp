@@ -3,8 +3,8 @@ from typing import Dict, List, Optional
 import pandas as pd
 import pytest
 
+import helpers.hgit as hgit
 import helpers.hsql as hsql
-import helpers.hsystem as hsystem
 import im_v2.common.data.client.test.im_client_test_case as icdctictc
 import im_v2.common.db.db_utils as imvcddbut
 import im_v2.talos.data.client.talos_clients as imvtdctacl
@@ -32,6 +32,10 @@ def get_expected_column_names() -> List[str]:
 # #############################################################################
 
 
+@pytest.mark.skipif(
+    not hgit.execute_repo_config_code("is_CK_S3_available()"),
+    reason="Need CK S3 support",
+)
 class TestTalosHistoricalPqByTileClient1(icdctictc.ImClientTestCase):
     """
     TODO(Grisha): Test multiple exchanges CmTask #1533.
@@ -348,10 +352,13 @@ class TestTalosHistoricalPqByTileClient1(icdctictc.ImClientTestCase):
 # #############################################################################
 
 
-@pytest.mark.skip()
+# @pytest.mark.skipif(
+#    hsystem.is_inside_ci(),
+#    reason="Extend AWS authentication system CmTask #1666.",
+# )
 @pytest.mark.skipif(
-    hsystem.is_inside_ci(),
-    reason="Extend AWS authentication system CmTask #1666.",
+    not hgit.execute_repo_config_code("is_CK_S3_available()"),
+    reason="Need CK S3 support",
 )
 class TestTalosHistoricalPqByTileClient2(icdctictc.ImClientTestCase):
     """
@@ -905,9 +912,6 @@ class TestRealTimeSqlTalosClient1(
             resample_1min, self.connection, table_name
         )
         return sql_talos_client
-
-    def test_get_universe1(self) -> None:
-        """ """
 
     def test_read_data1(self) -> None:
         # Load test data.

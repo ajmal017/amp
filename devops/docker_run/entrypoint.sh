@@ -23,7 +23,7 @@ if [ -z "$AM_ENABLE_DIND" ]; then
 fi;
 
 if [[ $AM_ENABLE_DIND == 1 ]]; then
-    echo "# Setting up Docker-in-docker"
+    echo "# Set up Docker-in-docker"
     if [[ ! -d /etc/docker ]]; then
         sudo mkdir /etc/docker
     fi;
@@ -63,10 +63,35 @@ if [[ $AM_ENABLE_DIND == 1 ]]; then
     done
 fi;
 
-
 # Mount other file systems.
 # mount -a || true
 # sudo change perms to /mnt/tmpfs
+
+# Check privileged mode.
+echo "# Check privileged mode"
+# Use the approach from https://stackoverflow.com/questions/32144575
+cmd="ip link add dummy0 type dummy"
+# Get the error code without failing.
+rc=$(($cmd >/dev/null 2>&1; echo $?) || true)
+echo "rc=$rc"
+if [[ $rc -eq 0 ]]; then
+    AM_DOCKER_HAS_PRIVILEGED_MODE=True
+    # clean the dummy0 link
+    ip link delete dummy0 >/dev/null
+else
+    AM_DOCKER_HAS_PRIVILEGED_MODE=""
+fi
+echo "AM_DOCKER_HAS_PRIVILEGED_MODE=$AM_DOCKER_HAS_PRIVILEGED_MODE"
+
+# Check git.
+VAL=$(git --version)
+echo "git --version: $VAL"
+# TODO(gp): Check https://github.com/alphamatic/amp/issues/2200#issuecomment-1101756708
+git config --global --add safe.directory /app
+if [[ -d /app/amp ]]; then
+    git config --global --add safe.directory /app/amp
+fi;
+git rev-parse --show-toplevel
 
 # Check set-up.
 ./devops/docker_run/test_setup.sh
@@ -111,6 +136,8 @@ echo "helpers: $VAL"
 echo "PATH=$PATH"
 echo "PYTHONPATH=$PYTHONPATH"
 echo "entrypoint.sh: '$@'"
+
+invoke print_env
 
 # TODO(gp): eval seems to be more general, but it creates a new executable.
 eval "$@"

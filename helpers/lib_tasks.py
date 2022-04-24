@@ -8,6 +8,7 @@ import datetime
 import functools
 import glob
 import grp
+import io
 import json
 import logging
 import os
@@ -16,6 +17,7 @@ import pwd
 import re
 import stat
 import sys
+import yaml
 from typing import Any, Dict, Iterator, List, Match, Optional, Set, Tuple, Union
 
 import tqdm
@@ -429,6 +431,15 @@ def print_tasks(ctx, as_code=False):  # type: ignore
         print("\n".join([f"{fn}," for fn in func_names]))
     else:
         print("\n".join(func_names))
+
+
+@task
+def print_env(ctx):  # type: ignore
+    """
+    Print the repo configuration.
+    """
+    _ = ctx
+    print(hversio.env_to_str())
 
 
 # #############################################################################
@@ -2064,17 +2075,6 @@ def docker_login(ctx):  # type: ignore
 # - amp as submodule / as supermodule
 # - different supermodules for amp
 
-
-# TODO(gp): The right approach is to programmatically generate a docker-compose
-#  file for each of the combination, instead of using the combination of multiple
-#  docker compose.
-#  For now we will copy / paste all the files.
-
-
-import io
-
-import yaml
-
 # TODO(gp): use_privileged_mode -> use_docker_privileged_mode
 #  use_sibling_container -> use_docker_containers_containers
 
@@ -2110,10 +2110,17 @@ def _generate_compose_file(
         am_enable_dind = 1
     else:
         am_enable_dind = 0
+    # sysname='Linux'
+    # nodename='cf-spm-dev4'
+    # release='3.10.0-1160.53.1.el7.x86_64'
+    # version='#1 SMP Fri Jan 14 13:59:45 UTC 2022'
+    # machine='x86_64'
+    am_host_os_name = os.uname()[0]
+    am_host_name = os.uname()[1]
     # We could do the same also with IMAGE for symmetry.
     # Use % instead of f-string since `${IMAGE}` confuses f-string as a variable.
-    txt_tmp = (
-        """
+    # Keep the env vars in sync with what we print in entrypoint.sh.
+    txt_tmp = """
     version: '3'
 
     services:
@@ -2128,6 +2135,8 @@ def _generate_compose_file(
           - AM_PUBLISH_NOTEBOOK_LOCAL_PATH=$AM_PUBLISH_NOTEBOOK_LOCAL_PATH
           - AM_S3_BUCKET=$AM_S3_BUCKET
           - AM_TELEGRAM_TOKEN=$AM_TELEGRAM_TOKEN
+          - AM_HOST_NAME=%s
+          - AM_HOST_OS_NAME=%s
           - AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
           - AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION
           - AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
@@ -2135,8 +2144,10 @@ def _generate_compose_file(
           # This env var is used by GH Action to signal that we are inside the CI.
           - CI=$CI
         image: ${IMAGE}
-    """
-        % am_enable_dind
+    """ % (
+        am_enable_dind,
+        am_host_name,
+        am_host_os_name,
     )
     indent_level = 0
     append(txt_tmp, indent_level)
@@ -2270,7 +2281,7 @@ def _generate_compose_file(
         indent_level = 1
         append(txt_tmp, indent_level)
     # Save file.
-    txt = "\n".join(txt)
+    txt: str = "\n".join(txt)
     if file_name:
         hio.to_file(file_name, txt)
     # Sanity check of the YAML file.
@@ -2634,7 +2645,7 @@ def _get_docker_base_cmd(
     extra_env_vars: Optional[List[str]],
     extra_docker_compose_files: Optional[List[str]],
 ) -> List[str]:
-    """
+    r"""
     Get base `docker-compose` command encoded as a list of strings.
 
     It can be used as a base to build more complicated commands, e.g., `run`, `up`, `down`.
@@ -6027,30 +6038,40 @@ def fix_perms(  # type: ignore
     _ = ctx
     _report_task()
     #
-    if action == "all":
-        action = ["fix_invalid_owner", "fix_group", "fix_group_permissions"]
+    if hgit.execute_repo_config_code("is_dev4()"):
+        if action == "all":
+            action = ["fix_invalid_owner", "fix_group", "fix_group_permissions"]
+        else:
+            action = [action]
+        #
+        file_name1 = "./tmp.fix_perms.before.txt"
+        _save_dir_status(dir_name, file_name1)
+        #
+        if "print_stats" in action:
+            _compute_stats_by_user_and_group(dir_name)
+        if "print_problems" in action:
+            _print_problems(dir_name)
+        if "fix_invalid_owner" in action:
+            _fix_invalid_owner(dir_name, fix, abort_on_error)
+        if "fix_group" in action:
+            _fix_group(dir_name, fix, abort_on_error)
+        if "fix_group_permissions" in action:
+            _fix_group_permissions(dir_name, abort_on_error)
+        #
+        file_name2 = "./tmp.fix_perms.after.txt"
+        _save_dir_status(dir_name, file_name2)
+        #
+        cmd = f"To compare run:\n> vimdiff {file_name1} {file_name2}"
+        print(cmd)
+    elif hgit.execute_repo_config_code("is_dev1()"):
+        user = hsystem.get_user_name()
+        group = user
+        cmd = f"sudo chown -R {user}:{group} *"
+        hsystem.system(cmd)
+        cmd = f"sudo chown -R {user}:{group} .pytest_cache"
+        hsystem.system(cmd, abort_on_error=False)
     else:
-        action = [action]
-    #
-    file_name1 = "./tmp.fix_perms.before.txt"
-    _save_dir_status(dir_name, file_name1)
-    #
-    if "print_stats" in action:
-        _compute_stats_by_user_and_group(dir_name)
-    if "print_problems" in action:
-        _print_problems(dir_name)
-    if "fix_invalid_owner" in action:
-        _fix_invalid_owner(dir_name, fix, abort_on_error)
-    if "fix_group" in action:
-        _fix_group(dir_name, fix, abort_on_error)
-    if "fix_group_permissions" in action:
-        _fix_group_permissions(dir_name, abort_on_error)
-    #
-    file_name2 = "./tmp.fix_perms.after.txt"
-    _save_dir_status(dir_name, file_name2)
-    #
-    cmd = f"To compare run:\n> vimdiff {file_name1} {file_name2}"
-    print(cmd)
+        raise ValueError(f"Invalid machine {os.uname()[1]}")
 
 
 # TODO(gp): Add gh_open_pr to jump to the PR from this branch.
