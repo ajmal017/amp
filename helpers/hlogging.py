@@ -347,7 +347,7 @@ def _get_logging_format(
     The logging format can be:
     - print: looks like a `print` statement
 
-    :param force_print_form: force to use the non-verbose format
+    :param force_print_format: force to use the non-verbose format
     :param force_verbose_format: force to use the verbose format
     """
     if _is_running_in_ipynb() and not force_no_warning:
@@ -483,8 +483,8 @@ class CustomFormatter(logging.Formatter):
         self._date_fmt = self._get_date_format(date_format_mode)
         #
         try:
-            # TODO(gp): Automatically detect the time zone. It might be complicated in
-            #  Docker.
+            # TODO(gp): Automatically detect the time zone. It might be complicated
+            #  in Docker.
             from dateutil import tz
 
             self._tzinfo = tz.gettz("America/New_York")
@@ -666,6 +666,10 @@ def set_v2_formatter(
     if verbose_format:
         # Force to report memory / CPU usage.
         # report_memory_usage = report_cpu_usage = True
+        print(
+            "report_memory_usage=%s report_cpu_usage=%s"
+            % (report_memory_usage, report_cpu_usage)
+        )
         formatter: Union[logging.Formatter, CustomFormatter] = CustomFormatter(
             report_memory_usage=report_memory_usage,
             report_cpu_usage=report_cpu_usage,
