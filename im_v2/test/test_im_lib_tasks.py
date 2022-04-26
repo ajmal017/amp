@@ -104,7 +104,7 @@ class TestGetImDockerUp(hunitest.TestCase):
         self.assert_equal(actual, expected, fuzzy_match=True, purify_text=True)
 
 
-@pytest.mark.skip("CMTask #789.")
+@pytest.mark.skip("CMTask789 'Refactor db invokes and move them out from im'")
 class TestGetCreateDbCmd(hunitest.TestCase):
     def test1(self) -> None:
         """
@@ -178,7 +178,7 @@ class TestGetCreateDbCmd(hunitest.TestCase):
         self.assert_equal(actual, expected, fuzzy_match=True, purify_text=True)
 
 
-@pytest.mark.skip("CMTask #789.")
+@pytest.mark.skip("CMTask789 'Refactor db invokes and move them out from im'")
 class TestGetRemoveDbCmd(hunitest.TestCase):
     def test1(self) -> None:
         """

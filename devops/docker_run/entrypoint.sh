@@ -67,22 +67,6 @@ fi;
 # mount -a || true
 # sudo change perms to /mnt/tmpfs
 
-# Check privileged mode.
-echo "# Check privileged mode"
-# Use the approach from https://stackoverflow.com/questions/32144575
-cmd="ip link add dummy0 type dummy"
-# Get the error code without failing.
-rc=$(($cmd >/dev/null 2>&1; echo $?) || true)
-echo "rc=$rc"
-if [[ $rc -eq 0 ]]; then
-    AM_DOCKER_HAS_PRIVILEGED_MODE=True
-    # clean the dummy0 link
-    ip link delete dummy0 >/dev/null
-else
-    AM_DOCKER_HAS_PRIVILEGED_MODE=""
-fi
-echo "AM_DOCKER_HAS_PRIVILEGED_MODE=$AM_DOCKER_HAS_PRIVILEGED_MODE"
-
 # Check git.
 VAL=$(git --version)
 echo "git --version: $VAL"

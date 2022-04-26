@@ -2084,12 +2084,14 @@ def _generate_compose_file(
     use_sibling_container: bool,
     use_shared_cache: bool,
     mount_as_submodule: bool,
+    use_network_mode_host: bool,
     file_name: Optional[str],
 ) -> str:
     _LOG.debug(
         hprint.to_str(
             "use_privileged_mode use_sibling_container "
-            "use_shared_cache mount_as_submodule file_name"
+            "use_shared_cache mount_as_submodule use_network_mode_host "
+            "file_name"
         )
     )
     txt = []
@@ -2238,7 +2240,11 @@ def _generate_compose_file(
           volumes:
             - ../../:/app
         """
-    if False:
+    # This is at the level of `services`.
+    indent_level = 1
+    append(txt_tmp, indent_level)
+    #
+    if use_network_mode_host:
         txt_tmp = """
         # Default network mode set to host so we can reach e.g.
         # a database container pointing to localhost:5432.
@@ -2246,9 +2252,9 @@ def _generate_compose_file(
         # See CmTask988 and https://stackoverflow.com/questions/24319662
         network_mode: ${NETWORK_MODE:-host}
         """
-    # This is at the level of `services`.
-    indent_level = 1
-    append(txt_tmp, indent_level)
+        # This is at the level of `services/app`.
+        indent_level = 2
+        append(txt_tmp, indent_level)
     #
     if True:
         txt_tmp = """
@@ -2350,14 +2356,12 @@ def _get_docker_compose_paths(
             mount_as_submodule = True
     # Write Docker compose file.
     file_name = get_base_docker_compose_path()
-    use_privileged_mode = get_default_param("USE_PRIVILEGED_MODE")
-    use_sibling_container = get_default_param("USE_SIBLING_CONTAINER")
-    use_shared_cache = get_default_param("USE_SHARED_CACHE")
     _generate_compose_file(
-        use_privileged_mode,
-        use_sibling_container,
-        use_shared_cache,
+        hgit.execute_repo_config_code("enable_privileged_mode()"),
+        hgit.execute_repo_config_code("use_docker_sibling_containers()"),
+        hgit.execute_repo_config_code("use_docker_shared_cache()"),
         mount_as_submodule,
+        hgit.execute_repo_config_code("use_docker_network_mode_host()"),
         file_name,
     )
     docker_compose_files.append(file_name)
@@ -5619,6 +5623,9 @@ def _get_gh_issue_title(issue_id: int, repo_short_name: str) -> Tuple[str, str]:
     #
     title = title.replace(" ", "_")
     title = title.replace("-", "_")
+    title = title.replace("'", "_")
+    title = title.replace("`", "_")
+    title = title.replace('"', "_")
     # Add the prefix `AmpTaskXYZ_...`
     task_prefix = hgit.get_task_prefix_from_repo_short_name(repo_short_name)
     _LOG.debug("task_prefix=%s", task_prefix)
@@ -5876,9 +5883,9 @@ def _print_problems(dir_name: str = ".") -> None:
     """
     _, _, file_to_user_group = _compute_stats_by_user_and_group(dir_name)
     user = hsystem.get_user_name()
-    docker_user = get_default_param("DOCKER_USER")
+    docker_user = hgit.execute_repo_config_code("get_docker_user()")
     # user_group = f"{user}_g"
-    # shared_group = get_default_param("SHARED_GROUP")
+    # shared_group = hgit.execute_repo_config_code("get_docker_shared_group()")
     files_with_problems = []
     for file, (curr_user, curr_group) in file_to_user_group.items():
         _ = curr_user, curr_group
@@ -5937,7 +5944,7 @@ def _fix_invalid_owner(dir_name: str, fix: bool, abort_on_error: bool) -> None:
     _, _, file_to_user_group = _compute_stats_by_user_and_group(dir_name)
     #
     user = hsystem.get_user_name()
-    docker_user = get_default_param("DOCKER_USER")
+    docker_user = hgit.execute_repo_config_code("get_docker_user()")
     for file, (curr_user, _) in tqdm.tqdm(file_to_user_group.items()):
         if curr_user not in (user, docker_user):
             _LOG.info("Fixing file '%s'", file)
@@ -5964,7 +5971,7 @@ def _fix_group(dir_name: str, fix: bool, abort_on_error: bool) -> None:
         # Get the user and the group.
         user = hsystem.get_user_name()
         user_group = f"{user}_g"
-        shared_group = get_default_param("SHARED_GROUP")
+        shared_group = hgit.execute_repo_config_code("get_docker_shared_group()")
         #
         for file, (curr_user, curr_group) in file_to_user_group.items():
             # If the group is the shared group there is nothing to do.

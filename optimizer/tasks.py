@@ -39,10 +39,6 @@ default_params = {
     # "BASE_IMAGE": "opt_tmp",
     "BASE_IMAGE": "opt",
     "DEV_TOOLS_IMAGE_PROD": f"{ECR_BASE_PATH}/dev_tools:prod",
-    # "USE_ONLY_ONE_DOCKER_COMPOSE": True,
-    "USE_PRIVILEGED_MODE": True,
-    "USE_SIBLING_CONTAINER": False,
-    "USE_SHARED_CACHE": False,
 }
 
 

@@ -2,6 +2,7 @@
 Contain info specific of `//amp` repo.
 """
 
+import functools
 import logging
 import os
 from typing import Dict, List
@@ -104,7 +105,10 @@ def is_dev1() -> bool:
     # version='Darwin Kernel Version 19.6.0: Mon Aug 31 22:12:52 PDT 2020; root:xnu-6153.141.2~1/RELEASE_X86_64'
     # machine='x86_64'
     host_name = os.uname()[1]
-    is_dev1_ = host_name == "dev1"
+    dev1 = "dev1"
+    am_host_name = os.environ.get("AM_HOST_NAME")
+    _LOG.debug("host_name=%s am_host_name=%s", host_name, am_host_name)
+    is_dev1_ = host_name == dev1 or am_host_name == dev1
     return is_dev1_
 
 
@@ -130,38 +134,91 @@ def is_mac() -> bool:
     return is_mac_
 
 
-def has_docker_sudo() -> bool:
+def _raise_invalid_host() -> None:
+    host_os_name = os.uname()[0]
+    am_host_os_name = os.environ.get("AM_HOST_OS_NAME")
+    raise ValueError(f"Don't recognize host: host_os_name={host_os_name}, "
+        f"am_host_os_name={am_host_os_name}")
+
+
+def enable_privileged_mode() -> bool:
+    """
+    Return whether an host supports privileged mode for its containers.
+    """
     if is_mac():
         val = True
     elif is_dev1():
         val = True
-    else:
+    elif is_dev4():
         val = False
+    elif is_inside_ci():
+        val = True
+    else:
+        _raise_invalid_host()
+    return val
+
+
+def has_docker_sudo() -> bool:
+    """
+    Return whether commands should be run with sudo or not.
+    """
+    if is_dev1():
+        val = False
+    elif is_dev4():
+        val = False
+    elif is_inside_ci():
+        val = False
+    elif is_mac():
+        val = True
+    else:
+        _raise_invalid_host()
     return val
 
 
 # TODO(gp): -> has_docker_privileged_mode
+@functools.lru_cache()
 def has_dind_support() -> bool:
     """
-    Return whether this repo image supports Docker-in-Docker.
+    Return whether the current container supports privileged mode.
+
+    This is need to use Docker-in-Docker.
     """
-    # `//amp` is executed on systems that can or cannot run Docker in privileged
-    # mode.
+    if not is_inside_docker():
+        # Outside Docker there is no privileged mode.
+        return False
     # Thus we rely on the approach from https://stackoverflow.com/questions/32144575
     # checking if we can execute.
-    # This is equivalent to the env var `AM_DOCKER_HAS_PRIVILEGED_MODE`.
+    # Sometimes there is some state left, so we need to clean it up.
+    cmd = "ip link delete dummy0 >/dev/null 2>&1"
+    if is_mac() or is_dev1():
+        cmd = f"sudo {cmd}"
+    os.system(cmd)
+    #
     cmd = "ip link add dummy0 type dummy >/dev/null 2>&1"
-    if is_inside_docker() and has_docker_sudo():
-        cmd = "sudo " + cmd
+    if is_mac() or is_dev1():
+        cmd = f"sudo {cmd}"
     rc = os.system(cmd)
     has_dind = rc == 0
+    # Clean up, after the fact.
+    cmd = "ip link delete dummy0 >/dev/null 2>&1"
+    if is_mac() or is_dev1():
+        cmd = f"sudo {cmd}"
+    rc = os.system(cmd)
+    # dind is supported on both Mac and GH Actions.
+    if True:
+        if is_mac() or is_dev1() or is_inside_ci():
+            assert has_dind, "Expected privileged mode"
+        elif is_dev4():
+            assert not has_dind, "Not expected privileged mode"
+        else:
+            _raise_invalid_host()
     return has_dind
 
 
 def use_docker_sibling_containers() -> bool:
     """ """
-    # Typically we use either sibling or children containers.
-    val = not has_dind_support()
+    # TODO(gp): We should enable it for dev4.
+    val = False
     return val
 
 
@@ -174,9 +231,19 @@ def use_docker_shared_cache() -> bool:
     return val
 
 
+def use_docker_network_mode_host() -> bool:
+    if is_mac() or is_dev1():
+        ret = True
+    else:
+        ret = False
+    return ret
+
+
 def run_docker_as_root() -> bool:
     """
     Return whether Docker should be run with root user.
+
+    I.e., adding `--user $(id -u):$(id -g)` to docker compose or not.
     """
     if is_inside_ci():
         # When running as user in GH action we get an error:
@@ -186,15 +253,17 @@ def run_docker_as_root() -> bool:
         # see https://github.com/alphamatic/amp/issues/1864
         # So we run as root in GH actions.
         res = True
+    elif is_dev4():
+        # //lime runs on a system with Docker remap which assumes we don't
+        # specify user credentials.
+        res = True
+    elif is_dev1():
+        # On dev1 we run as users specifying the user / group id as outside.
+        res = False
+    elif is_mac():
+        res = False
     else:
-        if is_dev4():
-            # //lime runs on a system with Docker remap which assumes we don't
-            # specify user credentials.
-            res = True
-        else:
-            # In //amp we run as users specifying the user / group id as
-            # outside.
-            res = True
+        _raise_invalid_host()
     return res
 
 
@@ -209,7 +278,7 @@ def get_docker_user() -> str:
     return val
 
 
-def get_docker_shared_user() -> str:
+def get_docker_shared_group() -> str:
     """
     Return the group of the user running Docker, if any.
     """
@@ -255,25 +324,28 @@ def config_func_to_str() -> str:
     Print the value of all the config functions.
     """
     ret: List[str] = []
-    for func_name in [
-        "get_name",
-        "get_repo_map",
+    for func_name in sorted([
+        "get_docker_base_image_name",
+        "get_docker_user",
         "get_host_name",
         "get_invalid_words",
-        "get_docker_base_image_name",
+        "get_name",
+        "get_repo_map",
+        "has_dind_support",
+        "is_AM_S3_available",
+        "is_CK_S3_available",
         "is_dev1",
         "is_dev4",
         "is_inside_ci",
+        "is_inside_docker",
         "is_mac",
-        "has_dind_support",
-        "use_docker_sibling_containers",
-        "use_docker_shared_cache",
         "run_docker_as_root",
-        "get_docker_user",
-        "is_AM_S3_available",
-        "is_CK_S3_available",
-    ]:
+        "use_docker_shared_cache",
+        "use_docker_sibling_containers",
+        "use_docker_network_mode_host",
+    ]):
         try:
+            _LOG.debug("func_name=%s", func_name)
             func_value = eval("%s()" % func_name)
         except NameError:
             func_value = "*undef*"

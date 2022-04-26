@@ -33,9 +33,6 @@ def _get_default_params() -> Dict[str, str]:
         "ECR_BASE_PATH": ecr_base_path,
         "BASE_IMAGE": "amp_test",
         "DEV_TOOLS_IMAGE_PROD": f"{ecr_base_path}/dev_tools:prod",
-        "USE_PRIVILEGED_MODE": rconf.has_dind_support(),
-        "USE_SIBLING_CONTAINER": rconf.use_docker_sibling_containers(),
-        "USE_SHARED_CACHE": rconf.use_docker_shared_cache(),
     }
     return default_params
 
@@ -485,6 +482,7 @@ class Test_generate_compose_file1(hunitest.TestCase):
         use_sibling_container: bool = False,
         use_shared_cache: bool = False,
         mount_as_submodule: bool = False,
+        use_network_mode_host: bool = True,
     ) -> None:
         txt = []
         #
@@ -493,6 +491,7 @@ class Test_generate_compose_file1(hunitest.TestCase):
             "use_sibling_container",
             "use_shared_cache",
             "mount_as_submodule",
+            "use_network_mode_host",
         ]
         txt_tmp = hprint.to_str(" ".join(params))
         txt.append(txt_tmp)
@@ -503,6 +502,7 @@ class Test_generate_compose_file1(hunitest.TestCase):
             use_sibling_container,
             use_shared_cache,
             mount_as_submodule,
+            use_network_mode_host,
             file_name,
         )
         txt_tmp = hunitest.filter_text("AM_HOST_NAME|AM_HOST_OS_NAME", txt_tmp)
