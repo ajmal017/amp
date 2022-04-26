@@ -1,3 +1,4 @@
+import io
 import logging
 
 import numpy as np
@@ -87,3 +88,86 @@ class Test_gaussian_rank1(hunitest.TestCase):
 2022-01-04 11:15:00-05:00 -1.26   NaN  1.72   NaN   NaN -5.20   NaN  5.20  0.99  1.57
 2022-01-04 11:30:00-05:00  0.93   NaN  1.52   NaN  5.20 -5.20  2.51 -0.92   NaN   NaN"""
         self.assert_equal(actual_str, expected_str, fuzzy_match=True)
+
+
+class Test_gaussian_rank2(hunitest.TestCase):
+    @staticmethod
+    def get_data() -> pd.DataFrame:
+        df_str = """
+,100,200,300,400
+2016-01-04 16:00:00,3,5,32,-3
+2016-01-04 16:01:00,NaN,NaN,NaN,NaN
+2016-01-05 09:29:00,NaN,NaN,NaN,NaN
+2016-01-05 09:30:00,NaN,2,-4,8
+2016-01-05 09:31:00,2,NaN,-4,8
+2016-01-05 09:32:00,1,2,3,4
+"""
+        df = pd.read_csv(
+            io.StringIO(df_str),
+            index_col=0,
+            parse_dates=True,
+        )
+        return df
+
+    def helper(
+        self,
+        expected_str: str,
+        bulk_frac_to_remove: float,
+        bulk_fill_method: str,
+    ) -> None:
+        df = self.get_data()
+        actual = csprcrse.gaussian_rank(
+            df,
+            bulk_frac_to_remove=bulk_frac_to_remove,
+            bulk_fill_method=bulk_fill_method,
+            n_quantiles=3,
+        )
+        precision = 2
+        actual_str = hpandas.df_to_str(
+            actual.round(precision), num_rows=None, precision=precision
+        )
+        self.assert_equal(actual_str, expected_str, fuzzy_match=True)
+
+    def test_default(self) -> None:
+        expected_str = r"""
+                      100   200   300  400
+2016-01-04 16:00:00 -0.18  0.04  5.20 -5.2
+2016-01-04 16:01:00   NaN   NaN   NaN  NaN
+2016-01-05 09:29:00   NaN   NaN   NaN  NaN
+2016-01-05 09:30:00   NaN  0.00 -5.20  5.2
+2016-01-05 09:31:00  0.00   NaN -5.20  5.2
+2016-01-05 09:32:00 -5.20 -0.43  0.43  5.2"""
+        self.helper(expected_str, 0.0, "nan")
+
+    def test_nan(self) -> None:
+        expected_str = r"""
+                     100  200  300  400
+2016-01-04 16:00:00  NaN  NaN  5.2 -5.2
+2016-01-04 16:01:00  NaN  NaN  NaN  NaN
+2016-01-05 09:29:00  NaN  NaN  NaN  NaN
+2016-01-05 09:30:00  NaN  NaN -5.2  5.2
+2016-01-05 09:31:00  NaN  NaN -5.2  5.2
+2016-01-05 09:32:00 -5.2  NaN  NaN  5.2"""
+        self.helper(expected_str, 0.5, "nan")
+
+    def test_zero(self) -> None:
+        expected_str = r"""
+                     100  200  300  400
+2016-01-04 16:00:00  0.0  0.0  5.2 -5.2
+2016-01-04 16:01:00  NaN  NaN  NaN  NaN
+2016-01-05 09:29:00  NaN  NaN  NaN  NaN
+2016-01-05 09:30:00  NaN  0.0 -5.2  5.2
+2016-01-05 09:31:00  0.0  NaN -5.2  5.2
+2016-01-05 09:32:00 -5.2  0.0  0.0  5.2"""
+        self.helper(expected_str, 0.5, "zero")
+
+    def test_ffill(self) -> None:
+        expected_str = r"""
+                     100  200  300  400
+2016-01-04 16:00:00  NaN  NaN  5.2 -5.2
+2016-01-04 16:01:00  NaN  NaN  NaN  NaN
+2016-01-05 09:29:00  NaN  NaN  NaN  NaN
+2016-01-05 09:30:00  NaN  NaN -5.2  5.2
+2016-01-05 09:31:00  NaN  NaN -5.2  5.2
+2016-01-05 09:32:00 -5.2  NaN -5.2  5.2"""
+        self.helper(expected_str, 0.5, "ffill")
