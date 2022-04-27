@@ -26,6 +26,7 @@ import helpers.henv as henv
 import helpers.hgit as hgit
 import helpers.hio as hio
 import helpers.hprint as hprint
+import helpers.hsystem as hsystem
 
 _LOG = logging.getLogger(__name__)
 
@@ -101,7 +102,7 @@ def _get_container_version() -> Optional[str]:
     Return the container version.
     """
     container_version: Optional[str] = None
-    if hgit.execute_repo_config_code("is_inside_docker()"):
+    if hsystem.is_inside_docker():
         env_var = "AM_CONTAINER_VERSION"
         if env_var not in os.environ:
             # This can happen when GH Actions pull the image using invoke
