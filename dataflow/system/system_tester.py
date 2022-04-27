@@ -58,7 +58,7 @@ class SystemTester:
         dollar_neutrality: str = "no_constraint",
     ) -> Tuple[str, pd.Series]:
         actual = ["\n# forecast_evaluator signature=\n"]
-        forecast_evaluator = dtfmod.ForecastEvaluator(
+        forecast_evaluator = dtfmod.ForecastEvaluatorFromReturns(
             returns_col=returns_col,
             volatility_col=volatility_col,
             prediction_col=prediction_col,

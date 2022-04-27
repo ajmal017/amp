@@ -109,7 +109,7 @@ class ProcessForecasts(dtfcore.FitPredictNode):
         _LOG.info("log_dir=%s", log_dir)
         target_gmv = self._evaluate_forecasts_config["target_gmv"]
         returns_col = self._evaluate_forecasts_config["returns_col"]
-        forecast_evaluator = dtfmod.ForecastEvaluator(
+        forecast_evaluator = dtfmod.ForecastEvaluatorFromReturns(
             returns_col=returns_col,
             volatility_col=self._volatility_col,
             prediction_col=self._prediction_col,
