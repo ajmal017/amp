@@ -27,9 +27,12 @@ else
     echo "Inferred AWS setup"
     HOME_DIR=$DIR_NAME
   else
-    if [[ $SERVER_NAME == "cf-spm-dev4" ]]; then
-      HOME_DIR=$HOME
-    fi;
+    # Try lime setup.
+    DIR_NAME="/local/home/$USER"
+    if [[ -d $DIR_NAME ]]; then
+      echo "Inferred lime setup"
+      HOME_DIR=$DIR_NAME
+    fi;  
   fi;
 fi;
 
