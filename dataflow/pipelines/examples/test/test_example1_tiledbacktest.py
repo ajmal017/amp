@@ -16,7 +16,6 @@ class Test_Example1_TiledBacktest(dtfmrpmofl.TiledBacktest_TestCase):
     """
 
     @pytest.mark.superslow
-    @pytest.mark.skip("LimeTask416: Breaks_2022_03_28")
     def test1(self) -> None:
         """
         Run on a couple of asset ids for a single month.

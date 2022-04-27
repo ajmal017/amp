@@ -118,8 +118,8 @@ def _run_qa_tests(ctx: Any, stage: str, version: str) -> bool:
     """
     _ = ctx
     # The QA tests are in `qa_test_dir` and are marked with `qa_test_tag`.
-    # qa_test_dir = "test"
-    qa_test_dir = "test/test_tasks.py::TestExecuteTasks1::test_docker_bash"
+    qa_test_dir = "test"
+    #qa_test_dir = "test/test_tasks.py::TestExecuteTasks1::test_docker_bash"
     qa_test_tag = "qa and not superslow"
     cmd = f'pytest -m "{qa_test_tag}" {qa_test_dir} --image_stage {stage}'
     if version:

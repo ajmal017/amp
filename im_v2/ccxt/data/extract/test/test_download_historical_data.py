@@ -4,16 +4,11 @@ import unittest.mock as umock
 
 import pytest
 
-import helpers.hgit as hgit
 import helpers.hmoto as hmoto
 import helpers.hsystem as hsystem
 import im_v2.ccxt.data.extract.download_historical_data as imvcdedhda
 
 
-@pytest.mark.skipif(
-    not hgit.execute_repo_config_code("is_CK_S3_available()"),
-    reason="Need CK S3 support",
-)
 @pytest.mark.skipif(
     hsystem.is_inside_ci(),
     reason="Extend AWS authentication system CmTask #1292/1666.",
