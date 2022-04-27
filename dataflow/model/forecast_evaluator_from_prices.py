@@ -35,10 +35,11 @@ class ForecastEvaluatorFromPrices:
         Initialize column names.
 
         Note:
+        - the `price_col` is unadjusted price (no adjustment for splits,
+          dividends, or volatility)
+        - the `volatility_col` is used for position sizing
         - the `prediction_col` is a prediction of vol-adjusted returns
-        - the `price_col` is unadjusted
-        - by passing `volatility_col` explicitly, we can easily calculate PnL
-          at a specified GMV and under a dollar neutrality constraint
+          (presumably with volatility given by `volatility_col`)
 
         :param price_col: price per share
         :param volatility_col: volatility used for adjustment of forward returns
@@ -74,6 +75,7 @@ class ForecastEvaluatorFromPrices:
             files = hio.listdir(dir_name, pattern, only_files, use_relative_paths)
             files.sort()
             file_name = files[-1]
+            _LOG.info("`file_name`=%s", file_name)
         price = ForecastEvaluatorFromPrices._read_df(
             log_dir, "price", file_name, tz
         )
@@ -121,14 +123,10 @@ class ForecastEvaluatorFromPrices:
     def to_str(
         self,
         df: pd.DataFrame,
-        *,
-        target_gmv: Optional[Union[float, pd.Series]] = None,
-        dollar_neutrality: str = "no_constraint",
-        quantization: str = "no_quantization",
-        burn_in_bars: int = 0,
+        **kwargs,
     ) -> str:
         """
-        Return the state of the Portfolio in terms of the holdings as a string.
+        Return the state of the Portfolio as a string.
 
         :param df: as in `compute_portfolio`
         :param target_gmv: as in `compute_portfolio`
@@ -136,10 +134,7 @@ class ForecastEvaluatorFromPrices:
         """
         holdings, positions, flows, pnl, stats = self.compute_portfolio(
             df,
-            target_gmv=target_gmv,
-            dollar_neutrality=dollar_neutrality,
-            quantization=quantization,
-            burn_in_bars=burn_in_bars,
+            **kwargs,
         )
         act = []
         round_precision = 6
@@ -189,26 +184,17 @@ class ForecastEvaluatorFromPrices:
         self,
         df: pd.DataFrame,
         log_dir: str,
-        *,
-        target_gmv: Optional[Union[float, pd.Series]] = None,
-        dollar_neutrality: str = "no_constraint",
-        quantization: str = "no_quantization",
-        reindex_like_input: bool = False,
-        burn_in_bars: int = 3,
+        **kwargs,
     ) -> str:
         hdbg.dassert(log_dir, "Must specify `log_dir` to log portfolio.")
         holdings, position, flow, pnl, statistics = self.compute_portfolio(
             df,
-            target_gmv=target_gmv,
-            dollar_neutrality=dollar_neutrality,
-            quantization=quantization,
-            reindex_like_input=reindex_like_input,
-            burn_in_bars=burn_in_bars,
+            **kwargs,
         )
         last_timestamp = df.index[-1]
         hdbg.dassert_isinstance(last_timestamp, pd.Timestamp)
-        last_time_str = last_timestamp.strftime("%Y%m%d_%H%M%S")
-        file_name = f"{last_time_str}.csv"
+        last_timestamp_str = last_timestamp.strftime("%Y%m%d_%H%M%S")
+        file_name = f"{last_timestamp_str}.csv"
         #
         ForecastEvaluatorFromPrices._write_df(
             df[self._price_col], log_dir, "price", file_name
@@ -236,8 +222,9 @@ class ForecastEvaluatorFromPrices:
         self,
         df: pd.DataFrame,
         *,
-        target_gmv: Optional[float] = None,
-        dollar_neutrality: str = "no_constraint",
+        bulk_frac_to_remove: float = 0.0,
+        bulk_fill_method: str = "zero",
+        target_gmv: Union[float, pd.Series] = 1e6,
         quantization: str = "no_quantization",
         reindex_like_input: bool = False,
         burn_in_bars: int = 3,
@@ -248,14 +235,21 @@ class ForecastEvaluatorFromPrices:
         Compute target positions, PnL, and portfolio stats.
 
         :param df: multiindexed dataframe with predictions, returns, volatility
-        :param target_gmv: if `None`, then GMV may float
-        :param dollar_neutrality: enforce a hard dollar neutrality constraint
+        :param bulk_frac_to_remove: applied to predictions; as in
+            `csigproc.gaussian_rank()`
+        :param bulk_fill_method: applied to predictions; as in
+            `csigproc.gaussian_rank()`
+        :param target_gmv: a float (constant target GMV) or else a
+            `datetime.time` indexed `pd.Series` of GMVs (e.g., to simulate
+            intraday ramp-up/ramp-down)
         :param reindex_like_input: output dataframes to have the same input as
             `df` (e.g., including any weekends or values outside of the
             `start_time`-`end_time` range)
         :param quantization: indicate whether to round to nearest share, lot
-        :param reindex_like_input:
-        :param burn_in_bars:
+        :param reindex_like_input: if `False`, only return dataframes indexed
+            by the inferred "active index" of datetimes
+        :param burn_in_bars: number of leading bars to trim (to remove warm-up
+            artifacts)
         :return: (holdings, position, flow, pnl, stats)
         """
         self._validate_df(df)
@@ -275,8 +269,9 @@ class ForecastEvaluatorFromPrices:
             ForecastEvaluatorFromPrices._compute_target_positions_from_forecasts(
                 volatility_df,
                 prediction_df,
-                target_gmv=target_gmv,
-                dollar_neutrality=dollar_neutrality,
+                bulk_frac_to_remove,
+                bulk_fill_method,
+                target_gmv,
             )
         )
         # Compute target holdings.
@@ -310,12 +305,7 @@ class ForecastEvaluatorFromPrices:
     def annotate_forecasts(
         self,
         df: pd.DataFrame,
-        *,
-        target_gmv: Optional[Union[float, pd.Series]] = None,
-        dollar_neutrality: str = "no_constraint",
-        quantization: str = "no_quantization",
-        reindex_like_input: bool = True,
-        burn_in_bars: int = 3,
+        **kwargs,
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
         Wraps `compute_portfolio()`, returns a single multiindexed dataframe.
@@ -331,11 +321,7 @@ class ForecastEvaluatorFromPrices:
         """
         holdings, position, flow, pnl, statistics_df = self.compute_portfolio(
             df,
-            target_gmv=target_gmv,
-            dollar_neutrality=dollar_neutrality,
-            quantization=quantization,
-            reindex_like_input=reindex_like_input,
-            burn_in_bars=burn_in_bars,
+            **kwargs,
         )
         portfolio_df = ForecastEvaluatorFromPrices._build_multiindex_df(
             df[self._price_col],
@@ -349,6 +335,9 @@ class ForecastEvaluatorFromPrices:
         return portfolio_df, statistics_df
 
     def get_cols(self) -> List[str]:
+        """
+        Return the names of the price, volatility, and prediction columns.
+        """
         cols = [
             self._price_col,
             self._volatility_col,
@@ -427,58 +416,41 @@ class ForecastEvaluatorFromPrices:
     def _compute_target_positions_from_forecasts(
         volatility: pd.DataFrame,
         predictions: pd.DataFrame,
-        *,
-        target_gmv: Optional[Union[float, pd.Series]] = None,
-        dollar_neutrality: str = "no_constraint",
+        bulk_frac_to_remove: float,
+        bulk_fill_method: str,
+        target_gmv: Union[float, pd.Series],
     ) -> pd.DataFrame:
         """
         Compute target dollar positions based on forecasts, basic constraints.
         """
-        target_positions = predictions.divide(volatility)
+        if predictions.columns.size > 1:
+            gaussian_ranked = sigproc.gaussian_rank(
+                predictions,
+                bulk_frac_to_remove=bulk_frac_to_remove,
+                bulk_fill_method=bulk_fill_method,
+            )
+        else:
+            _LOG.info(
+                "Predictions provided for one asset; skipping Gaussian ranking."
+            )
+            gaussian_ranked = predictions
+        _LOG.debug(
+            "gaussian_ranked=\n%s",
+            hpandas.df_to_str(gaussian_ranked, num_rows=10),
+        )
+        target_position_signs = np.sign(gaussian_ranked)
+        _LOG.debug(
+            "target_position_signs=\n%s",
+            hpandas.df_to_str(target_position_signs, num_rows=10),
+        )
+        target_positions = target_position_signs.divide(volatility ** 2)
         _LOG.debug(
             "target_positions=\n%s",
-            hpandas.df_to_str(target_positions, num_rows=None),
-        )
-        target_positions = ForecastEvaluatorFromPrices._apply_dollar_neutrality(
-            target_positions, dollar_neutrality
+            hpandas.df_to_str(target_positions, num_rows=10),
         )
         target_positions = ForecastEvaluatorFromPrices._apply_gmv_scaling(
             target_positions, target_gmv
         )
-        return target_positions
-
-    @staticmethod
-    def _apply_dollar_neutrality(
-        target_positions: pd.DataFrame,
-        dollar_neutrality: str,
-    ) -> pd.DataFrame:
-        hdbg.dassert_isinstance(dollar_neutrality, str)
-        if dollar_neutrality == "no_constraint":
-            pass
-        elif dollar_neutrality == "gaussian_rank":
-            target_positions = sigproc.gaussian_rank(target_positions)
-        elif dollar_neutrality == "demean":
-            # Cross-sectionally demean signals on a per-bar basis.
-            # This is equivalent to a dollar neutralizing linear projection.
-            hdbg.dassert_lt(
-                1,
-                target_positions.shape[1],
-                "Unable to enforce dollar neutrality with a single asset.",
-            )
-            net_asset_value = target_positions.mean(axis=1)
-            _LOG.debug(
-                "net asset value=\n%s"
-                % hpandas.df_to_str(net_asset_value, num_rows=None)
-            )
-            target_positions = target_positions.subtract(net_asset_value, axis=0)
-            _LOG.debug(
-                "dollar neutral target_positions=\n%s"
-                % hpandas.df_to_str(target_positions, num_rows=None)
-            )
-        else:
-            raise ValueError(
-                "Unrecognized option `dollar_neutrality`=%s" % dollar_neutrality
-            )
         return target_positions
 
     @staticmethod
@@ -593,20 +565,13 @@ class ForecastEvaluatorFromPrices:
         # Drop rows with no prices (this is an approximate way to handle weekends,
         # market holidays, and shortened trading sessions).
         df = df.reindex(index=active_index)
-        # Forward fill to mitigate spurious artifacts at the portfolio bar
-        # level.
-        # TODO(Paul): Make this optional, or only apply to assets for which we
-        # have predictions (e.g., the universe may change over the time window
-        # of interest).
-        # df = df.ffill()
         return df
 
     def _compute_holdings_and_flows(
         self,
         price: pd.DataFrame,
         target_positions: pd.DataFrame,
-        *,
-        quantization: str = "no_quantization",
+        quantization: str,
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
         Compute holdings in shares from price and dollar position targets.
